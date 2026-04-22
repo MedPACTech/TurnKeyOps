@@ -1,0 +1,6 @@
+@MedInsights.API_HostAddress = http://localhost:5178
+
+GET {{MedInsights.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

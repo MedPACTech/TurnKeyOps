@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "AzureStorageSettings:ConnectionString": "UseDevelopmentStorage=true",
+    "AzureStorageSettings:AudioTranscriptionQueueName": "audio-transcription-jobs",
+    "AzureSpeechSettings:Key": "61QGAFoswuL4fOVxRfrktM755WCQ4emHJHfO9Ygt8HVti4N6K0aUJQQJ99BIACYeBjFXJ3w3AAAYACOGzlAy",
+    "AzureSpeechSettings:Region": "eastus"
+  }
+}

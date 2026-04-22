@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+  <TargetFramework>net10.0</TargetFramework>
+  <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <PackageReference Include="IBeam.Communications.Sms.AzureCommunications" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Communications.Email.AzureCommunications" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Identity.Api" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Identity.Services" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Identity" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Identity.Repositories.AzureTable" Version="$(IBeamVersion)" />
+    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.48.2" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="OpenAI" Version="2.9.1" />
+    <PackageReference Include="Polly" Version="8.6.5" />
+    <PackageReference Include="Stripe.net" Version="50.3.0" />
+    <PackageReference Include="Xabe.FFmpeg" Version="6.0.2" />
+    <PackageReference Include="PdfPig" Version="0.1.13" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.*" />
+    <PackageReference Include="Tesseract" Version="5.*" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.*" />
+    <PackageReference Include="AngleSharp" Version="1.4.0" />
+    <PackageReference Include="Mime-Detective" Version="25.8.1" />
+    <PackageReference Include="System.IO.Packaging" Version="10.0.3" />
+    <PackageReference Include="PDFiumSharpV2" Version="1.1.4" />
+    <PackageReference Include="bblanchon.PDFium.Win32" Version="147.0.7699" />
+    <PackageReference Include="bblanchon.PDFium.macOS" Version="147.0.7699" />
+    <PackageReference Include="Azure.Storage.Queues" Version="12.25.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TurnKeyOps.AzureServices\TurnKeyOps.AzureServices.csproj" />
+    <ProjectReference Include="..\TurnKeyOps.Lib\TurnKeyOps.Lib.csproj" />
+    <ProjectReference Include="..\TurnKeyOps.Repositories\TurnKeyOps.Repositories.csproj" />
+    <ProjectReference Include="..\Transcription.Core\Transcription.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+  <!-- Copy tessdata to build output and publish output -->
+  <None Include="Tessdata\**\*">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    <Pack>true</Pack>
+    <PackagePath>Tessdata</PackagePath>
+  </None>
+</ItemGroup>
+
+</Project>

@@ -1,0 +1,12 @@
+trigger: none
+pr: none
+
+extends:
+  template: templates/api-deploy.yml
+  parameters:
+    environmentName: 'Production'
+    buildConfiguration: 'Release'
+    webAppName: 'prod-medinsights-api'
+    azureSubscription: 'Qurvia / MedInsights Production'
+    resourceGroupName: 'production'
+    deployBranchPrimary: 'main'

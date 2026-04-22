@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Data.Tables" Version="12.11.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.9" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+    <PackageReference Include="TimeZoneConverter" Version="7.2.0" />
+    <PackageReference Include="Mime-Detective" Version="25.8.1" />
+    <PackageReference Include="IBeam.Repositories" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Repositories.AzureTables" Version="$(IBeamVersion)" />
+  </ItemGroup>
+
+</Project>

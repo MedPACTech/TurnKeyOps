@@ -1,0 +1,16 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+appsettings.*.json
+!appsettings.json
+node_modules/
+.svelte-kit/
+build/
+dist/
+.env
+.env.*
+.DS_Store
+**/.DS_Store
+**/.nuget/

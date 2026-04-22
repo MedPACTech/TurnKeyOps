@@ -1,0 +1,21 @@
+[
+  {
+  "PartitionKey": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "RowKey": "a34c6f6c-dec6-44ba-b5aa-a42b1f69b46a",
+  "ApplicationUserId": "2fce0746-e41b-4a01-91a8-5dfecce27dd6",
+  "IsActive": "true",
+  "FirstName": "Christian",
+  "LastName": "Armstrong",
+  "PrimaryPhone": "string",
+  "PrimaryEmail": "string",
+  "SecondaryPhone": "string",
+  "SecondaryEmail": "string",
+  "AddressLine1": "string",
+  "AddressLine2": "string",
+  "City": "string",
+  "State": "string",
+  "PostalCode": "string",
+  "Title": "string",
+  "Suffix": "string"
+  }
+]

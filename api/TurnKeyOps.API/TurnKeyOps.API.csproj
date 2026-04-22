@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>TurnKeyOps.API-Local</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IBeam.Communications" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Communications.Sms.AzureCommunications" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Communications.Email.AzureCommunications" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Identity.Repositories.AzureTable" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Identity.Services" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Identity.Api" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Identity" Version="$(IBeamVersion)" />
+    <PackageReference Include="IBeam.Repositories.AzureTables" Version="$(IBeamVersion)" />
+    <PackageReference Include="Azure.Data.Tables" Version="12.11.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
+    <!-- <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.1" /> -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Caching.SqlServer" Version="10.0.3" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+    <PackageReference Include="Stripe.net" Version="50.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TurnKeyOps.Lib\TurnKeyOps.Lib.csproj" />
+    <ProjectReference Include="..\TurnKeyOps.Repositories\TurnKeyOps.Repositories.csproj" />
+    <ProjectReference Include="..\TurnKeyOps.Services\TurnKeyOps.Services.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="artifacts\**" />
+    <None Remove="artifacts\**" />
+    <None Update="Templates\EnrollmentEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\PasswordResetEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\QurviaEmailConfirm.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\QurviaPasswordReset.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\RegistrationEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\QurviaWelcomeEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <IBeamVersion Condition="'$(IBeamVersion)' == ''">2.0.32</IBeamVersion>
+    <RestorePackagesPath Condition="'$(RestorePackagesPath)' == ''">$(UserProfile)\.nuget\packages</RestorePackagesPath>
+  </PropertyGroup>
+</Project>

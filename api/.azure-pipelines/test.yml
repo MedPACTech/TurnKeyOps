@@ -1,0 +1,16 @@
+trigger:
+  branches:
+    include:
+    - test
+
+pr: none
+
+extends:
+  template: templates/api-deploy.yml
+  parameters:
+    environmentName: 'Test'
+    buildConfiguration: 'Debug'
+    webAppName: 'test-medinsights-api'
+    azureSubscription: 'Qurvia / MedInsights Test'
+    resourceGroupName: 'test'
+    deployBranchPrimary: 'test'

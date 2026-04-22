@@ -1,0 +1,66 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IBeam.Communications.Email.Templating" Version="1.*-dev*" />
+    <PackageReference Include="IBeam.Communications.Sms.AzureCommunications" Version="1.*-dev*" />
+    <PackageReference Include="IBeam.Communications.Email.AzureCommunications" Version="1.*-dev*" />
+    <PackageReference Include="IBeam.Identity.Abstractions" Version="1.*-dev*" />
+    <PackageReference Include="IBeam.Identity.Repositories.AzureTable" Version="1.*-dev*" />
+    <PackageReference Include="IBeam.Identity.Services" Version="1.*-dev*" />
+    <PackageReference Include="Azure.Data.Tables" Version="12.11.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.19" />
+    <!-- <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.1" /> -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Caching.SqlServer" Version="8.0.8" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.*">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../MedPACTech.Identity.SqliteMigrations/MedPACTech.Identity.SqliteMigrations.csproj" />
+    <ProjectReference Include="../MedPACTech.Identity.SqlServerMigrations/MedPACTech.Identity.SqlServerMigrations.csproj" />
+    <ProjectReference Include="..\MedInsights.Lib\MedInsights.Lib.csproj" />
+    <ProjectReference Include="..\MedInsights.Repositories\MedInsights.Repositories.csproj" />
+    <ProjectReference Include="..\MedInsights.Services\MedInsights.Services.csproj" />
+    <ProjectReference Include="..\MedPACTech.Identity\MedPACTech.Identity.csproj" />
+    <ProjectReference Include="..\MedPACTech.System.Services\MedPACTech.System.Services.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Templates\EnrollmentEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\PasswordResetEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\QurviaEmailConfirm.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\QurviaPasswordReset.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\RegistrationEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\QurviaWelcomeEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Tools\ffmpeg\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Tools/ffmpeg/mac/" />
+  </ItemGroup>
+
+</Project>
