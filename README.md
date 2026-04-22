@@ -1,13 +1,14 @@
 # TurnKeyOps
 
-Unified TurnKeyOps monorepo for the API and admin applications.
+Unified TurnKeyOps monorepo for the API, admin, and client applications.
 
 ## Structure
 
 ```
 TurnKeyOps/
 ├── api/    # ASP.NET Core backend
-└── admin/  # SvelteKit frontend
+├── admin/  # Internal admin app
+└── client/ # Public-facing client site
 ```
 
 ## Quick Start
@@ -27,6 +28,13 @@ npm run dev
 # → http://localhost:5173
 ```
 
+### Client
+```bash
+cd client
+npm install
+npm run dev
+```
+
 ### Local Storage (Azurite)
 ```bash
 npm install -g azurite
@@ -37,4 +45,5 @@ azurite --silent --location .azurite --debug .azurite/debug.log
 
 - `api/` was consolidated from the previous `turnkeyops-api` repository.
 - `admin/` was consolidated from the previous `turnkeyops-client` repository and renamed from `frontend/`.
-- I did not find separate local `platform` or `client` repositories in the workspace during consolidation.
+- `client/` was added from the older `turnkeyops-client` app that contains the public-facing site foundation.
+- I did not find a separate local `platform` repository in the workspace during consolidation.
