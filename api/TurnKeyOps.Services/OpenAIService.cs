@@ -91,6 +91,7 @@ namespace MedInsights.Services
 
             // 🔧 Keeps tool call state across updates
             var toolCallState = new Dictionary<string, ToolCallAccumulator>();
+            var toolCallKeyByIndex = new Dictionary<int, string>();
             string? lastToolCallKey = null;
 
             await foreach (var update in stream.WithCancellation(ct))
@@ -115,28 +116,28 @@ namespace MedInsights.Services
                     {
                         var rawId = toolUpdate.ToolCallId;
                         var rawName = toolUpdate.FunctionName;
+                        var index = toolUpdate.Index;
 
-                        // Decide which key to use
-                        string key;
-                        if (!string.IsNullOrEmpty(rawId))
+                        var key = SelectToolCallKey(
+                            index,
+                            rawId,
+                            rawName,
+                            toolCallKeyByIndex,
+                            ref lastToolCallKey,
+                            out var rebasedFromKey);
+
+                        // Guard: ignore orphaned continuation chunks with no stable key.
+                        if (string.IsNullOrEmpty(key))
+                            continue;
+
+                        // If we initially keyed by index, then a later update provides an id,
+                        // move accumulated args under the canonical id key.
+                        if (!string.IsNullOrEmpty(rebasedFromKey)
+                            && toolCallState.TryGetValue(rebasedFromKey, out var rebasedAcc)
+                            && !toolCallState.ContainsKey(key))
                         {
-                            key = rawId;
-                            lastToolCallKey = key;
-                        }
-                        else if (!string.IsNullOrEmpty(rawName))
-                        {
-                            key = $"fn::{rawName}";
-                            lastToolCallKey = key;
-                        }
-                        else if (!string.IsNullOrEmpty(lastToolCallKey))
-                        {
-                            // No id and no name → continuation of the last tool call
-                            key = lastToolCallKey;
-                        }
-                        else
-                        {
-                            key = $"tool_call::{toolCallState.Count}";
-                            lastToolCallKey = key;
+                            toolCallState.Remove(rebasedFromKey);
+                            toolCallState[key] = rebasedAcc;
                         }
 
                         if (!toolCallState.TryGetValue(key, out var acc))
@@ -482,6 +483,53 @@ namespace MedInsights.Services
                 FunctionName = functionName;
                 Arguments = new StringBuilder();
             }
+        }
+
+        internal static string? SelectToolCallKey(
+            int index,
+            string? rawId,
+            string? rawName,
+            IDictionary<int, string> toolCallKeyByIndex,
+            ref string? lastToolCallKey,
+            out string? rebasedFromKey)
+        {
+            rebasedFromKey = null;
+
+            if (!string.IsNullOrWhiteSpace(rawId))
+            {
+                if (toolCallKeyByIndex.TryGetValue(index, out var existingKey)
+                    && !string.Equals(existingKey, rawId, StringComparison.Ordinal))
+                {
+                    rebasedFromKey = existingKey;
+                }
+
+                toolCallKeyByIndex[index] = rawId;
+                lastToolCallKey = rawId;
+                return rawId;
+            }
+
+            if (toolCallKeyByIndex.TryGetValue(index, out var indexKey))
+            {
+                lastToolCallKey = indexKey;
+                return indexKey;
+            }
+
+            if (!string.IsNullOrWhiteSpace(rawName))
+            {
+                var generatedIndexKey = $"idx::{index}";
+                toolCallKeyByIndex[index] = generatedIndexKey;
+                lastToolCallKey = generatedIndexKey;
+                return generatedIndexKey;
+            }
+
+            if (!string.IsNullOrWhiteSpace(lastToolCallKey))
+            {
+                // No id and no name: continuation is only safe when we already have prior context.
+                return lastToolCallKey;
+            }
+
+            // No id/name/index mapping/prior context -> skip this chunk.
+            return null;
         }
     }
 }
