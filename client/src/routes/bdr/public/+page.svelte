@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { bdrSiteContent, resolveBdrCopyright } from '$lib/bdr-site-content';
+	import { resolveBdrCopyright } from '$lib/bdr-site-content';
 	import SectionCard from '$lib/components/SectionCard.svelte';
 	import { fallbackMvpSnapshot } from '$lib/mvp-data';
 	import { buildPublicProof } from '$lib/mvp-display';
@@ -7,13 +7,14 @@
 
 	let { data, form }: { data: PageData; form: any } = $props();
 
-	const content = bdrSiteContent;
+	const content = $derived(data.content);
 	const year = new Date().getFullYear();
 	const priorityOptions = [
 		{ value: 'standard', label: 'Standard project' },
 		{ value: 'priority', label: 'Priority quote' },
 		{ value: 'emergency', label: 'Storm / leak emergency' }
 	] as const;
+	const serviceTypeOptions = $derived(content.services.items);
 	const fieldClass =
 		'rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-orange-300/50 focus:bg-black/50';
 </script>
@@ -170,15 +171,20 @@
 					</div>
 				{/if}
 
-				<form method="POST" action="?/submitQuoteRequest" class="mt-6 grid gap-4">
+				<form method="POST" action="?/submitQuoteRequest" enctype="multipart/form-data" class="mt-6 grid gap-4">
 					{#if form?.errors?.form}
 						<div class="rounded-[1.2rem] border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">{form.errors.form}</div>
 					{/if}
 					<div class="grid gap-4 md:grid-cols-2">
 						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="customerName">Full name</label>
-							<input id="customerName" name="customerName" class={fieldClass} value={form?.values?.customerName ?? ''} placeholder="Jane Smith" />
-							{#if form?.errors?.customerName}<p class="text-xs text-orange-200">{form.errors.customerName}</p>{/if}
+							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="companyName">Company / customer</label>
+							<input id="companyName" name="companyName" class={fieldClass} value={form?.values?.companyName ?? ''} placeholder="Lakeview HOA or Jane Smith" />
+							{#if form?.errors?.companyName}<p class="text-xs text-orange-200">{form.errors.companyName}</p>{/if}
+						</div>
+						<div class="grid gap-2">
+							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="contactName">Contact</label>
+							<input id="contactName" name="contactName" class={fieldClass} value={form?.values?.contactName ?? ''} placeholder="Jane Smith" />
+							{#if form?.errors?.contactName}<p class="text-xs text-orange-200">{form.errors.contactName}</p>{/if}
 						</div>
 						<div class="grid gap-2">
 							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="email">Email</label>
@@ -191,14 +197,24 @@
 							{#if form?.errors?.phone}<p class="text-xs text-orange-200">{form.errors.phone}</p>{/if}
 						</div>
 						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="serviceAddress">Service address</label>
+							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="siteName">Site</label>
+							<input id="siteName" name="siteName" class={fieldClass} value={form?.values?.siteName ?? ''} placeholder="Building A, main clubhouse, retail center…" />
+							{#if form?.errors?.siteName}<p class="text-xs text-orange-200">{form.errors.siteName}</p>{/if}
+						</div>
+						<div class="grid gap-2">
+							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="serviceAddress">Site address</label>
 							<input id="serviceAddress" name="serviceAddress" class={fieldClass} value={form?.values?.serviceAddress ?? ''} placeholder="123 Main St, Charlotte, NC" />
 							{#if form?.errors?.serviceAddress}<p class="text-xs text-orange-200">{form.errors.serviceAddress}</p>{/if}
 						</div>
 						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="projectType">Project type</label>
-							<input id="projectType" name="projectType" class={fieldClass} value={form?.values?.projectType ?? ''} placeholder="Roof leak, replacement, siding, gutters…" />
-							{#if form?.errors?.projectType}<p class="text-xs text-orange-200">{form.errors.projectType}</p>{/if}
+							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="serviceType">Service type</label>
+							<select id="serviceType" name="serviceType" class={fieldClass}>
+								<option value="">Select service type</option>
+								{#each serviceTypeOptions as option}
+									<option value={option} selected={form?.values?.serviceType === option}>{option}</option>
+								{/each}
+							</select>
+							{#if form?.errors?.serviceType}<p class="text-xs text-orange-200">{form.errors.serviceType}</p>{/if}
 						</div>
 						<div class="grid gap-2">
 							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="propertyType">Property type</label>
@@ -206,9 +222,9 @@
 							{#if form?.errors?.propertyType}<p class="text-xs text-orange-200">{form.errors.propertyType}</p>{/if}
 						</div>
 						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="preferredTimeline">Preferred timing</label>
-							<input id="preferredTimeline" name="preferredTimeline" class={fieldClass} value={form?.values?.preferredTimeline ?? ''} placeholder="ASAP, this week, before board meeting…" />
-							{#if form?.errors?.preferredTimeline}<p class="text-xs text-orange-200">{form.errors.preferredTimeline}</p>{/if}
+							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="requestedTimeline">Requested timeline</label>
+							<input id="requestedTimeline" name="requestedTimeline" class={fieldClass} value={form?.values?.requestedTimeline ?? ''} placeholder="ASAP, this week, before board meeting…" />
+							{#if form?.errors?.requestedTimeline}<p class="text-xs text-orange-200">{form.errors.requestedTimeline}</p>{/if}
 						</div>
 						<div class="grid gap-2">
 							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="priority">Request priority</label>
@@ -223,9 +239,21 @@
 					</div>
 
 					<div class="grid gap-2">
-						<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="message">Project details</label>
-						<textarea id="message" name="message" rows="5" class={`${fieldClass} min-h-32`} placeholder="Tell BDR what is happening, any damage, insurance context, and the best time to reach you.">{form?.values?.message ?? ''}</textarea>
-						{#if form?.errors?.message}<p class="text-xs text-orange-200">{form.errors.message}</p>{/if}
+						<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="need">What do you need?</label>
+						<textarea id="need" name="need" rows="5" class={`${fieldClass} min-h-32`} placeholder="Tell BDR what is happening, any damage, insurance context, access notes, and the best time to reach you.">{form?.values?.need ?? ''}</textarea>
+						{#if form?.errors?.need}<p class="text-xs text-orange-200">{form.errors.need}</p>{/if}
+					</div>
+
+					<div class="grid gap-2">
+						<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="attachments">Attachments</label>
+						<input
+							id="attachments"
+							name="attachments"
+							type="file"
+							multiple
+							class="rounded-2xl border border-dashed border-white/14 bg-black/25 px-4 py-4 text-sm text-slate-200 file:mr-4 file:rounded-full file:border-0 file:bg-orange-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-black hover:border-orange-300/35"
+						/>
+						<p class="text-xs leading-5 text-slate-400">Attach photos, reports, drawings, or insurance files. The operator queue records file names and sizes with the submitted payload.</p>
 					</div>
 
 					<div class="flex flex-col gap-3 rounded-[1.2rem] border border-white/10 bg-white/4 p-4 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">

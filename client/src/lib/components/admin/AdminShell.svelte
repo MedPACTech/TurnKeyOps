@@ -129,7 +129,7 @@
 	</header>
 
 	<div class="mx-auto flex min-h-screen w-full max-w-[1680px] gap-0 px-0 pt-14">
-		<aside class={`sticky top-14 hidden h-[calc(100vh-3.5rem)] shrink-0 border-r border-[var(--shell-border)] bg-[var(--pane-bg)] transition-[width] duration-200 lg:flex lg:flex-col ${navCollapsed ? 'w-[84px]' : 'w-[320px]'}`}>
+		<aside class={`sticky top-14 hidden h-[calc(100vh-3.5rem)] shrink-0 border-r border-[var(--shell-border)] bg-[var(--pane-bg)] transition-[width] duration-200 lg:flex lg:flex-col ${navCollapsed ? 'w-[84px]' : 'w-[280px]'}`}>
 			<div class="flex items-center justify-between border-b border-[var(--shell-border)] px-3 py-3">
 				{#if !navCollapsed}
 					<div>
@@ -152,8 +152,8 @@
 					{#each navItems as item}
 						<a
 							href={withRole(item.href)}
-							title={`${item.label} · ${item.summary}`}
-							class={`flex items-start gap-3 rounded-xl border px-3 py-3 transition ${
+							title={item.label}
+							class={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition ${
 								activePath === item.href
 									? 'border-[var(--accent-border)] bg-[var(--accent-soft)]'
 									: 'border-transparent hover:border-[var(--shell-border)] hover:bg-[var(--shell-panel)]'
@@ -201,7 +201,6 @@
 							{#if !navCollapsed}
 								<div class="min-w-0">
 									<p class="truncate text-sm font-semibold text-[var(--text-strong)]">{item.label}</p>
-									<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.summary}</p>
 								</div>
 							{/if}
 						</a>

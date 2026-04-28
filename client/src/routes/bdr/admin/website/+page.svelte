@@ -5,6 +5,8 @@
 		type EditableListItem
 	} from '$lib/components/admin/ContentEditorCard.svelte';
 	import { resolveBdrCopyright } from '$lib/bdr-site-content';
+	import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-svelte';
+	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
 	type WebsiteSection = {
@@ -33,6 +35,13 @@
 	let { data }: PageProps = $props();
 
 	const year = new Date().getFullYear();
+
+	let serviceItems = $state(untrack(() => [...data.content.services.items]));
+	let selectedServiceIndex = $state(0);
+	let serviceDraft = $state(untrack(() => data.content.services.items[0] ?? ''));
+	let serviceError = $state('');
+	let serviceStatus = $state('Select a service to edit it.');
+	let serviceIsSaving = $state(false);
 
 	const websiteSections = $derived<WebsiteSection[]>([
 		{
@@ -109,14 +118,14 @@
 			description: 'The demand-facing summary of service lines.',
 			previewTitle: data.content.services.title,
 			previewBody: data.content.services.copy,
-			previewMeta: `${data.content.services.items.length} service bullets`,
+			previewMeta: `${serviceItems.length} service bullets`,
 			fields: [
 				{ label: 'Eyebrow', value: data.content.services.eyebrow },
 				{ label: 'Title', value: data.content.services.title },
 				{ label: 'Body copy', value: data.content.services.copy, multiline: true }
 			],
 			listTitle: 'Service bullets',
-			listItems: data.content.services.items.map((item) => ({ label: 'Service', value: item })),
+			listItems: serviceItems.map((item) => ({ label: 'Service', value: item })),
 			actions: ['Add service', 'Reorder services'],
 			areas: [
 				{
@@ -133,10 +142,10 @@
 				{
 					id: 'services-items',
 					label: 'Service bullets',
-					value: data.content.services.items.join(' · '),
+					value: serviceItems.join(' · '),
 					listTitle: 'Service bullets',
-					listItems: data.content.services.items.map((item) => ({ label: 'Service', value: item })),
-					actions: ['Reorder bullets']
+					listItems: serviceItems.map((item) => ({ label: 'Service', value: item })),
+					actions: ['Add service', 'Edit selected', 'Delete selected', 'Reorder services']
 				}
 			]
 		},
@@ -295,6 +304,9 @@
 	const selectedArea = $derived(
 		selectedSection.areas.find((area) => area.id === selectedAreaId) ?? selectedSection.areas[0]
 	);
+	const isServicesCrudSelected = $derived(selectedSection.id === 'services' && selectedArea.id === 'services-items');
+	const isCreatingService = $derived(selectedServiceIndex >= serviceItems.length);
+	const selectedServiceLabel = $derived(isCreatingService ? 'New service' : (serviceItems[selectedServiceIndex] ?? 'No service selected'));
 
 	$effect(() => {
 		if (selectedSection && !selectedSection.areas.some((area) => area.id === selectedAreaId)) {
@@ -307,6 +319,138 @@
 		{ label: 'Editable areas', value: String(websiteSections.reduce((sum, section) => sum + section.areas.length, 0)), detail: 'Clickable areas in preview switch the lower work surface into edit mode' },
 		{ label: 'Preview mode', value: 'Live scaffold', detail: 'Work area preview is rendered from the same structured content used by the public site' }
 	]);
+
+	const selectSection = (section: WebsiteSection) => {
+		selectedSectionId = section.id;
+		selectedAreaId = section.id === 'services' ? 'services-items' : (section.areas[0]?.id ?? '');
+	};
+
+	const openServicesCrud = () => {
+		selectedSectionId = 'services';
+		selectedAreaId = 'services-items';
+	};
+
+	const selectService = (index: number) => {
+		openServicesCrud();
+		selectedServiceIndex = index;
+		serviceDraft = serviceItems[index] ?? '';
+		serviceError = '';
+		serviceStatus = `Editing service ${index + 1}.`;
+	};
+
+	const startNewService = () => {
+		openServicesCrud();
+		selectedServiceIndex = serviceItems.length;
+		serviceDraft = '';
+		serviceError = '';
+		serviceStatus = 'New service draft ready.';
+	};
+
+	const persistServices = async (next: string[], successStatus: string, previous: string[]) => {
+		const formData = new FormData();
+		next.forEach((service) => formData.append('services', service));
+
+		serviceIsSaving = true;
+
+		try {
+			const response = await fetch('?/updateServices', {
+				method: 'POST',
+				body: formData
+			});
+
+			if (!response.ok) {
+				throw new Error(`Services save failed with ${response.status}`);
+			}
+
+			serviceStatus = successStatus;
+			serviceError = '';
+			return true;
+		} catch (cause) {
+			console.error('Unable to persist service changes.', cause);
+			serviceItems = previous;
+			selectedServiceIndex = Math.max(0, Math.min(selectedServiceIndex, serviceItems.length - 1));
+			serviceDraft = serviceItems[selectedServiceIndex] ?? '';
+			serviceError = 'Services could not be saved. Please try again.';
+			serviceStatus = 'The last change was not saved.';
+			return false;
+		} finally {
+			serviceIsSaving = false;
+		}
+	};
+
+	const saveService = async () => {
+		const value = serviceDraft.trim();
+
+		if (!value) {
+			serviceError = 'Service name is required.';
+			serviceStatus = 'Add a service name before saving.';
+			return;
+		}
+
+		const previous = [...serviceItems];
+
+		if (isCreatingService) {
+			const next = [...serviceItems, value];
+			serviceItems = next;
+			selectedServiceIndex = next.length - 1;
+			serviceDraft = value;
+			serviceError = '';
+			serviceStatus = `Saving "${value}"...`;
+			await persistServices(next, `Added "${value}".`, previous);
+			return;
+		}
+
+		const next = [...serviceItems];
+		next[selectedServiceIndex] = value;
+		serviceItems = next;
+		serviceDraft = value;
+		serviceError = '';
+		serviceStatus = `Saving "${value}"...`;
+		await persistServices(next, `Updated "${value}".`, previous);
+	};
+
+	const deleteSelectedService = async () => {
+		if (isCreatingService || serviceItems.length === 0) {
+			serviceDraft = '';
+			serviceError = '';
+			serviceStatus = 'No selected service to delete.';
+			return;
+		}
+
+		const previous = [...serviceItems];
+		const removed = serviceItems[selectedServiceIndex];
+		const next = serviceItems.filter((_, index) => index !== selectedServiceIndex);
+		serviceItems = next;
+
+		const nextIndex = Math.max(0, Math.min(selectedServiceIndex, next.length - 1));
+		selectedServiceIndex = nextIndex;
+		serviceDraft = next[nextIndex] ?? '';
+		serviceError = '';
+		serviceStatus = `Saving deletion of "${removed}"...`;
+		await persistServices(
+			next,
+			next.length ? `Deleted "${removed}".` : 'No services remain. Add a service to rebuild the list.',
+			previous
+		);
+	};
+
+	const moveService = async (index: number, direction: -1 | 1) => {
+		const targetIndex = index + direction;
+
+		if (targetIndex < 0 || targetIndex >= serviceItems.length) {
+			return;
+		}
+
+		const previous = [...serviceItems];
+		const next = [...serviceItems];
+		[next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+		serviceItems = next;
+		selectedServiceIndex = targetIndex;
+		serviceDraft = next[targetIndex];
+		serviceError = '';
+		serviceStatus = `Saving service order...`;
+		await persistServices(next, `Moved service to position ${targetIndex + 1}.`, previous);
+	};
 </script>
 
 <AdminWorkspace
@@ -322,7 +466,7 @@
 				<button
 					type="button"
 					class={`w-full rounded-md border px-3 py-3 text-left transition ${selectedSection.id === section.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
-					onclick={() => (selectedSectionId = section.id)}
+					onclick={() => selectSection(section)}
 				>
 					<p class="text-sm font-semibold text-[var(--text-strong)]">{section.label}</p>
 					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{section.description}</p>
@@ -355,14 +499,19 @@
 
 						<div class="mt-6 grid gap-3 lg:grid-cols-2">
 							{#each selectedSection.areas as area}
-								<button
-									type="button"
-									class={`rounded-xl border p-4 text-left transition ${selectedArea.id === area.id ? 'border-orange-300 bg-orange-50 shadow-[0_12px_24px_rgba(234,88,12,0.12)]' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40'}`}
-									onclick={() => (selectedAreaId = area.id)}
-								>
-									<div class="flex items-start justify-between gap-3">
-										<div>
-											<p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Editable area</p>
+									<button
+										type="button"
+										class={`rounded-xl border p-4 text-left transition ${selectedArea.id === area.id ? 'border-orange-300 bg-orange-50 shadow-[0_12px_24px_rgba(234,88,12,0.12)]' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40'}`}
+										onclick={() => {
+											selectedAreaId = area.id;
+											if (area.id === 'services-items') {
+												openServicesCrud();
+											}
+										}}
+									>
+										<div class="flex items-start justify-between gap-3">
+											<div>
+												<p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Editable area</p>
 											<p class="mt-2 text-base font-semibold text-slate-900">{area.label}</p>
 										</div>
 										<span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-500">Edit</span>
@@ -376,17 +525,170 @@
 						</div>
 					</div>
 				</div>
-			</div>
+				</div>
 
-			<ContentEditorCard
-				eyebrow={`${selectedSection.label} · Editing surface`}
-				title={selectedArea.label}
-				description={selectedArea.detail ?? `Editing controls for the ${selectedArea.label.toLowerCase()} area.`}
-				fields={selectedArea.fields ?? selectedSection.fields ?? []}
-				listTitle={selectedArea.listTitle ?? selectedSection.listTitle}
-				listItems={selectedArea.listItems ?? selectedSection.listItems ?? []}
-				actions={selectedArea.actions ?? selectedSection.actions ?? []}
-			/>
-		</div>
-	{/snippet}
-</AdminWorkspace>
+				{#if isServicesCrudSelected}
+					<article
+						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
+						data-testid="cms-service-crud-panel"
+					>
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Services · CRUD surface</p>
+								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Service catalog</h4>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Select a customer-facing service, edit its label, add a new service, delete stale entries, or reorder the public services list.</p>
+							</div>
+							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">Interactive CRUD</span>
+						</div>
+
+						<div class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+							<section class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+								<div class="flex flex-wrap items-center justify-between gap-3">
+									<div>
+										<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Managed services</p>
+										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{serviceItems.length} services on the customer site.</p>
+									</div>
+									<button
+										type="button"
+										class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)] disabled:cursor-not-allowed disabled:opacity-50"
+										disabled={serviceIsSaving}
+										onclick={startNewService}
+									>
+										<Plus size={15} />
+										New
+									</button>
+								</div>
+
+								<div class="mt-3 grid gap-2">
+									{#if serviceItems.length === 0}
+										<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4 text-sm leading-6 text-[var(--text-muted)]">
+											No services are currently listed. Use New to create the first public service.
+										</div>
+									{/if}
+
+									{#each serviceItems as service, index}
+										<div
+											class={`rounded-md border p-3 transition ${selectedServiceIndex === index ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel-strong)]'}`}
+											data-testid={`cms-service-row-${index}`}
+										>
+											<div class="flex items-start justify-between gap-3">
+												<button
+													type="button"
+													class="min-w-0 flex-1 text-left"
+													aria-pressed={selectedServiceIndex === index}
+													onclick={() => selectService(index)}
+												>
+													<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Service {index + 1}</p>
+													<p class="mt-2 text-sm font-medium text-[var(--text-strong)]">{service}</p>
+												</button>
+												<div class="flex shrink-0 gap-1">
+													<button
+														type="button"
+														class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] text-[var(--text-base)] disabled:cursor-not-allowed disabled:opacity-40"
+														aria-label={`Move ${service} up`}
+														disabled={serviceIsSaving || index === 0}
+														onclick={() => moveService(index, -1)}
+													>
+														<ArrowUp size={14} />
+													</button>
+													<button
+														type="button"
+														class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] text-[var(--text-base)] disabled:cursor-not-allowed disabled:opacity-40"
+														aria-label={`Move ${service} down`}
+														disabled={serviceIsSaving || index === serviceItems.length - 1}
+														onclick={() => moveService(index, 1)}
+													>
+														<ArrowDown size={14} />
+													</button>
+												</div>
+											</div>
+										</div>
+									{/each}
+								</div>
+							</section>
+
+							<section class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+								<div class="flex flex-wrap items-start justify-between gap-3">
+									<div>
+										<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Selected service</p>
+										<h5 class="mt-1 text-lg font-semibold text-[var(--text-strong)]">{selectedServiceLabel}</h5>
+									</div>
+									<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+										{isCreatingService ? 'Create' : 'Update'}
+									</span>
+								</div>
+
+								<label class="mt-4 block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-3">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Service name</span>
+									<input
+										class="mt-2 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm text-[var(--text-base)] outline-none focus:border-[var(--accent-border)]"
+										bind:value={serviceDraft}
+										disabled={serviceIsSaving}
+										placeholder="Example: Roof maintenance program"
+									/>
+									{#if serviceError}
+										<p class="mt-2 text-xs leading-5 text-rose-600">{serviceError}</p>
+									{/if}
+								</label>
+
+								<div class="mt-4 flex flex-wrap gap-2">
+									<button
+										type="button"
+										class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)] disabled:cursor-not-allowed disabled:opacity-50"
+										disabled={serviceIsSaving}
+										onclick={saveService}
+									>
+										<Save size={15} />
+										{isCreatingService ? 'Create service' : 'Update service'}
+									</button>
+									<button
+										type="button"
+										class="inline-flex items-center gap-2 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-base)] disabled:cursor-not-allowed disabled:opacity-50"
+										disabled={serviceIsSaving}
+										onclick={startNewService}
+									>
+										<Plus size={15} />
+										New draft
+									</button>
+									<button
+										type="button"
+										class="inline-flex items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+										disabled={serviceIsSaving || isCreatingService || serviceItems.length === 0}
+										onclick={deleteSelectedService}
+									>
+										<Trash2 size={15} />
+										Delete
+									</button>
+								</div>
+
+								<p class="mt-4 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]" aria-live="polite">
+									{serviceStatus}
+								</p>
+
+								<div class="mt-4 rounded-md border border-[var(--shell-border)] bg-white/70 p-3">
+									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-slate-500">Public services preview</p>
+									<div class="mt-3 grid gap-2">
+										{#each serviceItems as service, index}
+											<div class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+												<span class="font-semibold text-slate-900">{index + 1}.</span> {service}
+											</div>
+										{/each}
+									</div>
+								</div>
+							</section>
+						</div>
+					</article>
+				{:else}
+					<ContentEditorCard
+						eyebrow={`${selectedSection.label} · Editing surface`}
+						title={selectedArea.label}
+						description={selectedArea.detail ?? `Editing controls for the ${selectedArea.label.toLowerCase()} area.`}
+						fields={selectedArea.fields ?? selectedSection.fields ?? []}
+						listTitle={selectedArea.listTitle ?? selectedSection.listTitle}
+						listItems={selectedArea.listItems ?? selectedSection.listItems ?? []}
+						actions={selectedArea.actions ?? selectedSection.actions ?? []}
+					/>
+				{/if}
+			</div>
+		{/snippet}
+	</AdminWorkspace>

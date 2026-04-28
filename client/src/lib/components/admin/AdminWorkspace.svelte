@@ -46,9 +46,9 @@
 </script>
 
 <section>
-	<div class={`grid gap-4 ${workspaceColumnsClass}`}>
+	<div class={`grid gap-0 ${workspaceColumnsClass}`}>
 		{#if context}
-			<aside class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
+			<aside class="border-r border-[var(--shell-border)] bg-transparent px-4 py-3">
 				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{contextLabel}</p>
 				<div class="mt-4">
 					{@render context()}
@@ -57,7 +57,7 @@
 		{/if}
 
 		{#if focus}
-			<aside class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
+			<aside class="border-r border-[var(--shell-border)] bg-transparent px-4 py-3">
 				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{focusLabel}</p>
 				<div class="mt-4">
 					{@render focus()}
@@ -65,7 +65,7 @@
 			</aside>
 		{/if}
 
-		<div class="min-w-0 rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
+		<div class="min-w-0 bg-transparent px-4 py-3">
 			{@render work()}
 		</div>
 	</div>

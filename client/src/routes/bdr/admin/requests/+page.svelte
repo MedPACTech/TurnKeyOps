@@ -1,12 +1,11 @@
 <script lang="ts">
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import {
-		getQuoteRequestToneClasses,
 		quoteRequestStatusMeta,
 		quoteRequestStatusOptions,
-		type QuoteRequest,
-		type QuoteRequestStatus
+		type QuoteRequest
 	} from '$lib/quote-requests';
+	import { ExternalLink, FileText, Pencil } from 'lucide-svelte';
 	import type { ActionData, PageProps } from './$types';
 
 	let { data, form }: { data: PageProps['data']; form: ActionData } = $props();
@@ -15,9 +14,9 @@
 	const scheduleSiteVisitByRequestId = $derived(data.scheduleSiteVisitByRequestId);
 	let selectedRequestId = $state('');
 	let laneFilter = $state<'all' | 'new' | 'active' | 'estimate' | 'won'>('all');
-	let priorityFilter = $state<'all' | QuoteRequest['priority']>('all');
-	let statusFilter = $state<'all' | QuoteRequestStatus>('all');
 	let search = $state('');
+	let selectedAttachmentId = $state('');
+	let contactDrawerOpen = $state(false);
 
 	$effect(() => {
 		if (!selectedRequestId && requests[0]) {
@@ -27,8 +26,8 @@
 
 	const laneMatches = (request: QuoteRequest) => {
 		if (laneFilter === 'new') return request.status === 'new';
-		if (laneFilter === 'active') return ['contacted', 'inspection-scheduled'].includes(request.status);
-		if (laneFilter === 'estimate') return ['estimate-drafted', 'estimate-sent'].includes(request.status);
+		if (laneFilter === 'active') return ['in-review', 'needs-info', 'contacted', 'inspection-scheduled'].includes(request.status);
+		if (laneFilter === 'estimate') return ['qualified', 'estimate-drafted', 'estimate-sent'].includes(request.status);
 		if (laneFilter === 'won') return request.status === 'won';
 		return true;
 	};
@@ -37,21 +36,33 @@
 		const query = search.trim().toLowerCase();
 
 		return requests.filter((request) => {
-			const matchesPriority = priorityFilter === 'all' || request.priority === priorityFilter;
-			const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
 			const haystack = [
+				quoteRequestStatusMeta[request.status].label,
+				request.companyName,
+				request.contactName,
 				request.customerName,
+				request.email,
+				request.phone,
+				request.siteName,
+				request.serviceType,
 				request.projectType,
 				request.serviceAddress,
+				request.propertyType,
+				request.requestedTimeline,
+				request.preferredTimeline,
+				request.priority,
+				request.need,
 				request.message,
 				request.intakeSummary,
-				request.assignedTo
+				request.assignedTo,
+				request.nextAction,
+				request.source
 			]
 				.join(' ')
 				.toLowerCase();
 			const matchesSearch = !query || haystack.includes(query);
 
-			return laneMatches(request) && matchesPriority && matchesStatus && matchesSearch;
+			return laneMatches(request) && matchesSearch;
 		});
 	});
 
@@ -72,6 +83,28 @@
 	const selectedRequestScheduleHref = $derived(
 		selectedRequest ? scheduleSiteVisitByRequestId[selectedRequest.id] ?? data.scheduleSiteVisitBaseHref : data.scheduleSiteVisitBaseHref
 	);
+	const selectedAttachment = $derived(
+		selectedRequest?.attachments.find((attachment) => attachment.id === selectedAttachmentId) ?? null
+	);
+	const selectedAttachmentUrl = $derived(
+		selectedRequest && selectedAttachment
+			? `/bdr/admin/requests/attachments/${encodeURIComponent(selectedRequest.id)}/${encodeURIComponent(selectedAttachment.id)}`
+			: ''
+	);
+	const selectedAttachmentCanPreview = $derived(
+		Boolean(
+			selectedAttachment &&
+				(selectedAttachment.contentType.startsWith('image/') ||
+					selectedAttachment.contentType === 'application/pdf' ||
+					selectedAttachment.contentType.startsWith('text/'))
+		)
+	);
+
+	$effect(() => {
+		if (!selectedRequest?.attachments.some((attachment) => attachment.id === selectedAttachmentId)) {
+			selectedAttachmentId = '';
+		}
+	});
 
 	const metrics = $derived([
 		{ label: 'Total requests', value: String(data.metrics.total), detail: 'Public-site and office-entered requests in one queue' },
@@ -87,16 +120,68 @@
 			minute: '2-digit'
 		});
 
-	const priorityTone = (priority: QuoteRequest['priority']) => {
-		if (priority === 'emergency') return 'border-red-400/30 bg-red-400/10 text-red-200';
-		if (priority === 'priority') return 'border-amber-400/30 bg-amber-400/10 text-amber-200';
-		return 'border-white/10 bg-white/5 text-slate-200';
+	const quoteCardStateClass = (request: QuoteRequest, isSelected: boolean) => {
+		const stateClass = request.status === 'new' ? 'border-t-4 border-t-emerald-400' : 'border-t border-t-[var(--shell-border)]';
+		const selectionClass = isSelected
+			? 'border-x-[var(--accent-border)] border-b-[var(--accent-border)] bg-[var(--accent-soft)]'
+			: 'border-x-[var(--shell-border)] border-b-[var(--shell-border)] bg-[var(--shell-panel)] hover:border-x-[var(--accent-border)] hover:border-b-[var(--accent-border)] hover:bg-[var(--shell-panel-strong)]';
+		return `${stateClass} ${selectionClass}`;
 	};
 
-	const priorityLabel = (priority: QuoteRequest['priority']) => {
-		if (priority === 'emergency') return 'Emergency';
-		if (priority === 'priority') return 'Priority';
-		return 'Standard';
+	const parseAddress = (value: string) => {
+		const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
+		const [address1 = '', ...rest] = parts;
+		const maybeStateZip = rest.at(-1) ?? '';
+		const maybeCity = rest.length > 1 ? (rest.at(-2) ?? '') : '';
+		const address2 = rest.length > 2 ? rest.slice(0, -2).join(', ') : '';
+		const [state = '', ...zipParts] = maybeStateZip.split(/\s+/).filter(Boolean);
+		return {
+			address1,
+			address2,
+			city: maybeCity,
+			state,
+			postalCode: zipParts.join(' ')
+		};
+	};
+
+	const selectedAddress = $derived(parseAddress(selectedRequest?.serviceAddress ?? ''));
+	const qualificationChecks = $derived.by(() => {
+		if (!selectedRequest) return [];
+
+		return [
+			{ label: 'Contact info captured', complete: Boolean(selectedRequest.contactName && selectedRequest.email && selectedRequest.phone) },
+			{ label: 'Site address captured', complete: Boolean(selectedAddress.address1 && selectedAddress.city && selectedAddress.state) },
+			{ label: 'Scope and service type captured', complete: Boolean(selectedRequest.serviceType && selectedRequest.need) },
+			{ label: 'Request timeframe captured', complete: Boolean(selectedRequest.requestedTimeline) },
+			{ label: 'Supporting files reviewed', complete: selectedRequest.attachments.length > 0 }
+		];
+	});
+
+	const formatAttachmentSize = (sizeBytes: number) => {
+		if (sizeBytes >= 1024 * 1024) return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+		if (sizeBytes >= 1024) return `${Math.round(sizeBytes / 1024)} KB`;
+		return `${sizeBytes} B`;
+	};
+
+	const formatAttachmentName = (fileName: string) => {
+		if (fileName.length <= 36) return fileName;
+
+		const extensionIndex = fileName.lastIndexOf('.');
+		const extension = extensionIndex > 0 ? fileName.slice(extensionIndex) : '';
+		const baseName = extension ? fileName.slice(0, extensionIndex) : fileName;
+
+		return `${baseName.slice(0, 24)}...${extension}`;
+	};
+
+	const isImageAttachment = (attachment: QuoteRequest['attachments'][number]) =>
+		attachment.contentType.startsWith('image/');
+
+	const viewAttachment = (attachment: QuoteRequest['attachments'][number]) => {
+		selectedAttachmentId = attachment.id;
+	};
+
+	const closeAttachmentPreview = () => {
+		selectedAttachmentId = '';
 	};
 </script>
 
@@ -108,6 +193,9 @@
 	{metrics}
 	contextLabel="Queue lanes"
 	focusLabel="Request focus"
+	drawerOpen={contactDrawerOpen}
+	drawerTitle="Edit contact information"
+	closeDrawer={() => (contactDrawerOpen = false)}
 >
 	{#snippet context()}
 		<div class="space-y-3">
@@ -141,52 +229,29 @@
 				/>
 			</label>
 
-			<div class="grid gap-3">
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Priority</span>
-					<select bind:value={priorityFilter} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none">
-						<option value="all">All priorities</option>
-						<option value="emergency">Emergency</option>
-						<option value="priority">Priority</option>
-						<option value="standard">Standard</option>
-					</select>
-				</label>
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Stage</span>
-					<select bind:value={statusFilter} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none">
-						<option value="all">All stages</option>
-						{#each quoteRequestStatusOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
-				</label>
-			</div>
-
 			<div class="space-y-2">
+				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+					{filteredRequests.length} matching quotes
+				</p>
 				{#if filteredRequests.length}
 					{#each filteredRequests as request}
 						<button
 							type="button"
-							class={`w-full rounded-xl border p-3 text-left transition ${selectedRequest?.id === request.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] shadow-[0_14px_34px_rgba(234,88,12,0.10)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel-strong)]'}`}
+							class={`w-full rounded-md border px-3 py-3 text-left transition ${quoteCardStateClass(request, selectedRequest?.id === request.id)}`}
 							onclick={() => (selectedRequestId = request.id)}
 						>
 							<div class="flex items-start justify-between gap-3">
 								<div class="min-w-0">
 									<p class="truncate text-sm font-semibold text-[var(--text-strong)]">{request.customerName}</p>
-									<p class="mt-1 line-clamp-1 text-xs text-[var(--text-muted)]">{request.projectType}</p>
+									<p class="mt-1 line-clamp-1 text-xs text-[var(--text-muted)]">{request.siteName} · {request.serviceType}</p>
 								</div>
-								<p class="shrink-0 text-[0.7rem] text-[var(--muted)]">{formatSubmittedAt(request.submittedAtUtc)}</p>
+								<p class="shrink-0 text-[0.68rem] text-[var(--muted)]">{formatSubmittedAt(request.submittedAtUtc)}</p>
 							</div>
-							<div class="mt-3 flex flex-wrap gap-2">
-								<span class={`rounded-full border px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.14em] ${priorityTone(request.priority)}`}>{priorityLabel(request.priority)}</span>
-								<span class={`rounded-full border px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.14em] ${getQuoteRequestToneClasses(quoteRequestStatusMeta[request.status].tone)}`}>{quoteRequestStatusMeta[request.status].label}</span>
-							</div>
-							<p class="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-base)]">{request.intakeSummary}</p>
 						</button>
 					{/each}
 				{:else}
-					<div class="rounded-xl border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-5 text-center text-sm text-[var(--text-muted)]">
-						No requests match this queue view.
+					<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-4 text-center text-sm text-[var(--text-muted)]">
+						No quotes match this queue and search.
 					</div>
 				{/if}
 			</div>
@@ -194,130 +259,280 @@
 	{/snippet}
 
 	{#snippet work()}
-		{#if selectedRequest}
-			<div class="space-y-4">
-				<section class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-					<div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-						<div class="max-w-3xl">
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Selected quote request</p>
-							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedRequest.customerName}</h4>
-							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">{selectedRequest.projectType} · {selectedRequest.propertyType} · {selectedRequest.serviceAddress}</p>
+		<div class="space-y-4">
+			{#if selectedRequest}
+				<form id={`request-triage-${selectedRequest.id}`} method="POST" action="?/updateRequest" class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+					<input type="hidden" name="id" value={selectedRequest.id} />
+					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+						<div>
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Triage</p>
+							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedRequest.companyName}</h4>
+							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">{selectedRequest.contactName} · {selectedRequest.serviceType} · {selectedRequest.siteName}</p>
 						</div>
-						<div class="flex flex-wrap gap-2">
-							<span class={`rounded-full border px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.16em] ${priorityTone(selectedRequest.priority)}`}>{priorityLabel(selectedRequest.priority)}</span>
-							<span class={`rounded-full border px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.16em] ${getQuoteRequestToneClasses(quoteRequestStatusMeta[selectedRequest.status].tone)}`}>{quoteRequestStatusMeta[selectedRequest.status].label}</span>
+						<div class="text-left lg:text-right">
+							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Submitted</p>
+							<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{formatSubmittedAt(selectedRequest.submittedAtUtc)}</p>
 						</div>
 					</div>
 
-					<div class="mt-5 grid gap-3 lg:grid-cols-3">
-						<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">What matters</p>
-							<p class="mt-2 text-base font-semibold text-[var(--text-strong)]">{selectedRequest.intakeSummary}</p>
+					{#if form?.success}
+						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Saved</p>
+					{:else if form?.message}
+						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">{form.message}</p>
+					{/if}
+
+					<div class="mt-5 grid gap-4 lg:grid-cols-[180px_220px_minmax(0,1fr)]">
+						<div class="grid gap-2">
+							<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="status">Stage</label>
+							<select id="status" name="status" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">
+								{#each quoteRequestStatusOptions as option}
+									<option value={option.value} selected={selectedRequest.status === option.value}>{option.label}</option>
+								{/each}
+							</select>
 						</div>
-						<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Owner</p>
-							<p class="mt-2 text-base font-semibold text-[var(--text-strong)]">{selectedRequest.assignedTo}</p>
-							<p class="mt-1 text-sm text-[var(--text-muted)]">Source: {selectedRequest.source}</p>
+						<div class="grid gap-2">
+							<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="assignedTo">Owner</label>
+							<input id="assignedTo" name="assignedTo" value={selectedRequest.assignedTo} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 						</div>
-						<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Submitted</p>
-							<p class="mt-2 text-base font-semibold text-[var(--text-strong)]">{formatSubmittedAt(selectedRequest.submittedAtUtc)}</p>
-							<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.preferredTimeline}</p>
+						<div class="grid gap-2">
+							<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="nextAction">Next action</label>
+							<textarea id="nextAction" name="nextAction" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">{selectedRequest.nextAction}</textarea>
+						</div>
+					</div>
+
+					<div class="mt-5 flex flex-wrap gap-3">
+						<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save changes</button>
+						<a href={selectedRequestScheduleHref} class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)] transition hover:bg-[var(--shell-panel)]">Schedule site visit</a>
+						<a href="/bdr/admin/estimates?role=office-admin" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Open estimate lane</a>
+					</div>
+				</form>
+
+				<section class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+					<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+						<div class="space-y-5">
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Request details</p>
+							<p class="mt-3 text-sm leading-7 text-[var(--text-base)]">{selectedRequest.need}</p>
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Request timeframe</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.requestedTimeline}</p>
+							</div>
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Notes</p>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-base)]">{selectedRequest.nextAction}</p>
+							</div>
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Qualification checklist</p>
+								<div class="mt-3 space-y-2">
+									{#each qualificationChecks as check}
+										<div class="flex items-center justify-between gap-3 text-sm">
+											<span class="text-[var(--text-base)]">{check.label}</span>
+											<span class={`rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${check.complete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-300'}`}>{check.complete ? 'Ready' : 'Needs info'}</span>
+										</div>
+									{/each}
+								</div>
+							</div>
+						</div>
+						<div class="space-y-4 border-t border-[var(--shell-border)] pt-5 text-sm xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+							<div class="flex items-center justify-between gap-3">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Contact</p>
+								<button
+									type="button"
+									class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] text-[var(--accent-text)] transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
+									onclick={() => (contactDrawerOpen = true)}
+									aria-label="Edit contact information"
+									title="Edit contact information"
+								>
+									<Pencil size={16} />
+								</button>
+							</div>
+							<div class="space-y-4">
+								<div>
+									<p class="text-base font-semibold text-[var(--text-strong)]">{selectedRequest.contactName}</p>
+									<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.email}</p>
+									<p class="text-sm text-[var(--text-muted)]">{selectedRequest.phone}</p>
+								</div>
+								<div>
+									<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</p>
+									<p class="mt-1 font-semibold text-[var(--text-strong)]">{selectedRequest.siteName}</p>
+									<div class="mt-2 space-y-0.5 text-sm leading-5 text-[var(--text-muted)]">
+										{#if selectedAddress.address1}
+											<p>{selectedAddress.address1}</p>
+										{/if}
+										{#if selectedAddress.address2}
+											<p>{selectedAddress.address2}</p>
+										{/if}
+										{#if selectedAddress.city}
+											<p>{selectedAddress.city}</p>
+										{/if}
+										{#if selectedAddress.state || selectedAddress.postalCode}
+											<p>{[selectedAddress.state, selectedAddress.postalCode].filter(Boolean).join(' ')}</p>
+										{/if}
+									</div>
+								</div>
+							</div>
 						</div>
 					</div>
 				</section>
 
-				<section class="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_360px]">
-					<div class="space-y-4">
-						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Customer message</p>
-							<p class="mt-4 text-sm leading-7 text-[var(--text-base)]">{selectedRequest.message}</p>
-						</div>
+				<section class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Attachments</p>
+							<div class="mt-4">
+								{#if selectedRequest.attachments.length}
+									<div class="flex flex-wrap gap-3">
+										{#each selectedRequest.attachments as attachment}
+											<button
+												type="button"
+												class={`w-[88px] rounded-md border p-2 text-center transition ${selectedAttachment?.id === attachment.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel-strong)] hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]'}`}
+												onclick={() => viewAttachment(attachment)}
+												title={attachment.fileName}
+											>
+												<span class="mx-auto flex h-[75px] w-[75px] items-center justify-center overflow-hidden rounded-md border border-[var(--shell-border)] bg-black/20 text-[var(--accent-text)]">
+													{#if isImageAttachment(attachment)}
+														<img
+															src={`/bdr/admin/requests/attachments/${encodeURIComponent(selectedRequest.id)}/${encodeURIComponent(attachment.id)}`}
+															alt={attachment.fileName}
+															class="h-full w-full object-cover"
+														/>
+													{:else}
+														<FileText size={24} />
+													{/if}
+												</span>
+												<span class="mt-2 block truncate text-[0.68rem] font-semibold leading-4 text-[var(--text-strong)]">{formatAttachmentName(attachment.fileName)}</span>
+											</button>
+										{/each}
+									</div>
 
-						<form method="POST" action="?/updateRequest" class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-							<input type="hidden" name="id" value={selectedRequest.id} />
-							<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-								<div>
-									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Operator controls</p>
-									<h5 class="mt-1 text-lg font-semibold text-[var(--text-strong)]">Work the request</h5>
-								</div>
-								{#if form?.success}
-									<p class="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Saved</p>
-								{:else if form?.message}
-									<p class="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">{form.message}</p>
+									{#if selectedAttachment}
+										<div class="mt-5 border-t border-[var(--shell-border)] pt-5">
+											<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+												<div>
+													<h5 class="break-all text-lg font-semibold text-[var(--text-strong)]">{selectedAttachment.fileName}</h5>
+													<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedAttachment.contentType} · {formatAttachmentSize(selectedAttachment.sizeBytes)}</p>
+												</div>
+												<div class="flex flex-wrap gap-2">
+													<a
+														href={selectedAttachmentUrl}
+														target="_blank"
+														rel="noreferrer"
+														class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]"
+													>
+														<ExternalLink size={15} />
+														Enlarge
+													</a>
+													<button
+														type="button"
+														class="inline-flex items-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]"
+														onclick={closeAttachmentPreview}
+													>
+														Close
+													</button>
+												</div>
+											</div>
+
+											<div class="mt-4 overflow-hidden rounded-md border border-[var(--shell-border)] bg-black/20">
+												{#if selectedAttachment.contentType.startsWith('image/')}
+													<img src={selectedAttachmentUrl} alt={selectedAttachment.fileName} class="max-h-[640px] w-full object-contain" />
+												{:else if selectedAttachmentCanPreview}
+													<iframe src={selectedAttachmentUrl} title={selectedAttachment.fileName} class="h-[640px] w-full bg-white"></iframe>
+												{:else}
+													<div class="p-5 text-sm leading-6 text-[var(--text-muted)]">
+														This file type cannot be previewed inline. Enlarge it in a new tab to review the document.
+													</div>
+												{/if}
+											</div>
+										</div>
+									{:else}
+										<p class="mt-4 rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 text-sm text-[var(--text-muted)]">Select a file to preview it here.</p>
+									{/if}
+								{:else}
+									<p class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 text-sm text-[var(--text-muted)]">No files attached.</p>
 								{/if}
 							</div>
-
-							<div class="mt-5 grid gap-4 md:grid-cols-2">
-								<div class="grid gap-2">
-									<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="status">Stage</label>
-									<select id="status" name="status" class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">
-										{#each quoteRequestStatusOptions as option}
-											<option value={option.value} selected={selectedRequest.status === option.value}>{option.label}</option>
-										{/each}
-									</select>
-								</div>
-								<div class="grid gap-2">
-									<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="assignedTo">Owner</label>
-									<input id="assignedTo" name="assignedTo" value={selectedRequest.assignedTo} class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
-								</div>
-							</div>
-
-							<div class="mt-4 grid gap-2">
-								<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="nextAction">Next action</label>
-								<textarea id="nextAction" name="nextAction" rows="4" class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">{selectedRequest.nextAction}</textarea>
-							</div>
-
-							<div class="mt-5 flex flex-wrap gap-3">
-								<button type="submit" class="rounded-xl border border-[var(--accent-border)] bg-[var(--accent-solid)] px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save changes</button>
-								<a href={selectedRequestScheduleHref} class="rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)] transition hover:bg-[var(--shell-panel)]">Schedule site visit</a>
-								<a href="/bdr/admin/estimates?role=office-admin" class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Open estimate lane</a>
-							</div>
-						</form>
-					</div>
-
-					<aside class="space-y-4">
-						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Contact</p>
-							<div class="mt-4 space-y-3">
-								<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-									<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Email</p>
-									<p class="mt-2 break-all text-sm text-[var(--text-strong)]">{selectedRequest.email}</p>
-								</div>
-								<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-									<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Phone</p>
-									<p class="mt-2 text-sm text-[var(--text-strong)]">{selectedRequest.phone}</p>
-								</div>
-								<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-									<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Service address</p>
-									<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">{selectedRequest.serviceAddress}</p>
-								</div>
-							</div>
-						</div>
-
-						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Action stack</p>
-							<div class="mt-4 space-y-3">
-								<a href={selectedRequestScheduleHref} class="block rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--shell-panel)]">Schedule site visit</a>
-								<p class="rounded-md border border-[var(--accent-border)] bg-[var(--shell-panel-strong)] px-4 py-3 text-xs leading-6 text-[var(--text-muted)]">Launches the calendar with this quote request in context so office can book the field visit intentionally, not just jump to a generic calendar screen.</p>
-								<a href="/bdr/admin/estimates?role=office-admin" class="block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Move to estimate lane</a>
-								<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-									<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Next action</p>
-									<p class="mt-2 text-sm text-[var(--text-strong)]">{selectedRequest.nextAction}</p>
-								</div>
-								<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-									<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Stage meaning</p>
-									<p class="mt-2 text-sm text-[var(--text-strong)]">{quoteRequestStatusMeta[selectedRequest.status].detail}</p>
-								</div>
-							</div>
-						</div>
-					</aside>
 				</section>
-			</div>
-		{:else}
-			<div class="rounded-xl border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
-				Pick a request from the queue to open the workspace.
-			</div>
+
+				<section class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Timeline</p>
+					<div class="mt-4 space-y-3">
+						{#each selectedRequest.timeline as event}
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
+								<div class="flex items-start justify-between gap-3">
+									<div>
+										<p class="text-sm font-semibold text-[var(--text-strong)]">{event.label}</p>
+										<p class="mt-1 text-xs text-[var(--text-muted)]">{event.actor}</p>
+									</div>
+									<p class="shrink-0 text-xs text-[var(--muted)]">{formatSubmittedAt(event.occurredAtUtc)}</p>
+								</div>
+								{#if event.payload}
+									<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">{event.payload.companyName} submitted {event.payload.serviceType} for {event.payload.siteName} with timeline "{event.payload.requestedTimeline}".</p>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</section>
+			{:else}
+				<div class="rounded-xl border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
+					Pick a request from the queue to open the workspace.
+				</div>
+			{/if}
+		</div>
+	{/snippet}
+
+	{#snippet drawer()}
+		{#if selectedRequest}
+			<form method="POST" action="?/updateRequest" class="space-y-4">
+				<input type="hidden" name="id" value={selectedRequest.id} />
+				<input type="hidden" name="status" value={selectedRequest.status} />
+				<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
+				<input type="hidden" name="nextAction" value={selectedRequest.nextAction} />
+
+				<label class="grid gap-1">
+					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Contact name</span>
+					<input name="contactName" value={selectedRequest.contactName} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+				</label>
+				<label class="grid gap-1">
+					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Email</span>
+					<input type="email" name="email" value={selectedRequest.email} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+				</label>
+				<label class="grid gap-1">
+					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Phone</span>
+					<input name="phone" value={selectedRequest.phone} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+				</label>
+				<label class="grid gap-1">
+					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</span>
+					<input name="siteName" value={selectedRequest.siteName} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+				</label>
+				<label class="grid gap-1">
+					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Address 1</span>
+					<input name="address1" value={selectedAddress.address1} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+				</label>
+				<label class="grid gap-1">
+					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Address 2</span>
+					<input name="address2" value={selectedAddress.address2} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+				</label>
+				<div class="grid grid-cols-[minmax(0,1fr)_88px_112px] gap-2">
+					<label class="grid gap-1">
+						<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">City</span>
+						<input name="city" value={selectedAddress.city} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+					</label>
+					<label class="grid gap-1">
+						<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">State</span>
+						<input name="state" value={selectedAddress.state} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+					</label>
+					<label class="grid gap-1">
+						<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Zip</span>
+						<input name="postalCode" value={selectedAddress.postalCode} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+					</label>
+				</div>
+				<label class="grid gap-1">
+					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Requested timeframe</span>
+					<input name="requestedTimeline" value={selectedRequest.requestedTimeline} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+				</label>
+
+				<div class="flex flex-wrap gap-3 pt-2">
+					<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save changes</button>
+					<button type="button" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]" onclick={() => (contactDrawerOpen = false)}>Cancel</button>
+				</div>
+			</form>
 		{/if}
 	{/snippet}
 </AdminWorkspace>
