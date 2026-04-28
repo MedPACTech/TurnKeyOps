@@ -185,6 +185,14 @@
           <p class="text-sm text-gray-600">{selectedEvent.description}</p>
         </div>
       {/if}
+      {#if selectedEvent.eventType === 'Inspection' || selectedEvent.jobId}
+        <a
+          class="btn-secondary mt-2 inline-flex"
+          href={`/app/site-visit-prep?eventId=${selectedEvent.id}`}
+        >
+          Open site visit prep
+        </a>
+      {/if}
     </div>
   {/if}
 </Modal>

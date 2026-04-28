@@ -80,7 +80,12 @@
         Review the estimate snapshot and move it through award, reject, revise, or conversion to job.
       </p>
     </div>
-    <button class="btn-secondary" on:click={() => goto('/app/estimates')}>Back to estimates</button>
+    <div class="flex flex-wrap gap-3">
+      {#if estimate}
+        <a class="btn-primary" href={`/app/site-visit-prep?estimateId=${estimate.id}`}>Open site visit prep</a>
+      {/if}
+      <button class="btn-secondary" on:click={() => goto('/app/estimates')}>Back to estimates</button>
+    </div>
   </div>
 
   {#if loading}
