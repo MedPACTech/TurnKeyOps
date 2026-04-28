@@ -1,13 +1,17 @@
 import { env } from '$env/dynamic/private';
 import { error } from '@sveltejs/kit';
 import {
+	buildQuoteRequestQualification,
 	buildQuoteRequestInbox,
 	createQuoteRequestFromForm,
+	normalizeQuoteRequestQualification,
 	seededQuoteRequests,
 	type QuoteRequest,
 	type QuoteRequestAttachment,
 	type QuoteRequestFormInput,
+	type QuoteRequestMissingInfoReasonCode,
 	type QuoteRequestPriority,
+	type QuoteRequestQualificationReview,
 	type QuoteRequestStatus,
 	type QuoteRequestSubmittedPayload,
 	type QuoteRequestTimelineEvent
@@ -57,6 +61,7 @@ type QuoteRequestDto = {
 	assignedTo: string;
 	nextAction: string;
 	intakeSummary: string;
+	qualification?: QuoteRequestQualificationReview | null;
 	submittedPayload?: QuoteRequestSubmittedPayload | null;
 	timeline?: QuoteRequestTimelineEvent[] | null;
 	updatedAtUtc?: string | null;
@@ -100,6 +105,7 @@ type QuoteLeadMetadata = {
 	nextAction: string;
 	intakeSummary: string;
 	source: QuoteRequest['source'];
+	qualification?: QuoteRequestQualificationReview;
 	submittedPayload?: QuoteRequestSubmittedPayload;
 	timeline?: QuoteRequestTimelineEvent[];
 };
@@ -236,6 +242,7 @@ const normalizeQuoteRequest = (request: QuoteRequest): QuoteRequest => {
 		message: request.message || request.need,
 		attachments,
 		submittedPayload: request.submittedPayload ?? ({} as QuoteRequestSubmittedPayload),
+		qualification: normalizeQuoteRequestQualification(request.qualification),
 		timeline: Array.isArray(request.timeline) ? request.timeline : []
 	};
 
@@ -353,6 +360,7 @@ const toQuoteRequest = (record: QuoteRequestDto | LegacyLeadDto): QuoteRequest |
 			assignedTo: record.assignedTo,
 			nextAction: record.nextAction,
 			intakeSummary: record.intakeSummary,
+			qualification: normalizeQuoteRequestQualification(record.qualification),
 			submittedPayload: record.submittedPayload ?? ({} as QuoteRequestSubmittedPayload),
 			timeline: record.timeline ?? []
 		});
@@ -385,6 +393,7 @@ const toQuoteRequest = (record: QuoteRequestDto | LegacyLeadDto): QuoteRequest |
 		assignedTo: record.assignedEstimator?.trim() || 'Office intake',
 		nextAction: metadata.nextAction,
 		intakeSummary: metadata.intakeSummary,
+		qualification: normalizeQuoteRequestQualification(metadata.qualification),
 		submittedPayload: metadata.submittedPayload ?? ({} as QuoteRequestSubmittedPayload),
 		timeline: metadata.timeline ?? []
 	});
@@ -429,6 +438,7 @@ const toQuoteRequestDto = (request: QuoteRequest, existing?: QuoteRequestDto): Q
 	assignedTo: request.assignedTo,
 	nextAction: request.nextAction,
 	intakeSummary: request.intakeSummary,
+	qualification: request.qualification,
 	submittedPayload: request.submittedPayload,
 	timeline: request.timeline,
 	updatedAtUtc: existing?.updatedAtUtc ?? null
@@ -454,6 +464,7 @@ const toLegacyLeadDto = (request: QuoteRequest, existing?: LegacyLeadDto): Legac
 		nextAction: request.nextAction,
 		intakeSummary: request.intakeSummary,
 		source: request.source,
+		qualification: request.qualification,
 		submittedPayload: request.submittedPayload,
 		timeline: request.timeline
 	};
@@ -530,6 +541,7 @@ export const updateQuoteRequest = async (
 		status: QuoteRequestStatus;
 		assignedTo: string;
 		nextAction: string;
+		missingInfoReasonCodes: QuoteRequestMissingInfoReasonCode[];
 		contactName?: string;
 		email?: string;
 		phone?: string;
@@ -540,12 +552,19 @@ export const updateQuoteRequest = async (
 ) => {
 	const buildUpdatedRequest = (existingRequest: QuoteRequest): QuoteRequest => {
 		const nextAssignedTo = params.assignedTo || 'Office intake';
+		const selectedMissingInfoReasonCodes = normalizeQuoteRequestQualification({
+			missingInfoReasonCodes: params.missingInfoReasonCodes
+		}).missingInfoReasonCodes;
+		const existingMissingInfoReasonCodes = normalizeQuoteRequestQualification(existingRequest.qualification).missingInfoReasonCodes;
 		const changes = [
 			existingRequest.status !== params.status ? `stage ${statusToPipelineStage[existingRequest.status]} to ${statusToPipelineStage[params.status]}` : '',
-			existingRequest.assignedTo !== nextAssignedTo ? `owner ${existingRequest.assignedTo || 'Unassigned'} to ${nextAssignedTo}` : ''
+			existingRequest.assignedTo !== nextAssignedTo ? `owner ${existingRequest.assignedTo || 'Unassigned'} to ${nextAssignedTo}` : '',
+			existingMissingInfoReasonCodes.join('|') !== selectedMissingInfoReasonCodes.join('|')
+				? `missing-info reasons ${selectedMissingInfoReasonCodes.length ? 'updated' : 'cleared'}`
+				: ''
 		].filter(Boolean);
 
-		return {
+		const draftRequest = {
 			...existingRequest,
 			status: params.status,
 			assignedTo: nextAssignedTo,
@@ -557,14 +576,33 @@ export const updateQuoteRequest = async (
 			siteName: params.siteName || existingRequest.siteName,
 			serviceAddress: params.serviceAddress || existingRequest.serviceAddress,
 			requestedTimeline: params.requestedTimeline || existingRequest.requestedTimeline,
-			preferredTimeline: params.requestedTimeline || existingRequest.preferredTimeline,
+			preferredTimeline: params.requestedTimeline || existingRequest.preferredTimeline
+		};
+		const suggestedMissingInfoReasonCodes = buildQuoteRequestQualification({
+			...draftRequest,
+			qualification: { missingInfoReasonCodes: [] }
+		}).suggestedMissingInfoReasonCodes;
+		const missingInfoReasonCodes =
+			params.status === 'needs-info'
+				? selectedMissingInfoReasonCodes.length
+					? selectedMissingInfoReasonCodes
+					: suggestedMissingInfoReasonCodes
+				: [];
+
+		return {
+			...draftRequest,
+			qualification: {
+				missingInfoReasonCodes,
+				reviewedAtUtc: new Date().toISOString(),
+				reviewedBy: 'External Admin'
+			},
 			timeline: [
 				...existingRequest.timeline,
 				{
 					id: crypto.randomUUID(),
 					occurredAtUtc: new Date().toISOString(),
 					type: 'operator-updated',
-					actor: 'Operator',
+					actor: 'External Admin',
 					label: changes.length ? `Request updated: ${changes.join(', ')}` : 'Request details updated'
 				}
 			]

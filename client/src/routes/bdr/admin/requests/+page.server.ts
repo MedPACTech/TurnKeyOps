@@ -1,5 +1,12 @@
 import { fail } from '@sveltejs/kit';
-import { buildQuoteRequestInbox, getQuoteRequestMetrics, quoteRequestStatuses, type QuoteRequestStatus } from '$lib/quote-requests';
+import {
+	buildQuoteRequestInbox,
+	getQuoteRequestMetrics,
+	isQuoteRequestMissingInfoReasonCode,
+	quoteRequestStatuses,
+	type QuoteRequestMissingInfoReasonCode,
+	type QuoteRequestStatus
+} from '$lib/quote-requests';
 import { loadQuoteRequests, updateQuoteRequest } from '$lib/server/quote-requests';
 
 const buildScheduleSiteVisitHref = (requestId: string) =>
@@ -43,9 +50,17 @@ export const actions = {
 		const siteName = String(formData.get('siteName') ?? '').trim();
 		const requestedTimeline = String(formData.get('requestedTimeline') ?? '').trim();
 		const serviceAddress = buildServiceAddress(formData);
+		const missingInfoReasonCodes = formData
+			.getAll('missingInfoReasonCodes')
+			.map((value) => String(value).trim())
+			.filter(isQuoteRequestMissingInfoReasonCode) as QuoteRequestMissingInfoReasonCode[];
 
 		if (!id || !quoteRequestStatuses.includes(status)) {
 			return fail(400, { message: 'Valid request id and status are required.' });
+		}
+
+		if (status === 'needs-info' && missingInfoReasonCodes.length === 0) {
+			return fail(400, { message: 'Choose at least one Needs Info reason code before saving.' });
 		}
 
 		try {
@@ -54,6 +69,7 @@ export const actions = {
 				status,
 				assignedTo,
 				nextAction,
+				missingInfoReasonCodes,
 				contactName,
 				email,
 				phone,

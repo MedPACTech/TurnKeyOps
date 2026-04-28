@@ -23,6 +23,26 @@ export type QuoteRequestAttachment = {
 	blobUrl?: string;
 };
 
+export type QuoteRequestQualificationCheckKey =
+	| 'service-fit'
+	| 'site-readiness'
+	| 'required-attachments'
+	| 'contact-readiness'
+	| 'scheduling-readiness';
+
+export type QuoteRequestMissingInfoReasonCode =
+	| 'service-fit-unconfirmed'
+	| 'site-readiness-unconfirmed'
+	| 'required-attachments-missing'
+	| 'contact-readiness-missing'
+	| 'scheduling-readiness-missing';
+
+export type QuoteRequestQualificationReview = {
+	missingInfoReasonCodes: QuoteRequestMissingInfoReasonCode[];
+	reviewedAtUtc?: string;
+	reviewedBy?: string;
+};
+
 export type QuoteRequestSubmittedPayload = {
 	companyName: string;
 	contactName: string;
@@ -71,6 +91,7 @@ export type QuoteRequest = {
 	assignedTo: string;
 	nextAction: string;
 	intakeSummary: string;
+	qualification: QuoteRequestQualificationReview;
 	submittedPayload: QuoteRequestSubmittedPayload;
 	timeline: QuoteRequestTimelineEvent[];
 };
@@ -137,6 +158,178 @@ export const quoteRequestStatusOptions = quoteRequestStatuses.map((status) => ({
 	label: quoteRequestStatusMeta[status].label
 }));
 
+export const quoteRequestMissingInfoReasonCodes: QuoteRequestMissingInfoReasonCode[] = [
+	'service-fit-unconfirmed',
+	'site-readiness-unconfirmed',
+	'required-attachments-missing',
+	'contact-readiness-missing',
+	'scheduling-readiness-missing'
+];
+
+export const quoteRequestMissingInfoReasonMeta: Record<
+	QuoteRequestMissingInfoReasonCode,
+	{ label: string; detail: string; checkKey: QuoteRequestQualificationCheckKey }
+> = {
+	'service-fit-unconfirmed': {
+		label: 'Service fit not confirmed',
+		detail: 'Scope, trade fit, or project type needs office review before BDR accepts it.',
+		checkKey: 'service-fit'
+	},
+	'site-readiness-unconfirmed': {
+		label: 'Site readiness missing',
+		detail: 'Site name, address, access, or readiness details are incomplete.',
+		checkKey: 'site-readiness'
+	},
+	'required-attachments-missing': {
+		label: 'Required attachments missing',
+		detail: 'Photos, scope files, board material, or damage documentation still needs to be attached.',
+		checkKey: 'required-attachments'
+	},
+	'contact-readiness-missing': {
+		label: 'Contact readiness missing',
+		detail: 'A reachable contact name, email, and phone are required for follow-up.',
+		checkKey: 'contact-readiness'
+	},
+	'scheduling-readiness-missing': {
+		label: 'Scheduling readiness missing',
+		detail: 'Requested timing or availability is not clear enough to book a site visit.',
+		checkKey: 'scheduling-readiness'
+	}
+};
+
+export const quoteRequestMissingInfoReasonOptions = quoteRequestMissingInfoReasonCodes.map((code) => ({
+	value: code,
+	...quoteRequestMissingInfoReasonMeta[code]
+}));
+
+export const isQuoteRequestMissingInfoReasonCode = (value: string): value is QuoteRequestMissingInfoReasonCode =>
+	quoteRequestMissingInfoReasonCodes.includes(value as QuoteRequestMissingInfoReasonCode);
+
+export const normalizeQuoteRequestQualification = (value: unknown): QuoteRequestQualificationReview => {
+	if (!value || typeof value !== 'object') {
+		return { missingInfoReasonCodes: [] };
+	}
+
+	const qualification = value as Partial<QuoteRequestQualificationReview>;
+	const missingInfoReasonCodes = Array.isArray(qualification.missingInfoReasonCodes)
+		? qualification.missingInfoReasonCodes.filter((code): code is QuoteRequestMissingInfoReasonCode =>
+				typeof code === 'string' && isQuoteRequestMissingInfoReasonCode(code)
+			)
+		: [];
+
+	return {
+		missingInfoReasonCodes: [...new Set(missingInfoReasonCodes)],
+		reviewedAtUtc: qualification.reviewedAtUtc,
+		reviewedBy: qualification.reviewedBy
+	};
+};
+
+export type QuoteRequestQualificationCheck = {
+	key: QuoteRequestQualificationCheckKey;
+	label: string;
+	detail: string;
+	complete: boolean;
+	missingInfoReasonCode: QuoteRequestMissingInfoReasonCode;
+};
+
+export type QuoteRequestQualificationSummary = {
+	checks: QuoteRequestQualificationCheck[];
+	suggestedMissingInfoReasonCodes: QuoteRequestMissingInfoReasonCode[];
+	missingInfoReasonCodes: QuoteRequestMissingInfoReasonCode[];
+	blockerLabels: string[];
+	isQualified: boolean;
+	scheduleEligible: boolean;
+};
+
+const hasText = (value: string | null | undefined) => Boolean(value?.trim());
+const hasEmail = (value: string | null | undefined) => Boolean(value?.includes('@') && value.includes('.'));
+const hasPhone = (value: string | null | undefined) => (value?.replace(/\D/g, '').length ?? 0) >= 7;
+const hasDetailedScope = (value: string | null | undefined) => (value?.trim().length ?? 0) >= 18;
+
+const hasUsableAddress = (value: string | null | undefined) => {
+	const parts = String(value ?? '')
+		.split(',')
+		.map((part) => part.trim())
+		.filter(Boolean);
+	return parts.length >= 2 && parts.join('').length >= 12;
+};
+
+const needsAttachmentReview = (request: Pick<QuoteRequest, 'serviceType' | 'projectType' | 'propertyType' | 'need' | 'message' | 'priority'>) => {
+	const text = [
+		request.serviceType,
+		request.projectType,
+		request.propertyType,
+		request.need,
+		request.message,
+		request.priority
+	]
+		.join(' ')
+		.toLowerCase();
+	return /storm|leak|damage|insurance|hoa|board|multi-building|multi-family|photo|attachment|attached/.test(text);
+};
+
+export const buildQuoteRequestQualification = (request: QuoteRequest): QuoteRequestQualificationSummary => {
+	const attachmentReviewRequired = needsAttachmentReview(request);
+	const checks: QuoteRequestQualificationCheck[] = [
+		{
+			key: 'service-fit',
+			label: 'Service fit',
+			detail: 'Service type and scope describe work BDR can evaluate.',
+			complete: hasText(request.serviceType) && hasDetailedScope(request.need || request.message),
+			missingInfoReasonCode: 'service-fit-unconfirmed'
+		},
+		{
+			key: 'site-readiness',
+			label: 'Site readiness',
+			detail: 'Site name and service address are clear enough for field planning.',
+			complete: hasText(request.siteName) && hasUsableAddress(request.serviceAddress),
+			missingInfoReasonCode: 'site-readiness-unconfirmed'
+		},
+		{
+			key: 'required-attachments',
+			label: 'Required attachments',
+			detail: attachmentReviewRequired
+				? 'This request type needs photos or supporting files before qualification.'
+				: 'No required attachment blocker detected for this request.',
+			complete: !attachmentReviewRequired || request.attachments.length > 0,
+			missingInfoReasonCode: 'required-attachments-missing'
+		},
+		{
+			key: 'contact-readiness',
+			label: 'Contact readiness',
+			detail: 'Contact name, email, and phone are ready for office follow-up.',
+			complete: hasText(request.contactName) && hasEmail(request.email) && hasPhone(request.phone),
+			missingInfoReasonCode: 'contact-readiness-missing'
+		},
+		{
+			key: 'scheduling-readiness',
+			label: 'Scheduling readiness',
+			detail: 'Requested timing is specific enough to move into site visit scheduling.',
+			complete: hasText(request.requestedTimeline) && !/^needs review$/i.test(request.requestedTimeline.trim()),
+			missingInfoReasonCode: 'scheduling-readiness-missing'
+		}
+	];
+	const suggestedMissingInfoReasonCodes = checks
+		.filter((check) => !check.complete)
+		.map((check) => check.missingInfoReasonCode);
+	const reviewedMissingInfoReasonCodes = normalizeQuoteRequestQualification(request.qualification).missingInfoReasonCodes;
+	const missingInfoReasonCodes = [...new Set([...suggestedMissingInfoReasonCodes, ...reviewedMissingInfoReasonCodes])];
+	const blockerLabels = missingInfoReasonCodes.map((code) => quoteRequestMissingInfoReasonMeta[code].label);
+	const isQualified = checks.every((check) => check.complete) && reviewedMissingInfoReasonCodes.length === 0;
+
+	return {
+		checks,
+		suggestedMissingInfoReasonCodes,
+		missingInfoReasonCodes,
+		blockerLabels,
+		isQualified,
+		scheduleEligible: request.status === 'qualified' && isQualified
+	};
+};
+
+export const isQuoteRequestReadyForScheduling = (request: QuoteRequest) =>
+	buildQuoteRequestQualification(request).scheduleEligible;
+
 export const seededQuoteRequests: QuoteRequest[] = [
 	{
 		id: 'qr-storm-lakeview',
@@ -162,6 +355,9 @@ export const seededQuoteRequests: QuoteRequest[] = [
 		assignedTo: 'Office intake',
 		nextAction: 'Call within 15 minutes and offer same-day inspection slot.',
 		intakeSummary: 'Leak + storm damage + homeowner needs immediate response.',
+		qualification: {
+			missingInfoReasonCodes: []
+		},
 		submittedPayload: {
 			companyName: 'Lakeview Place',
 			contactName: 'Melissa Carter',
@@ -224,6 +420,9 @@ export const seededQuoteRequests: QuoteRequest[] = [
 		assignedTo: 'Ella - office admin',
 		nextAction: 'Send board-ready scope checklist before tomorrow noon.',
 		intakeSummary: 'HOA board timing matters more than speed; quote needs phased options.',
+		qualification: {
+			missingInfoReasonCodes: []
+		},
 		submittedPayload: {
 			companyName: 'Elmwood HOA',
 			contactName: 'Sandra Holt',
@@ -286,6 +485,9 @@ export const seededQuoteRequests: QuoteRequest[] = [
 		assignedTo: 'Estimator queue',
 		nextAction: 'Confirm ladder access and after-hours contact before Tuesday.',
 		intakeSummary: 'Commercial repair request already qualified and ready for site walk.',
+		qualification: {
+			missingInfoReasonCodes: []
+		},
 		submittedPayload: {
 			companyName: 'Riverside Retail',
 			contactName: 'Marcus Wynn',
@@ -383,6 +585,9 @@ export const createQuoteRequestFromForm = (form: QuoteRequestFormInput): QuoteRe
 		assignedTo: 'Office intake',
 		nextAction: 'Review submission, call customer, and assign inspection owner.',
 		intakeSummary: `${form.companyName} · ${form.serviceType} · ${form.requestedTimeline}`,
+		qualification: {
+			missingInfoReasonCodes: []
+		},
 		submittedPayload,
 		timeline: [
 			{

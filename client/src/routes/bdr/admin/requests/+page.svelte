@@ -1,11 +1,15 @@
 <script lang="ts">
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import {
+		buildQuoteRequestQualification,
+		quoteRequestMissingInfoReasonOptions,
 		quoteRequestStatusMeta,
 		quoteRequestStatusOptions,
-		type QuoteRequest
+		type QuoteRequest,
+		type QuoteRequestMissingInfoReasonCode,
+		type QuoteRequestStatus
 	} from '$lib/quote-requests';
-	import { ExternalLink, FileText, Pencil } from 'lucide-svelte';
+	import { AlertTriangle, CalendarCheck, CheckCircle2, ExternalLink, FileText, Lock, Pencil } from 'lucide-svelte';
 	import type { ActionData, PageProps } from './$types';
 
 	let { data, form }: { data: PageProps['data']; form: ActionData } = $props();
@@ -17,6 +21,7 @@
 	let search = $state('');
 	let selectedAttachmentId = $state('');
 	let contactDrawerOpen = $state(false);
+	let triageStatus = $state<QuoteRequestStatus>('new');
 
 	$effect(() => {
 		if (!selectedRequestId && requests[0]) {
@@ -36,6 +41,7 @@
 		const query = search.trim().toLowerCase();
 
 		return requests.filter((request) => {
+			const qualification = buildQuoteRequestQualification(request);
 			const haystack = [
 				quoteRequestStatusMeta[request.status].label,
 				request.companyName,
@@ -56,6 +62,7 @@
 				request.intakeSummary,
 				request.assignedTo,
 				request.nextAction,
+				...qualification.blockerLabels,
 				request.source
 			]
 				.join(' ')
@@ -99,10 +106,17 @@
 					selectedAttachment.contentType.startsWith('text/'))
 		)
 	);
+	const selectedQualification = $derived(selectedRequest ? buildQuoteRequestQualification(selectedRequest) : null);
 
 	$effect(() => {
 		if (!selectedRequest?.attachments.some((attachment) => attachment.id === selectedAttachmentId)) {
 			selectedAttachmentId = '';
+		}
+	});
+
+	$effect(() => {
+		if (selectedRequest) {
+			triageStatus = selectedRequest.status;
 		}
 	});
 
@@ -145,17 +159,11 @@
 	};
 
 	const selectedAddress = $derived(parseAddress(selectedRequest?.serviceAddress ?? ''));
-	const qualificationChecks = $derived.by(() => {
-		if (!selectedRequest) return [];
-
-		return [
-			{ label: 'Contact info captured', complete: Boolean(selectedRequest.contactName && selectedRequest.email && selectedRequest.phone) },
-			{ label: 'Site address captured', complete: Boolean(selectedAddress.address1 && selectedAddress.city && selectedAddress.state) },
-			{ label: 'Scope and service type captured', complete: Boolean(selectedRequest.serviceType && selectedRequest.need) },
-			{ label: 'Request timeframe captured', complete: Boolean(selectedRequest.requestedTimeline) },
-			{ label: 'Supporting files reviewed', complete: selectedRequest.attachments.length > 0 }
-		];
-	});
+	const isMissingInfoReasonChecked = (code: QuoteRequestMissingInfoReasonCode) =>
+		Boolean(
+			selectedQualification?.suggestedMissingInfoReasonCodes.includes(code) ||
+				selectedRequest?.qualification.missingInfoReasonCodes.includes(code)
+		);
 
 	const formatAttachmentSize = (sizeBytes: number) => {
 		if (sizeBytes >= 1024 * 1024) return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -235,6 +243,7 @@
 				</p>
 				{#if filteredRequests.length}
 					{#each filteredRequests as request}
+						{@const qualification = buildQuoteRequestQualification(request)}
 						<button
 							type="button"
 							class={`w-full rounded-md border px-3 py-3 text-left transition ${quoteCardStateClass(request, selectedRequest?.id === request.id)}`}
@@ -246,6 +255,22 @@
 									<p class="mt-1 line-clamp-1 text-xs text-[var(--text-muted)]">{request.siteName} · {request.serviceType}</p>
 								</div>
 								<p class="shrink-0 text-[0.68rem] text-[var(--muted)]">{formatSubmittedAt(request.submittedAtUtc)}</p>
+							</div>
+							<div class="mt-3 flex flex-wrap items-center gap-2">
+								<span class={`rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${selectedRequest?.id === request.id ? 'border-[var(--accent-border)] bg-[var(--shell-panel)] text-[var(--accent-text)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel-strong)] text-[var(--text-muted)]'}`}>
+									{quoteRequestStatusMeta[request.status].label}
+								</span>
+								{#if qualification.blockerLabels.length}
+									<span class="inline-flex min-w-0 items-center gap-1 rounded-md border border-amber-400/35 bg-amber-400/10 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-amber-300">
+										<AlertTriangle size={12} />
+										<span class="truncate">{qualification.blockerLabels.slice(0, 2).join(' · ')}</span>
+									</span>
+								{:else}
+									<span class="inline-flex items-center gap-1 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-emerald-300">
+										<CheckCircle2 size={12} />
+										Qualified inputs
+									</span>
+								{/if}
 							</div>
 						</button>
 					{/each}
@@ -284,9 +309,9 @@
 					<div class="mt-5 grid gap-4 lg:grid-cols-[180px_220px_minmax(0,1fr)]">
 						<div class="grid gap-2">
 							<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="status">Stage</label>
-							<select id="status" name="status" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">
+							<select id="status" name="status" bind:value={triageStatus} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">
 								{#each quoteRequestStatusOptions as option}
-									<option value={option.value} selected={selectedRequest.status === option.value}>{option.label}</option>
+									<option value={option.value}>{option.label}</option>
 								{/each}
 							</select>
 						</div>
@@ -300,9 +325,52 @@
 						</div>
 					</div>
 
+					{#if triageStatus === 'needs-info'}
+						<div class="mt-5 rounded-md border border-amber-400/30 bg-amber-400/10 p-4">
+							<div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+								<div>
+									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-amber-200">Needs Info reason codes</p>
+									<p class="mt-1 text-sm leading-6 text-amber-100/80">Select the structured blockers the customer must resolve before qualification can finish.</p>
+								</div>
+								<span class="rounded-md border border-amber-300/30 bg-black/10 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-amber-100">Required</span>
+							</div>
+							<div class="mt-4 grid gap-2 lg:grid-cols-2">
+								{#each quoteRequestMissingInfoReasonOptions as reason}
+									<label class="flex gap-3 rounded-md border border-amber-300/20 bg-black/10 p-3 text-left">
+										<input
+											type="checkbox"
+											name="missingInfoReasonCodes"
+											value={reason.value}
+											checked={isMissingInfoReasonChecked(reason.value)}
+											class="mt-1 h-4 w-4 rounded border-amber-200 bg-[var(--shell-panel)] text-[var(--accent-solid)]"
+										/>
+										<span>
+											<span class="block text-sm font-semibold text-amber-100">{reason.label}</span>
+											<span class="mt-1 block text-xs leading-5 text-amber-100/70">{reason.detail}</span>
+										</span>
+									</label>
+								{/each}
+							</div>
+						</div>
+					{:else if selectedQualification?.blockerLabels.length}
+						<div class="mt-5 rounded-md border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100">
+							<span class="font-semibold">Blocking inputs:</span> {selectedQualification.blockerLabels.join(' · ')}. Move the request to Needs Info to store customer-facing reason codes.
+						</div>
+					{/if}
+
 					<div class="mt-5 flex flex-wrap gap-3">
 						<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save changes</button>
-						<a href={selectedRequestScheduleHref} class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)] transition hover:bg-[var(--shell-panel)]">Schedule site visit</a>
+						{#if selectedQualification?.scheduleEligible}
+							<a href={selectedRequestScheduleHref} class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)] transition hover:bg-[var(--shell-panel)]">
+								<CalendarCheck size={15} />
+								Schedule site visit
+							</a>
+						{:else}
+							<span class="inline-flex items-center gap-2 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]" title="Mark the request Qualified after clearing qualification blockers to schedule a site visit.">
+								<Lock size={15} />
+								Qualify before scheduling
+							</span>
+						{/if}
 						<a href="/bdr/admin/estimates?role=office-admin" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Open estimate lane</a>
 					</div>
 				</form>
@@ -321,15 +389,37 @@
 								<p class="mt-2 text-sm leading-6 text-[var(--text-base)]">{selectedRequest.nextAction}</p>
 							</div>
 							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Qualification checklist</p>
+								<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+									<div>
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Qualification checklist</p>
+										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Service fit, site readiness, attachments, contact readiness, and scheduling readiness.</p>
+									</div>
+									<span class={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${selectedQualification?.isQualified ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-300'}`}>
+										{#if selectedQualification?.isQualified}
+											<CheckCircle2 size={13} />
+											Qualified
+										{:else}
+											<AlertTriangle size={13} />
+											Blocked
+										{/if}
+									</span>
+								</div>
 								<div class="mt-3 space-y-2">
-									{#each qualificationChecks as check}
-										<div class="flex items-center justify-between gap-3 text-sm">
-											<span class="text-[var(--text-base)]">{check.label}</span>
-											<span class={`rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${check.complete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-300'}`}>{check.complete ? 'Ready' : 'Needs info'}</span>
+									{#each selectedQualification?.checks ?? [] as check}
+										<div class="flex items-start justify-between gap-3 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm">
+											<div class="min-w-0">
+												<p class="font-semibold text-[var(--text-base)]">{check.label}</p>
+												<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{check.detail}</p>
+											</div>
+											<span class={`shrink-0 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${check.complete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-300'}`}>{check.complete ? 'Ready' : 'Needs info'}</span>
 										</div>
 									{/each}
 								</div>
+								{#if selectedQualification?.blockerLabels.length}
+									<div class="mt-3 rounded-md border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
+										<span class="font-semibold">Blocking reasons:</span> {selectedQualification.blockerLabels.join(' · ')}
+									</div>
+								{/if}
 							</div>
 						</div>
 						<div class="space-y-4 border-t border-[var(--shell-border)] pt-5 text-sm xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
@@ -484,6 +574,9 @@
 				<input type="hidden" name="status" value={selectedRequest.status} />
 				<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
 				<input type="hidden" name="nextAction" value={selectedRequest.nextAction} />
+				{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
+					<input type="hidden" name="missingInfoReasonCodes" value={code} />
+				{/each}
 
 				<label class="grid gap-1">
 					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Contact name</span>

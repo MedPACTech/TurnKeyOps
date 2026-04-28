@@ -293,6 +293,7 @@ type SiteVisit = {
 
 	const selectedDateKey = $derived(formatDateKey(selectedDate));
 	const scheduledRequest = $derived(data.scheduledRequest);
+	const scheduledRequestQualification = $derived(data.scheduledRequestQualification);
 	const scheduledRequestDateLabel = $derived(
 		scheduledRequest
 			? new Date(scheduledRequest.submittedAtUtc).toLocaleString('en-US', {
@@ -589,8 +590,15 @@ type SiteVisit = {
 					</div>
 					<div class="mt-4 grid gap-3 lg:grid-cols-3">
 						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
-							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Scheduling intent</p>
-							<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">Book the site visit from this request, then use the visit as the bridge into field capture and estimate generation.</p>
+							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Scheduling eligibility</p>
+							{#if scheduledRequestQualification?.scheduleEligible}
+								<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">Qualified for site visit scheduling. Use the visit as the bridge into field capture and estimate generation.</p>
+							{:else}
+								<p class="mt-2 text-sm leading-6 text-amber-300">Qualification must be cleared before this request can move into site visit scheduling.</p>
+								{#if scheduledRequestQualification?.blockerLabels.length}
+									<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{scheduledRequestQualification.blockerLabels.join(' · ')}</p>
+								{/if}
+							{/if}
 						</div>
 						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
 							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Customer contact</p>
