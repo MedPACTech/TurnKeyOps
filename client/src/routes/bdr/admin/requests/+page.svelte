@@ -2,6 +2,7 @@
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import {
 		buildQuoteRequestQualification,
+		isQuoteRequestUnassigned,
 		quoteRequestMissingInfoReasonOptions,
 		quoteRequestStatusMeta,
 		quoteRequestStatusOptions,
@@ -22,6 +23,15 @@
 	let selectedAttachmentId = $state('');
 	let contactDrawerOpen = $state(false);
 	let triageStatus = $state<QuoteRequestStatus>('new');
+	let scheduleVisitDate = $state('');
+	let scheduleWindowStart = $state('09:00');
+	let scheduleWindowEnd = $state('10:30');
+	let scheduleSiteContact = $state('');
+	let scheduleSiteContactPhone = $state('');
+	let scheduleAssignedFieldResource = $state('');
+	let scheduleNotes = $state('');
+
+	const fieldResourceSuggestions = ['Estimator - Maya', 'Estimator - Chris', 'Estimator - Lane', 'Ella - office admin', 'Estimator - Jordan'];
 
 	$effect(() => {
 		if (!selectedRequestId && requests[0]) {
@@ -107,6 +117,15 @@
 		)
 	);
 	const selectedQualification = $derived(selectedRequest ? buildQuoteRequestQualification(selectedRequest) : null);
+	const selectedRequestScheduleSectionId = $derived(
+		selectedRequest ? `schedule-site-visit-${selectedRequest.id}` : 'schedule-site-visit'
+	);
+	const selectedRequestCanOpenScheduler = $derived(
+		Boolean(
+			selectedRequest &&
+				(selectedQualification?.isQualified || selectedRequest.status === 'inspection-scheduled' || selectedRequest.siteVisitSchedule)
+		)
+	);
 
 	$effect(() => {
 		if (!selectedRequest?.attachments.some((attachment) => attachment.id === selectedAttachmentId)) {
@@ -118,6 +137,24 @@
 		if (selectedRequest) {
 			triageStatus = selectedRequest.status;
 		}
+	});
+
+	const defaultScheduleDate = () => {
+		const value = new Date();
+		value.setDate(value.getDate() + 1);
+		return value.toISOString().slice(0, 10);
+	};
+
+	$effect(() => {
+		if (!selectedRequest) return;
+		const existingSchedule = selectedRequest.siteVisitSchedule;
+		scheduleVisitDate = existingSchedule?.visitDate ?? defaultScheduleDate();
+		scheduleWindowStart = existingSchedule?.windowStart ?? '09:00';
+		scheduleWindowEnd = existingSchedule?.windowEnd ?? '10:30';
+		scheduleSiteContact = existingSchedule?.siteContact ?? selectedRequest.contactName;
+		scheduleSiteContactPhone = existingSchedule?.siteContactPhone ?? selectedRequest.phone;
+		scheduleAssignedFieldResource = existingSchedule?.assignedFieldResource ?? (isQuoteRequestUnassigned(selectedRequest) ? '' : selectedRequest.assignedTo);
+		scheduleNotes = existingSchedule?.notes ?? '';
 	});
 
 	const metrics = $derived([
@@ -133,6 +170,27 @@
 			hour: 'numeric',
 			minute: '2-digit'
 		});
+
+	const formatScheduleDate = (value: string) =>
+		new Date(`${value}T12:00:00`).toLocaleDateString([], {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+
+	const formatScheduleTime = (value: string) => {
+		const [hoursText = '0', minutesText = '0'] = value.split(':');
+		const hours = Number(hoursText);
+		const minutes = Number(minutesText);
+		if (Number.isNaN(hours) || Number.isNaN(minutes)) return value;
+		return new Date(2026, 0, 1, hours, minutes).toLocaleTimeString([], {
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+	};
+
+	const formatScheduleWindow = (windowStart: string, windowEnd: string) =>
+		`${formatScheduleTime(windowStart)} – ${formatScheduleTime(windowEnd)}`;
 
 	const quoteCardStateClass = (request: QuoteRequest, isSelected: boolean) => {
 		const stateClass = request.status === 'new' ? 'border-t-4 border-t-emerald-400' : 'border-t border-t-[var(--shell-border)]';
@@ -300,9 +358,9 @@
 						</div>
 					</div>
 
-					{#if form?.success}
+					{#if form?.success && form.updatedRequestId === selectedRequest.id}
 						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Saved</p>
-					{:else if form?.message}
+					{:else if form?.message && form.updatedRequestId === selectedRequest.id}
 						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">{form.message}</p>
 					{/if}
 
@@ -360,10 +418,10 @@
 
 					<div class="mt-5 flex flex-wrap gap-3">
 						<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save changes</button>
-						{#if selectedQualification?.scheduleEligible}
-							<a href={selectedRequestScheduleHref} class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)] transition hover:bg-[var(--shell-panel)]">
+						{#if selectedRequestCanOpenScheduler}
+							<a href={`#${selectedRequestScheduleSectionId}`} class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)] transition hover:bg-[var(--shell-panel)]">
 								<CalendarCheck size={15} />
-								Schedule site visit
+								{selectedRequest.siteVisitSchedule ? 'Review site visit' : 'Open site visit workspace'}
 							</a>
 						{:else}
 							<span class="inline-flex items-center gap-2 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]" title="Mark the request Qualified after clearing qualification blockers to schedule a site visit.">
@@ -374,6 +432,121 @@
 						<a href="/bdr/admin/estimates?role=office-admin" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Open estimate lane</a>
 					</div>
 				</form>
+
+				<section id={selectedRequestScheduleSectionId} class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+						<div class="max-w-3xl">
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Site visit scheduling workspace</p>
+							<h5 class="mt-1 text-xl font-semibold text-[var(--text-strong)]">Book the field handoff without leaving the quote request detail flow</h5>
+							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+								Propose the visit date, time window, site contact, and assigned field resource here. Saving this workspace moves the request to Site Visit Scheduled and writes the confirmation into the activity timeline.
+							</p>
+						</div>
+						{#if selectedRequest.siteVisitSchedule}
+							<span class="inline-flex items-center gap-2 rounded-md border border-emerald-400/35 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300">
+								<CheckCircle2 size={14} />
+								Scheduled
+							</span>
+						{:else if selectedRequestCanOpenScheduler}
+							<span class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
+								<CalendarCheck size={14} />
+								Ready to book
+							</span>
+						{:else}
+							<span class="inline-flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-300">
+								<AlertTriangle size={14} />
+								Blocked
+							</span>
+						{/if}
+					</div>
+
+					{#if form?.scheduleSuccess && form.scheduledRequestId === selectedRequest.id}
+						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Site visit scheduled</p>
+					{:else if form?.scheduleMessage && form.scheduledRequestId === selectedRequest.id}
+						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">{form.scheduleMessage}</p>
+					{/if}
+
+					{#if selectedRequest.siteVisitSchedule}
+						<div class="mt-4 grid gap-3 lg:grid-cols-3">
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Current visit window</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatScheduleDate(selectedRequest.siteVisitSchedule.visitDate)}</p>
+								<p class="mt-1 text-sm text-[var(--text-muted)]">{formatScheduleWindow(selectedRequest.siteVisitSchedule.windowStart, selectedRequest.siteVisitSchedule.windowEnd)}</p>
+							</div>
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site contact</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.siteVisitSchedule.siteContact}</p>
+								<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.siteVisitSchedule.siteContactPhone || 'Phone not captured'}</p>
+							</div>
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Assigned field resource</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.siteVisitSchedule.assignedFieldResource}</p>
+								<p class="mt-1 text-sm text-[var(--text-muted)]">Scheduled by {selectedRequest.siteVisitSchedule.scheduledBy}</p>
+							</div>
+						</div>
+					{/if}
+
+					{#if selectedRequestCanOpenScheduler}
+						<form method="POST" action="?/scheduleSiteVisit" class="mt-5 space-y-4">
+							<input type="hidden" name="id" value={selectedRequest.id} />
+							<div class="grid gap-4 lg:grid-cols-[160px_150px_150px_minmax(0,1fr)]">
+								<label class="grid gap-2">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Visit date</span>
+									<input bind:value={scheduleVisitDate} type="date" name="visitDate" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-2">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Window start</span>
+									<input bind:value={scheduleWindowStart} type="time" name="windowStart" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-2">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Window end</span>
+									<input bind:value={scheduleWindowEnd} type="time" name="windowEnd" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-2">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Assigned field resource</span>
+									<input bind:value={scheduleAssignedFieldResource} list="field-resource-options" name="assignedFieldResource" placeholder="Estimator or crew" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+							</div>
+							<div class="grid gap-4 lg:grid-cols-2">
+								<label class="grid gap-2">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site contact</span>
+									<input bind:value={scheduleSiteContact} name="siteContact" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-2">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site contact phone</span>
+									<input bind:value={scheduleSiteContactPhone} name="siteContactPhone" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+							</div>
+							<label class="grid gap-2">
+								<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Field notes</span>
+								<textarea bind:value={scheduleNotes} name="notes" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" placeholder="Access instructions, expected scope, ladder notes, parking details"></textarea>
+							</label>
+							<datalist id="field-resource-options">
+								{#each fieldResourceSuggestions as resource}
+									<option value={resource}></option>
+								{/each}
+							</datalist>
+							<div class="flex flex-wrap gap-3">
+								<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">
+									{selectedRequest.siteVisitSchedule ? 'Update site visit' : 'Schedule site visit'}
+								</button>
+								<a href={selectedRequestScheduleHref} class="inline-flex items-center gap-2 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">
+									<ExternalLink size={14} />
+									Open calendar view
+								</a>
+							</div>
+						</form>
+					{:else}
+						<div class="mt-4 rounded-md border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100">
+							<span class="font-semibold">Scheduling is blocked:</span>
+							{#if selectedQualification?.blockerLabels.length}
+								{selectedQualification.blockerLabels.join(' · ')}. Clear the blockers and move the request to Qualified before booking.
+							{:else}
+								Move the request to Qualified before booking.
+							{/if}
+						</div>
+					{/if}
+				</section>
 
 				<section class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -552,7 +725,28 @@
 									</div>
 									<p class="shrink-0 text-xs text-[var(--muted)]">{formatSubmittedAt(event.occurredAtUtc)}</p>
 								</div>
-								{#if event.payload}
+								{#if event.siteVisitSchedule}
+									<div class="mt-3 grid gap-3 lg:grid-cols-3">
+										<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3">
+											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Visit window</p>
+											<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatScheduleDate(event.siteVisitSchedule.visitDate)}</p>
+											<p class="mt-1 text-xs text-[var(--text-muted)]">{formatScheduleWindow(event.siteVisitSchedule.windowStart, event.siteVisitSchedule.windowEnd)}</p>
+										</div>
+										<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3">
+											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Site contact</p>
+											<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{event.siteVisitSchedule.siteContact}</p>
+											<p class="mt-1 text-xs text-[var(--text-muted)]">{event.siteVisitSchedule.siteContactPhone || 'Phone not captured'}</p>
+										</div>
+										<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3">
+											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Field resource</p>
+											<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{event.siteVisitSchedule.assignedFieldResource}</p>
+											<p class="mt-1 text-xs text-[var(--text-muted)]">Scheduled by {event.siteVisitSchedule.scheduledBy}</p>
+										</div>
+									</div>
+									{#if event.note}
+										<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">{event.note}</p>
+									{/if}
+								{:else if event.payload}
 									<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">{event.payload.companyName} submitted {event.payload.serviceType} for {event.payload.siteName} with timeline "{event.payload.requestedTimeline}".</p>
 								{/if}
 							</div>

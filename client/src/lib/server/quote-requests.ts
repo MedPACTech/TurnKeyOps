@@ -5,6 +5,7 @@ import {
 	buildQuoteRequestInbox,
 	createQuoteRequestFromForm,
 	normalizeQuoteRequestQualification,
+	normalizeQuoteRequestSiteVisitSchedule,
 	seededQuoteRequests,
 	type QuoteRequest,
 	type QuoteRequestAttachment,
@@ -12,6 +13,7 @@ import {
 	type QuoteRequestMissingInfoReasonCode,
 	type QuoteRequestPriority,
 	type QuoteRequestQualificationReview,
+	type QuoteRequestSiteVisitSchedule,
 	type QuoteRequestStatus,
 	type QuoteRequestSubmittedPayload,
 	type QuoteRequestTimelineEvent
@@ -64,6 +66,7 @@ type QuoteRequestDto = {
 	qualification?: QuoteRequestQualificationReview | null;
 	submittedPayload?: QuoteRequestSubmittedPayload | null;
 	timeline?: QuoteRequestTimelineEvent[] | null;
+	siteVisitSchedule?: QuoteRequestSiteVisitSchedule | null;
 	updatedAtUtc?: string | null;
 };
 
@@ -108,6 +111,7 @@ type QuoteLeadMetadata = {
 	qualification?: QuoteRequestQualificationReview;
 	submittedPayload?: QuoteRequestSubmittedPayload;
 	timeline?: QuoteRequestTimelineEvent[];
+	siteVisitSchedule?: QuoteRequestSiteVisitSchedule | null;
 };
 
 const statusToPipelineStage: Record<QuoteRequestStatus, string> = {
@@ -116,7 +120,7 @@ const statusToPipelineStage: Record<QuoteRequestStatus, string> = {
 	'needs-info': 'Needs Info',
 	qualified: 'Qualified',
 	contacted: 'Contacted',
-	'inspection-scheduled': 'Inspection Scheduled',
+	'inspection-scheduled': 'Site Visit Scheduled',
 	'estimate-drafted': 'Estimate Drafted',
 	'estimate-sent': 'Quoted',
 	won: 'Won',
@@ -129,7 +133,7 @@ const pipelineStageToStatus = (value: string | null | undefined): QuoteRequestSt
 	if (normalized === 'needs info') return 'needs-info';
 	if (normalized === 'qualified') return 'qualified';
 	if (normalized === 'contacted') return 'contacted';
-	if (normalized === 'inspection scheduled') return 'inspection-scheduled';
+	if (normalized === 'inspection scheduled' || normalized === 'site visit scheduled') return 'inspection-scheduled';
 	if (normalized === 'estimate drafted') return 'estimate-drafted';
 	if (normalized === 'quoted' || normalized === 'estimate sent') return 'estimate-sent';
 	if (normalized === 'won') return 'won';
@@ -243,7 +247,8 @@ const normalizeQuoteRequest = (request: QuoteRequest): QuoteRequest => {
 		attachments,
 		submittedPayload: request.submittedPayload ?? ({} as QuoteRequestSubmittedPayload),
 		qualification: normalizeQuoteRequestQualification(request.qualification),
-		timeline: Array.isArray(request.timeline) ? request.timeline : []
+		timeline: Array.isArray(request.timeline) ? request.timeline : [],
+		siteVisitSchedule: normalizeQuoteRequestSiteVisitSchedule(request.siteVisitSchedule)
 	};
 
 	const submittedPayload = isSubmittedPayload(request.submittedPayload)
@@ -271,6 +276,26 @@ const normalizeQuoteRequest = (request: QuoteRequest): QuoteRequest => {
 		timeline
 	};
 };
+
+const formatSiteVisitDateLabel = (value: string) =>
+	new Date(`${value}T12:00:00`).toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric'
+	});
+
+const formatSiteVisitTimeLabel = (value: string) => {
+	const [hoursText = '0', minutesText = '0'] = value.split(':');
+	const hours = Number(hoursText);
+	const minutes = Number(minutesText);
+	if (Number.isNaN(hours) || Number.isNaN(minutes)) return value;
+	return new Date(2026, 0, 1, hours, minutes).toLocaleTimeString('en-US', {
+		hour: 'numeric',
+		minute: '2-digit'
+	});
+};
+
+const buildSiteVisitWindowLabel = (schedule: Pick<QuoteRequestSiteVisitSchedule, 'windowStart' | 'windowEnd'>) =>
+	`${formatSiteVisitTimeLabel(schedule.windowStart)} – ${formatSiteVisitTimeLabel(schedule.windowEnd)}`;
 
 const readLocalQuoteRequests = async (): Promise<QuoteRequest[]> => {
 	try {
@@ -362,7 +387,8 @@ const toQuoteRequest = (record: QuoteRequestDto | LegacyLeadDto): QuoteRequest |
 			intakeSummary: record.intakeSummary,
 			qualification: normalizeQuoteRequestQualification(record.qualification),
 			submittedPayload: record.submittedPayload ?? ({} as QuoteRequestSubmittedPayload),
-			timeline: record.timeline ?? []
+			timeline: record.timeline ?? [],
+			siteVisitSchedule: normalizeQuoteRequestSiteVisitSchedule(record.siteVisitSchedule)
 		});
 	}
 
@@ -395,7 +421,8 @@ const toQuoteRequest = (record: QuoteRequestDto | LegacyLeadDto): QuoteRequest |
 		intakeSummary: metadata.intakeSummary,
 		qualification: normalizeQuoteRequestQualification(metadata.qualification),
 		submittedPayload: metadata.submittedPayload ?? ({} as QuoteRequestSubmittedPayload),
-		timeline: metadata.timeline ?? []
+		timeline: metadata.timeline ?? [],
+		siteVisitSchedule: normalizeQuoteRequestSiteVisitSchedule(metadata.siteVisitSchedule)
 	});
 };
 
@@ -441,6 +468,7 @@ const toQuoteRequestDto = (request: QuoteRequest, existing?: QuoteRequestDto): Q
 	qualification: request.qualification,
 	submittedPayload: request.submittedPayload,
 	timeline: request.timeline,
+	siteVisitSchedule: request.siteVisitSchedule,
 	updatedAtUtc: existing?.updatedAtUtc ?? null
 });
 
@@ -466,7 +494,8 @@ const toLegacyLeadDto = (request: QuoteRequest, existing?: LegacyLeadDto): Legac
 		source: request.source,
 		qualification: request.qualification,
 		submittedPayload: request.submittedPayload,
-		timeline: request.timeline
+		timeline: request.timeline,
+		siteVisitSchedule: request.siteVisitSchedule
 	};
 
 	return {
@@ -527,6 +556,7 @@ export const submitQuoteRequest = async (fetch: typeof globalThis.fetch, input: 
 		});
 
 		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		await saveLocalQuoteRequest(request);
 	} catch (cause) {
 		console.warn('Quote request API unavailable; saving request locally for operator triage.', cause);
 		await saveLocalQuoteRequest(request);
@@ -632,9 +662,117 @@ export const updateQuoteRequest = async (
 		});
 
 		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		await saveLocalQuoteRequest(updatedRequest);
 		return updatedRequest;
 	} catch (cause) {
 		console.warn('Quote request API unavailable; trying local quote request update.', cause);
+		const localRequests = await readLocalQuoteRequests();
+		const existingRequest = localRequests.find((request) => request.id === params.id);
+		if (!existingRequest) {
+			throw error(404, 'Quote request record was not found locally');
+		}
+
+		const updatedRequest = buildUpdatedRequest(existingRequest);
+		await updateLocalQuoteRequest(updatedRequest);
+		return updatedRequest;
+	}
+};
+
+export const scheduleQuoteRequestSiteVisit = async (
+	fetch: typeof globalThis.fetch,
+	params: {
+		id: string;
+		visitDate: string;
+		windowStart: string;
+		windowEnd: string;
+		siteContact: string;
+		siteContactPhone?: string;
+		assignedFieldResource: string;
+		notes?: string;
+	}
+) => {
+	const scheduledAtUtc = new Date().toISOString();
+	const normalizedSchedule = normalizeQuoteRequestSiteVisitSchedule({
+		visitDate: params.visitDate,
+		windowStart: params.windowStart,
+		windowEnd: params.windowEnd,
+		siteContact: params.siteContact,
+		siteContactPhone: params.siteContactPhone ?? '',
+		assignedFieldResource: params.assignedFieldResource,
+		notes: params.notes ?? '',
+		scheduledAtUtc,
+		scheduledBy: 'External Admin'
+	});
+
+	if (!normalizedSchedule) {
+		throw error(400, 'Site visit schedule details were incomplete.');
+	}
+
+	const buildUpdatedRequest = (existingRequest: QuoteRequest): QuoteRequest => {
+		const visitWindowLabel = buildSiteVisitWindowLabel(normalizedSchedule);
+		const visitDateLabel = formatSiteVisitDateLabel(normalizedSchedule.visitDate);
+		const nextAction = [
+			`Site visit scheduled for ${visitDateLabel} (${visitWindowLabel}).`,
+			`Field resource: ${normalizedSchedule.assignedFieldResource}.`,
+			`Site contact: ${normalizedSchedule.siteContact}${normalizedSchedule.siteContactPhone ? ` · ${normalizedSchedule.siteContactPhone}` : ''}.`,
+			normalizedSchedule.notes ? `Notes: ${normalizedSchedule.notes}` : ''
+		]
+			.filter(Boolean)
+			.join(' ');
+
+		return {
+			...existingRequest,
+			status: 'inspection-scheduled',
+			assignedTo: normalizedSchedule.assignedFieldResource,
+			nextAction,
+			qualification: {
+				missingInfoReasonCodes: [],
+				reviewedAtUtc: scheduledAtUtc,
+				reviewedBy: 'External Admin'
+			},
+			siteVisitSchedule: normalizedSchedule,
+			timeline: [
+				...existingRequest.timeline,
+				{
+					id: crypto.randomUUID(),
+					occurredAtUtc: scheduledAtUtc,
+					type: 'site-visit-scheduled',
+					actor: 'External Admin',
+					label: `Site visit scheduled · ${visitDateLabel} · ${visitWindowLabel}`,
+					note: normalizedSchedule.notes,
+					siteVisitSchedule: normalizedSchedule
+				}
+			]
+		};
+	};
+
+	try {
+		const existingResponse = await fetch(`${getApiBaseUrl()}/api/quote-requests/${params.id}`, {
+			headers: getApiHeaders()
+		});
+		const existingRecord = await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(existingResponse);
+		const existingRequest = toQuoteRequest(existingRecord);
+
+		if (!existingRequest) {
+			throw error(404, 'Quote request record was not found in the API');
+		}
+
+		const updatedRequest = buildUpdatedRequest(existingRequest);
+		const body = isQuoteRequestDto(existingRecord)
+			? toQuoteRequestDto(updatedRequest, existingRecord)
+			: toLegacyLeadDto(updatedRequest, existingRecord);
+
+		const response = await fetch(`${getApiBaseUrl()}/api/quote-requests/${params.id}`, {
+			method: 'PUT',
+			headers: getApiHeaders(),
+			body: JSON.stringify(body)
+		});
+
+		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		await saveLocalQuoteRequest(updatedRequest);
+		return updatedRequest;
+	} catch (cause) {
+		console.warn('Quote request API unavailable; trying local site visit scheduling.', cause);
 		const localRequests = await readLocalQuoteRequests();
 		const existingRequest = localRequests.find((request) => request.id === params.id);
 		if (!existingRequest) {

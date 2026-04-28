@@ -23,6 +23,18 @@ export type QuoteRequestAttachment = {
 	blobUrl?: string;
 };
 
+export type QuoteRequestSiteVisitSchedule = {
+	visitDate: string;
+	windowStart: string;
+	windowEnd: string;
+	siteContact: string;
+	siteContactPhone: string;
+	assignedFieldResource: string;
+	notes?: string;
+	scheduledAtUtc: string;
+	scheduledBy: string;
+};
+
 export type QuoteRequestQualificationCheckKey =
 	| 'service-fit'
 	| 'site-readiness'
@@ -61,10 +73,12 @@ export type QuoteRequestSubmittedPayload = {
 export type QuoteRequestTimelineEvent = {
 	id: string;
 	occurredAtUtc: string;
-	type: 'submitted' | 'operator-updated';
+	type: 'submitted' | 'operator-updated' | 'site-visit-scheduled';
 	actor: string;
 	label: string;
 	payload?: QuoteRequestSubmittedPayload;
+	note?: string;
+	siteVisitSchedule?: QuoteRequestSiteVisitSchedule;
 };
 
 export type QuoteRequest = {
@@ -94,6 +108,7 @@ export type QuoteRequest = {
 	qualification: QuoteRequestQualificationReview;
 	submittedPayload: QuoteRequestSubmittedPayload;
 	timeline: QuoteRequestTimelineEvent[];
+	siteVisitSchedule?: QuoteRequestSiteVisitSchedule | null;
 };
 
 export type QuoteRequestFormInput = {
@@ -135,7 +150,7 @@ export const quoteRequestStatusMeta: Record<
 	qualified: { label: 'Qualified', detail: 'Request has enough context to schedule or estimate.', tone: 'emerald' },
 	contacted: { label: 'Contacted', detail: 'BDR has made first contact and is qualifying scope.', tone: 'blue' },
 	'inspection-scheduled': {
-		label: 'Inspection scheduled',
+		label: 'Site Visit Scheduled',
 		detail: 'Site visit is booked and waiting on field follow-through.',
 		tone: 'violet'
 	},
@@ -204,6 +219,39 @@ export const quoteRequestMissingInfoReasonOptions = quoteRequestMissingInfoReaso
 
 export const isQuoteRequestMissingInfoReasonCode = (value: string): value is QuoteRequestMissingInfoReasonCode =>
 	quoteRequestMissingInfoReasonCodes.includes(value as QuoteRequestMissingInfoReasonCode);
+
+export const normalizeQuoteRequestSiteVisitSchedule = (value: unknown): QuoteRequestSiteVisitSchedule | null => {
+	if (!value || typeof value !== 'object') {
+		return null;
+	}
+
+	const schedule = value as Partial<QuoteRequestSiteVisitSchedule>;
+	const visitDate = String(schedule.visitDate ?? '').trim();
+	const windowStart = String(schedule.windowStart ?? '').trim();
+	const windowEnd = String(schedule.windowEnd ?? '').trim();
+	const siteContact = String(schedule.siteContact ?? '').trim();
+	const siteContactPhone = String(schedule.siteContactPhone ?? '').trim();
+	const assignedFieldResource = String(schedule.assignedFieldResource ?? '').trim();
+	const scheduledAtUtc = String(schedule.scheduledAtUtc ?? '').trim();
+	const scheduledBy = String(schedule.scheduledBy ?? '').trim();
+	const notes = String(schedule.notes ?? '').trim();
+
+	if (!visitDate || !windowStart || !windowEnd || !siteContact || !assignedFieldResource || !scheduledAtUtc || !scheduledBy) {
+		return null;
+	}
+
+	return {
+		visitDate,
+		windowStart,
+		windowEnd,
+		siteContact,
+		siteContactPhone,
+		assignedFieldResource,
+		notes: notes || undefined,
+		scheduledAtUtc,
+		scheduledBy
+	};
+};
 
 export const normalizeQuoteRequestQualification = (value: unknown): QuoteRequestQualificationReview => {
 	if (!value || typeof value !== 'object') {
@@ -462,6 +510,71 @@ export const seededQuoteRequests: QuoteRequest[] = [
 		]
 	},
 	{
+		id: 'qr-maple-garage',
+		submittedAtUtc: '2026-03-29T14:15:00.000Z',
+		companyName: 'Maple Street Properties',
+		contactName: 'Ariana Brooks',
+		customerName: 'Ariana Brooks',
+		email: 'ariana@maplestreetproperties.com',
+		phone: '(704) 555-0168',
+		siteName: 'Maple detached garage',
+		serviceAddress: '148 Maple Street, Concord, NC',
+		serviceType: 'Detached garage slab replacement',
+		projectType: 'Detached garage slab replacement',
+		propertyType: 'Residential',
+		requestedTimeline: 'Next Tuesday morning',
+		preferredTimeline: 'Next Tuesday morning',
+		priority: 'standard',
+		need: 'Need a quote for replacing a cracked detached garage slab and apron before listing the house.',
+		message: 'Need a quote for replacing a cracked detached garage slab and apron before listing the house.',
+		attachments: [],
+		source: 'office',
+		status: 'qualified',
+		assignedTo: 'Ella - office admin',
+		nextAction: 'Book a site visit and line up the estimator handoff.',
+		intakeSummary: 'Qualified residential slab request ready for site-visit booking.',
+		qualification: {
+			missingInfoReasonCodes: []
+		},
+		submittedPayload: {
+			companyName: 'Maple Street Properties',
+			contactName: 'Ariana Brooks',
+			email: 'ariana@maplestreetproperties.com',
+			phone: '(704) 555-0168',
+			siteName: 'Maple detached garage',
+			serviceAddress: '148 Maple Street, Concord, NC',
+			serviceType: 'Detached garage slab replacement',
+			propertyType: 'Residential',
+			requestedTimeline: 'Next Tuesday morning',
+			priority: 'standard',
+			need: 'Need a quote for replacing a cracked detached garage slab and apron before listing the house.',
+			attachments: []
+		},
+		timeline: [
+			{
+				id: 'qr-maple-garage-submitted',
+				occurredAtUtc: '2026-03-29T14:15:00.000Z',
+				type: 'submitted',
+				actor: 'Customer Admin',
+				label: 'Quote request submitted',
+				payload: {
+					companyName: 'Maple Street Properties',
+					contactName: 'Ariana Brooks',
+					email: 'ariana@maplestreetproperties.com',
+					phone: '(704) 555-0168',
+					siteName: 'Maple detached garage',
+					serviceAddress: '148 Maple Street, Concord, NC',
+					serviceType: 'Detached garage slab replacement',
+					propertyType: 'Residential',
+					requestedTimeline: 'Next Tuesday morning',
+					priority: 'standard',
+					need: 'Need a quote for replacing a cracked detached garage slab and apron before listing the house.',
+					attachments: []
+				}
+			}
+		]
+	},
+	{
 		id: 'qr-riverside-retail',
 		submittedAtUtc: '2026-03-29T16:40:00.000Z',
 		companyName: 'Riverside Retail',
@@ -487,6 +600,17 @@ export const seededQuoteRequests: QuoteRequest[] = [
 		intakeSummary: 'Commercial repair request already qualified and ready for site walk.',
 		qualification: {
 			missingInfoReasonCodes: []
+		},
+		siteVisitSchedule: {
+			visitDate: '2026-04-02',
+			windowStart: '18:00',
+			windowEnd: '19:30',
+			siteContact: 'Marcus Wynn',
+			siteContactPhone: '(704) 555-0187',
+			assignedFieldResource: 'Estimator - Maya',
+			notes: 'Capture roof access details and after-hours entry protocol before leaving site.',
+			scheduledAtUtc: '2026-03-30T14:10:00.000Z',
+			scheduledBy: 'External Admin'
 		},
 		submittedPayload: {
 			companyName: 'Riverside Retail',
@@ -522,6 +646,25 @@ export const seededQuoteRequests: QuoteRequest[] = [
 					priority: 'standard',
 					need: 'Need repair pricing for recurring ponding and flashing issues behind two tenant units.',
 					attachments: []
+				}
+			},
+			{
+				id: 'qr-riverside-retail-site-visit',
+				occurredAtUtc: '2026-03-30T14:10:00.000Z',
+				type: 'site-visit-scheduled',
+				actor: 'External Admin',
+				label: 'Site visit scheduled · Apr 2 · 6:00 PM – 7:30 PM',
+				note: 'Estimator - Maya confirmed for the after-hours roof walk.',
+				siteVisitSchedule: {
+					visitDate: '2026-04-02',
+					windowStart: '18:00',
+					windowEnd: '19:30',
+					siteContact: 'Marcus Wynn',
+					siteContactPhone: '(704) 555-0187',
+					assignedFieldResource: 'Estimator - Maya',
+					notes: 'Capture roof access details and after-hours entry protocol before leaving site.',
+					scheduledAtUtc: '2026-03-30T14:10:00.000Z',
+					scheduledBy: 'External Admin'
 				}
 			}
 		]
@@ -598,7 +741,8 @@ export const createQuoteRequestFromForm = (form: QuoteRequestFormInput): QuoteRe
 				label: 'Quote request submitted',
 				payload: submittedPayload
 			}
-		]
+		],
+		siteVisitSchedule: null
 	};
 };
 
