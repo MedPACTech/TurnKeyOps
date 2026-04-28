@@ -8,6 +8,8 @@ const defaultApiBaseUrl = 'http://localhost:5178';
 export const getPublicApiBaseUrl = () =>
 	(env.PUBLIC_TKO_API_BASE_URL || defaultApiBaseUrl).replace(/\/$/, '');
 
+const hasConfiguredApiBaseUrl = () => Boolean(env.PUBLIC_TKO_API_BASE_URL?.trim());
+
 export const loadMvpScaffold = async (fetch: typeof globalThis.fetch): Promise<MvpScaffoldSnapshot> => {
 	const response = await fetch(`${getPublicApiBaseUrl()}/api/mvp/scaffold`);
 
@@ -27,6 +29,10 @@ export const loadMvpScaffold = async (fetch: typeof globalThis.fetch): Promise<M
 export const resolveMvpScaffold = async (
 	fetch: typeof globalThis.fetch
 ): Promise<{ snapshot: MvpScaffoldSnapshot; source: MvpScaffoldSource }> => {
+	if (!hasConfiguredApiBaseUrl()) {
+		return { snapshot: fallbackMvpSnapshot, source: 'fallback' };
+	}
+
 	try {
 		const snapshot = await loadMvpScaffold(fetch);
 		return { snapshot, source: 'api' };

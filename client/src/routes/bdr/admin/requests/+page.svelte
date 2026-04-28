@@ -492,25 +492,25 @@
 							<div class="grid gap-4 lg:grid-cols-[160px_150px_150px_minmax(0,1fr)]">
 								<label class="grid gap-2">
 									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Visit date</span>
-									<input bind:value={scheduleVisitDate} type="date" name="visitDate" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+									<input bind:value={scheduleVisitDate} type="date" name="visitDate" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 								<label class="grid gap-2">
 									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Window start</span>
-									<input bind:value={scheduleWindowStart} type="time" name="windowStart" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+									<input bind:value={scheduleWindowStart} type="time" name="windowStart" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 								<label class="grid gap-2">
 									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Window end</span>
-									<input bind:value={scheduleWindowEnd} type="time" name="windowEnd" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+									<input bind:value={scheduleWindowEnd} type="time" name="windowEnd" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 								<label class="grid gap-2">
 									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Assigned field resource</span>
-									<input bind:value={scheduleAssignedFieldResource} list="field-resource-options" name="assignedFieldResource" placeholder="Estimator or crew" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+									<input bind:value={scheduleAssignedFieldResource} list="field-resource-options" name="assignedFieldResource" placeholder="Estimator or crew" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 							</div>
 							<div class="grid gap-4 lg:grid-cols-2">
 								<label class="grid gap-2">
 									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site contact</span>
-									<input bind:value={scheduleSiteContact} name="siteContact" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+									<input bind:value={scheduleSiteContact} name="siteContact" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 								<label class="grid gap-2">
 									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site contact phone</span>

@@ -33,6 +33,7 @@ type SiteVisit = {
 
 	type CalendarEvent = {
 		id: string;
+		quoteRequestId?: string;
 		type: EventType;
 		name: string;
 		customerType: 'customer' | 'company';
@@ -48,6 +49,7 @@ type SiteVisit = {
 		crew: string;
 		estimatedValue: string;
 		notes: string;
+		source?: 'seed' | 'quote-request';
 	};
 
 	type WeatherSummary = {
@@ -290,6 +292,7 @@ type SiteVisit = {
 		'Site Visit': true
 	});
 	let selectedEventId = $state<string | null>(null);
+	let focusedScheduleRequestId = $state<string | null>(null);
 
 	const selectedDateKey = $derived(formatDateKey(selectedDate));
 	const scheduledRequest = $derived(data.scheduledRequest);
@@ -304,8 +307,10 @@ type SiteVisit = {
 			})
 			: ''
 	);
-	const selectedEvent = $derived(mockedEvents.find((event) => event.id === selectedEventId) ?? null);
-	const filteredEvents = $derived(mockedEvents.filter((event) => enabledTypes[event.type]));
+	const scheduledVisitEvents = $derived((data.scheduledVisitRequests ?? []).map(toScheduledVisitEvent));
+	const calendarEvents = $derived([...mockedEvents, ...scheduledVisitEvents]);
+	const selectedEvent = $derived(calendarEvents.find((event) => event.id === selectedEventId) ?? null);
+	const filteredEvents = $derived(calendarEvents.filter((event) => enabledTypes[event.type]));
 	const monthLabel = $derived(
 		selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 	);
@@ -323,6 +328,18 @@ type SiteVisit = {
 
 	$effect(() => {
 		pickerValue = formatDateKey(selectedDate);
+	});
+
+	$effect(() => {
+		const requestId = data.scheduleRequestId;
+		if (!requestId || focusedScheduleRequestId === requestId) return;
+
+		const event = scheduledVisitEvents.find((item) => item.quoteRequestId === requestId);
+		if (!event) return;
+
+		selectedDate = parseDateKey(event.date) ?? selectedDate;
+		selectedEventId = event.id;
+		focusedScheduleRequestId = requestId;
 	});
 
 	function setView(view: CalendarView) {
@@ -377,6 +394,46 @@ type SiteVisit = {
 		if (currentView === 'day') return `${dayEvents.length} event(s)`;
 		if (currentView === 'week') return `${weekDays.reduce((sum, day) => sum + day.events.length, 0)} event(s)`;
 		return `${monthGrid.reduce((sum, week) => sum + week.reduce((inner, day) => inner + day.events.length, 0), 0)} event(s)`;
+	}
+
+	function toScheduledVisitEvent(request: PageProps['data']['scheduledVisitRequests'][number]): CalendarEvent {
+		const schedule = request.siteVisitSchedule;
+		return {
+			id: `quote-request-${request.id}`,
+			quoteRequestId: request.id,
+			type: 'Site Visit',
+			name: request.companyName || request.customerName,
+			customerType: request.companyName && request.companyName !== request.customerName ? 'company' : 'customer',
+			date: schedule?.visitDate ?? todayKey,
+			startTime: formatScheduleTime(schedule?.windowStart ?? '09:00'),
+			endTime: formatScheduleTime(schedule?.windowEnd ?? '10:00'),
+			address: request.serviceAddress,
+			zipCode: extractZipCode(request.serviceAddress),
+			customerContact: schedule?.siteContact || request.contactName,
+			phone: schedule?.siteContactPhone || request.phone,
+			projectSummary: request.need || request.intakeSummary,
+			status: 'Site Visit Scheduled',
+			crew: schedule?.assignedFieldResource || request.assignedTo,
+			estimatedValue: 'Pending estimate',
+			notes: schedule?.notes || request.nextAction,
+			source: 'quote-request'
+		};
+	}
+
+	function formatScheduleTime(value: string) {
+		const [hoursText = '', minutesText = ''] = value.split(':');
+		const hours = Number(hoursText);
+		const minutes = Number(minutesText);
+		if (Number.isNaN(hours) || Number.isNaN(minutes)) return value;
+
+		return new Date(2026, 0, 1, hours, minutes).toLocaleTimeString('en-US', {
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+	}
+
+	function extractZipCode(address: string) {
+		return address.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] ?? '—';
 	}
 
 	function formatDateKey(date: Date) {
@@ -566,7 +623,7 @@ type SiteVisit = {
 								</div>
 								<div>
 									<p class="text-sm font-semibold text-[var(--text-strong)]">{type}</p>
-									<p class="text-xs text-[var(--text-muted)]">{mockedEvents.filter((event) => event.type === type).length} event(s)</p>
+									<p class="text-xs text-[var(--text-muted)]">{calendarEvents.filter((event) => event.type === type).length} event(s)</p>
 								</div>
 							</div>
 							<div class={`h-2.5 w-2.5 rounded-full ${enabledTypes[type as EventType] ? 'bg-[var(--accent-solid)]' : 'bg-slate-300'}`}></div>
@@ -590,9 +647,14 @@ type SiteVisit = {
 					</div>
 					<div class="mt-4 grid gap-3 lg:grid-cols-3">
 						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
-							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Scheduling eligibility</p>
-							{#if scheduledRequestQualification?.scheduleEligible}
-								<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">Qualified for site visit scheduling. Use the visit as the bridge into field capture and estimate generation.</p>
+							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{scheduledRequest.siteVisitSchedule ? 'Scheduled visit' : 'Scheduling eligibility'}</p>
+							{#if scheduledRequest.siteVisitSchedule}
+								<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">
+									{formatScheduleTime(scheduledRequest.siteVisitSchedule.windowStart)} – {formatScheduleTime(scheduledRequest.siteVisitSchedule.windowEnd)} on {scheduledRequest.siteVisitSchedule.visitDate}.
+								</p>
+								<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Assigned to {scheduledRequest.siteVisitSchedule.assignedFieldResource}</p>
+							{:else if scheduledRequestQualification?.isQualified}
+								<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">Qualified for site visit scheduling. Use the request workspace to book the visit, then it will appear on this calendar.</p>
 							{:else}
 								<p class="mt-2 text-sm leading-6 text-amber-300">Qualification must be cleared before this request can move into site visit scheduling.</p>
 								{#if scheduledRequestQualification?.blockerLabels.length}
@@ -764,7 +826,7 @@ type SiteVisit = {
 				<section class="rounded-[1.1rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 					<div class="flex items-center justify-between gap-3">
 						<div>
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Weather · zip 43074</p>
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Weather · zip {selectedEvent.zipCode}</p>
 							<p class="mt-2 text-sm text-[var(--text-base)]">{(mockedWeather.get(selectedEvent.date) ?? selectedDayWeather).label}</p>
 						</div>
 						<div class="inline-flex items-center gap-2 rounded-full bg-[var(--module-bg)] px-3 py-2 text-sm text-[var(--text-muted)]">
@@ -804,6 +866,11 @@ type SiteVisit = {
 							<p class="font-semibold text-[var(--text-strong)]">Operational note</p>
 							<p class="mt-1 leading-6 text-[var(--text-muted)]">{selectedEvent.notes}</p>
 						</div>
+						{#if selectedEvent.quoteRequestId}
+							<a href="/bdr/admin/requests?role=office-admin" class="inline-flex rounded-xl border border-[var(--shell-border)] bg-[var(--module-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
+								Open quote request queue
+							</a>
+						{/if}
 					</div>
 				</section>
 			</div>

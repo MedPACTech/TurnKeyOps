@@ -7,6 +7,7 @@ export const load = async ({ fetch, data }) => {
 		source,
 		snapshot,
 		scheduleRequestId: data.scheduleRequestId,
+		scheduledVisitRequests: data.scheduledVisitRequests,
 		scheduledRequest: data.scheduledRequest,
 		scheduledRequestQualification: data.scheduledRequestQualification
 	};
