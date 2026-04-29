@@ -47,13 +47,13 @@
 			case 'playbooks':
 				return {
 					title: 'Implementation playbooks',
-					description: 'Codify what good rollout looks like across discovery, configuration, migration, training, and launch readiness so new tenants do not restart from scratch.',
+					description: 'Codify what good rollout looks like across discovery, configuration, workflow modeling, migration, training, and launch readiness so new tenants do not restart from scratch.',
 					context: {
 						label: 'Context',
 						title: 'Reusable operating knowledge',
-						summary: 'Playbooks convert one-off launch lessons into repeatable implementation assets and product requirements.',
+						summary: 'Playbooks convert one-off launch lessons into repeatable implementation assets and product requirements, including the shared workflow data model behind request, visit, and estimate handoffs.',
 						metrics: [
-							{ label: 'Active playbooks', value: '5', detail: 'One per delivery stage from qualification through go-live.' },
+							{ label: 'Active playbooks', value: '6', detail: 'Now includes the shared request-to-estimate schema map alongside rollout-stage standards.' },
 							{ label: 'Vertical templates', value: '3', detail: 'Contractor, field services, and white-glove service variants are being shaped.' },
 							{ label: 'Recent updates', value: '8', detail: 'Implementation lessons from BDR drove process and product edits this week.' }
 						]
@@ -64,14 +64,14 @@
 						summary: 'A believable platform console should show how the team captures and reuses operational knowledge, not just status snapshots.',
 						notes: [
 							{ title: 'Playbooks should map to routes and configuration', detail: 'Every playbook stage should have a matching UI surface, owner, and exit criteria.' },
-							{ title: 'Use platform language', detail: 'The copy here should describe controls, templates, integrations, and launch gates rather than tenant-specific office tasks.' },
+							{ title: 'Workflow models should stay explicit', detail: 'Document source of truth, editability, and audit posture before request, visit, and estimate logic diverges.' },
 							{ title: 'Audit for drift', detail: 'When a tenant invents a workaround, decide whether it belongs in the platform or should stay local.' }
 						]
 					},
 					canvas: {
 						label: 'Playbook canvas',
 						title: 'Launch standards and templates',
-						summary: 'Stage ownership, artifacts, and upgrade pressure across the implementation lifecycle.',
+						summary: 'Stage ownership, artifacts, schema expectations, and upgrade pressure across the implementation lifecycle.',
 						actions: [
 							{ label: 'Open health view', href: '/turnkeyops/admin/health', variant: 'secondary' },
 							{ label: 'Open control plane', href: '/turnkeyops/admin/access' }
