@@ -12,6 +12,52 @@ export type PrepChecklistState = Record<PrepChecklistField, boolean> & {
   lastUpdatedAt?: string;
 };
 
+export type SiteVisitOutcomeFileMeta = {
+  id: string;
+  name: string;
+  contentType: string;
+  sizeBytes: number;
+};
+
+export type SiteVisitOutcomeMeasurements = {
+  lengthFt: number | null;
+  widthFt: number | null;
+  depthIn: number | null;
+  pourCount: number | null;
+  notes: string;
+};
+
+export type SiteVisitOutcomeStructuredFields = {
+  reinforcementType: string;
+  finishType: string;
+  demoRequired: boolean;
+  excavationRequired: boolean;
+  pumpRequired: boolean;
+};
+
+export type SiteVisitOutcomeTimelineEntry = {
+  id: string;
+  type: 'visit-completed';
+  occurredAt: string;
+  actor: string;
+  label: string;
+  note?: string;
+};
+
+export type SiteVisitOutcomeRecord = {
+  findings: string;
+  scopeChanges: string;
+  followUpActions: string;
+  files: SiteVisitOutcomeFileMeta[];
+  measurements: SiteVisitOutcomeMeasurements;
+  structuredFields: SiteVisitOutcomeStructuredFields;
+  requestStatus: 'In Progress' | 'Visit Complete';
+  completedAt?: string;
+  completedBy?: string;
+  lastSavedAt?: string;
+  timeline: SiteVisitOutcomeTimelineEntry[];
+};
+
 const hasText = (value?: string | null): value is string => Boolean(value?.trim());
 
 const uniq = (values: string[]) => Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
@@ -49,6 +95,70 @@ export const readPrepChecklist = (storageKey: string): PrepChecklistState => {
 };
 
 export const writePrepChecklist = (storageKey: string, value: PrepChecklistState) => {
+  if (!browser) return;
+  localStorage.setItem(storageKey, JSON.stringify(value));
+};
+
+export const buildOutcomeStorageKey = (prepStorageKey: string) => `${prepStorageKey}_outcome`;
+
+export const createDefaultSiteVisitOutcome = (
+  seed?: Partial<SiteVisitOutcomeRecord>
+): SiteVisitOutcomeRecord => {
+  const base: SiteVisitOutcomeRecord = {
+    findings: '',
+    scopeChanges: '',
+    followUpActions: '',
+    files: [],
+    measurements: {
+      lengthFt: null,
+      widthFt: null,
+      depthIn: null,
+      pourCount: null,
+      notes: ''
+    },
+    structuredFields: {
+      reinforcementType: '',
+      finishType: '',
+      demoRequired: false,
+      excavationRequired: false,
+      pumpRequired: false
+    },
+    requestStatus: 'In Progress',
+    timeline: []
+  };
+
+  return {
+    ...base,
+    ...seed,
+    files: seed?.files ?? base.files,
+    measurements: {
+      ...base.measurements,
+      ...seed?.measurements
+    },
+    structuredFields: {
+      ...base.structuredFields,
+      ...seed?.structuredFields
+    },
+    timeline: seed?.timeline ?? base.timeline
+  };
+};
+
+export const readSiteVisitOutcome = (storageKey: string): SiteVisitOutcomeRecord | null => {
+  if (!browser) return null;
+
+  const raw = localStorage.getItem(storageKey);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<SiteVisitOutcomeRecord>;
+    return createDefaultSiteVisitOutcome(parsed);
+  } catch {
+    localStorage.removeItem(storageKey);
+    return null;
+  }
+};
+
+export const writeSiteVisitOutcome = (storageKey: string, value: SiteVisitOutcomeRecord) => {
   if (!browser) return;
   localStorage.setItem(storageKey, JSON.stringify(value));
 };
