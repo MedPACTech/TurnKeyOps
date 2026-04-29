@@ -1,10 +1,18 @@
 <script lang="ts">
 	import {
+		CalendarDays,
+		FileText,
+		Globe,
 		Building2,
+		LayoutDashboard,
 		LogOut,
 		Menu,
 		PanelLeftClose,
 		PanelLeftOpen,
+		Receipt,
+		Settings2,
+		SquareUserRound,
+		ClipboardList,
 		X
 	} from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
@@ -68,17 +76,17 @@
 			.filter((section) => section.items.length)
 	);
 
-	const iconFor = (slug: string) =>
+	const navIconFor = (slug: string) =>
 		({
-			dashboard: '📊',
-			calendar: '📅',
-			estimates: '📝',
-			invoices: '💰',
-			customers: '👥',
-			requests: '💬',
-			content: '🌐',
-			settings: '🔧'
-		})[slug] ?? '🔧';
+			dashboard: LayoutDashboard,
+			calendar: CalendarDays,
+			estimates: FileText,
+			invoices: Receipt,
+			customers: SquareUserRound,
+			requests: ClipboardList,
+			content: Globe,
+			settings: Settings2
+		})[slug] ?? Settings2;
 
 	const isActive = (item: BdrAdminNavItem) => activePath === item.href;
 	const roleLabel = $derived(
@@ -123,6 +131,7 @@
 							</div>
 							<div class="space-y-1">
 								{#each section.items as item}
+									{@const Icon = navIconFor(item.slug)}
 									<a
 										href={withRole(item.href)}
 										title={item.label}
@@ -132,7 +141,9 @@
 												: 'text-white/70 hover:bg-white/10 hover:text-white'
 										}`}
 									>
-										<span class="flex h-5 w-5 shrink-0 items-center justify-center text-lg leading-none" aria-hidden="true">{iconFor(item.slug)}</span>
+										<span class="flex h-5 w-5 shrink-0 items-center justify-center text-[var(--currentColor)]" aria-hidden="true">
+											<Icon class="h-4 w-4" aria-hidden="true" />
+										</span>
 										<span class="truncate">{item.label}</span>
 									</a>
 								{/each}
@@ -144,6 +155,7 @@
 								<div class="mx-auto mb-2 h-px w-8 bg-white/10"></div>
 							{/if}
 							{#each section.items as item}
+								{@const Icon = navIconFor(item.slug)}
 								<a
 									href={withRole(item.href)}
 									title={`${section.label}: ${item.label}`}
@@ -151,9 +163,11 @@
 										isActive(item)
 											? 'bg-[var(--brand-solid)] text-white shadow-sm'
 											: 'text-white/70 hover:bg-white/10 hover:text-white'
-									}`}
+										}`}
 								>
-									<span class="flex h-5 w-5 shrink-0 items-center justify-center text-lg leading-none" aria-hidden="true">{iconFor(item.slug)}</span>
+									<span class="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
+										<Icon class="h-4 w-4" aria-hidden="true" />
+									</span>
 								</a>
 							{/each}
 						</div>
@@ -225,6 +239,7 @@
 								</div>
 								<div class="space-y-1">
 									{#each section.items as item}
+										{@const Icon = navIconFor(item.slug)}
 										<a
 											href={withRole(item.href)}
 											class={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -234,7 +249,9 @@
 											}`}
 											onclick={() => (sidebarOpen = false)}
 										>
-											<span class="flex h-5 w-5 shrink-0 items-center justify-center text-lg leading-none" aria-hidden="true">{iconFor(item.slug)}</span>
+											<span class="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
+												<Icon class="h-4 w-4" aria-hidden="true" />
+											</span>
 											<span>{item.label}</span>
 										</a>
 									{/each}

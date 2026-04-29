@@ -171,7 +171,7 @@ export const bdrAdminNavigation: BdrAdminNavItem[] = [
 	},
 	{
 		slug: 'requests',
-		label: 'Quotes',
+		label: 'Requests',
 		href: '/bdr/admin/requests',
 		summary: 'Public-site intake, triage, follow-up, and conversion handling',
 		contextLabel: 'Intake Ops',
