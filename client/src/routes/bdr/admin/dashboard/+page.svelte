@@ -134,20 +134,20 @@
 <div class="space-y-4">
 	<section class="flex flex-col gap-4 rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
 		<div>
-			<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">Dashboard</p>
-			<h1 class="mt-1 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">Contractor office dashboard</h1>
+			<p class="text-sm font-semibold text-[var(--accent-text)]">Dashboard</p>
+			<h1 class="mt-1 text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">Contractor office dashboard</h1>
 			<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Pipeline, schedule, billing, and Bob’s next actions in one clean operating surface.</p>
 		</div>
 		<a
 			href="/bdr/admin/estimates?role=office-admin"
-			class="inline-flex items-center justify-center rounded-lg bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+			class="inline-flex items-center justify-center rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold leading-5 text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:ring-offset-2"
 		>
 			+ New Estimate
 		</a>
 	</section>
 
-	<section class="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_360px]">
-		<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+	<section class="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+		<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 		{#each summaryCards as card}
 			{@const Icon = card.icon}
 			<a
@@ -156,15 +156,15 @@
 			>
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
-						<p class="text-xs font-medium text-[var(--text-muted)]">{card.label}</p>
-						<p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">{card.value}</p>
+						<p class="text-sm font-medium leading-5 text-[var(--text-muted)]">{card.label}</p>
+						<p class="mt-2 text-3xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{card.value}</p>
 						<p class="mt-2 text-sm leading-5 text-[var(--text-muted)]">{card.detail}</p>
 					</div>
-					<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+					<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent-text)]">
 						<Icon class="h-4 w-4" aria-hidden="true" />
 					</div>
 				</div>
-				<div class="mt-4 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
+				<div class="mt-4 flex items-center gap-1 text-sm font-semibold leading-5 text-[var(--accent-text)]">
 					Open
 					<ArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
 				</div>
@@ -174,12 +174,12 @@
 
 		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
 			<div class="flex items-start gap-3">
-				<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+				<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent-text)]">
 					<Bot class="h-5 w-5" aria-hidden="true" />
 				</div>
 				<div>
-					<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Bob</p>
-					<h2 class="text-xl font-semibold text-[var(--text-strong)]">Back-office next actions</h2>
+					<p class="text-sm font-semibold text-[var(--text-muted)]">Bob</p>
+					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Back-office next actions</h2>
 					<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Practical help for follow-up, scheduling, and collections. No chat pitch.</p>
 				</div>
 			</div>
@@ -201,18 +201,18 @@
 		</article>
 	</section>
 
-	<section class="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+	<section class="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_320px]">
 		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
 			<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Revenue trend</p>
-					<h2 class="text-xl font-semibold text-[var(--text-strong)]">Quiet revenue view</h2>
+					<p class="text-sm font-semibold text-[var(--text-muted)]">Revenue trend</p>
+					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Quiet revenue view</h2>
 				</div>
-				<div class="inline-flex rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-1">
+				<div class="inline-flex rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-1">
 					{#each rangeOptions as option}
 						<button
 							type="button"
-							class={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+							class={`rounded-md px-3 py-1.5 text-sm font-semibold leading-5 transition ${
 								activeRange === option.key
 									? 'bg-[var(--accent-solid)] text-white shadow-sm'
 									: 'text-[var(--text-muted)] hover:text-[var(--text-strong)]'
@@ -231,25 +231,25 @@
 						<line x1="0" y1={line} x2="100" y2={line} stroke="rgba(148,163,184,0.22)" stroke-width="0.6" />
 					{/each}
 					<polyline fill="none" stroke="#94a3b8" stroke-width="1.4" points={chartPoints('prior')} />
-					<polyline fill="none" stroke="#4050e6" stroke-width="1.8" points={chartPoints('actual')} />
-					<polyline fill="none" stroke="#22c55e" stroke-dasharray="2.5 2.5" stroke-width="1.6" points={chartPoints('projected')} />
+					<polyline fill="none" stroke="#f97316" stroke-width="1.8" points={chartPoints('actual')} />
+					<polyline fill="none" stroke="#475569" stroke-dasharray="2.5 2.5" stroke-width="1.6" points={chartPoints('projected')} />
 				</svg>
 				<div class="mt-3 flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
-					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#4050e6]"></span>Actual</div>
+					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#f97316]"></span>Actual</div>
 					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#94a3b8]"></span>Prior</div>
-					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#22c55e]"></span>Projected</div>
+					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#475569]"></span>Projected</div>
 				</div>
 			</div>
 		</article>
 
 		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
-			<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Office board</p>
+			<p class="text-sm font-semibold text-[var(--text-muted)]">Office board</p>
 			<div class="mt-4 space-y-3">
 				{#each operations as metric}
 					<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-						<p class="text-xs font-medium text-[var(--text-muted)]">{metric.label}</p>
+						<p class="text-sm font-medium leading-5 text-[var(--text-muted)]">{metric.label}</p>
 						<div class="mt-1 flex items-end justify-between gap-3">
-							<p class="text-2xl font-semibold text-[var(--text-strong)]">{metric.value}</p>
+							<p class="text-2xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{metric.value}</p>
 						</div>
 						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{metric.detail}</p>
 					</div>

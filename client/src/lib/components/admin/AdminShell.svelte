@@ -96,20 +96,20 @@
 
 <div class="concept-admin-shell min-h-screen bg-[var(--app-bg)] text-[var(--text-base)]">
 	<div class="flex min-h-screen">
-		<aside class={`hidden shrink-0 flex-col border-r border-white/10 bg-[var(--nav-bg)] text-white transition-[width] duration-200 lg:flex ${navCollapsed ? 'w-[88px]' : 'w-64'}`}>
-			<div class="flex h-16 items-center gap-3 border-b border-white/10 px-4">
-				<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-solid)] text-white shadow-sm">
+		<aside class={`hidden shrink-0 flex-col border-r border-[var(--nav-divider)] bg-[var(--nav-bg)] text-white transition-[width] duration-200 lg:flex ${navCollapsed ? 'w-[88px]' : 'w-64'}`}>
+			<div class="flex h-16 items-center gap-3 border-b border-[var(--nav-divider)] px-4">
+				<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--brand-solid)] text-white shadow-sm">
 					<Building2 class="h-5 w-5" aria-hidden="true" />
 				</div>
 				{#if !navCollapsed}
 					<div class="min-w-0">
-						<p class="truncate text-base font-bold leading-5">TurnKeyOps</p>
+						<p class="truncate text-base font-semibold leading-5">TurnKeyOps</p>
 						<p class="truncate text-xs text-white/55">Contractor workspace</p>
 					</div>
 				{/if}
 				<button
 					type="button"
-					class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white"
+					class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-white/60 transition hover:bg-white/10 hover:text-white"
 					title={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}
 					aria-label={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}
 					onclick={() => (navCollapsed = !navCollapsed)}
@@ -127,7 +127,7 @@
 					{#if !navCollapsed}
 						<div class={sectionIndex === 0 ? '' : 'mt-5'}>
 							<div class="mb-2 px-3">
-								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/40">{section.label}</p>
+								<p class="text-[0.68rem] font-semibold text-white/45">{section.label}</p>
 							</div>
 							<div class="space-y-1">
 								{#each section.items as item}
@@ -135,13 +135,13 @@
 									<a
 										href={withRole(item.href)}
 										title={item.label}
-										class={`group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+										class={`group flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium leading-5 transition-colors ${
 											isActive(item)
-												? 'bg-[var(--brand-solid)] text-white shadow-sm'
+												? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'
 												: 'text-white/70 hover:bg-white/10 hover:text-white'
 										}`}
 									>
-										<span class="flex h-5 w-5 shrink-0 items-center justify-center text-[var(--currentColor)]" aria-hidden="true">
+										<span class="flex h-5 w-5 shrink-0 items-center justify-center text-current" aria-hidden="true">
 											<Icon class="h-4 w-4" aria-hidden="true" />
 										</span>
 										<span class="truncate">{item.label}</span>
@@ -159,9 +159,9 @@
 								<a
 									href={withRole(item.href)}
 									title={`${section.label}: ${item.label}`}
-									class={`group flex min-h-11 items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+									class={`group flex min-h-11 items-center justify-center rounded-md px-3 py-2.5 text-sm font-medium leading-5 transition-colors ${
 										isActive(item)
-											? 'bg-[var(--brand-solid)] text-white shadow-sm'
+											? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'
 											: 'text-white/70 hover:bg-white/10 hover:text-white'
 										}`}
 								>
@@ -175,7 +175,7 @@
 				{/each}
 			</nav>
 
-			<div class="border-t border-white/10 p-4">
+			<div class="border-t border-[var(--nav-divider)] p-4">
 				<div class={`flex gap-3 ${navCollapsed ? 'flex-col items-center' : 'items-center'}`}>
 					<button
 						type="button"
@@ -212,18 +212,18 @@
 					aria-label="Close navigation"
 					onclick={() => (sidebarOpen = false)}
 				></button>
-				<aside class="fixed inset-y-0 left-0 flex w-64 flex-col bg-[var(--nav-bg)] text-white shadow-xl">
-					<div class="flex h-16 items-center gap-3 border-b border-white/10 px-4">
-						<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--brand-solid)]">
+				<aside class="fixed inset-y-0 left-0 flex w-64 flex-col bg-[var(--nav-bg)] text-white shadow-[var(--shell-shadow)]">
+					<div class="flex h-16 items-center gap-3 border-b border-[var(--nav-divider)] px-4">
+						<div class="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--brand-solid)]">
 							<Building2 class="h-5 w-5" aria-hidden="true" />
 						</div>
 						<div>
-							<p class="text-base font-bold leading-5">TurnKeyOps</p>
+							<p class="text-base font-semibold leading-5">TurnKeyOps</p>
 							<p class="text-xs text-white/55">Contractor workspace</p>
 						</div>
 						<button
 							type="button"
-							class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
+							class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white"
 							aria-label="Close navigation"
 							onclick={() => (sidebarOpen = false)}
 						>
@@ -235,16 +235,16 @@
 						{#each groupedNavItems as section, sectionIndex}
 							<div class={sectionIndex === 0 ? '' : 'mt-5'}>
 								<div class="mb-2 px-3">
-									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/40">{section.label}</p>
+									<p class="text-[0.68rem] font-semibold text-white/45">{section.label}</p>
 								</div>
 								<div class="space-y-1">
 									{#each section.items as item}
 										{@const Icon = navIconFor(item.slug)}
 										<a
 											href={withRole(item.href)}
-											class={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+											class={`flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium leading-5 transition-colors ${
 												isActive(item)
-													? 'bg-[var(--brand-solid)] text-white'
+													? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'
 													: 'text-white/70 hover:bg-white/10 hover:text-white'
 											}`}
 											onclick={() => (sidebarOpen = false)}
@@ -264,25 +264,25 @@
 		{/if}
 
 		<div class="flex min-w-0 flex-1 flex-col">
-			<header class="sticky top-0 z-30 border-b border-[var(--shell-border)] bg-white/95 backdrop-blur">
+			<header class="sticky top-0 z-30 border-b border-[var(--shell-border)] bg-[var(--topbar-bg)] backdrop-blur">
 				<div class="flex min-h-16 items-center justify-between gap-3 px-4 lg:px-6">
 					<div class="flex min-w-0 items-center gap-3">
 						<button
 							type="button"
-							class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--shell-border)] bg-white text-[var(--text-base)] shadow-sm lg:hidden"
+							class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--shell-border)] bg-white text-[var(--text-base)] shadow-sm lg:hidden"
 							aria-label="Open navigation"
 							onclick={() => (sidebarOpen = true)}
 						>
 							<Menu class="h-5 w-5" aria-hidden="true" />
 						</button>
 						<div class="min-w-0">
-							<p class="truncate text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{activeNav.label}</p>
-							<p class="truncate text-sm font-semibold text-[var(--text-strong)]">{title}</p>
+							<p class="truncate text-[0.7rem] font-medium text-[var(--text-muted)]">{activeNav.label}</p>
+							<p class="truncate text-sm font-semibold leading-5 text-[var(--text-strong)]">{title}</p>
 						</div>
 					</div>
 
 					<div class="hidden items-center gap-2 sm:flex">
-						<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
+						<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-1 text-[0.7rem] font-semibold text-[var(--text-base)]">
 							{roleLabel}
 						</span>
 					</div>
@@ -306,12 +306,12 @@
 	<aside class="fixed inset-y-0 right-0 z-[60] flex w-full max-w-sm flex-col border-l border-[var(--shell-border)] bg-white shadow-xl">
 		<div class="flex items-center justify-between border-b border-[var(--shell-border)] px-5 py-4">
 			<div>
-				<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Profile</p>
+				<p class="text-sm font-semibold text-[var(--text-muted)]">Profile</p>
 				<h2 class="mt-1 text-xl font-semibold text-[var(--text-strong)]">Operator settings</h2>
 			</div>
 			<button
 				type="button"
-				class="rounded-lg border border-[var(--shell-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]"
+				class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]"
 				onclick={() => (profileOpen = false)}
 			>
 				Close
@@ -330,10 +330,10 @@
 			</section>
 
 			<section class="rounded-lg border border-[var(--shell-border)] bg-white p-4 shadow-sm">
-				<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Workspace</p>
+				<p class="text-sm font-semibold text-[var(--text-muted)]">Workspace</p>
 				<div class="mt-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-3">
 					<p class="text-base font-semibold text-[var(--text-strong)]">BDR Admin</p>
-					<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Contractor operations workspace with the TurnKeyOps Concept UX treatment.</p>
+					<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Calm contractor office workspace for daily estimating, scheduling, and follow-through.</p>
 				</div>
 			</section>
 		</div>
@@ -342,29 +342,35 @@
 
 <style>
 	.concept-admin-shell {
-		--app-bg: #f9fafb;
-		--nav-bg: #1a1f52;
-		--brand-solid: #4050e6;
-		--shell-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+		--app-bg: #f6f7f9;
+		--nav-bg: #1f2933;
+		--nav-divider: rgba(255, 255, 255, 0.08);
+		--nav-active-bg: #ffffff;
+		--nav-active-text: #111827;
+		--brand-solid: #f97316;
+		--brand-solid-hover: #ea580c;
+		--focus-ring: #fdba74;
+		--shell-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 28px rgba(15, 23, 42, 0.04);
 		--shell-border: #e5e7eb;
 		--shell-border-strong: #d1d5db;
 		--text-strong: #111827;
 		--text-base: #374151;
 		--text-muted: #6b7280;
 		--muted: #9ca3af;
-		--accent-soft: #eef2ff;
-		--accent-border: #c7d2fe;
-		--accent-text: #4050e6;
-		--accent-solid: #4050e6;
+		--accent-soft: #fff7ed;
+		--accent-border: #fed7aa;
+		--accent-text: #c2410c;
+		--accent-solid: #f97316;
+		--accent-solid-hover: #ea580c;
 		--accent-solid-text: #ffffff;
-		--topbar-bg: #ffffff;
+		--topbar-bg: rgba(255, 255, 255, 0.95);
 		--rail-bg: #ffffff;
 		--pane-bg: #ffffff;
-		--canvas-bg: #f9fafb;
+		--canvas-bg: #f6f7f9;
 		--module-bg: #ffffff;
 		--shell-card: #ffffff;
 		--shell-panel: #ffffff;
-		--shell-panel-strong: #f3f4f6;
+		--shell-panel-strong: #f8fafc;
 		--drawer-bg: #ffffff;
 		--drawer-card-bg: #ffffff;
 	}
