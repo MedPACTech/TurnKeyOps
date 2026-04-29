@@ -6,6 +6,7 @@
 
 	type RangeKey = 'week' | 'month' | 'year';
 	let activeRange = $state<RangeKey>('month');
+	let completedOrderIds = $state<string[]>([]);
 
 	const rangeOptions: Array<{ key: RangeKey; label: string }> = [
 		{ key: 'week', label: 'Week' },
@@ -96,6 +97,12 @@
 
 	const concreteYardsToday = $derived(Math.max(28, Math.round(activeMetrics.scheduledYards / 120)));
 	const priorityRequest = $derived(data.requestInbox[0]);
+	const isOrderComplete = (id: string) => completedOrderIds.includes(id);
+	const toggleOrderComplete = (id: string) => {
+		completedOrderIds = isOrderComplete(id)
+			? completedOrderIds.filter((orderId) => orderId !== id)
+			: [...completedOrderIds, id];
+	};
 
 	const bobMoves = $derived([
 		priorityRequest
@@ -128,6 +135,7 @@
 
 	const orderItems = $derived([
 		{
+			id: 'concrete',
 			icon: '🚚',
 			item: 'Concrete',
 			quantity: `${concreteYardsToday} yd`,
@@ -135,6 +143,7 @@
 			href: '/bdr/admin/calendar?role=office-admin'
 		},
 		{
+			id: 'forms-rebar',
 			icon: '🧱',
 			item: 'Forms and rebar',
 			quantity: '6 kits',
@@ -142,6 +151,7 @@
 			href: '/bdr/admin/requests?role=office-admin'
 		},
 		{
+			id: 'pump-truck',
 			icon: '🛻',
 			item: 'Pump truck',
 			quantity: '1 slot',
@@ -149,6 +159,7 @@
 			href: '/bdr/admin/calendar?role=office-admin'
 		},
 		{
+			id: 'finish-kit',
 			icon: '✨',
 			item: 'Finish kit',
 			quantity: '4 sets',
@@ -179,9 +190,9 @@
 		{#each summaryCards as card}
 			<a
 				href={card.href}
-				class="group flex aspect-square flex-col justify-between rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+				class="group flex h-44 flex-col justify-between rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
 			>
-				<div class="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl shadow-sm" aria-hidden="true">
+				<div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/80 text-2xl shadow-sm ring-1 ring-slate-900/5" aria-hidden="true">
 					{card.icon}
 				</div>
 				<div>
@@ -195,7 +206,7 @@
 	<article class="rounded-lg bg-white/88 p-5 shadow-[var(--shell-shadow)]">
 		<div class="flex items-start justify-between gap-3">
 			<div class="flex items-start gap-3">
-				<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl shadow-sm">
+				<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/85 text-2xl shadow-sm ring-1 ring-slate-900/5">
 					👷‍♂️
 				</div>
 				<div>
@@ -270,14 +281,35 @@
 			</div>
 			<div class="mt-4 space-y-3">
 				{#each orderItems as item}
-					<a href={item.href} class="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg bg-[var(--shell-panel-strong)]/90 px-3 py-3 shadow-sm transition hover:bg-[var(--accent-soft)]">
-						<span class="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-xl shadow-sm" aria-hidden="true">{item.icon}</span>
+					{@const completed = isOrderComplete(item.id)}
+					<div
+						class={`grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-3 shadow-sm transition ${
+							completed
+								? 'bg-slate-100/80 text-slate-400 opacity-60'
+								: 'bg-[var(--shell-panel-strong)]/90 hover:bg-[var(--accent-soft)]'
+						}`}
+					>
+						<span class={`flex h-10 w-10 items-center justify-center rounded-lg bg-white text-xl shadow-sm ${completed ? 'grayscale' : ''}`} aria-hidden="true">{item.icon}</span>
 						<div class="min-w-0">
-							<p class="truncate text-sm font-semibold leading-5 text-[var(--text-strong)]">{item.item}</p>
-							<p class="truncate text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
+							<p class={`truncate text-sm font-semibold leading-5 ${completed ? 'text-slate-500 line-through' : 'text-[var(--text-strong)]'}`}>{item.item}</p>
+							<p class={`truncate text-xs leading-5 ${completed ? 'text-slate-400' : 'text-[var(--text-muted)]'}`}>{item.detail}</p>
 						</div>
-						<p class="text-sm font-semibold leading-5 text-[var(--text-strong)]">{item.quantity}</p>
-					</a>
+						<div class="flex items-center gap-2">
+							<p class={`text-sm font-semibold leading-5 ${completed ? 'text-slate-500 line-through' : 'text-[var(--text-strong)]'}`}>{item.quantity}</p>
+							<button
+								type="button"
+								class={`rounded-md px-2.5 py-1.5 text-xs font-semibold leading-4 shadow-sm transition ${
+									completed
+										? 'bg-slate-200 text-slate-500 hover:bg-slate-300'
+										: 'bg-white text-[var(--accent-text)] hover:bg-[var(--accent-soft)]'
+								}`}
+								aria-pressed={completed}
+								onclick={() => toggleOrderComplete(item.id)}
+							>
+								{completed ? 'Done' : 'Complete'}
+							</button>
+						</div>
+					</div>
 				{/each}
 			</div>
 		</article>

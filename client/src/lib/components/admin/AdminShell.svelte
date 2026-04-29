@@ -63,15 +63,9 @@
 	<div class="flex min-h-screen">
 		<aside class={`hidden shrink-0 flex-col border-r border-[var(--nav-divider)] bg-[var(--nav-bg)] text-white transition-[width] duration-200 lg:flex ${navCollapsed ? 'w-[88px]' : 'w-64'}`}>
 			<div class="flex h-16 items-center gap-3 border-b border-[var(--nav-divider)] px-4">
-				<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--brand-solid)] text-white shadow-sm">
-					<span class="text-lg" aria-hidden="true">🏢</span>
+				<div class={`flex shrink-0 items-center justify-center rounded-md bg-white p-1.5 shadow-sm ${navCollapsed ? 'h-10 w-10' : 'h-12 w-32'}`}>
+					<img src="/turnkeyops-logo.png" alt="TurnKeyOps" class="h-full w-full object-contain" />
 				</div>
-				{#if !navCollapsed}
-					<div class="min-w-0">
-						<p class="truncate text-base font-semibold leading-5">TurnKeyOps</p>
-						<p class="truncate text-xs text-white/55">Contractor workspace</p>
-					</div>
-				{/if}
 				<button
 					type="button"
 					class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-white/60 transition hover:bg-white/10 hover:text-white"
@@ -155,12 +149,8 @@
 				></button>
 				<aside class="fixed inset-y-0 left-0 flex w-64 flex-col bg-[var(--nav-bg)] text-white shadow-[var(--shell-shadow)]">
 					<div class="flex h-16 items-center gap-3 border-b border-[var(--nav-divider)] px-4">
-						<div class="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--brand-solid)]">
-							<span class="text-lg" aria-hidden="true">🏢</span>
-						</div>
-						<div>
-							<p class="text-base font-semibold leading-5">TurnKeyOps</p>
-							<p class="text-xs text-white/55">Contractor workspace</p>
+						<div class="flex h-12 w-32 items-center justify-center rounded-md bg-white p-1.5 shadow-sm">
+							<img src="/turnkeyops-logo.png" alt="TurnKeyOps" class="h-full w-full object-contain" />
 						</div>
 						<button
 							type="button"
@@ -299,6 +289,9 @@
 
 	.admin-workarea {
 		background:
-			linear-gradient(135deg, rgba(255, 247, 237, 0.95) 0%, rgba(239, 246, 255, 0.9) 37%, rgba(246, 244, 255, 0.86) 68%, rgba(246, 247, 249, 0.98) 100%);
+			radial-gradient(circle at 0% 0%, rgba(255, 247, 237, 0.98) 0, rgba(255, 247, 237, 0.52) 21rem, rgba(255, 247, 237, 0) 42rem),
+			radial-gradient(circle at 100% 0%, rgba(219, 234, 254, 0.98) 0, rgba(219, 234, 254, 0.58) 22rem, rgba(219, 234, 254, 0) 44rem),
+			radial-gradient(circle at 78% 72%, rgba(245, 243, 255, 0.9) 0, rgba(245, 243, 255, 0.48) 20rem, rgba(245, 243, 255, 0) 40rem),
+			linear-gradient(135deg, rgba(255, 252, 247, 0.98) 0%, rgba(239, 246, 255, 0.92) 42%, rgba(248, 247, 255, 0.96) 100%);
 	}
 </style>
