@@ -920,7 +920,8 @@
 				</section>
 
 				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Timeline</p>
+					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Activity history</p>
+					<p class="mt-2 text-sm text-[var(--text-muted)]">Submission, ownership, status, scheduling, and estimate activity stay visible from the main request workspace.</p>
 					<div class="mt-4 space-y-3">
 						{#each selectedRequest.timeline as event}
 							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
@@ -949,11 +950,11 @@
 											<p class="mt-1 text-xs text-[var(--text-muted)]">Scheduled by {event.siteVisitSchedule.scheduledBy}</p>
 										</div>
 									</div>
-									{#if event.note}
-										<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">{event.note}</p>
-									{/if}
 								{:else if event.payload}
 									<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">{event.payload.companyName} submitted {event.payload.serviceType} for {event.payload.siteName} with timeline "{event.payload.requestedTimeline}".</p>
+								{/if}
+								{#if event.note}
+									<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">{event.note}</p>
 								{/if}
 							</div>
 						{/each}

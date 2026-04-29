@@ -6,6 +6,8 @@ import {
 	createQuoteRequestFromForm,
 	normalizeQuoteRequestQualification,
 	normalizeQuoteRequestSiteVisitSchedule,
+	quoteRequestMissingInfoReasonMeta,
+	quoteRequestStatusMeta,
 	seededQuoteRequests,
 	type QuoteRequest,
 	type QuoteRequestAttachment,
@@ -258,7 +260,7 @@ const normalizeQuoteRequest = (request: QuoteRequest): QuoteRequest => {
 			}
 		: buildSubmittedPayload(normalized);
 	const timeline = normalized.timeline.length
-		? normalized.timeline
+		? [...normalized.timeline]
 		: [
 				{
 					id: crypto.randomUUID(),
@@ -270,10 +272,30 @@ const normalizeQuoteRequest = (request: QuoteRequest): QuoteRequest => {
 				}
 			];
 
+	if (
+		normalized.siteVisitSchedule &&
+		!timeline.some(
+			(event) =>
+				event.siteVisitSchedule?.scheduledAtUtc === normalized.siteVisitSchedule?.scheduledAtUtc &&
+				event.siteVisitSchedule?.visitDate === normalized.siteVisitSchedule?.visitDate
+		)
+	) {
+		const visitDateLabel = formatSiteVisitDateLabel(normalized.siteVisitSchedule.visitDate);
+		const visitWindowLabel = buildSiteVisitWindowLabel(normalized.siteVisitSchedule);
+		timeline.push(
+			createActivityEvent({
+				occurredAtUtc: normalized.siteVisitSchedule.scheduledAtUtc,
+				label: `Site visit scheduled · ${visitDateLabel} · ${visitWindowLabel}`,
+				note: normalized.siteVisitSchedule.notes,
+				siteVisitSchedule: normalized.siteVisitSchedule
+			})
+		);
+	}
+
 	return {
 		...normalized,
 		submittedPayload,
-		timeline
+		timeline: timeline.sort((left, right) => new Date(left.occurredAtUtc).getTime() - new Date(right.occurredAtUtc).getTime())
 	};
 };
 
@@ -296,6 +318,29 @@ const formatSiteVisitTimeLabel = (value: string) => {
 
 const buildSiteVisitWindowLabel = (schedule: Pick<QuoteRequestSiteVisitSchedule, 'windowStart' | 'windowEnd'>) =>
 	`${formatSiteVisitTimeLabel(schedule.windowStart)} – ${formatSiteVisitTimeLabel(schedule.windowEnd)}`;
+
+const createActivityEvent = ({
+	occurredAtUtc,
+	label,
+	note,
+	siteVisitSchedule
+}: {
+	occurredAtUtc: string;
+	label: string;
+	note?: string;
+	siteVisitSchedule?: QuoteRequestSiteVisitSchedule;
+}): QuoteRequestTimelineEvent => ({
+	id: crypto.randomUUID(),
+	occurredAtUtc,
+	type: siteVisitSchedule ? 'site-visit-scheduled' : 'operator-updated',
+	actor: 'External Admin',
+	label,
+	note,
+	siteVisitSchedule
+});
+
+const formatMissingInfoReasonSummary = (codes: QuoteRequestMissingInfoReasonCode[]) =>
+	codes.map((code) => quoteRequestMissingInfoReasonMeta[code].label).join(' · ');
 
 const readLocalQuoteRequests = async (): Promise<QuoteRequest[]> => {
 	try {
@@ -581,24 +626,18 @@ export const updateQuoteRequest = async (
 	}
 ) => {
 	const buildUpdatedRequest = (existingRequest: QuoteRequest): QuoteRequest => {
+		const occurredAtUtc = new Date().toISOString();
 		const nextAssignedTo = params.assignedTo || 'Office intake';
+		const nextAction = params.nextAction || 'Review request and decide next office step.';
 		const selectedMissingInfoReasonCodes = normalizeQuoteRequestQualification({
 			missingInfoReasonCodes: params.missingInfoReasonCodes
 		}).missingInfoReasonCodes;
 		const existingMissingInfoReasonCodes = normalizeQuoteRequestQualification(existingRequest.qualification).missingInfoReasonCodes;
-		const changes = [
-			existingRequest.status !== params.status ? `stage ${statusToPipelineStage[existingRequest.status]} to ${statusToPipelineStage[params.status]}` : '',
-			existingRequest.assignedTo !== nextAssignedTo ? `owner ${existingRequest.assignedTo || 'Unassigned'} to ${nextAssignedTo}` : '',
-			existingMissingInfoReasonCodes.join('|') !== selectedMissingInfoReasonCodes.join('|')
-				? `missing-info reasons ${selectedMissingInfoReasonCodes.length ? 'updated' : 'cleared'}`
-				: ''
-		].filter(Boolean);
-
 		const draftRequest = {
 			...existingRequest,
 			status: params.status,
 			assignedTo: nextAssignedTo,
-			nextAction: params.nextAction || 'Review request and decide next office step.',
+			nextAction,
 			contactName: params.contactName || existingRequest.contactName,
 			customerName: params.contactName || existingRequest.customerName,
 			email: params.email || existingRequest.email,
@@ -618,24 +657,100 @@ export const updateQuoteRequest = async (
 					? selectedMissingInfoReasonCodes
 					: suggestedMissingInfoReasonCodes
 				: [];
+		const activityEvents: QuoteRequestTimelineEvent[] = [];
+		const previousStatusLabel = quoteRequestStatusMeta[existingRequest.status].label;
+		const nextStatusLabel = quoteRequestStatusMeta[params.status].label;
+		const previousOwner = existingRequest.assignedTo || 'Unassigned';
+		const nextOwner = nextAssignedTo || 'Unassigned';
+
+		if (existingRequest.status !== params.status) {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc,
+					label: `Status changed · ${previousStatusLabel} → ${nextStatusLabel}`,
+					note: `Request moved from ${previousStatusLabel} to ${nextStatusLabel}.`
+				})
+			);
+		}
+
+		if (existingRequest.assignedTo !== nextAssignedTo) {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc,
+					label: `Owner reassigned · ${previousOwner} → ${nextOwner}`,
+					note: `Ownership changed from ${previousOwner} to ${nextOwner}.`
+				})
+			);
+		}
+
+		if (existingRequest.status === 'inspection-scheduled' && params.status !== 'inspection-scheduled') {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc,
+					label: 'Site visit completed',
+					note: `Site work was marked complete and the request advanced to ${nextStatusLabel}.`
+				})
+			);
+		}
+
+		if (params.status === 'estimate-sent' && existingRequest.status !== 'estimate-sent') {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc,
+					label: 'Estimate sent to customer',
+					note: 'Estimate packet was marked sent from the main request workspace.'
+				})
+			);
+		}
+
+		if (existingMissingInfoReasonCodes.join('|') !== missingInfoReasonCodes.join('|')) {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc,
+					label: missingInfoReasonCodes.length ? 'Needs info reasons updated' : 'Needs info reasons cleared',
+					note: missingInfoReasonCodes.length ? formatMissingInfoReasonSummary(missingInfoReasonCodes) : 'All qualification blockers were cleared.'
+				})
+			);
+		}
+
+		const editedFieldLabels = [
+			existingRequest.nextAction !== nextAction ? 'next action' : '',
+			existingRequest.contactName !== draftRequest.contactName ? 'contact name' : '',
+			existingRequest.email !== draftRequest.email ? 'email' : '',
+			existingRequest.phone !== draftRequest.phone ? 'phone' : '',
+			existingRequest.siteName !== draftRequest.siteName ? 'site name' : '',
+			existingRequest.serviceAddress !== draftRequest.serviceAddress ? 'service address' : '',
+			existingRequest.requestedTimeline !== draftRequest.requestedTimeline ? 'requested timeline' : ''
+		].filter(Boolean);
+
+		if (editedFieldLabels.length) {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc,
+					label: 'Request details updated',
+					note: `Updated ${editedFieldLabels.join(', ')}.`
+				})
+			);
+		}
+
+		if (!activityEvents.length) {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc,
+					label: 'Request details reviewed',
+					note: 'Internal Admin reviewed the request workspace with no visible field changes.'
+				})
+			);
+		}
 
 		return {
 			...draftRequest,
 			qualification: {
 				missingInfoReasonCodes,
-				reviewedAtUtc: new Date().toISOString(),
+				reviewedAtUtc: occurredAtUtc,
 				reviewedBy: 'External Admin'
 			},
-			timeline: [
-				...existingRequest.timeline,
-				{
-					id: crypto.randomUUID(),
-					occurredAtUtc: new Date().toISOString(),
-					type: 'operator-updated',
-					actor: 'External Admin',
-					label: changes.length ? `Request updated: ${changes.join(', ')}` : 'Request details updated'
-				}
-			]
+			timeline: [...existingRequest.timeline, ...activityEvents]
 		};
 	};
 
@@ -719,6 +834,36 @@ export const scheduleQuoteRequestSiteVisit = async (
 		]
 			.filter(Boolean)
 			.join(' ');
+		const activityEvents: QuoteRequestTimelineEvent[] = [];
+
+		if (existingRequest.status !== 'inspection-scheduled') {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc: scheduledAtUtc,
+					label: `Status changed · ${quoteRequestStatusMeta[existingRequest.status].label} → ${quoteRequestStatusMeta['inspection-scheduled'].label}`,
+					note: 'Request moved into the site visit lane.'
+				})
+			);
+		}
+
+		if (existingRequest.assignedTo !== normalizedSchedule.assignedFieldResource) {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc: scheduledAtUtc,
+					label: `Owner reassigned · ${existingRequest.assignedTo || 'Unassigned'} → ${normalizedSchedule.assignedFieldResource}`,
+					note: `Field ownership moved to ${normalizedSchedule.assignedFieldResource}.`
+				})
+			);
+		}
+
+		activityEvents.push(
+			createActivityEvent({
+				occurredAtUtc: scheduledAtUtc,
+				label: `Site visit scheduled · ${visitDateLabel} · ${visitWindowLabel}`,
+				note: normalizedSchedule.notes,
+				siteVisitSchedule: normalizedSchedule
+			})
+		);
 
 		return {
 			...existingRequest,
@@ -731,18 +876,7 @@ export const scheduleQuoteRequestSiteVisit = async (
 				reviewedBy: 'External Admin'
 			},
 			siteVisitSchedule: normalizedSchedule,
-			timeline: [
-				...existingRequest.timeline,
-				{
-					id: crypto.randomUUID(),
-					occurredAtUtc: scheduledAtUtc,
-					type: 'site-visit-scheduled',
-					actor: 'External Admin',
-					label: `Site visit scheduled · ${visitDateLabel} · ${visitWindowLabel}`,
-					note: normalizedSchedule.notes,
-					siteVisitSchedule: normalizedSchedule
-				}
-			]
+			timeline: [...existingRequest.timeline, ...activityEvents]
 		};
 	};
 
