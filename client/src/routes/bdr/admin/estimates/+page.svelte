@@ -1,23 +1,49 @@
 <script lang="ts">
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import { buildEstimateViews, getScaffoldBanner } from '$lib/mvp-display';
+	import type { QuoteRequest } from '$lib/quote-requests';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import type { PageProps } from './$types';
 
 	type EstimateView = ReturnType<typeof buildEstimateViews>[number];
+	type EstimateDraftRecord = {
+		requestId: string;
+		customerName: string;
+		siteName: string;
+		serviceSummary: string;
+		visitFindings: string;
+		scopeLineItems: string[];
+		notes: string;
+		assumptions: string[];
+		savedAtUtc: string;
+	};
+	type EstimateDraftPageData = PageProps['data'] & {
+		quoteRequests?: QuoteRequest[];
+		estimateDrafts?: Record<string, EstimateDraftRecord>;
+	};
 
-	let { data }: PageProps = $props();
+	let { data, form }: { data: EstimateDraftPageData; form: PageProps['form'] } = $props();
 
 	const allEstimates = $derived(
 		[...buildEstimateViews(data.estimates, data.customers)].sort((left, right) =>
 			String(right.validUntilUtc ?? '').localeCompare(String(left.validUntilUtc ?? ''))
 		)
 	);
+	const quoteRequests = $derived((data.quoteRequests ?? []) as QuoteRequest[]);
+	const estimateDrafts = $derived((data.estimateDrafts ?? {}) as Record<string, EstimateDraftRecord>);
 	const totalValue = $derived(allEstimates.reduce((sum, estimate) => sum + estimate.totalAmount, 0));
 
 	let search = $state('');
 	let statusFilter = $state('Open');
 	let selectedEstimateId = $state('');
+	let selectedDraftRequestId = $state('');
+	let draftCustomerName = $state('');
+	let draftSiteName = $state('');
+	let draftServiceSummary = $state('');
+	let draftVisitFindings = $state('');
+	let draftScopeLineItems = $state('');
+	let draftNotes = $state('');
+	let draftAssumptions = $state('');
 
 	const filterMatches = (estimate: EstimateView) => {
 		const status = estimate.status.toLowerCase();
@@ -67,6 +93,18 @@
 		const current = filteredEstimates.find((estimate) => estimate.id === selectedEstimateId);
 		return current ?? filteredEstimates[0] ?? null;
 	});
+	const draftSourceRequests = $derived(
+		quoteRequests.filter(
+			(request) =>
+				Boolean(request.siteVisitSchedule) ||
+				request.status === 'inspection-scheduled' ||
+				request.status === 'estimate-drafted' ||
+				request.status === 'estimate-sent'
+		)
+	);
+	const selectedDraftRequest = $derived(
+		draftSourceRequests.find((request) => request.id === selectedDraftRequestId) ?? draftSourceRequests[0] ?? null
+	);
 
 	const metrics = $derived([
 		{ label: 'Estimate queue', value: String(allEstimates.length), detail: getScaffoldBanner(data.source) },
@@ -82,6 +120,77 @@
 		if (selectedEstimate && selectedEstimateId !== selectedEstimate.id) {
 			selectedEstimateId = selectedEstimate.id;
 		}
+	});
+
+	const buildVisitFindingSeed = (request: QuoteRequest | null) => {
+		if (!request) return '';
+		const visitEvent = [...request.timeline]
+			.reverse()
+			.find((event) => event.type.startsWith('site-visit') && event.note?.trim());
+		return visitEvent?.note?.trim() ?? request.siteVisitSchedule?.notes ?? '';
+	};
+
+	const buildServiceSummarySeed = (request: QuoteRequest | null) =>
+		request
+			? [request.serviceType, request.need || request.message]
+					.filter(Boolean)
+					.join(' — ')
+			: '';
+
+	const buildDraftTrace = (request: QuoteRequest | null) => {
+		if (!request) return [] as { label: string; value: string; source: string }[];
+		return [
+			{
+				label: 'Customer',
+				value: request.customerName,
+				source: 'Request contact snapshot'
+			},
+			{
+				label: 'Site',
+				value: request.siteName,
+				source: 'Request site/address fields'
+			},
+			{
+				label: 'Service summary',
+				value: request.serviceType,
+				source: 'Request service + need'
+			},
+			{
+				label: 'Visit findings',
+				value: buildVisitFindingSeed(request) || 'No visit notes captured yet',
+				source: request.siteVisitSchedule ? 'Visit schedule note / timeline' : 'No visit record yet'
+			}
+		];
+	};
+
+	const selectedDraftTrace = $derived(buildDraftTrace(selectedDraftRequest));
+
+	$effect(() => {
+		if (!selectedDraftRequestId && draftSourceRequests[0]) {
+			selectedDraftRequestId = draftSourceRequests[0].id;
+		}
+	});
+
+	$effect(() => {
+		const request = selectedDraftRequest;
+		if (!request) return;
+		const savedDraft = estimateDrafts[request.id];
+		draftCustomerName = savedDraft?.customerName ?? request.customerName;
+		draftSiteName = savedDraft?.siteName ?? request.siteName;
+		draftServiceSummary = savedDraft?.serviceSummary ?? buildServiceSummarySeed(request);
+		draftVisitFindings = savedDraft?.visitFindings ?? buildVisitFindingSeed(request);
+		draftScopeLineItems = savedDraft?.scopeLineItems.join('\n') ?? '';
+		draftNotes = savedDraft?.notes ?? request.nextAction;
+		draftAssumptions =
+			savedDraft?.assumptions.join('\n') ??
+			[
+				request.requestedTimeline ? `Customer requested timeline: ${request.requestedTimeline}` : '',
+				request.siteVisitSchedule
+					? `Visit scheduled for ${request.siteVisitSchedule.visitDate} (${request.siteVisitSchedule.windowStart} - ${request.siteVisitSchedule.windowEnd})`
+					: ''
+			]
+				.filter(Boolean)
+				.join('\n');
 	});
 </script>
 
@@ -160,7 +269,100 @@
 	{/snippet}
 
 	{#snippet work()}
-		{#if selectedEstimate}
+		<div class="space-y-4">
+			{#if selectedDraftRequest}
+				<form method="POST" action="?/saveDraft" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+					<input type="hidden" name="requestId" value={selectedDraftRequest.id} />
+					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+						<div class="max-w-3xl">
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Estimate draft from request + visit</p>
+							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">Seed an editable draft without re-entering intake data</h4>
+							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+								Pull customer, site, service summary, and visit context from the Internal Admin request workflow, then save a local draft before anything is sent.
+							</p>
+						</div>
+						<div class="w-full max-w-sm">
+							<label class="grid gap-1">
+								<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Source request</span>
+								<select bind:value={selectedDraftRequestId} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">
+									{#each draftSourceRequests as request}
+										<option value={request.id}>{request.customerName} · {request.serviceType}</option>
+									{/each}
+								</select>
+							</label>
+						</div>
+					</div>
+
+					{#if form?.draftSaved && form.savedRequestId === selectedDraftRequest.id}
+						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
+							Draft saved locally
+						</p>
+					{:else if form?.draftMessage && form.savedRequestId === selectedDraftRequest.id}
+						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+							{form.draftMessage}
+						</p>
+					{/if}
+
+					<div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+						{#each selectedDraftTrace as item}
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-3">
+								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{item.label}</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{item.value}</p>
+								<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{item.source}</p>
+							</div>
+						{/each}
+					</div>
+
+					<div class="mt-5 grid gap-4 lg:grid-cols-2">
+						<label class="grid gap-2">
+							<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Customer</span>
+							<input bind:value={draftCustomerName} name="customerName" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+						</label>
+						<label class="grid gap-2">
+							<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</span>
+							<input bind:value={draftSiteName} name="siteName" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+						</label>
+					</div>
+
+					<div class="mt-4 grid gap-4 xl:grid-cols-2">
+						<label class="grid gap-2">
+							<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Service summary</span>
+							<textarea bind:value={draftServiceSummary} name="serviceSummary" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none"></textarea>
+						</label>
+						<label class="grid gap-2">
+							<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Visit findings</span>
+							<textarea bind:value={draftVisitFindings} name="visitFindings" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none"></textarea>
+						</label>
+					</div>
+
+					<div class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+						<label class="grid gap-2">
+							<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Scope line items</span>
+							<textarea bind:value={draftScopeLineItems} name="scopeLineItems" rows="6" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" placeholder="One line item per line"></textarea>
+						</label>
+						<div class="grid gap-4">
+							<label class="grid gap-2">
+								<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Assumptions</span>
+								<textarea bind:value={draftAssumptions} name="assumptions" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" placeholder="One assumption per line"></textarea>
+							</label>
+							<label class="grid gap-2">
+								<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Internal notes</span>
+								<textarea bind:value={draftNotes} name="notes" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none"></textarea>
+							</label>
+						</div>
+					</div>
+
+					<div class="mt-5 flex flex-wrap gap-3">
+						<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save draft</button>
+						<a href="/bdr/admin/requests?role=office-admin" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Open request workspace</a>
+						{#if estimateDrafts[selectedDraftRequest.id]?.savedAtUtc}
+							<p class="text-xs leading-5 text-[var(--text-muted)]">Last saved {formatDate(estimateDrafts[selectedDraftRequest.id].savedAtUtc)}</p>
+						{/if}
+					</div>
+				</form>
+			{/if}
+
+			{#if selectedEstimate}
 			<div class="space-y-4">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div>
@@ -220,10 +422,11 @@
 					</div>
 				</div>
 			</div>
-		{:else}
+			{:else}
 			<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
 				No estimates match the current filters.
 			</div>
-		{/if}
+			{/if}
+		</div>
 	{/snippet}
 </AdminWorkspace>
