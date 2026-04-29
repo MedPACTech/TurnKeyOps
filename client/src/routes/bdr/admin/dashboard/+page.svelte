@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { ArrowRight, Bot, CalendarDays, FileText, Receipt, Users } from 'lucide-svelte';
 	import { formatCurrency } from '$lib/utils/format';
 	import type { PageProps } from './$types';
 
@@ -42,36 +41,31 @@
 	} as const;
 
 	const activeMetrics = $derived(dashboardRanges[activeRange]);
-	const rangeLabel = $derived(activeRange === 'week' ? '7 days' : activeRange === 'month' ? '30 days' : '12 months');
 
 	const summaryCards = $derived([
 		{
 			label: 'Active jobs',
 			value: String(activeMetrics.upcomingJobs),
-			detail: `Scheduled in the next ${rangeLabel}`,
 			href: '/bdr/admin/calendar?role=office-admin',
-			icon: CalendarDays
+			icon: '🏗️'
 		},
 		{
 			label: 'Pending estimates',
 			value: String(data.snapshot.summary.estimateCount),
-			detail: `${formatCurrency(data.snapshot.summary.estimateValue)} in active value`,
 			href: '/bdr/admin/estimates?role=office-admin',
-			icon: FileText
+			icon: '📝'
 		},
 		{
 			label: 'Quote requests',
 			value: String(data.requestInbox.length),
-			detail: `${data.requestMetrics.newCount} new waiting`,
 			href: '/bdr/admin/requests?role=office-admin',
-			icon: Users
+			icon: '📥'
 		},
 		{
 			label: 'Open invoices',
 			value: String(data.snapshot.summary.invoiceCount),
-			detail: 'Billing follow-through and collections',
 			href: '/bdr/admin/invoices?role=office-admin',
-			icon: Receipt
+			icon: '💰'
 		}
 	]);
 
@@ -100,34 +94,66 @@
 			})
 			.join(' ');
 
-	const operations = $derived([
-		{ label: 'Upcoming jobs', value: String(activeMetrics.upcomingJobs), detail: `Scheduled over the next ${activeRange}` },
-		{ label: 'Quotes', value: String(activeMetrics.quotes), detail: 'Issued or in review' },
-		{ label: 'Scheduled yards', value: activeMetrics.scheduledYards.toLocaleString(), detail: 'Projected concrete volume' },
-		{ label: 'Average ticket', value: formatCurrency(activeMetrics.avgTicket), detail: 'Blended estimate size' },
-		{ label: 'Close rate', value: `${activeMetrics.closeRate}%`, detail: 'Quote-to-job conversion' }
-	]);
+	const concreteYardsToday = $derived(Math.max(28, Math.round(activeMetrics.scheduledYards / 120)));
+	const priorityRequest = $derived(data.requestInbox[0]);
 
 	const bobMoves = $derived([
+		priorityRequest
+			? {
+					label: priorityRequest.contactName ? `Call ${priorityRequest.contactName}` : 'Review newest request',
+					detail: priorityRequest.siteName || priorityRequest.serviceAddress || priorityRequest.nextAction,
+					href: '/bdr/admin/requests?role=office-admin'
+				}
+			: {
+					label: 'Review request queue',
+					detail: `${data.requestInbox.length} requests`,
+					href: '/bdr/admin/requests?role=office-admin'
+				},
 		{
-			label: 'Draft estimate from request',
-			detail: `${data.requestInbox.length} intake item(s) can move into scoped estimate work`,
-			href: '/bdr/admin/requests?role=office-admin'
-		},
-		{
-			label: 'Summarize quote request',
-			detail: `${data.requestMetrics.newCount} new request(s) need a callback brief`,
-			href: '/bdr/admin/requests?role=office-admin'
-		},
-		{
-			label: 'Chase estimate follow-up',
-			detail: `${data.snapshot.summary.estimateCount} pending estimate(s) need send or revision work`,
+			label: 'Price pending estimates',
+			detail: `${data.snapshot.summary.estimateCount} estimates - ${formatCurrency(data.snapshot.summary.estimateValue)}`,
 			href: '/bdr/admin/estimates?role=office-admin'
 		},
 		{
-			label: 'Prep invoice follow-up',
-			detail: `${data.snapshot.summary.invoiceCount} invoice record(s) still need collections follow-through`,
+			label: 'Confirm schedule gaps',
+			detail: `${activeMetrics.upcomingJobs} active jobs`,
+			href: '/bdr/admin/calendar?role=office-admin'
+		},
+		{
+			label: 'Collect open invoices',
+			detail: `${data.snapshot.summary.invoiceCount} invoices`,
 			href: '/bdr/admin/invoices?role=office-admin'
+		}
+	]);
+
+	const orderItems = $derived([
+		{
+			icon: '🚚',
+			item: 'Concrete',
+			quantity: `${concreteYardsToday} yd`,
+			detail: "Today's pours",
+			href: '/bdr/admin/calendar?role=office-admin'
+		},
+		{
+			icon: '🧱',
+			item: 'Forms and rebar',
+			quantity: '6 kits',
+			detail: 'Patio prep',
+			href: '/bdr/admin/requests?role=office-admin'
+		},
+		{
+			icon: '🛻',
+			item: 'Pump truck',
+			quantity: '1 slot',
+			detail: 'Access window',
+			href: '/bdr/admin/calendar?role=office-admin'
+		},
+		{
+			icon: '✨',
+			item: 'Finish kit',
+			quantity: '4 sets',
+			detail: 'Cure compound',
+			href: '/bdr/admin/estimates?role=office-admin'
 		}
 	]);
 </script>
@@ -136,7 +162,7 @@
 	<title>BDR Admin · Dashboard</title>
 </svelte:head>
 
-<div class="space-y-4">
+<div class="space-y-5">
 	<section class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<div>
 			<h1 class="text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">Dashboard</h1>
@@ -149,68 +175,59 @@
 		</a>
 	</section>
 
-	<section class="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_360px]">
-		<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+	<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		{#each summaryCards as card}
-			{@const Icon = card.icon}
 			<a
 				href={card.href}
-				class="rounded-lg border border-[var(--shell-border)] bg-white p-4 shadow-sm transition hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)]"
+				class="group flex aspect-square flex-col justify-between rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
 			>
-				<div class="flex items-start justify-between gap-3">
-					<div class="min-w-0">
-						<p class="text-sm font-medium leading-5 text-[var(--text-muted)]">{card.label}</p>
-						<p class="mt-2 text-3xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{card.value}</p>
-						<p class="mt-2 text-sm leading-5 text-[var(--text-muted)]">{card.detail}</p>
-					</div>
-					<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent-text)]">
-						<Icon class="h-4 w-4" aria-hidden="true" />
-					</div>
+				<div class="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl shadow-sm" aria-hidden="true">
+					{card.icon}
 				</div>
-				<div class="mt-4 flex items-center gap-1 text-sm font-semibold leading-5 text-[var(--accent-text)]">
-					Open
-					<ArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
+				<div>
+					<p class="text-4xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{card.value}</p>
+					<p class="mt-3 text-sm font-medium leading-5 text-[var(--text-muted)]">{card.label}</p>
 				</div>
 			</a>
 		{/each}
-		</div>
-
-		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
-			<div class="flex items-start gap-3">
-				<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent-text)]">
-					<Bot class="h-5 w-5" aria-hidden="true" />
-				</div>
-				<div>
-					<p class="text-sm font-semibold text-[var(--accent-text)]">AI work lane</p>
-					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Bob&apos;s next moves</h2>
-				</div>
-			</div>
-
-			<div class="mt-4 space-y-2">
-				{#each bobMoves as item}
-					<a
-						href={item.href}
-						class="flex items-start justify-between gap-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 transition hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)]"
-					>
-						<div class="min-w-0">
-							<p class="text-sm font-semibold text-[var(--text-strong)]">{item.label}</p>
-							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
-						</div>
-						<ArrowRight class="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-text)]" aria-hidden="true" />
-					</a>
-				{/each}
-			</div>
-		</article>
 	</section>
 
-	<section class="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
+	<article class="rounded-lg bg-white/88 p-5 shadow-[var(--shell-shadow)]">
+		<div class="flex items-start justify-between gap-3">
+			<div class="flex items-start gap-3">
+				<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl shadow-sm">
+					👷‍♂️
+				</div>
+				<div>
+					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Bob</h2>
+					<p class="text-sm leading-5 text-[var(--text-muted)]">Next moves</p>
+				</div>
+			</div>
+			<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm" title="AI-driven">
+				✦
+			</span>
+		</div>
+
+		<div class="mt-4 grid gap-3 md:grid-cols-2">
+			{#each bobMoves as item}
+				<a
+					href={item.href}
+					class="rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3 shadow-sm transition hover:bg-[var(--accent-soft)]"
+				>
+					<p class="text-sm font-semibold leading-5 text-[var(--text-strong)]">{item.label}</p>
+					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
+				</a>
+			{/each}
+		</div>
+	</article>
+
+	<section class="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_380px]">
+		<article class="rounded-lg bg-white/86 p-5 shadow-[var(--shell-shadow)]">
 			<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<p class="text-sm font-semibold text-[var(--text-muted)]">Revenue trend</p>
-					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Quiet revenue view</h2>
+					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Revenue</h2>
 				</div>
-				<div class="inline-flex rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-1">
+				<div class="inline-flex rounded-md bg-white/70 p-1 shadow-sm">
 					{#each rangeOptions as option}
 						<button
 							type="button"
@@ -227,7 +244,7 @@
 				</div>
 			</div>
 
-			<div class="mt-4 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
+			<div class="mt-4 rounded-lg bg-[var(--shell-panel-strong)]/80 p-4">
 				<svg viewBox="0 0 100 100" class="h-40 w-full overflow-visible" preserveAspectRatio="none" aria-label="Revenue line graph">
 					{#each [20, 40, 60, 80] as line}
 						<line x1="0" y1={line} x2="100" y2={line} stroke="rgba(148,163,184,0.22)" stroke-width="0.6" />
@@ -244,17 +261,23 @@
 			</div>
 		</article>
 
-		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
-			<p class="text-sm font-semibold text-[var(--text-muted)]">Operations snapshot</p>
+		<article class="rounded-lg bg-white/88 p-5 shadow-[var(--shell-shadow)]">
+			<div class="flex items-center justify-between gap-3">
+				<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Bob&apos;s order list</h2>
+				<span class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-text)] shadow-sm" title="AI-driven">
+					✦
+				</span>
+			</div>
 			<div class="mt-4 space-y-3">
-				{#each operations as metric}
-					<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-						<p class="text-sm font-medium leading-5 text-[var(--text-muted)]">{metric.label}</p>
-						<div class="mt-1 flex items-end justify-between gap-3">
-							<p class="text-2xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{metric.value}</p>
+				{#each orderItems as item}
+					<a href={item.href} class="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg bg-[var(--shell-panel-strong)]/90 px-3 py-3 shadow-sm transition hover:bg-[var(--accent-soft)]">
+						<span class="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-xl shadow-sm" aria-hidden="true">{item.icon}</span>
+						<div class="min-w-0">
+							<p class="truncate text-sm font-semibold leading-5 text-[var(--text-strong)]">{item.item}</p>
+							<p class="truncate text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
 						</div>
-						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{metric.detail}</p>
-					</div>
+						<p class="text-sm font-semibold leading-5 text-[var(--text-strong)]">{item.quantity}</p>
+					</a>
 				{/each}
 			</div>
 		</article>

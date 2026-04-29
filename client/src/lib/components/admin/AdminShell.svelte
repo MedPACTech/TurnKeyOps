@@ -1,27 +1,6 @@
 <script lang="ts">
-	import {
-		CalendarDays,
-		FileText,
-		Globe,
-		Building2,
-		LayoutDashboard,
-		LogOut,
-		Menu,
-		PanelLeftClose,
-		PanelLeftOpen,
-		Receipt,
-		Settings2,
-		SquareUserRound,
-		ClipboardList,
-		X
-	} from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
-	import {
-		bdrAdminNavigation,
-		bdrAdminNavSections,
-		type BdrAdminNavItem,
-		type BdrAdminRole
-	} from '$lib/config/platform';
+	import { bdrAdminNavigation, type BdrAdminNavItem, type BdrAdminRole } from '$lib/config/platform';
 
 	type ShellMetric = { label: string; value: string; detail: string };
 	type ShellNote = { title: string; detail: string };
@@ -30,9 +9,6 @@
 	let {
 		role,
 		activePath,
-		activeNav,
-		title,
-		description,
 		children
 	} = $props<{
 		role: BdrAdminRole;
@@ -67,31 +43,20 @@
 
 	const withRole = (href: string) => `${href}?role=${role}`;
 	const navItems = $derived(bdrAdminNavigation);
-	const groupedNavItems = $derived(
-		bdrAdminNavSections
-			.map((section) => ({
-				...section,
-				items: navItems.filter((item) => item.section === section.key)
-			}))
-			.filter((section) => section.items.length)
-	);
 
 	const navIconFor = (slug: string) =>
 		({
-			dashboard: LayoutDashboard,
-			calendar: CalendarDays,
-			estimates: FileText,
-			invoices: Receipt,
-			customers: SquareUserRound,
-			requests: ClipboardList,
-			content: Globe,
-			settings: Settings2
-		})[slug] ?? Settings2;
+			dashboard: '📊',
+			calendar: '📅',
+			estimates: '📝',
+			invoices: '💰',
+			customers: '👥',
+			requests: '📥',
+			content: '🌐',
+			settings: '⚙️'
+		})[slug] ?? '⚙️';
 
 	const isActive = (item: BdrAdminNavItem) => activePath === item.href;
-	const roleLabel = $derived(
-		role === 'owner' ? 'Owner' : role === 'office-admin' ? 'Office Admin' : 'Estimator Crew Lite'
-	);
 </script>
 
 <div class="concept-admin-shell min-h-screen bg-[var(--app-bg)] text-[var(--text-base)]">
@@ -99,7 +64,7 @@
 		<aside class={`hidden shrink-0 flex-col border-r border-[var(--nav-divider)] bg-[var(--nav-bg)] text-white transition-[width] duration-200 lg:flex ${navCollapsed ? 'w-[88px]' : 'w-64'}`}>
 			<div class="flex h-16 items-center gap-3 border-b border-[var(--nav-divider)] px-4">
 				<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--brand-solid)] text-white shadow-sm">
-					<Building2 class="h-5 w-5" aria-hidden="true" />
+					<span class="text-lg" aria-hidden="true">🏢</span>
 				</div>
 				{#if !navCollapsed}
 					<div class="min-w-0">
@@ -115,64 +80,40 @@
 					onclick={() => (navCollapsed = !navCollapsed)}
 				>
 					{#if navCollapsed}
-						<PanelLeftOpen class="h-5 w-5" aria-hidden="true" />
+						<span class="text-xl leading-none" aria-hidden="true">›</span>
 					{:else}
-						<PanelLeftClose class="h-5 w-5" aria-hidden="true" />
+						<span class="text-xl leading-none" aria-hidden="true">‹</span>
 					{/if}
 				</button>
 			</div>
 
 			<nav class="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
-				{#each groupedNavItems as section, sectionIndex}
-					{#if !navCollapsed}
-						<div class={sectionIndex === 0 ? '' : 'mt-5'}>
-							<div class="mb-2 px-3">
-								<p class="text-[0.68rem] font-semibold text-white/45">{section.label}</p>
-							</div>
-							<div class="space-y-1">
-								{#each section.items as item}
-									{@const Icon = navIconFor(item.slug)}
-									<a
-										href={withRole(item.href)}
-										title={item.label}
-										class={`group flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium leading-5 transition-colors ${
-											isActive(item)
-												? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'
-												: 'text-white/70 hover:bg-white/10 hover:text-white'
-										}`}
-									>
-										<span class="flex h-5 w-5 shrink-0 items-center justify-center text-current" aria-hidden="true">
-											<Icon class="h-4 w-4" aria-hidden="true" />
-										</span>
-										<span class="truncate">{item.label}</span>
-									</a>
-								{/each}
-							</div>
-						</div>
-					{:else}
-						<div class={sectionIndex === 0 ? 'space-y-1' : 'mt-4 space-y-1'}>
-							{#if sectionIndex > 0}
-								<div class="mx-auto mb-2 h-px w-8 bg-white/10"></div>
-							{/if}
-							{#each section.items as item}
-								{@const Icon = navIconFor(item.slug)}
-								<a
-									href={withRole(item.href)}
-									title={`${section.label}: ${item.label}`}
-									class={`group flex min-h-11 items-center justify-center rounded-md px-3 py-2.5 text-sm font-medium leading-5 transition-colors ${
-										isActive(item)
-											? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'
-											: 'text-white/70 hover:bg-white/10 hover:text-white'
-										}`}
-								>
-									<span class="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
-										<Icon class="h-4 w-4" aria-hidden="true" />
-									</span>
-								</a>
-							{/each}
-						</div>
-					{/if}
+				<div class="space-y-1.5">
+				{#each navItems as item}
+					{@const icon = navIconFor(item.slug)}
+					<a
+						href={withRole(item.href)}
+						title={item.label}
+						class={`group flex min-h-12 items-center ${navCollapsed ? 'justify-center px-2' : 'gap-3 px-3'} rounded-md py-2.5 text-sm font-medium leading-5 transition-colors ${
+							isActive(item)
+								? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'
+								: 'text-white/70 hover:bg-white/10 hover:text-white'
+						}`}
+					>
+						<span
+							class={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg ${
+								isActive(item) ? 'bg-[var(--accent-soft)]' : 'bg-white/5'
+							}`}
+							aria-hidden="true"
+						>
+							{icon}
+						</span>
+						{#if !navCollapsed}
+							<span class="truncate">{item.label}</span>
+						{/if}
+					</a>
 				{/each}
+				</div>
 			</nav>
 
 			<div class="border-t border-[var(--nav-divider)] p-4">
@@ -197,7 +138,7 @@
 							title="Sign out"
 							aria-label="Sign out"
 						>
-							<LogOut class="h-4 w-4" aria-hidden="true" />
+							<span aria-hidden="true">↪</span>
 						</a>
 					{/if}
 				</div>
@@ -215,7 +156,7 @@
 				<aside class="fixed inset-y-0 left-0 flex w-64 flex-col bg-[var(--nav-bg)] text-white shadow-[var(--shell-shadow)]">
 					<div class="flex h-16 items-center gap-3 border-b border-[var(--nav-divider)] px-4">
 						<div class="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--brand-solid)]">
-							<Building2 class="h-5 w-5" aria-hidden="true" />
+							<span class="text-lg" aria-hidden="true">🏢</span>
 						</div>
 						<div>
 							<p class="text-base font-semibold leading-5">TurnKeyOps</p>
@@ -227,68 +168,50 @@
 							aria-label="Close navigation"
 							onclick={() => (sidebarOpen = false)}
 						>
-							<X class="h-5 w-5" aria-hidden="true" />
+							<span aria-hidden="true">✕</span>
 						</button>
 					</div>
 
 					<nav class="flex-1 overflow-y-auto px-3 py-4" aria-label="Mobile navigation">
-						{#each groupedNavItems as section, sectionIndex}
-							<div class={sectionIndex === 0 ? '' : 'mt-5'}>
-								<div class="mb-2 px-3">
-									<p class="text-[0.68rem] font-semibold text-white/45">{section.label}</p>
-								</div>
-								<div class="space-y-1">
-									{#each section.items as item}
-										{@const Icon = navIconFor(item.slug)}
-										<a
-											href={withRole(item.href)}
-											class={`flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium leading-5 transition-colors ${
-												isActive(item)
-													? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'
-													: 'text-white/70 hover:bg-white/10 hover:text-white'
-											}`}
-											onclick={() => (sidebarOpen = false)}
-										>
-											<span class="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
-												<Icon class="h-4 w-4" aria-hidden="true" />
-											</span>
-											<span>{item.label}</span>
-										</a>
-									{/each}
-								</div>
-							</div>
+						<div class="space-y-1.5">
+						{#each navItems as item}
+							{@const icon = navIconFor(item.slug)}
+							<a
+								href={withRole(item.href)}
+								class={`flex min-h-12 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium leading-5 transition-colors ${
+									isActive(item)
+										? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'
+										: 'text-white/70 hover:bg-white/10 hover:text-white'
+								}`}
+								onclick={() => (sidebarOpen = false)}
+							>
+								<span
+									class={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg ${
+										isActive(item) ? 'bg-[var(--accent-soft)]' : 'bg-white/5'
+									}`}
+									aria-hidden="true"
+								>
+									{icon}
+								</span>
+								<span>{item.label}</span>
+							</a>
 						{/each}
+						</div>
 					</nav>
 				</aside>
 			</div>
 		{/if}
 
 		<div class="flex min-w-0 flex-1 flex-col">
-			<header class="sticky top-0 z-30 border-b border-[var(--shell-border)] bg-[var(--topbar-bg)] backdrop-blur">
-				<div class="flex min-h-16 items-center justify-between gap-3 px-4 lg:px-6">
-					<div class="flex min-w-0 items-center gap-3">
-						<button
-							type="button"
-							class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--shell-border)] bg-white text-[var(--text-base)] shadow-sm lg:hidden"
-							aria-label="Open navigation"
-							onclick={() => (sidebarOpen = true)}
-						>
-							<Menu class="h-5 w-5" aria-hidden="true" />
-						</button>
-						<div class="min-w-0">
-							<p class="truncate text-sm font-semibold leading-5 text-[var(--text-strong)]">{activeNav.label}</p>
-						</div>
-					</div>
-
-					<div class="hidden items-center gap-2 sm:flex">
-						<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-1 text-[0.7rem] font-semibold text-[var(--text-base)]">
-							{roleLabel}
-						</span>
-					</div>
-				</div>
-			</header>
-
-			<main class="min-w-0 flex-1 overflow-auto px-4 py-4 lg:px-6 lg:py-6">
+			<main class="admin-workarea min-w-0 flex-1 overflow-auto px-4 py-5 lg:px-6 lg:py-7">
+				<button
+					type="button"
+					class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md bg-white/85 text-xl text-[var(--text-base)] shadow-sm lg:hidden"
+					aria-label="Open navigation"
+					onclick={() => (sidebarOpen = true)}
+				>
+					<span aria-hidden="true">☰</span>
+				</button>
 				{@render children()}
 			</main>
 		</div>
@@ -372,5 +295,10 @@
 		--shell-panel-strong: #f8fafc;
 		--drawer-bg: #ffffff;
 		--drawer-card-bg: #ffffff;
+	}
+
+	.admin-workarea {
+		background:
+			linear-gradient(135deg, rgba(255, 247, 237, 0.95) 0%, rgba(239, 246, 255, 0.9) 37%, rgba(246, 244, 255, 0.86) 68%, rgba(246, 247, 249, 0.98) 100%);
 	}
 </style>
