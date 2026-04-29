@@ -2,13 +2,18 @@
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import {
 		buildQuoteRequestQualification,
+		buildQuoteRequestWorkflowModel,
+		getQuoteRequestWorkflowLane,
+		getQuoteRequestWorkflowPhase,
 		isQuoteRequestUnassigned,
 		quoteRequestMissingInfoReasonOptions,
 		quoteRequestStatusMeta,
 		quoteRequestStatusOptions,
+		quoteRequestWorkflowLaneMeta,
 		type QuoteRequest,
 		type QuoteRequestMissingInfoReasonCode,
-		type QuoteRequestStatus
+		type QuoteRequestStatus,
+		type QuoteRequestWorkflowLane
 	} from '$lib/quote-requests';
 	import { AlertTriangle, CalendarCheck, CheckCircle2, ExternalLink, FileText, Lock, Pencil } from 'lucide-svelte';
 	import type { ActionData, PageProps } from './$types';
@@ -18,7 +23,7 @@
 	const requests = $derived(data.requests);
 	const scheduleSiteVisitByRequestId = $derived(data.scheduleSiteVisitByRequestId);
 	let selectedRequestId = $state('');
-	let laneFilter = $state<'all' | 'new' | 'active' | 'estimate' | 'won'>('all');
+	let laneFilter = $state<'all' | QuoteRequestWorkflowLane>('all');
 	let search = $state('');
 	let selectedAttachmentId = $state('');
 	let contactDrawerOpen = $state(false);
@@ -40,11 +45,8 @@
 	});
 
 	const laneMatches = (request: QuoteRequest) => {
-		if (laneFilter === 'new') return request.status === 'new';
-		if (laneFilter === 'active') return ['in-review', 'needs-info', 'contacted', 'inspection-scheduled'].includes(request.status);
-		if (laneFilter === 'estimate') return ['qualified', 'estimate-drafted', 'estimate-sent'].includes(request.status);
-		if (laneFilter === 'won') return request.status === 'won';
-		return true;
+		if (laneFilter === 'all') return true;
+		return getQuoteRequestWorkflowLane(request.status) === laneFilter;
 	};
 
 	const filteredRequests = $derived.by(() => {
@@ -117,6 +119,8 @@
 		)
 	);
 	const selectedQualification = $derived(selectedRequest ? buildQuoteRequestQualification(selectedRequest) : null);
+	const selectedWorkflow = $derived(selectedRequest ? buildQuoteRequestWorkflowModel(selectedRequest.status) : []);
+	const selectedWorkflowPhase = $derived(selectedRequest ? getQuoteRequestWorkflowPhase(selectedRequest.status) : null);
 	const selectedRequestScheduleSectionId = $derived(
 		selectedRequest ? `schedule-site-visit-${selectedRequest.id}` : 'schedule-site-visit'
 	);
@@ -160,7 +164,7 @@
 	const metrics = $derived([
 		{ label: 'Total requests', value: String(data.metrics.total), detail: 'Public-site and office-entered requests in one queue' },
 		{ label: 'Needs response', value: String(data.metrics.newCount), detail: 'Fresh messages waiting on first office action' },
-		{ label: 'Active work', value: String(data.metrics.activeCount), detail: 'Requests still moving through triage, inspection, or estimate handling' }
+		{ label: 'Active work', value: String(data.metrics.activeCount), detail: 'Requests still moving through qualification or site-visit handling' }
 	]);
 
 	const formatSubmittedAt = (value: string) =>
@@ -265,13 +269,11 @@
 >
 	{#snippet context()}
 		<div class="space-y-3">
-			{#each [
-				{ key: 'all' as const, label: 'All queue', detail: `${requests.length} total requests` },
-				{ key: 'new' as const, label: 'New intake', detail: `${requests.filter((request) => request.status === 'new').length} unread-style requests` },
-				{ key: 'active' as const, label: 'Working', detail: `${requests.filter((request) => ['contacted', 'inspection-scheduled'].includes(request.status)).length} in contact or inspection motion` },
-				{ key: 'estimate' as const, label: 'Estimate desk', detail: `${requests.filter((request) => ['estimate-drafted', 'estimate-sent'].includes(request.status)).length} waiting on quote work` },
-				{ key: 'won' as const, label: 'Won / handoff', detail: `${requests.filter((request) => request.status === 'won').length} ready for production follow-through` }
-			] as lane}
+			{#each [{ key: 'all' as const, label: 'All queue', detail: `${requests.length} total requests` }, ...quoteRequestWorkflowLaneMeta.map((lane) => ({
+				key: lane.key,
+				label: lane.label,
+				detail: `${requests.filter((request) => getQuoteRequestWorkflowLane(request.status) === lane.key).length} ${lane.detail.toLowerCase()}`
+			}))] as lane}
 				<button
 					type="button"
 					class={`w-full rounded-md border px-3 py-3 text-left transition ${laneFilter === lane.key ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
@@ -363,6 +365,28 @@
 					{:else if form?.message && form.updatedRequestId === selectedRequest.id}
 						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{form.message}</p>
 					{/if}
+
+					<div class="mt-5 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
+						<div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+							<div>
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Workflow status model</p>
+								<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{selectedWorkflowPhase?.label ?? 'Workflow'}</p>
+								<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{selectedWorkflowPhase?.detail ?? 'Track the request from intake through outcome without losing context.'}</p>
+							</div>
+							<span class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
+								{quoteRequestStatusMeta[selectedRequest.status].label}
+							</span>
+						</div>
+						<div class="mt-4 grid gap-3 lg:grid-cols-5">
+							{#each selectedWorkflow as phase}
+								<div class={`rounded-md border px-3 py-3 ${phase.isCurrent ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : phase.isComplete ? 'border-emerald-400/25 bg-emerald-400/10' : 'border-[var(--shell-border)] bg-[var(--shell-panel)]'}`}>
+									<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{phase.label}</p>
+									<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{phase.statuses.map((status) => quoteRequestStatusMeta[status].label).join(' · ')}</p>
+									<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{phase.detail}</p>
+								</div>
+							{/each}
+						</div>
+					</div>
 
 					<div class="mt-5 grid gap-4 lg:grid-cols-[180px_220px_minmax(0,1fr)]">
 						<div class="grid gap-2">

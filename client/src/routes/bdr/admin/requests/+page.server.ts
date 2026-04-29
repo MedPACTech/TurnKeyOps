@@ -3,6 +3,7 @@ import {
 	buildQuoteRequestQualification,
 	buildQuoteRequestInbox,
 	getQuoteRequestMetrics,
+	isQuoteRequestClosedStatus,
 	isQuoteRequestMissingInfoReasonCode,
 	quoteRequestStatuses,
 	type QuoteRequestMissingInfoReasonCode,
@@ -50,7 +51,6 @@ const formatDateLabel = (value: string) =>
 	});
 
 const rangesOverlap = (startA: number, endA: number, startB: number, endB: number) => startA < endB && startB < endA;
-const closedScheduleStatuses = new Set<QuoteRequestStatus>(['won', 'closed']);
 
 export const load = async ({ fetch }) => {
 	const { requests, source } = await loadQuoteRequests(fetch);
@@ -159,7 +159,7 @@ export const actions = {
 			});
 		}
 
-		if (closedScheduleStatuses.has(selectedRequest.status)) {
+		if (isQuoteRequestClosedStatus(selectedRequest.status)) {
 			return fail(400, {
 				scheduleMessage: 'Closed or won requests cannot be scheduled for a new site visit.',
 				scheduledRequestId: id

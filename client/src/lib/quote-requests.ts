@@ -11,6 +11,9 @@ export type QuoteRequestStatus =
 	| 'won'
 	| 'closed';
 
+export type QuoteRequestWorkflowLane = 'new' | 'active' | 'estimate' | 'won';
+export type QuoteRequestWorkflowPhaseKey = 'intake' | 'qualification' | 'inspection' | 'estimate' | 'outcome';
+
 export type QuoteRequestAttachment = {
 	id: string;
 	fileName: string;
@@ -172,6 +175,104 @@ export const quoteRequestStatusOptions = quoteRequestStatuses.map((status) => ({
 	value: status,
 	label: quoteRequestStatusMeta[status].label
 }));
+
+export const quoteRequestWorkflowPhases: {
+	key: QuoteRequestWorkflowPhaseKey;
+	lane: QuoteRequestWorkflowLane;
+	label: string;
+	detail: string;
+	statuses: QuoteRequestStatus[];
+}[] = [
+	{
+		key: 'intake',
+		lane: 'new',
+		label: 'Intake',
+		detail: 'Fresh requests waiting on office triage and first response.',
+		statuses: ['new', 'in-review']
+	},
+	{
+		key: 'qualification',
+		lane: 'active',
+		label: 'Qualification',
+		detail: 'Owner assignment, follow-up, and blocker cleanup before a visit is booked.',
+		statuses: ['needs-info', 'qualified', 'contacted']
+	},
+	{
+		key: 'inspection',
+		lane: 'active',
+		label: 'Site visit',
+		detail: 'Field work is scheduled and the request is moving toward estimate prep.',
+		statuses: ['inspection-scheduled']
+	},
+	{
+		key: 'estimate',
+		lane: 'estimate',
+		label: 'Estimate desk',
+		detail: 'Scope, revisions, and follow-up are in the quote lane.',
+		statuses: ['estimate-drafted', 'estimate-sent']
+	},
+	{
+		key: 'outcome',
+		lane: 'won',
+		label: 'Outcome',
+		detail: 'The request is either handed off as won work or closed out.',
+		statuses: ['won', 'closed']
+	}
+];
+
+const statusToWorkflowPhase = new Map(
+	quoteRequestWorkflowPhases.flatMap((phase) => phase.statuses.map((status) => [status, phase]))
+);
+
+export const quoteRequestWorkflowLaneMeta: {
+	key: QuoteRequestWorkflowLane;
+	label: string;
+	detail: string;
+	phaseKeys: QuoteRequestWorkflowPhaseKey[];
+}[] = [
+	{
+		key: 'new',
+		label: 'New intake',
+		detail: 'Unread-style requests that need first touch from the office.',
+		phaseKeys: ['intake']
+	},
+	{
+		key: 'active',
+		label: 'Working',
+		detail: 'Requests in qualification, contact motion, or site-visit handling.',
+		phaseKeys: ['qualification', 'inspection']
+	},
+	{
+		key: 'estimate',
+		label: 'Estimate desk',
+		detail: 'Requests waiting on estimate drafting, send, or follow-up.',
+		phaseKeys: ['estimate']
+	},
+	{
+		key: 'won',
+		label: 'Won / handoff',
+		detail: 'Requests that already resolved into outcome status.',
+		phaseKeys: ['outcome']
+	}
+];
+
+export const getQuoteRequestWorkflowPhase = (status: QuoteRequestStatus) =>
+	statusToWorkflowPhase.get(status) ?? quoteRequestWorkflowPhases[0];
+
+export const getQuoteRequestWorkflowLane = (status: QuoteRequestStatus): QuoteRequestWorkflowLane =>
+	getQuoteRequestWorkflowPhase(status).lane;
+
+export const isQuoteRequestClosedStatus = (status: QuoteRequestStatus) => getQuoteRequestWorkflowPhase(status).key === 'outcome';
+
+export const buildQuoteRequestWorkflowModel = (status: QuoteRequestStatus) => {
+	const activeIndex = quoteRequestWorkflowPhases.findIndex((phase) => phase.key === getQuoteRequestWorkflowPhase(status).key);
+	return quoteRequestWorkflowPhases.map((phase, index) => ({
+		...phase,
+		isCurrent: index === activeIndex,
+		isComplete: index < activeIndex,
+		containsStatus: phase.statuses.includes(status)
+	}));
+};
 
 export const quoteRequestMissingInfoReasonCodes: QuoteRequestMissingInfoReasonCode[] = [
 	'service-fit-unconfirmed',
@@ -758,8 +859,8 @@ export const buildQuoteRequestInbox = (requests: QuoteRequest[]) =>
 
 export const getQuoteRequestMetrics = (requests: QuoteRequest[]) => ({
 	total: requests.length,
-	newCount: requests.filter((request) => request.status === 'new').length,
-	activeCount: requests.filter((request) => !['won', 'closed'].includes(request.status)).length,
+	newCount: requests.filter((request) => getQuoteRequestWorkflowLane(request.status) === 'new').length,
+	activeCount: requests.filter((request) => getQuoteRequestWorkflowLane(request.status) === 'active').length,
 	wonCount: requests.filter((request) => request.status === 'won').length
 });
 
