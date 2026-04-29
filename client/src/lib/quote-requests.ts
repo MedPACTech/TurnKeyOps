@@ -38,6 +38,13 @@ export type QuoteRequestSiteVisitSchedule = {
 	scheduledBy: string;
 };
 
+export type QuoteRequestSiteVisitCancellationReasonCode =
+	| 'customer-requested'
+	| 'site-not-ready'
+	| 'field-resource-unavailable'
+	| 'weather-delay'
+	| 'scope-needs-review';
+
 export type QuoteRequestQualificationCheckKey =
 	| 'service-fit'
 	| 'site-readiness'
@@ -76,7 +83,12 @@ export type QuoteRequestSubmittedPayload = {
 export type QuoteRequestTimelineEvent = {
 	id: string;
 	occurredAtUtc: string;
-	type: 'submitted' | 'operator-updated' | 'site-visit-scheduled';
+	type:
+		| 'submitted'
+		| 'operator-updated'
+		| 'site-visit-scheduled'
+		| 'site-visit-rescheduled'
+		| 'site-visit-cancelled';
 	actor: string;
 	label: string;
 	payload?: QuoteRequestSubmittedPayload;
@@ -175,6 +187,53 @@ export const quoteRequestStatusOptions = quoteRequestStatuses.map((status) => ({
 	value: status,
 	label: quoteRequestStatusMeta[status].label
 }));
+
+export const quoteRequestSiteVisitCancellationReasonCodes: QuoteRequestSiteVisitCancellationReasonCode[] = [
+	'customer-requested',
+	'site-not-ready',
+	'field-resource-unavailable',
+	'weather-delay',
+	'scope-needs-review'
+];
+
+export const quoteRequestSiteVisitCancellationReasonMeta: Record<
+	QuoteRequestSiteVisitCancellationReasonCode,
+	{ label: string; detail: string }
+> = {
+	'customer-requested': {
+		label: 'Customer requested cancellation',
+		detail: 'The customer asked to move or pause the visit before the field handoff.'
+	},
+	'site-not-ready': {
+		label: 'Site not ready',
+		detail: 'Access, readiness, or property conditions make the current visit slot unusable.'
+	},
+	'field-resource-unavailable': {
+		label: 'Field resource unavailable',
+		detail: 'Crew or estimator availability changed and the current slot cannot be staffed.'
+	},
+	'weather-delay': {
+		label: 'Weather delay',
+		detail: 'Weather conditions make the scheduled visit window unsafe or ineffective.'
+	},
+	'scope-needs-review': {
+		label: 'Scope needs review',
+		detail: 'The visit needs office review before it should be rebooked.'
+	}
+};
+
+export const quoteRequestSiteVisitCancellationReasonOptions =
+	quoteRequestSiteVisitCancellationReasonCodes.map((code) => ({
+		value: code,
+		...quoteRequestSiteVisitCancellationReasonMeta[code]
+	}));
+
+export const isQuoteRequestSiteVisitCancellationReasonCode = (
+	value: string
+): value is QuoteRequestSiteVisitCancellationReasonCode =>
+	quoteRequestSiteVisitCancellationReasonCodes.includes(
+		value as QuoteRequestSiteVisitCancellationReasonCode
+	);
 
 export const quoteRequestWorkflowPhases: {
 	key: QuoteRequestWorkflowPhaseKey;

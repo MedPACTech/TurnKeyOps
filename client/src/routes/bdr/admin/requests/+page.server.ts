@@ -3,13 +3,19 @@ import {
 	buildQuoteRequestQualification,
 	buildQuoteRequestInbox,
 	getQuoteRequestMetrics,
+	isQuoteRequestSiteVisitCancellationReasonCode,
 	isQuoteRequestClosedStatus,
 	isQuoteRequestMissingInfoReasonCode,
 	quoteRequestStatuses,
 	type QuoteRequestMissingInfoReasonCode,
 	type QuoteRequestStatus
 } from '$lib/quote-requests';
-import { loadQuoteRequests, scheduleQuoteRequestSiteVisit, updateQuoteRequest } from '$lib/server/quote-requests';
+import {
+	cancelQuoteRequestSiteVisit,
+	loadQuoteRequests,
+	scheduleQuoteRequestSiteVisit,
+	updateQuoteRequest
+} from '$lib/server/quote-requests';
 
 const buildScheduleSiteVisitHref = (requestId: string) =>
 	`/bdr/admin/calendar?role=office-admin&scheduleRequest=${encodeURIComponent(requestId)}`;
@@ -203,5 +209,41 @@ export const actions = {
 		}
 
 		return { scheduleSuccess: true, scheduledRequestId: id };
+	},
+	cancelSiteVisit: async ({ fetch, request }) => {
+		const formData = await request.formData();
+		const id = String(formData.get('id') ?? '').trim();
+		const reasonCode = String(formData.get('cancellationReasonCode') ?? '').trim();
+		const notes = String(formData.get('cancellationNotes') ?? '').trim();
+
+		if (!id) {
+			return fail(400, {
+				cancelMessage: 'A valid quote request is required before cancelling the site visit.',
+				cancelledRequestId: id
+			});
+		}
+
+		if (!isQuoteRequestSiteVisitCancellationReasonCode(reasonCode)) {
+			return fail(400, {
+				cancelMessage: 'Choose a cancellation reason code before removing the site visit from the queue.',
+				cancelledRequestId: id
+			});
+		}
+
+		try {
+			await cancelQuoteRequestSiteVisit(fetch, {
+				id,
+				reasonCode,
+				notes
+			});
+		} catch (cause) {
+			console.error('Failed to persist site visit cancellation through API.', cause);
+			return fail(502, {
+				cancelMessage: 'Could not save the site visit cancellation to the API.',
+				cancelledRequestId: id
+			});
+		}
+
+		return { cancelSuccess: true, cancelledRequestId: id };
 	}
 };

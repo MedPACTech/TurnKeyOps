@@ -2,6 +2,7 @@
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import {
 		buildQuoteRequestQualification,
+		quoteRequestSiteVisitCancellationReasonOptions,
 		buildQuoteRequestWorkflowModel,
 		getQuoteRequestWorkflowLane,
 		getQuoteRequestWorkflowPhase,
@@ -34,6 +35,8 @@
 	let scheduleSiteContactPhone = $state('');
 	let scheduleAssignedFieldResource = $state('');
 	let scheduleNotes = $state('');
+	let cancellationReasonCode = $state('');
+	let cancellationNotes = $state('');
 	let detailInlineEditing = $state(false);
 	let contactInlineEditing = $state(false);
 	let detailRequestedTimeline = $state('');
@@ -191,6 +194,8 @@
 		scheduleSiteContactPhone = existingSchedule?.siteContactPhone ?? selectedRequest.phone;
 		scheduleAssignedFieldResource = existingSchedule?.assignedFieldResource ?? (isQuoteRequestUnassigned(selectedRequest) ? '' : selectedRequest.assignedTo);
 		scheduleNotes = existingSchedule?.notes ?? '';
+		cancellationReasonCode = '';
+		cancellationNotes = '';
 	});
 
 	const metrics = $derived([
@@ -534,6 +539,12 @@
 						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{form.scheduleMessage}</p>
 					{/if}
 
+					{#if form?.cancelSuccess && form.cancelledRequestId === selectedRequest.id}
+						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Site visit cancelled</p>
+					{:else if form?.cancelMessage && form.cancelledRequestId === selectedRequest.id}
+						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{form.cancelMessage}</p>
+					{/if}
+
 					{#if selectedRequest.siteVisitSchedule}
 						<div class="mt-4 grid gap-3 lg:grid-cols-3">
 							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
@@ -552,6 +563,42 @@
 								<p class="mt-1 text-sm text-[var(--text-muted)]">Scheduled by {selectedRequest.siteVisitSchedule.scheduledBy}</p>
 							</div>
 						</div>
+
+						<form method="POST" action="?/cancelSiteVisit" class="mt-4 rounded-md border border-rose-400/25 bg-rose-400/10 p-4">
+							<input type="hidden" name="id" value={selectedRequest.id} />
+							<div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+								<div class="max-w-2xl">
+									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-rose-700">Cancellation handling</p>
+									<p class="mt-1 text-sm leading-6 text-rose-900">
+										Cancel from this workspace when the current visit slot is no longer valid. A reason code is required and the request moves back into the qualified queue with a new next action.
+									</p>
+								</div>
+								<span class="rounded-md border border-rose-300/30 bg-white/70 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-rose-800">Reason code required</span>
+							</div>
+							<div class="mt-4 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+								<label class="grid gap-2">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-rose-800">Cancellation reason code</span>
+									<select bind:value={cancellationReasonCode} name="cancellationReasonCode" required class="rounded-md border border-rose-300/30 bg-white/80 px-3 py-3 text-sm text-[var(--text-base)] outline-none">
+										<option value="">Select a reason</option>
+										{#each quoteRequestSiteVisitCancellationReasonOptions as reason}
+											<option value={reason.value}>{reason.label}</option>
+										{/each}
+									</select>
+								</label>
+								<label class="grid gap-2">
+									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-rose-800">Cancellation notes</span>
+									<textarea bind:value={cancellationNotes} name="cancellationNotes" rows="3" class="rounded-md border border-rose-300/30 bg-white/80 px-3 py-3 text-sm text-[var(--text-base)] outline-none" placeholder="Customer availability, weather issue, access problem, or other operator follow-up notes"></textarea>
+								</label>
+							</div>
+							<div class="mt-4 flex flex-wrap gap-3">
+								<button type="submit" class="rounded-md border border-rose-500/40 bg-rose-600 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:opacity-90">
+									Cancel site visit
+								</button>
+								<p class="text-xs leading-5 text-rose-900">
+									The timeline will record the cancellation reason and the request will return to the qualified queue for follow-up.
+								</p>
+							</div>
+						</form>
 					{/if}
 
 					{#if selectedRequestCanOpenScheduler}

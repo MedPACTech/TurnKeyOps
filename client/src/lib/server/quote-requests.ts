@@ -4,9 +4,11 @@ import {
 	buildQuoteRequestQualification,
 	buildQuoteRequestInbox,
 	createQuoteRequestFromForm,
+	isQuoteRequestSiteVisitCancellationReasonCode,
 	normalizeQuoteRequestQualification,
 	normalizeQuoteRequestSiteVisitSchedule,
 	quoteRequestMissingInfoReasonMeta,
+	quoteRequestSiteVisitCancellationReasonMeta,
 	quoteRequestStatusMeta,
 	seededQuoteRequests,
 	type QuoteRequest,
@@ -15,6 +17,7 @@ import {
 	type QuoteRequestMissingInfoReasonCode,
 	type QuoteRequestPriority,
 	type QuoteRequestQualificationReview,
+	type QuoteRequestSiteVisitCancellationReasonCode,
 	type QuoteRequestSiteVisitSchedule,
 	type QuoteRequestStatus,
 	type QuoteRequestSubmittedPayload,
@@ -25,6 +28,8 @@ import type { ApiEnvelope } from '$lib/types/mvp';
 const defaultApiBaseUrl = 'http://localhost:5178';
 const quoteMarker = 'TKO_BDR_QUOTE_REQUEST::';
 const demoTenantId = '7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b';
+const internalAdminActor = 'Internal Admin';
+const officeQueueOwner = 'Office intake';
 const fsModuleName = 'node:fs/promises';
 const getCwd = () =>
 	(globalThis as typeof globalThis & { process?: { cwd: () => string } }).process?.cwd() ?? '.';
@@ -323,17 +328,21 @@ const createActivityEvent = ({
 	occurredAtUtc,
 	label,
 	note,
-	siteVisitSchedule
+	siteVisitSchedule,
+	type,
+	actor
 }: {
 	occurredAtUtc: string;
 	label: string;
 	note?: string;
 	siteVisitSchedule?: QuoteRequestSiteVisitSchedule;
+	type?: QuoteRequestTimelineEvent['type'];
+	actor?: string;
 }): QuoteRequestTimelineEvent => ({
 	id: crypto.randomUUID(),
 	occurredAtUtc,
-	type: siteVisitSchedule ? 'site-visit-scheduled' : 'operator-updated',
-	actor: 'External Admin',
+	type: type ?? (siteVisitSchedule ? 'site-visit-scheduled' : 'operator-updated'),
+	actor: actor ?? internalAdminActor,
 	label,
 	note,
 	siteVisitSchedule
@@ -748,7 +757,7 @@ export const updateQuoteRequest = async (
 			qualification: {
 				missingInfoReasonCodes,
 				reviewedAtUtc: occurredAtUtc,
-				reviewedBy: 'External Admin'
+				reviewedBy: internalAdminActor
 			},
 			timeline: [...existingRequest.timeline, ...activityEvents]
 		};
@@ -816,7 +825,7 @@ export const scheduleQuoteRequestSiteVisit = async (
 		assignedFieldResource: params.assignedFieldResource,
 		notes: params.notes ?? '',
 		scheduledAtUtc,
-		scheduledBy: 'External Admin'
+		scheduledBy: internalAdminActor
 	});
 
 	if (!normalizedSchedule) {
@@ -824,10 +833,24 @@ export const scheduleQuoteRequestSiteVisit = async (
 	}
 
 	const buildUpdatedRequest = (existingRequest: QuoteRequest): QuoteRequest => {
+		const existingSchedule = existingRequest.siteVisitSchedule;
 		const visitWindowLabel = buildSiteVisitWindowLabel(normalizedSchedule);
 		const visitDateLabel = formatSiteVisitDateLabel(normalizedSchedule.visitDate);
+		const isReschedule = Boolean(
+			existingSchedule &&
+				(existingSchedule.visitDate !== normalizedSchedule.visitDate ||
+					existingSchedule.windowStart !== normalizedSchedule.windowStart ||
+					existingSchedule.windowEnd !== normalizedSchedule.windowEnd ||
+					existingSchedule.siteContact !== normalizedSchedule.siteContact ||
+					existingSchedule.siteContactPhone !== normalizedSchedule.siteContactPhone ||
+					existingSchedule.assignedFieldResource !== normalizedSchedule.assignedFieldResource ||
+					(existingSchedule.notes ?? '') !== (normalizedSchedule.notes ?? ''))
+		);
+		const previousVisitLabel = existingSchedule
+			? `${formatSiteVisitDateLabel(existingSchedule.visitDate)} · ${buildSiteVisitWindowLabel(existingSchedule)}`
+			: '';
 		const nextAction = [
-			`Site visit scheduled for ${visitDateLabel} (${visitWindowLabel}).`,
+			`${isReschedule ? 'Site visit rescheduled' : 'Site visit scheduled'} for ${visitDateLabel} (${visitWindowLabel}).`,
 			`Field resource: ${normalizedSchedule.assignedFieldResource}.`,
 			`Site contact: ${normalizedSchedule.siteContact}${normalizedSchedule.siteContactPhone ? ` · ${normalizedSchedule.siteContactPhone}` : ''}.`,
 			normalizedSchedule.notes ? `Notes: ${normalizedSchedule.notes}` : ''
@@ -859,8 +882,11 @@ export const scheduleQuoteRequestSiteVisit = async (
 		activityEvents.push(
 			createActivityEvent({
 				occurredAtUtc: scheduledAtUtc,
-				label: `Site visit scheduled · ${visitDateLabel} · ${visitWindowLabel}`,
-				note: normalizedSchedule.notes,
+				type: isReschedule ? 'site-visit-rescheduled' : 'site-visit-scheduled',
+				label: `${isReschedule ? 'Site visit rescheduled' : 'Site visit scheduled'} · ${visitDateLabel} · ${visitWindowLabel}`,
+				note: isReschedule
+					? [`Previous visit: ${previousVisitLabel}.`, normalizedSchedule.notes].filter(Boolean).join(' ')
+					: normalizedSchedule.notes,
 				siteVisitSchedule: normalizedSchedule
 			})
 		);
@@ -873,7 +899,7 @@ export const scheduleQuoteRequestSiteVisit = async (
 			qualification: {
 				missingInfoReasonCodes: [],
 				reviewedAtUtc: scheduledAtUtc,
-				reviewedBy: 'External Admin'
+				reviewedBy: internalAdminActor
 			},
 			siteVisitSchedule: normalizedSchedule,
 			timeline: [...existingRequest.timeline, ...activityEvents]
@@ -907,6 +933,119 @@ export const scheduleQuoteRequestSiteVisit = async (
 		return updatedRequest;
 	} catch (cause) {
 		console.warn('Quote request API unavailable; trying local site visit scheduling.', cause);
+		const localRequests = await readLocalQuoteRequests();
+		const existingRequest = localRequests.find((request) => request.id === params.id);
+		if (!existingRequest) {
+			throw error(404, 'Quote request record was not found locally');
+		}
+
+		const updatedRequest = buildUpdatedRequest(existingRequest);
+		await updateLocalQuoteRequest(updatedRequest);
+		return updatedRequest;
+	}
+};
+
+export const cancelQuoteRequestSiteVisit = async (
+	fetch: typeof globalThis.fetch,
+	params: {
+		id: string;
+		reasonCode: QuoteRequestSiteVisitCancellationReasonCode;
+		notes?: string;
+	}
+) => {
+	if (!isQuoteRequestSiteVisitCancellationReasonCode(params.reasonCode)) {
+		throw error(400, 'A valid site visit cancellation reason code is required.');
+	}
+
+	const cancelledAtUtc = new Date().toISOString();
+	const reasonMeta = quoteRequestSiteVisitCancellationReasonMeta[params.reasonCode];
+
+	const buildUpdatedRequest = (existingRequest: QuoteRequest): QuoteRequest => {
+		if (!existingRequest.siteVisitSchedule) {
+			throw error(400, 'This request does not have a scheduled site visit to cancel.');
+		}
+
+		const previousVisitLabel = `${formatSiteVisitDateLabel(
+			existingRequest.siteVisitSchedule.visitDate
+		)} · ${buildSiteVisitWindowLabel(existingRequest.siteVisitSchedule)}`;
+		const activityEvents: QuoteRequestTimelineEvent[] = [];
+
+		if (existingRequest.status !== 'qualified') {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc: cancelledAtUtc,
+					label: `Status changed · ${quoteRequestStatusMeta[existingRequest.status].label} → ${quoteRequestStatusMeta.qualified.label}`,
+					note: 'Request moved back into the qualified scheduling lane after the site visit cancellation.'
+				})
+			);
+		}
+
+		if (existingRequest.assignedTo !== officeQueueOwner) {
+			activityEvents.push(
+				createActivityEvent({
+					occurredAtUtc: cancelledAtUtc,
+					label: `Owner reassigned · ${existingRequest.assignedTo || 'Unassigned'} → ${officeQueueOwner}`,
+					note: 'Office follow-up now owns the request until a new visit is booked.'
+				})
+			);
+		}
+
+		activityEvents.push(
+			createActivityEvent({
+				occurredAtUtc: cancelledAtUtc,
+				type: 'site-visit-cancelled',
+				label: `Site visit cancelled · ${reasonMeta.label}`,
+				note: [`Previous visit: ${previousVisitLabel}.`, params.notes?.trim()].filter(Boolean).join(' ')
+			})
+		);
+
+		return {
+			...existingRequest,
+			status: 'qualified',
+			assignedTo: officeQueueOwner,
+			nextAction: [
+				`Reschedule site visit after ${reasonMeta.label.toLowerCase()}.`,
+				params.notes?.trim() ? `Notes: ${params.notes.trim()}` : ''
+			]
+				.filter(Boolean)
+				.join(' '),
+			qualification: {
+				...existingRequest.qualification,
+				reviewedAtUtc: cancelledAtUtc,
+				reviewedBy: internalAdminActor
+			},
+			siteVisitSchedule: null,
+			timeline: [...existingRequest.timeline, ...activityEvents]
+		};
+	};
+
+	try {
+		const existingResponse = await fetch(`${getApiBaseUrl()}/api/quote-requests/${params.id}`, {
+			headers: getApiHeaders()
+		});
+		const existingRecord = await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(existingResponse);
+		const existingRequest = toQuoteRequest(existingRecord);
+
+		if (!existingRequest) {
+			throw error(404, 'Quote request record was not found in the API');
+		}
+
+		const updatedRequest = buildUpdatedRequest(existingRequest);
+		const body = isQuoteRequestDto(existingRecord)
+			? toQuoteRequestDto(updatedRequest, existingRecord)
+			: toLegacyLeadDto(updatedRequest, existingRecord);
+
+		const response = await fetch(`${getApiBaseUrl()}/api/quote-requests/${params.id}`, {
+			method: 'PUT',
+			headers: getApiHeaders(),
+			body: JSON.stringify(body)
+		});
+
+		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		await saveLocalQuoteRequest(updatedRequest);
+		return updatedRequest;
+	} catch (cause) {
+		console.warn('Quote request API unavailable; trying local site visit cancellation.', cause);
 		const localRequests = await readLocalQuoteRequests();
 		const existingRequest = localRequests.find((request) => request.id === params.id);
 		if (!existingRequest) {
