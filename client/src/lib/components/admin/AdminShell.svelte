@@ -10,6 +10,7 @@
 	import type { Snippet } from 'svelte';
 	import {
 		bdrAdminNavigation,
+		bdrAdminNavSections,
 		type BdrAdminNavItem,
 		type BdrAdminRole
 	} from '$lib/config/platform';
@@ -58,6 +59,14 @@
 
 	const withRole = (href: string) => `${href}?role=${role}`;
 	const navItems = $derived(bdrAdminNavigation);
+	const groupedNavItems = $derived(
+		bdrAdminNavSections
+			.map((section) => ({
+				...section,
+				items: navItems.filter((item) => item.section === section.key)
+			}))
+			.filter((section) => section.items.length)
+	);
 
 	const iconFor = (slug: string) =>
 		({
@@ -102,22 +111,51 @@
 				</button>
 			</div>
 
-			<nav class="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
-				{#each navItems as item}
-					<a
-						href={withRole(item.href)}
-						title={item.label}
-						class={`group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-							isActive(item)
-								? 'bg-[var(--brand-solid)] text-white shadow-sm'
-							: 'text-white/70 hover:bg-white/10 hover:text-white'
-						}`}
-					>
-						<span class="flex h-5 w-5 shrink-0 items-center justify-center text-lg leading-none" aria-hidden="true">{iconFor(item.slug)}</span>
-						{#if !navCollapsed}
-							<span class="truncate">{item.label}</span>
-						{/if}
-					</a>
+			<nav class="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
+				{#each groupedNavItems as section, sectionIndex}
+					{#if !navCollapsed}
+						<div class={sectionIndex === 0 ? '' : 'mt-5'}>
+							<div class="mb-2 px-3">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/40">{section.label}</p>
+								<p class="mt-1 text-[0.7rem] leading-4 text-white/35">{section.description}</p>
+							</div>
+							<div class="space-y-1">
+								{#each section.items as item}
+									<a
+										href={withRole(item.href)}
+										title={item.label}
+										class={`group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+											isActive(item)
+												? 'bg-[var(--brand-solid)] text-white shadow-sm'
+												: 'text-white/70 hover:bg-white/10 hover:text-white'
+										}`}
+									>
+										<span class="flex h-5 w-5 shrink-0 items-center justify-center text-lg leading-none" aria-hidden="true">{iconFor(item.slug)}</span>
+										<span class="truncate">{item.label}</span>
+									</a>
+								{/each}
+							</div>
+						</div>
+					{:else}
+						<div class={sectionIndex === 0 ? 'space-y-1' : 'mt-4 space-y-1'}>
+							{#if sectionIndex > 0}
+								<div class="mx-auto mb-2 h-px w-8 bg-white/10"></div>
+							{/if}
+							{#each section.items as item}
+								<a
+									href={withRole(item.href)}
+									title={`${section.label}: ${item.label}`}
+									class={`group flex min-h-11 items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+										isActive(item)
+											? 'bg-[var(--brand-solid)] text-white shadow-sm'
+											: 'text-white/70 hover:bg-white/10 hover:text-white'
+									}`}
+								>
+									<span class="flex h-5 w-5 shrink-0 items-center justify-center text-lg leading-none" aria-hidden="true">{iconFor(item.slug)}</span>
+								</a>
+							{/each}
+						</div>
+					{/if}
 				{/each}
 			</nav>
 
@@ -177,20 +215,30 @@
 						</button>
 					</div>
 
-					<nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Mobile navigation">
-						{#each navItems as item}
-							<a
-								href={withRole(item.href)}
-								class={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-									isActive(item)
-										? 'bg-[var(--brand-solid)] text-white'
-										: 'text-white/70 hover:bg-white/10 hover:text-white'
-								}`}
-								onclick={() => (sidebarOpen = false)}
-							>
-								<span class="flex h-5 w-5 shrink-0 items-center justify-center text-lg leading-none" aria-hidden="true">{iconFor(item.slug)}</span>
-								<span>{item.label}</span>
-							</a>
+					<nav class="flex-1 overflow-y-auto px-3 py-4" aria-label="Mobile navigation">
+						{#each groupedNavItems as section, sectionIndex}
+							<div class={sectionIndex === 0 ? '' : 'mt-5'}>
+								<div class="mb-2 px-3">
+									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/40">{section.label}</p>
+									<p class="mt-1 text-[0.7rem] leading-4 text-white/35">{section.description}</p>
+								</div>
+								<div class="space-y-1">
+									{#each section.items as item}
+										<a
+											href={withRole(item.href)}
+											class={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+												isActive(item)
+													? 'bg-[var(--brand-solid)] text-white'
+													: 'text-white/70 hover:bg-white/10 hover:text-white'
+											}`}
+											onclick={() => (sidebarOpen = false)}
+										>
+											<span class="flex h-5 w-5 shrink-0 items-center justify-center text-lg leading-none" aria-hidden="true">{iconFor(item.slug)}</span>
+											<span>{item.label}</span>
+										</a>
+									{/each}
+								</div>
+							</div>
 						{/each}
 					</nav>
 				</aside>
