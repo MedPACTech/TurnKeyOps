@@ -70,7 +70,7 @@
 	{#snippet work()}
 		{#if selectedGroup}
 			<div class="space-y-4">
-				<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+				<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Configuration domain</p>
 					<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedGroup.label}</h4>
 					<p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{selectedGroup.description}</p>
@@ -81,7 +81,7 @@
 
 				<div class="grid gap-3">
 					{#each selectedGroup.fields as field}
-						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 							<div class="flex flex-wrap items-start justify-between gap-3">
 								<div>
 									<p class="text-sm font-semibold text-[var(--text-strong)]">{field.label}</p>

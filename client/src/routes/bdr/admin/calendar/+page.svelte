@@ -558,14 +558,14 @@ type SiteVisit = {
 
 <div class="relative min-h-[calc(100vh-10rem)]">
 	<div class="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-		<aside class="space-y-4 rounded-[1.5rem] border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
+		<aside class="space-y-4 rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
 			<div>
 				<p class="text-[0.66rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Calendar</p>
 				<h1 class="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">Focus rail</h1>
 				<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Switch views, move the active date, and filter work instantly without losing the selected day.</p>
 			</div>
 
-			<section class="space-y-3 rounded-[1.2rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+			<section class="space-y-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">View</p>
 				<div class="grid grid-cols-3 gap-2">
 					{#each ['day', 'week', 'month'] as view}
@@ -580,7 +580,7 @@ type SiteVisit = {
 				</div>
 			</section>
 
-			<section class="space-y-3 rounded-[1.2rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+			<section class="space-y-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 				<div class="flex items-center justify-between gap-3">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Date navigation</p>
 					<span class="text-xs text-[var(--text-muted)]">{formatRangeTitle()}</span>
@@ -591,20 +591,20 @@ type SiteVisit = {
 						type="date"
 						value={pickerValue}
 						onchange={(event) => handleDateInput((event.currentTarget as HTMLInputElement).value)}
-						class="rounded-xl border border-[var(--shell-border)] bg-[var(--module-bg)] px-3 py-2.5 text-sm text-[var(--text-strong)] outline-none"
+						class="rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] px-3 py-2.5 text-sm text-[var(--text-strong)] outline-none"
 					/>
 				</label>
 				<div class="grid grid-cols-2 gap-2">
-					<button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--shell-border)] bg-[var(--module-bg)] px-3 py-2.5 text-sm font-medium text-[var(--text-strong)]" onclick={() => shiftRange(-1)}>
+					<button type="button" class="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] px-3 py-2.5 text-sm font-medium text-[var(--text-strong)]" onclick={() => shiftRange(-1)}>
 						<ChevronLeft size={16} /> Prev
 					</button>
-					<button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--shell-border)] bg-[var(--module-bg)] px-3 py-2.5 text-sm font-medium text-[var(--text-strong)]" onclick={() => shiftRange(1)}>
+					<button type="button" class="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] px-3 py-2.5 text-sm font-medium text-[var(--text-strong)]" onclick={() => shiftRange(1)}>
 						Next <ChevronRight size={16} />
 					</button>
 				</div>
 			</section>
 
-			<section class="space-y-3 rounded-[1.2rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+			<section class="space-y-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 				<div class="flex items-center justify-between gap-3">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Event filters</p>
 					<span class="text-xs text-[var(--text-muted)]">All enabled by default</span>
@@ -614,7 +614,7 @@ type SiteVisit = {
 						{@const Icon = meta.icon}
 						<button
 							type="button"
-							class={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition ${enabledTypes[type as EventType] ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--module-bg)]'}`}
+							class={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left transition ${enabledTypes[type as EventType] ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--module-bg)]'}`}
 							onclick={() => toggleType(type as EventType)}
 						>
 							<div class="flex items-center gap-3">
@@ -633,9 +633,9 @@ type SiteVisit = {
 			</section>
 		</aside>
 
-		<section class="rounded-[1.5rem] border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)] lg:p-5">
+		<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)] lg:p-5">
 			{#if scheduledRequest}
-				<div class="mb-4 rounded-[1.2rem] border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4">
+				<div class="mb-4 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">Scheduling from quote request</p>
 					<div class="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div class="max-w-3xl">
@@ -643,10 +643,10 @@ type SiteVisit = {
 							<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Submitted {scheduledRequestDateLabel} · {scheduledRequest.serviceAddress}</p>
 							<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">{scheduledRequest.intakeSummary}</p>
 						</div>
-						<a href="/bdr/admin/requests?role=office-admin" class="inline-flex rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">Back to quote requests</a>
+						<a href="/bdr/admin/requests?role=office-admin" class="inline-flex rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">Back to quote requests</a>
 					</div>
 					<div class="mt-4 grid gap-3 lg:grid-cols-3">
-						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
 							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{scheduledRequest.siteVisitSchedule ? 'Scheduled visit' : 'Scheduling eligibility'}</p>
 							{#if scheduledRequest.siteVisitSchedule}
 								<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">
@@ -656,18 +656,18 @@ type SiteVisit = {
 							{:else if scheduledRequestQualification?.isQualified}
 								<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">Qualified for site visit scheduling. Use the request workspace to book the visit, then it will appear on this calendar.</p>
 							{:else}
-								<p class="mt-2 text-sm leading-6 text-amber-300">Qualification must be cleared before this request can move into site visit scheduling.</p>
+								<p class="mt-2 text-sm leading-6 text-amber-700">Qualification must be cleared before this request can move into site visit scheduling.</p>
 								{#if scheduledRequestQualification?.blockerLabels.length}
 									<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{scheduledRequestQualification.blockerLabels.join(' · ')}</p>
 								{/if}
 							{/if}
 						</div>
-						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
 							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Customer contact</p>
 							<p class="mt-2 text-sm text-[var(--text-strong)]">{scheduledRequest.phone}</p>
 							<p class="mt-1 text-sm text-[var(--text-muted)] break-all">{scheduledRequest.email}</p>
 						</div>
-						<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
 							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Current office step</p>
 							<p class="mt-2 text-sm leading-6 text-[var(--text-strong)]">{scheduledRequest.nextAction}</p>
 						</div>
@@ -687,7 +687,7 @@ type SiteVisit = {
 			</div>
 
 			{#if currentView === 'month'}
-				<div class="mt-4 overflow-hidden rounded-[1.2rem] border border-[var(--shell-border)]">
+				<div class="mt-4 overflow-hidden rounded-lg border border-[var(--shell-border)]">
 					<div class="grid grid-cols-7 border-b border-[var(--shell-border)] bg-[var(--shell-panel)]">
 						{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as weekday}
 							<div class="px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{weekday}</div>
@@ -733,7 +733,7 @@ type SiteVisit = {
 			{:else if currentView === 'week'}
 				<div class="mt-4 grid gap-3 xl:grid-cols-7">
 					{#each weekDays as day}
-						<div class="rounded-[1.2rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
 							<div class="flex items-start justify-between gap-2">
 								<button type="button" class={`text-left ${day.isSelected ? 'text-[var(--accent-text)]' : 'text-[var(--text-strong)]'}`} onclick={() => selectDate(day.date)}>
 									<p class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{day.label}</p>
@@ -745,7 +745,7 @@ type SiteVisit = {
 								{#if day.events.length}
 									{#each day.events as event}
 										{@const EventIcon = eventTypeMeta[event.type].icon}
-										<button type="button" class={`w-full rounded-xl border px-3 py-3 text-left transition ${eventTypeMeta[event.type].colorClass}`} onclick={() => openEvent(event)}>
+										<button type="button" class={`w-full rounded-lg border px-3 py-3 text-left transition ${eventTypeMeta[event.type].colorClass}`} onclick={() => openEvent(event)}>
 											<div class="flex items-center gap-2">
 												<EventIcon size={14} />
 												<span class="truncate font-semibold">{event.name}</span>
@@ -754,14 +754,14 @@ type SiteVisit = {
 										</button>
 									{/each}
 								{:else}
-									<div class="rounded-xl border border-dashed border-[var(--shell-border)] px-3 py-6 text-center text-sm text-[var(--text-muted)]">No events</div>
+									<div class="rounded-lg border border-dashed border-[var(--shell-border)] px-3 py-6 text-center text-sm text-[var(--text-muted)]">No events</div>
 								{/if}
 							</div>
 						</div>
 					{/each}
 				</div>
 			{:else}
-				<div class="mt-4 rounded-[1.2rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+				<div class="mt-4 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 					<div class="flex items-start justify-between gap-3 border-b border-[var(--shell-border)] pb-4">
 						<div>
 							<p class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Day view</p>
@@ -775,7 +775,7 @@ type SiteVisit = {
 					<div class="mt-4 space-y-3">
 						{#if dayEvents.length}
 							{#each dayEvents as event}
-								<button type="button" class="w-full rounded-[1.1rem] border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 text-left transition hover:bg-[var(--shell-panel-strong)]" onclick={() => openEvent(event)}>
+								<button type="button" class="w-full rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 text-left transition hover:bg-[var(--shell-panel-strong)]" onclick={() => openEvent(event)}>
 									<div class="flex flex-wrap items-start justify-between gap-3">
 										<div>
 											<div class="flex items-center gap-2">
@@ -792,7 +792,7 @@ type SiteVisit = {
 								</button>
 							{/each}
 						{:else}
-							<div class="rounded-[1.1rem] border border-dashed border-[var(--shell-border)] px-4 py-12 text-center text-sm text-[var(--text-muted)]">No events for the selected day.</div>
+							<div class="rounded-lg border border-dashed border-[var(--shell-border)] px-4 py-12 text-center text-sm text-[var(--text-muted)]">No events for the selected day.</div>
 						{/if}
 					</div>
 				</div>
@@ -802,7 +802,7 @@ type SiteVisit = {
 
 	{#if selectedEvent}
 		<button type="button" class="fixed inset-0 z-40 bg-slate-950/20" aria-label="Close calendar details" onclick={closeDrawer}></button>
-		<aside class="fixed inset-y-16 right-4 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-[1.5rem] border border-[var(--shell-border)] bg-[var(--drawer-bg)] shadow-[0_30px_80px_rgba(15,23,42,0.28)]">
+		<aside class="fixed inset-y-16 right-4 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-lg border border-[var(--shell-border)] bg-[var(--drawer-bg)] shadow-[0_30px_80px_rgba(15,23,42,0.28)]">
 			<div class="flex items-start justify-between gap-3 border-b border-[var(--shell-border)] px-5 py-4">
 				<div>
 					<p class="text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Event details</p>
@@ -823,7 +823,7 @@ type SiteVisit = {
 					<span class="rounded-full bg-[var(--shell-panel)] px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)]">{selectedEvent.status}</span>
 				</div>
 
-				<section class="rounded-[1.1rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 					<div class="flex items-center justify-between gap-3">
 						<div>
 							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Weather · zip {selectedEvent.zipCode}</p>
@@ -836,7 +836,7 @@ type SiteVisit = {
 					</div>
 				</section>
 
-				<section class="rounded-[1.1rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Customer details</p>
 					<div class="mt-3 space-y-3 text-sm text-[var(--text-base)]">
 						<div class="flex items-start gap-3"><UserRound size={16} class="mt-0.5 text-[var(--muted)]" /><div><p class="font-semibold text-[var(--text-strong)]">{selectedEvent.customerContact}</p><p class="text-[var(--text-muted)]">{selectedEvent.phone}</p></div></div>
@@ -845,7 +845,7 @@ type SiteVisit = {
 					</div>
 				</section>
 
-				<section class="rounded-[1.1rem] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Project details</p>
 					<div class="mt-3 space-y-3 text-sm text-[var(--text-base)]">
 						<div>
@@ -853,11 +853,11 @@ type SiteVisit = {
 							<p class="mt-1 leading-6 text-[var(--text-muted)]">{selectedEvent.projectSummary}</p>
 						</div>
 						<div class="grid gap-3 sm:grid-cols-2">
-							<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--module-bg)] p-3">
+							<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-3">
 								<p class="text-[0.62rem] uppercase tracking-[0.16em] text-[var(--muted)]">Crew</p>
 								<p class="mt-1 font-semibold text-[var(--text-strong)]">{selectedEvent.crew}</p>
 							</div>
-							<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--module-bg)] p-3">
+							<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-3">
 								<p class="text-[0.62rem] uppercase tracking-[0.16em] text-[var(--muted)]">Estimated value</p>
 								<p class="mt-1 font-semibold text-[var(--text-strong)]">{selectedEvent.estimatedValue}</p>
 							</div>
@@ -867,7 +867,7 @@ type SiteVisit = {
 							<p class="mt-1 leading-6 text-[var(--text-muted)]">{selectedEvent.notes}</p>
 						</div>
 						{#if selectedEvent.quoteRequestId}
-							<a href="/bdr/admin/requests?role=office-admin" class="inline-flex rounded-xl border border-[var(--shell-border)] bg-[var(--module-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
+							<a href="/bdr/admin/requests?role=office-admin" class="inline-flex rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
 								Open quote request queue
 							</a>
 						{/if}

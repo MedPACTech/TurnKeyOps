@@ -179,7 +179,7 @@
 
 		<main class="min-w-0 flex-1 bg-[var(--shell-bg)]">
 			<div class="min-h-[calc(100vh-3.75rem)] px-3 py-4 lg:px-5 lg:py-5">
-				<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--drawer-bg)] shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+				<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--drawer-bg)] shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
 
 					<div class="min-h-0 px-4 py-4 lg:px-6 lg:py-5">
 						{@render children()}

@@ -319,7 +319,7 @@
 									{quoteRequestStatusMeta[request.status].label}
 								</span>
 								{#if qualification.blockerLabels.length}
-									<span class="inline-flex min-w-0 items-center gap-1 rounded-md border border-amber-400/35 bg-amber-400/10 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-amber-300">
+									<span class="inline-flex min-w-0 items-center gap-1 rounded-md border border-amber-400/35 bg-amber-400/10 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-amber-700">
 										<AlertTriangle size={12} />
 										<span class="truncate">{qualification.blockerLabels.slice(0, 2).join(' · ')}</span>
 									</span>
@@ -344,7 +344,7 @@
 	{#snippet work()}
 		<div class="space-y-4">
 			{#if selectedRequest}
-				<form id={`request-triage-${selectedRequest.id}`} method="POST" action="?/updateRequest" class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+				<form id={`request-triage-${selectedRequest.id}`} method="POST" action="?/updateRequest" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<input type="hidden" name="id" value={selectedRequest.id} />
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div>
@@ -361,7 +361,7 @@
 					{#if form?.success && form.updatedRequestId === selectedRequest.id}
 						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Saved</p>
 					{:else if form?.message && form.updatedRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">{form.message}</p>
+						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{form.message}</p>
 					{/if}
 
 					<div class="mt-5 grid gap-4 lg:grid-cols-[180px_220px_minmax(0,1fr)]">
@@ -387,14 +387,14 @@
 						<div class="mt-5 rounded-md border border-amber-400/30 bg-amber-400/10 p-4">
 							<div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
 								<div>
-									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-amber-200">Needs Info reason codes</p>
-									<p class="mt-1 text-sm leading-6 text-amber-100/80">Select the structured blockers the customer must resolve before qualification can finish.</p>
+									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-amber-700">Needs Info reason codes</p>
+									<p class="mt-1 text-sm leading-6 text-amber-800">Select the structured blockers the customer must resolve before qualification can finish.</p>
 								</div>
-								<span class="rounded-md border border-amber-300/30 bg-black/10 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-amber-100">Required</span>
+								<span class="rounded-md border border-amber-300/30 bg-white/60 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-amber-800">Required</span>
 							</div>
 							<div class="mt-4 grid gap-2 lg:grid-cols-2">
 								{#each quoteRequestMissingInfoReasonOptions as reason}
-									<label class="flex gap-3 rounded-md border border-amber-300/20 bg-black/10 p-3 text-left">
+									<label class="flex gap-3 rounded-md border border-amber-300/20 bg-white/60 p-3 text-left">
 										<input
 											type="checkbox"
 											name="missingInfoReasonCodes"
@@ -403,15 +403,15 @@
 											class="mt-1 h-4 w-4 rounded border-amber-200 bg-[var(--shell-panel)] text-[var(--accent-solid)]"
 										/>
 										<span>
-											<span class="block text-sm font-semibold text-amber-100">{reason.label}</span>
-											<span class="mt-1 block text-xs leading-5 text-amber-100/70">{reason.detail}</span>
+											<span class="block text-sm font-semibold text-amber-800">{reason.label}</span>
+											<span class="mt-1 block text-xs leading-5 text-amber-800">{reason.detail}</span>
 										</span>
 									</label>
 								{/each}
 							</div>
 						</div>
 					{:else if selectedQualification?.blockerLabels.length}
-						<div class="mt-5 rounded-md border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100">
+						<div class="mt-5 rounded-md border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-800">
 							<span class="font-semibold">Blocking inputs:</span> {selectedQualification.blockerLabels.join(' · ')}. Move the request to Needs Info to store customer-facing reason codes.
 						</div>
 					{/if}
@@ -433,7 +433,7 @@
 					</div>
 				</form>
 
-				<section id={selectedRequestScheduleSectionId} class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+				<section id={selectedRequestScheduleSectionId} class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div class="max-w-3xl">
 							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Site visit scheduling workspace</p>
@@ -453,7 +453,7 @@
 								Ready to book
 							</span>
 						{:else}
-							<span class="inline-flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-300">
+							<span class="inline-flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
 								<AlertTriangle size={14} />
 								Blocked
 							</span>
@@ -463,7 +463,7 @@
 					{#if form?.scheduleSuccess && form.scheduledRequestId === selectedRequest.id}
 						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Site visit scheduled</p>
 					{:else if form?.scheduleMessage && form.scheduledRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">{form.scheduleMessage}</p>
+						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{form.scheduleMessage}</p>
 					{/if}
 
 					{#if selectedRequest.siteVisitSchedule}
@@ -537,7 +537,7 @@
 							</div>
 						</form>
 					{:else}
-						<div class="mt-4 rounded-md border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100">
+						<div class="mt-4 rounded-md border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-800">
 							<span class="font-semibold">Scheduling is blocked:</span>
 							{#if selectedQualification?.blockerLabels.length}
 								{selectedQualification.blockerLabels.join(' · ')}. Clear the blockers and move the request to Qualified before booking.
@@ -548,7 +548,7 @@
 					{/if}
 				</section>
 
-				<section class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
 						<div class="space-y-5">
 							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Request details</p>
@@ -567,7 +567,7 @@
 										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Qualification checklist</p>
 										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Service fit, site readiness, attachments, contact readiness, and scheduling readiness.</p>
 									</div>
-									<span class={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${selectedQualification?.isQualified ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-300'}`}>
+									<span class={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${selectedQualification?.isQualified ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-700'}`}>
 										{#if selectedQualification?.isQualified}
 											<CheckCircle2 size={13} />
 											Qualified
@@ -584,12 +584,12 @@
 												<p class="font-semibold text-[var(--text-base)]">{check.label}</p>
 												<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{check.detail}</p>
 											</div>
-											<span class={`shrink-0 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${check.complete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-300'}`}>{check.complete ? 'Ready' : 'Needs info'}</span>
+											<span class={`shrink-0 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${check.complete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-700'}`}>{check.complete ? 'Ready' : 'Needs info'}</span>
 										</div>
 									{/each}
 								</div>
 								{#if selectedQualification?.blockerLabels.length}
-									<div class="mt-3 rounded-md border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
+									<div class="mt-3 rounded-md border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-800">
 										<span class="font-semibold">Blocking reasons:</span> {selectedQualification.blockerLabels.join(' · ')}
 									</div>
 								{/if}
@@ -637,7 +637,7 @@
 					</div>
 				</section>
 
-				<section class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Attachments</p>
 							<div class="mt-4">
 								{#if selectedRequest.attachments.length}
@@ -713,7 +713,7 @@
 							</div>
 				</section>
 
-				<section class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Timeline</p>
 					<div class="mt-4 space-y-3">
 						{#each selectedRequest.timeline as event}
@@ -754,7 +754,7 @@
 					</div>
 				</section>
 			{:else}
-				<div class="rounded-xl border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
+				<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
 					Pick a request from the queue to open the workspace.
 				</div>
 			{/if}

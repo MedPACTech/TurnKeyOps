@@ -477,7 +477,7 @@
 
 	{#snippet work()}
 		<div class="space-y-4">
-			<div class="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+			<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div>
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section preview</p>
@@ -491,8 +491,8 @@
 					{/if}
 				</div>
 
-				<div class="mt-5 rounded-2xl border border-[var(--shell-border)] bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.06))] p-5">
-					<div class="rounded-2xl border border-[var(--shell-border)] bg-white/80 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
+				<div class="mt-5 rounded-lg border border-[var(--shell-border)] bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.06))] p-5">
+					<div class="rounded-lg border border-[var(--shell-border)] bg-white/80 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Live representation</p>
 						<h5 class="mt-3 text-2xl font-semibold text-slate-900">{selectedSection.previewTitle}</h5>
 						<p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{selectedSection.previewBody}</p>
@@ -501,7 +501,7 @@
 							{#each selectedSection.areas as area}
 									<button
 										type="button"
-										class={`rounded-xl border p-4 text-left transition ${selectedArea.id === area.id ? 'border-orange-300 bg-orange-50 shadow-[0_12px_24px_rgba(234,88,12,0.12)]' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40'}`}
+										class={`rounded-lg border p-4 text-left transition ${selectedArea.id === area.id ? 'border-indigo-300 bg-indigo-50 shadow-[0_12px_24px_rgba(64,80,230,0.12)]' : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/40'}`}
 										onclick={() => {
 											selectedAreaId = area.id;
 											if (area.id === 'services-items') {
