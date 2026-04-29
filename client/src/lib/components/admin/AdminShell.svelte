@@ -62,13 +62,17 @@
 <div class="concept-admin-shell min-h-screen bg-[var(--app-bg)] text-[var(--text-base)]">
 	<div class="flex min-h-screen">
 		<aside class={`hidden shrink-0 flex-col border-r border-[var(--nav-divider)] bg-[var(--nav-bg)] text-white transition-[width] duration-200 lg:flex ${navCollapsed ? 'w-[88px]' : 'w-64'}`}>
-			<div class="flex h-16 items-center gap-3 border-b border-[var(--nav-divider)] px-4">
-				<div class={`flex shrink-0 items-center justify-center rounded-md bg-white p-1.5 shadow-sm ${navCollapsed ? 'h-10 w-10' : 'h-12 w-32'}`}>
-					<img src="/turnkeyops-logo.png" alt="TurnKeyOps" class="h-full w-full object-contain" />
+			<div class={`relative border-b border-[var(--nav-divider)] ${navCollapsed ? 'px-3 py-5' : 'px-4 py-5'}`}>
+				<div class={`flex w-full flex-col gap-4 bg-white shadow-sm ${navCollapsed ? 'p-1.5' : 'px-4 py-3'}`}>
+					<img
+						src="/turnkeyops-logo.png"
+						alt="TurnKeyOps"
+						class={`h-auto w-full object-contain ${navCollapsed ? 'max-w-[3.75rem]' : 'max-w-[14rem]'}`}
+					/>
 				</div>
 				<button
 					type="button"
-					class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-white/60 transition hover:bg-white/10 hover:text-white"
+					class="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-950/40 text-white/75 shadow-sm ring-1 ring-white/20 backdrop-blur transition hover:bg-slate-950/55 hover:text-white focus:outline-none focus:ring-white/30"
 					title={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}
 					aria-label={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}
 					onclick={() => (navCollapsed = !navCollapsed)}
@@ -132,7 +136,7 @@
 							title="Sign out"
 							aria-label="Sign out"
 						>
-							<span aria-hidden="true">↪</span>
+							<span aria-hidden="true">🚪</span>
 						</a>
 					{/if}
 				</div>
@@ -148,13 +152,17 @@
 					onclick={() => (sidebarOpen = false)}
 				></button>
 				<aside class="fixed inset-y-0 left-0 flex w-64 flex-col bg-[var(--nav-bg)] text-white shadow-[var(--shell-shadow)]">
-					<div class="flex h-16 items-center gap-3 border-b border-[var(--nav-divider)] px-4">
-						<div class="flex h-12 w-32 items-center justify-center rounded-md bg-white p-1.5 shadow-sm">
-							<img src="/turnkeyops-logo.png" alt="TurnKeyOps" class="h-full w-full object-contain" />
+					<div class="relative border-b border-[var(--nav-divider)] px-4 py-5">
+						<div class="flex w-full flex-col gap-4 bg-white px-4 py-3 shadow-sm">
+							<img
+								src="/turnkeyops-logo.png"
+								alt="TurnKeyOps"
+								class="h-auto w-full max-w-[14rem] object-contain"
+							/>
 						</div>
 						<button
 							type="button"
-							class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white"
+							class="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-950/40 text-white/75 shadow-sm ring-1 ring-white/20 backdrop-blur transition hover:bg-slate-950/55 hover:text-white focus:outline-none focus:ring-white/30"
 							aria-label="Close navigation"
 							onclick={() => (sidebarOpen = false)}
 						>
@@ -254,6 +262,9 @@
 
 <style>
 	.concept-admin-shell {
+		/* Shared External Admin shell tokens for all /bdr/admin/* routes. Reuse
+		   admin-workarea for the SPA canvas and the module/shell panel tokens
+		   below for route-level cards, rails, drawers, CTA states, and AI accents. */
 		--app-bg: #f6f7f9;
 		--nav-bg: #1f2933;
 		--nav-divider: rgba(255, 255, 255, 0.08);
@@ -289,9 +300,7 @@
 
 	.admin-workarea {
 		background:
-			radial-gradient(circle at 0% 0%, rgba(255, 247, 237, 0.98) 0, rgba(255, 247, 237, 0.52) 21rem, rgba(255, 247, 237, 0) 42rem),
-			radial-gradient(circle at 100% 0%, rgba(219, 234, 254, 0.98) 0, rgba(219, 234, 254, 0.58) 22rem, rgba(219, 234, 254, 0) 44rem),
-			radial-gradient(circle at 78% 72%, rgba(245, 243, 255, 0.9) 0, rgba(245, 243, 255, 0.48) 20rem, rgba(245, 243, 255, 0) 40rem),
-			linear-gradient(135deg, rgba(255, 252, 247, 0.98) 0%, rgba(239, 246, 255, 0.92) 42%, rgba(248, 247, 255, 0.96) 100%);
+			radial-gradient(circle at top right, rgba(249, 115, 22, 0.1), transparent 24%),
+			linear-gradient(180deg, #fffdf9 0%, #f6f8fb 100%);
 	}
 </style>

@@ -5,6 +5,15 @@
 	let { data }: PageProps = $props();
 
 	type RangeKey = 'week' | 'month' | 'year';
+	type SummaryCard = {
+		label: string;
+		value: string;
+		href: string;
+		icon: string;
+		trend?: string;
+		trendClass?: string;
+	};
+
 	let activeRange = $state<RangeKey>('month');
 	let completedOrderIds = $state<string[]>([]);
 
@@ -63,12 +72,20 @@
 			icon: '📥'
 		},
 		{
-			label: 'Open invoices',
-			value: String(data.snapshot.summary.invoiceCount),
+			label: 'Overdue',
+			value: '0',
 			href: '/bdr/admin/invoices?role=office-admin',
-			icon: '💰'
+			icon: '⚠️'
+		},
+		{
+			label: 'Revenue (Month)',
+			value: '$0',
+			href: '/bdr/admin/invoices?role=office-admin',
+			icon: '💰',
+			trend: '▲',
+			trendClass: 'text-green-600'
 		}
-	]);
+	] satisfies SummaryCard[]);
 
 	const revenueSeries = [
 		{ label: 'Jan', actual: 420000, prior: 356000, projected: 435000 },
@@ -186,18 +203,23 @@
 		</a>
 	</section>
 
-	<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+	<section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
 		{#each summaryCards as card}
 			<a
 				href={card.href}
-				class="group flex h-44 flex-col justify-between rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+				class="group flex h-40 flex-col justify-between rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
 			>
-				<div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/80 text-2xl shadow-sm ring-1 ring-slate-900/5" aria-hidden="true">
-					{card.icon}
+				<div class="flex items-start justify-between gap-3">
+					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/80 text-xl" aria-hidden="true">
+						{card.icon}
+					</div>
+					{#if card.trend}
+						<span class={`text-sm font-bold leading-none ${card.trendClass ?? 'text-[var(--text-muted)]'}`} aria-hidden="true">{card.trend}</span>
+					{/if}
 				</div>
 				<div>
 					<p class="text-4xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{card.value}</p>
-					<p class="mt-3 text-sm font-medium leading-5 text-[var(--text-muted)]">{card.label}</p>
+					<p class="mt-2 whitespace-nowrap text-xs font-medium leading-5 text-[var(--text-muted)]">{card.label}</p>
 				</div>
 			</a>
 		{/each}
@@ -206,16 +228,16 @@
 	<article class="rounded-lg bg-white/88 p-5 shadow-[var(--shell-shadow)]">
 		<div class="flex items-start justify-between gap-3">
 			<div class="flex items-start gap-3">
-				<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/85 text-2xl shadow-sm ring-1 ring-slate-900/5">
+				<div class="flex h-12 w-12 shrink-0 items-center justify-center text-2xl">
 					👷‍♂️
 				</div>
 				<div>
-					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Bob</h2>
-					<p class="text-sm leading-5 text-[var(--text-muted)]">Next moves</p>
+					<h2 class="text-base font-semibold leading-12 tracking-normal text-[var(--text-strong)]">Bob's next moves</h2>
+
 				</div>
 			</div>
 			<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm" title="AI-driven">
-				✦
+				✨
 			</span>
 		</div>
 
@@ -260,9 +282,9 @@
 					{#each [20, 40, 60, 80] as line}
 						<line x1="0" y1={line} x2="100" y2={line} stroke="rgba(148,163,184,0.22)" stroke-width="0.6" />
 					{/each}
-					<polyline fill="none" stroke="#94a3b8" stroke-width="1.4" points={chartPoints('prior')} />
-					<polyline fill="none" stroke="#f97316" stroke-width="1.8" points={chartPoints('actual')} />
-					<polyline fill="none" stroke="#475569" stroke-dasharray="2.5 2.5" stroke-width="1.6" points={chartPoints('projected')} />
+					<polyline fill="none" stroke="#94a3b8" stroke-width="1" points={chartPoints('prior')} />
+					<polyline fill="none" stroke="#f97316" stroke-width="1" points={chartPoints('actual')} />
+					<polyline fill="none" stroke="#475569" stroke-dasharray="2.5 2.5" stroke-width="1" points={chartPoints('projected')} />
 				</svg>
 				<div class="mt-3 flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
 					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#f97316]"></span>Actual</div>
@@ -274,9 +296,14 @@
 
 		<article class="rounded-lg bg-white/88 p-5 shadow-[var(--shell-shadow)]">
 			<div class="flex items-center justify-between gap-3">
-				<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Bob&apos;s order list</h2>
+				<div class="flex min-w-0 items-center gap-3">
+					<div class="flex h-12 w-12 shrink-0 items-center justify-center text-2xl">
+						👷‍♂️
+					</div>
+					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Bob's order list</h2>
+				</div>
 				<span class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-text)] shadow-sm" title="AI-driven">
-					✦
+					✨
 				</span>
 			</div>
 			<div class="mt-4 space-y-3">

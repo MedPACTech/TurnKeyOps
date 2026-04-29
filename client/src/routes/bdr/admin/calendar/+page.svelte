@@ -559,12 +559,6 @@ type SiteVisit = {
 <div class="relative min-h-[calc(100vh-10rem)]">
 	<div class="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
 		<aside class="space-y-4 rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
-			<div>
-				<p class="text-[0.66rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Calendar</p>
-				<h1 class="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">Focus rail</h1>
-				<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Switch views, move the active date, and filter work instantly without losing the selected day.</p>
-			</div>
-
 			<section class="space-y-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">View</p>
 				<div class="grid grid-cols-3 gap-2">
@@ -581,10 +575,6 @@ type SiteVisit = {
 			</section>
 
 			<section class="space-y-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
-				<div class="flex items-center justify-between gap-3">
-					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Date navigation</p>
-					<span class="text-xs text-[var(--text-muted)]">{formatRangeTitle()}</span>
-				</div>
 				<label class="grid gap-2">
 					<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Date picker</span>
 					<input
@@ -607,7 +597,6 @@ type SiteVisit = {
 			<section class="space-y-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 				<div class="flex items-center justify-between gap-3">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Event filters</p>
-					<span class="text-xs text-[var(--text-muted)]">All enabled by default</span>
 				</div>
 				<div class="space-y-2">
 					{#each Object.entries(eventTypeMeta) as [type, meta]}
@@ -676,9 +665,7 @@ type SiteVisit = {
 			{/if}
 			<div class="flex flex-col gap-4 border-b border-[var(--shell-border)] pb-4 sm:flex-row sm:items-end sm:justify-between">
 				<div>
-					<p class="text-[0.66rem] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Calendar workarea</p>
 					<h2 class="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">{formatRangeTitle()}</h2>
-					<p class="mt-2 text-sm text-[var(--text-muted)]">{visibleEventsSummary()} · Selected date persists across Day, Week, and Month.</p>
 				</div>
 				<div class="inline-flex items-center gap-2 rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2 text-sm text-[var(--text-muted)]">
 					<CalendarRange size={16} />
