@@ -26,7 +26,6 @@
 	let laneFilter = $state<'all' | QuoteRequestWorkflowLane>('all');
 	let search = $state('');
 	let selectedAttachmentId = $state('');
-	let contactDrawerOpen = $state(false);
 	let triageStatus = $state<QuoteRequestStatus>('new');
 	let scheduleVisitDate = $state('');
 	let scheduleWindowStart = $state('09:00');
@@ -35,6 +34,19 @@
 	let scheduleSiteContactPhone = $state('');
 	let scheduleAssignedFieldResource = $state('');
 	let scheduleNotes = $state('');
+	let detailInlineEditing = $state(false);
+	let contactInlineEditing = $state(false);
+	let detailRequestedTimeline = $state('');
+	let detailNextAction = $state('');
+	let contactNameDraft = $state('');
+	let contactEmailDraft = $state('');
+	let contactPhoneDraft = $state('');
+	let contactSiteNameDraft = $state('');
+	let contactAddress1Draft = $state('');
+	let contactAddress2Draft = $state('');
+	let contactCityDraft = $state('');
+	let contactStateDraft = $state('');
+	let contactPostalCodeDraft = $state('');
 
 	const fieldResourceSuggestions = ['Estimator - Maya', 'Estimator - Chris', 'Estimator - Lane', 'Ella - office admin', 'Estimator - Jordan'];
 
@@ -143,6 +155,26 @@
 		}
 	});
 
+	const resetDetailDraft = (request: QuoteRequest | null | undefined) => {
+		detailRequestedTimeline = request?.requestedTimeline ?? '';
+		detailNextAction = request?.nextAction ?? '';
+		detailInlineEditing = false;
+	};
+
+	const resetContactDraft = (request: QuoteRequest | null | undefined) => {
+		const address = parseAddress(request?.serviceAddress ?? '');
+		contactNameDraft = request?.contactName ?? '';
+		contactEmailDraft = request?.email ?? '';
+		contactPhoneDraft = request?.phone ?? '';
+		contactSiteNameDraft = request?.siteName ?? '';
+		contactAddress1Draft = address.address1;
+		contactAddress2Draft = address.address2;
+		contactCityDraft = address.city;
+		contactStateDraft = address.state;
+		contactPostalCodeDraft = address.postalCode;
+		contactInlineEditing = false;
+	};
+
 	const defaultScheduleDate = () => {
 		const value = new Date();
 		value.setDate(value.getDate() + 1);
@@ -221,6 +253,21 @@
 	};
 
 	const selectedAddress = $derived(parseAddress(selectedRequest?.serviceAddress ?? ''));
+	const selectedWorkflowLane = $derived(selectedRequest ? getQuoteRequestWorkflowLane(selectedRequest.status) : null);
+	const selectedOpsSnapshot = $derived.by(() => {
+		if (!selectedRequest) return [] as { label: string; value: string; detail: string }[];
+		return [
+			{ label: 'Workflow lane', value: selectedWorkflowPhase?.label ?? 'Workflow', detail: selectedWorkflowLane ? quoteRequestWorkflowLaneMeta.find((lane) => lane.key === selectedWorkflowLane)?.label ?? 'Lane' : 'Lane' },
+			{ label: 'Source', value: selectedRequest.source === 'public-site' ? 'Public site' : selectedRequest.source === 'office' ? 'Office entered' : 'Referral', detail: selectedRequest.priority === 'emergency' ? 'Emergency priority' : `${selectedRequest.attachments.length} attachment${selectedRequest.attachments.length === 1 ? '' : 's'}` },
+			{ label: 'Property', value: selectedRequest.propertyType, detail: selectedRequest.projectType },
+			{ label: 'Requested timeline', value: selectedRequest.requestedTimeline, detail: selectedRequest.preferredTimeline }
+		];
+	});
+
+	$effect(() => {
+		resetDetailDraft(selectedRequest);
+		resetContactDraft(selectedRequest);
+	});
 	const isMissingInfoReasonChecked = (code: QuoteRequestMissingInfoReasonCode) =>
 		Boolean(
 			selectedQualification?.suggestedMissingInfoReasonCodes.includes(code) ||
@@ -263,9 +310,6 @@
 	{metrics}
 	contextLabel="Queue lanes"
 	focusLabel="Request focus"
-	drawerOpen={contactDrawerOpen}
-	drawerTitle="Edit contact information"
-	closeDrawer={() => (contactDrawerOpen = false)}
 >
 	{#snippet context()}
 		<div class="space-y-3">
@@ -575,16 +619,88 @@
 				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
 						<div class="space-y-5">
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Request details</p>
-							<p class="mt-3 text-sm leading-7 text-[var(--text-base)]">{selectedRequest.need}</p>
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Request timeframe</p>
-								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.requestedTimeline}</p>
+							<div class="flex items-start justify-between gap-3">
+								<div>
+									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Request details</p>
+									<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Dense record view for the scope summary, timing, and next-step posture.</p>
+								</div>
+								<button
+									type="button"
+									class={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em] transition ${detailInlineEditing ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-text)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel-strong)] text-[var(--text-strong)] hover:bg-[var(--shell-panel)]'}`}
+									onclick={() => {
+										if (detailInlineEditing) {
+											resetDetailDraft(selectedRequest);
+											return;
+										}
+										detailInlineEditing = true;
+									}}
+								>
+									<Pencil size={14} />
+									{detailInlineEditing ? 'Cancel edit' : 'Edit inline'}
+								</button>
 							</div>
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Notes</p>
-								<p class="mt-2 text-sm leading-6 text-[var(--text-base)]">{selectedRequest.nextAction}</p>
+
+							<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+								{#each selectedOpsSnapshot as item}
+									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{item.label}</p>
+										<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{item.value}</p>
+										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
+									</div>
+								{/each}
 							</div>
+
+							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Scope summary</p>
+								<p class="mt-3 text-sm leading-7 text-[var(--text-base)]">{selectedRequest.need}</p>
+							</div>
+
+							{#if detailInlineEditing}
+								<form method="POST" action="?/updateRequest" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4">
+									<input type="hidden" name="id" value={selectedRequest.id} />
+									<input type="hidden" name="status" value={selectedRequest.status} />
+									<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
+									<input type="hidden" name="contactName" value={selectedRequest.contactName} />
+									<input type="hidden" name="email" value={selectedRequest.email} />
+									<input type="hidden" name="phone" value={selectedRequest.phone} />
+									<input type="hidden" name="siteName" value={selectedRequest.siteName} />
+									<input type="hidden" name="address1" value={selectedAddress.address1} />
+									<input type="hidden" name="address2" value={selectedAddress.address2} />
+									<input type="hidden" name="city" value={selectedAddress.city} />
+									<input type="hidden" name="state" value={selectedAddress.state} />
+									<input type="hidden" name="postalCode" value={selectedAddress.postalCode} />
+									{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
+										<input type="hidden" name="missingInfoReasonCodes" value={code} />
+									{/each}
+									<div class="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+										<label class="grid gap-2">
+											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Requested timeline</span>
+											<input bind:value={detailRequestedTimeline} name="requestedTimeline" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+										</label>
+										<label class="grid gap-2">
+											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Next action</span>
+											<textarea bind:value={detailNextAction} name="nextAction" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none"></textarea>
+										</label>
+									</div>
+									<div class="mt-4 flex flex-wrap gap-3">
+										<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save details</button>
+										<button type="button" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]" onclick={() => resetDetailDraft(selectedRequest)}>Cancel</button>
+									</div>
+								</form>
+							{:else}
+								<div class="grid gap-3 md:grid-cols-2">
+									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Request timeframe</p>
+										<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.requestedTimeline}</p>
+										<p class="mt-1 text-xs text-[var(--text-muted)]">Customer-facing expectation window</p>
+									</div>
+									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Next action</p>
+										<p class="mt-2 text-sm leading-6 text-[var(--text-base)]">{selectedRequest.nextAction}</p>
+									</div>
+								</div>
+							{/if}
+
 							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
 								<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 									<div>
@@ -621,42 +737,108 @@
 						</div>
 						<div class="space-y-4 border-t border-[var(--shell-border)] pt-5 text-sm xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
 							<div class="flex items-center justify-between gap-3">
-								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Contact</p>
+								<div>
+									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Contact and site</p>
+									<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Keep customer, site, and address edits in the same dense workspace.</p>
+								</div>
 								<button
 									type="button"
 									class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] text-[var(--accent-text)] transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
-									onclick={() => (contactDrawerOpen = true)}
+									onclick={() => {
+										if (contactInlineEditing) {
+											resetContactDraft(selectedRequest);
+											return;
+										}
+										contactInlineEditing = true;
+									}}
 									aria-label="Edit contact information"
 									title="Edit contact information"
 								>
 									<Pencil size={16} />
 								</button>
 							</div>
-							<div class="space-y-4">
-								<div>
-									<p class="text-base font-semibold text-[var(--text-strong)]">{selectedRequest.contactName}</p>
-									<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.email}</p>
-									<p class="text-sm text-[var(--text-muted)]">{selectedRequest.phone}</p>
-								</div>
-								<div>
-									<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</p>
-									<p class="mt-1 font-semibold text-[var(--text-strong)]">{selectedRequest.siteName}</p>
-									<div class="mt-2 space-y-0.5 text-sm leading-5 text-[var(--text-muted)]">
-										{#if selectedAddress.address1}
-											<p>{selectedAddress.address1}</p>
-										{/if}
-										{#if selectedAddress.address2}
-											<p>{selectedAddress.address2}</p>
-										{/if}
-										{#if selectedAddress.city}
-											<p>{selectedAddress.city}</p>
-										{/if}
-										{#if selectedAddress.state || selectedAddress.postalCode}
-											<p>{[selectedAddress.state, selectedAddress.postalCode].filter(Boolean).join(' ')}</p>
-										{/if}
+							{#if contactInlineEditing}
+								<form method="POST" action="?/updateRequest" class="space-y-4 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4">
+									<input type="hidden" name="id" value={selectedRequest.id} />
+									<input type="hidden" name="status" value={selectedRequest.status} />
+									<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
+									<input type="hidden" name="nextAction" value={selectedRequest.nextAction} />
+									<input type="hidden" name="requestedTimeline" value={selectedRequest.requestedTimeline} />
+									{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
+										<input type="hidden" name="missingInfoReasonCodes" value={code} />
+									{/each}
+									<div class="grid gap-3">
+										<label class="grid gap-1">
+											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Contact name</span>
+											<input bind:value={contactNameDraft} name="contactName" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+										</label>
+										<label class="grid gap-1">
+											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Email</span>
+											<input bind:value={contactEmailDraft} type="email" name="email" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+										</label>
+										<label class="grid gap-1">
+											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Phone</span>
+											<input bind:value={contactPhoneDraft} name="phone" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+										</label>
+										<label class="grid gap-1">
+											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</span>
+											<input bind:value={contactSiteNameDraft} name="siteName" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+										</label>
+										<label class="grid gap-1">
+											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Address 1</span>
+											<input bind:value={contactAddress1Draft} name="address1" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+										</label>
+										<label class="grid gap-1">
+											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Address 2</span>
+											<input bind:value={contactAddress2Draft} name="address2" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+										</label>
+										<div class="grid grid-cols-[minmax(0,1fr)_88px_112px] gap-2">
+											<label class="grid gap-1">
+												<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">City</span>
+												<input bind:value={contactCityDraft} name="city" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+											</label>
+											<label class="grid gap-1">
+												<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">State</span>
+												<input bind:value={contactStateDraft} name="state" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+											</label>
+											<label class="grid gap-1">
+												<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Zip</span>
+												<input bind:value={contactPostalCodeDraft} name="postalCode" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+											</label>
+										</div>
+									</div>
+									<div class="flex flex-wrap gap-3">
+										<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save contact</button>
+										<button type="button" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]" onclick={() => resetContactDraft(selectedRequest)}>Cancel</button>
+									</div>
+								</form>
+							{:else}
+								<div class="space-y-4">
+									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+										<p class="text-base font-semibold text-[var(--text-strong)]">{selectedRequest.contactName}</p>
+										<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.email}</p>
+										<p class="text-sm text-[var(--text-muted)]">{selectedRequest.phone}</p>
+									</div>
+									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</p>
+										<p class="mt-1 font-semibold text-[var(--text-strong)]">{selectedRequest.siteName}</p>
+										<div class="mt-2 space-y-0.5 text-sm leading-5 text-[var(--text-muted)]">
+											{#if selectedAddress.address1}
+												<p>{selectedAddress.address1}</p>
+											{/if}
+											{#if selectedAddress.address2}
+												<p>{selectedAddress.address2}</p>
+											{/if}
+											{#if selectedAddress.city}
+												<p>{selectedAddress.city}</p>
+											{/if}
+											{#if selectedAddress.state || selectedAddress.postalCode}
+												<p>{[selectedAddress.state, selectedAddress.postalCode].filter(Boolean).join(' ')}</p>
+											{/if}
+										</div>
 									</div>
 								</div>
-							</div>
+							{/if}
 						</div>
 					</div>
 				</section>
@@ -785,65 +967,4 @@
 		</div>
 	{/snippet}
 
-	{#snippet drawer()}
-		{#if selectedRequest}
-			<form method="POST" action="?/updateRequest" class="space-y-4">
-				<input type="hidden" name="id" value={selectedRequest.id} />
-				<input type="hidden" name="status" value={selectedRequest.status} />
-				<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
-				<input type="hidden" name="nextAction" value={selectedRequest.nextAction} />
-				{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
-					<input type="hidden" name="missingInfoReasonCodes" value={code} />
-				{/each}
-
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Contact name</span>
-					<input name="contactName" value={selectedRequest.contactName} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-				</label>
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Email</span>
-					<input type="email" name="email" value={selectedRequest.email} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-				</label>
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Phone</span>
-					<input name="phone" value={selectedRequest.phone} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-				</label>
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</span>
-					<input name="siteName" value={selectedRequest.siteName} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-				</label>
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Address 1</span>
-					<input name="address1" value={selectedAddress.address1} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-				</label>
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Address 2</span>
-					<input name="address2" value={selectedAddress.address2} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-				</label>
-				<div class="grid grid-cols-[minmax(0,1fr)_88px_112px] gap-2">
-					<label class="grid gap-1">
-						<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">City</span>
-						<input name="city" value={selectedAddress.city} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-					</label>
-					<label class="grid gap-1">
-						<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">State</span>
-						<input name="state" value={selectedAddress.state} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-					</label>
-					<label class="grid gap-1">
-						<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Zip</span>
-						<input name="postalCode" value={selectedAddress.postalCode} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-					</label>
-				</div>
-				<label class="grid gap-1">
-					<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Requested timeframe</span>
-					<input name="requestedTimeline" value={selectedRequest.requestedTimeline} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-				</label>
-
-				<div class="flex flex-wrap gap-3 pt-2">
-					<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save changes</button>
-					<button type="button" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]" onclick={() => (contactDrawerOpen = false)}>Cancel</button>
-				</div>
-			</form>
-		{/if}
-	{/snippet}
 </AdminWorkspace>
