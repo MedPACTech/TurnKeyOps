@@ -10,6 +10,11 @@
 		title: string;
 		team: string;
 	};
+	type BobMove = {
+		label: string;
+		detail: string;
+		href: string;
+	};
 
 	let { data }: PageProps = $props();
 
@@ -54,6 +59,26 @@
 		const current = visibleContacts.find((contact) => contact.id === selectedContactId);
 		return current ?? visibleContacts[0] ?? null;
 	});
+	const contactTypeOptions = $derived([
+		{
+			key: 'customer' as const,
+			label: 'Customers',
+			count: contactRecords.filter((contact) => contact.contactType === 'customer').length,
+			detail: 'Accounts and properties'
+		},
+		{
+			key: 'vendor' as const,
+			label: 'Vendors',
+			count: contactRecords.filter((contact) => contact.contactType === 'vendor').length,
+			detail: 'Suppliers and trade partners'
+		},
+		{
+			key: 'employee' as const,
+			label: 'Employees',
+			count: contactRecords.filter((contact) => contact.contactType === 'employee').length,
+			detail: 'Office and field operators'
+		}
+	]);
 
 	const metrics = $derived([
 		{ label: 'Contact records', value: String(contactRecords.length), detail: 'Customers, vendors, and employees presented in one shell model' },
@@ -64,6 +89,35 @@
 		},
 		{ label: 'Source', value: data.source === 'api' ? 'API scaffold' : 'Fallback scaffold', detail: getScaffoldBanner(data.source) }
 	]);
+	const bobMoves = $derived.by(() => {
+		if (!selectedContact) {
+			return [
+				{
+					label: 'Review relationship desk',
+					detail: `${visibleContacts.length} record${visibleContacts.length === 1 ? '' : 's'} in view`,
+					href: '/bdr/admin/contact?role=office-admin'
+				}
+			] satisfies BobMove[];
+		}
+
+		return [
+			{
+				label: 'Prep follow-up',
+				detail: selectedContact.nextStep,
+				href: '#relationship-record'
+			},
+			{
+				label: 'Summarize relationship',
+				detail: `${selectedContact.property} · ${selectedContact.segment}`,
+				href: '#relationship-record'
+			},
+			{
+				label: 'Check linked work',
+				detail: `${selectedContact.openEstimateCount} estimate link(s) · ${selectedContact.openInvoiceCount} invoice link(s)`,
+				href: '#relationship-tabs'
+			}
+		] satisfies BobMove[];
+	});
 
 	$effect(() => {
 		if (selectedContact && selectedContactId !== selectedContact.id) {
@@ -73,20 +127,16 @@
 </script>
 
 <AdminWorkspace
-	kicker="Contact"
-	title="Shared contact desk for customers, vendors, and employees"
-	description="The old customer screen is now a Contact surface. Type selection lives in the context rail, the focus rail lists records for that type, and the work area keeps tabs for practical operator detail."
+	kicker="External Admin / Contacts"
+	title="Relationship desk for customers, vendors, and team follow-up"
+	description="Keep people, property context, and the next follow-up visible without turning the page into a dense CRM screen."
 	{metrics}
 	contextLabel="Contact type"
 	focusLabel="Contact list"
 >
 	{#snippet context()}
 		<div class="space-y-3">
-			{#each [
-				{ key: 'customer' as const, label: 'Customer', detail: 'Accounts, properties, and linked revenue work' },
-				{ key: 'vendor' as const, label: 'Vendor', detail: 'Suppliers and partner contacts used by the office' },
-				{ key: 'employee' as const, label: 'Employee', detail: 'Internal operator and field-facing records' }
-			] as option}
+			{#each contactTypeOptions as option}
 				<button
 					type="button"
 					class={`w-full rounded-md border px-3 py-3 text-left transition ${contactType === option.key ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
@@ -95,24 +145,63 @@
 						selectedContactId = '';
 					}}
 				>
-					<p class="text-sm font-semibold text-[var(--text-strong)]">{option.label}</p>
+					<div class="flex items-center justify-between gap-3">
+						<p class="text-sm font-semibold text-[var(--text-strong)]">{option.label}</p>
+						<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
+							{option.count}
+						</span>
+					</div>
 					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{option.detail}</p>
 				</button>
 			{/each}
+
+			<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+				<div class="flex items-start justify-between gap-3">
+					<div>
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Bob relationship assist</p>
+						<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{selectedContact?.displayName ?? 'Relationship queue'}</p>
+					</div>
+					<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm">
+						✨
+					</span>
+				</div>
+				<div class="mt-3 space-y-2">
+					{#each bobMoves as move}
+						<a
+							href={move.href}
+							class="block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
+						>
+							<p class="text-sm font-semibold text-[var(--text-strong)]">{move.label}</p>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{move.detail}</p>
+						</a>
+					{/each}
+				</div>
+			</div>
 		</div>
 	{/snippet}
 
 	{#snippet focus()}
 		<div class="space-y-2">
+			<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+				{visibleContacts.length} records
+			</p>
 			{#each visibleContacts as contact}
 				<button
 					type="button"
 					class={`w-full rounded-md border px-3 py-3 text-left transition ${selectedContact?.id === contact.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
 					onclick={() => (selectedContactId = contact.id)}
 				>
-					<p class="text-sm font-semibold text-[var(--text-strong)]">{contact.displayName}</p>
-					<p class="mt-1 text-xs text-[var(--text-muted)]">{contact.title}</p>
-					<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{contact.primaryContactEmail ?? 'No email'} · {contact.primaryContactPhone ?? 'No phone'}</p>
+					<div class="flex items-start justify-between gap-3">
+						<div class="min-w-0">
+							<p class="truncate text-sm font-semibold text-[var(--text-strong)]">{contact.displayName}</p>
+							<p class="mt-1 text-xs text-[var(--text-muted)]">{contact.title} · {contact.team}</p>
+						</div>
+						<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
+							{contact.status}
+						</span>
+					</div>
+					<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{contact.property}</p>
+					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{contact.nextStep}</p>
 				</button>
 			{/each}
 		</div>
@@ -120,7 +209,7 @@
 
 	{#snippet work()}
 		{#if selectedContact}
-			<div class="space-y-4">
+			<div id="relationship-record" class="space-y-4">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div>
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{contactType}</p>
@@ -133,7 +222,22 @@
 					</div>
 				</div>
 
-				<div class="flex flex-wrap gap-2 border-b border-[var(--shell-border)] pb-3">
+				<div class="grid gap-3 md:grid-cols-3">
+					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Property / job</p>
+						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedContact.property}</p>
+					</div>
+					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Last touch</p>
+						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedContact.lastTouch}</p>
+					</div>
+					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Next action</p>
+						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedContact.nextStep}</p>
+					</div>
+				</div>
+
+				<div id="relationship-tabs" class="flex flex-wrap gap-2 border-b border-[var(--shell-border)] pb-3">
 					{#each [
 						{ key: 'overview' as const, label: 'Overview' },
 						{ key: 'activity' as const, label: 'Activity' },
@@ -200,7 +304,7 @@
 			</div>
 		{:else}
 			<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
-				No contact records are available for this type.
+				No relationship records are available in this view.
 			</div>
 		{/if}
 	{/snippet}
