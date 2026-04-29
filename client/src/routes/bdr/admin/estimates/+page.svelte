@@ -15,7 +15,11 @@
 		scopeLineItems: string[];
 		notes: string;
 		assumptions: string[];
+		status: 'draft' | 'ready-to-send' | 'sent';
+		commercialSummary: string;
 		savedAtUtc: string;
+		sentAtUtc?: string;
+		sentBy?: string;
 	};
 	type EstimateDraftPageData = PageProps['data'] & {
 		quoteRequests?: QuoteRequest[];
@@ -44,6 +48,7 @@
 	let draftScopeLineItems = $state('');
 	let draftNotes = $state('');
 	let draftAssumptions = $state('');
+	let draftStatus = $state<'draft' | 'ready-to-send' | 'sent'>('draft');
 
 	const filterMatches = (estimate: EstimateView) => {
 		const status = estimate.status.toLowerCase();
@@ -164,6 +169,24 @@
 	};
 
 	const selectedDraftTrace = $derived(buildDraftTrace(selectedDraftRequest));
+	const selectedSavedDraft = $derived(
+		selectedDraftRequest ? estimateDrafts[selectedDraftRequest.id] ?? null : null
+	);
+	const draftCommercialSummary = $derived.by(() => {
+		const scopeCount = draftScopeLineItems
+			.split('\n')
+			.map((entry) => entry.trim())
+			.filter(Boolean).length;
+		const assumptionCount = draftAssumptions
+			.split('\n')
+			.map((entry) => entry.trim())
+			.filter(Boolean).length;
+		return [
+			scopeCount ? `${scopeCount} scope line item(s)` : 'No scope line items yet',
+			assumptionCount ? `${assumptionCount} assumption(s)` : 'No assumptions recorded',
+			draftStatus === 'sent' ? 'Customer-visible send completed' : 'Review before send'
+		].join(' · ');
+	});
 
 	$effect(() => {
 		if (!selectedDraftRequestId && draftSourceRequests[0]) {
@@ -181,6 +204,7 @@
 		draftVisitFindings = savedDraft?.visitFindings ?? buildVisitFindingSeed(request);
 		draftScopeLineItems = savedDraft?.scopeLineItems.join('\n') ?? '';
 		draftNotes = savedDraft?.notes ?? request.nextAction;
+		draftStatus = savedDraft?.status ?? 'draft';
 		draftAssumptions =
 			savedDraft?.assumptions.join('\n') ??
 			[
@@ -297,6 +321,10 @@
 						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
 							Draft saved locally
 						</p>
+					{:else if form?.draftSent && form.savedRequestId === selectedDraftRequest.id}
+						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
+							Estimate sent
+						</p>
 					{:else if form?.draftMessage && form.savedRequestId === selectedDraftRequest.id}
 						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
 							{form.draftMessage}
@@ -352,8 +380,39 @@
 						</div>
 					</div>
 
+					<div class="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+						<label class="grid gap-2">
+							<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Draft status</span>
+							<select bind:value={draftStatus} name="draftStatus" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">
+								<option value="draft">Draft</option>
+								<option value="ready-to-send">Ready to Send</option>
+								<option value="sent" disabled>Sent</option>
+							</select>
+						</label>
+						<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Commercial review</p>
+							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{draftCommercialSummary}</p>
+							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+								Review the customer/site seed, visit findings, line items, and assumptions here before promoting the draft to customer-visible status.
+							</p>
+							{#if selectedSavedDraft?.sentAtUtc}
+								<p class="mt-3 text-xs text-[var(--text-muted)]">
+									Sent by {selectedSavedDraft.sentBy} on {formatDate(selectedSavedDraft.sentAtUtc)}.
+								</p>
+							{/if}
+						</div>
+					</div>
+
 					<div class="mt-5 flex flex-wrap gap-3">
 						<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save draft</button>
+						<button
+							type="submit"
+							formaction="?/sendDraft"
+							class="rounded-md border border-emerald-400/35 bg-emerald-500 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+							disabled={draftStatus !== 'ready-to-send'}
+						>
+							Send estimate
+						</button>
 						<a href="/bdr/admin/requests?role=office-admin" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Open request workspace</a>
 						{#if estimateDrafts[selectedDraftRequest.id]?.savedAtUtc}
 							<p class="text-xs leading-5 text-[var(--text-muted)]">Last saved {formatDate(estimateDrafts[selectedDraftRequest.id].savedAtUtc)}</p>

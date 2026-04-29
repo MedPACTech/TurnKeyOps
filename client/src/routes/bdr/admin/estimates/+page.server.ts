@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { loadQuoteRequests } from '$lib/server/quote-requests';
+import { loadQuoteRequests, updateQuoteRequest } from '$lib/server/quote-requests';
 
 const fsModuleName = 'node:fs/promises';
 const getCwd = () =>
@@ -22,7 +22,11 @@ type EstimateDraftRecord = {
 	scopeLineItems: string[];
 	notes: string;
 	assumptions: string[];
+	status: 'draft' | 'ready-to-send' | 'sent';
+	commercialSummary: string;
 	savedAtUtc: string;
+	sentAtUtc?: string;
+	sentBy?: string;
 };
 
 const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
@@ -50,6 +54,40 @@ const parseLines = (value: FormDataEntryValue | null) =>
 		.map((entry) => entry.trim())
 		.filter(Boolean);
 
+const parseDraftStatus = (value: FormDataEntryValue | null): EstimateDraftRecord['status'] => {
+	const normalized = String(value ?? '').trim();
+	if (normalized === 'ready-to-send' || normalized === 'sent') return normalized;
+	return 'draft';
+};
+
+const buildCommercialSummary = (scopeLineItems: string[], assumptions: string[]) =>
+	[
+		scopeLineItems.length ? `${scopeLineItems.length} scope line item(s)` : 'No scope line items yet',
+		assumptions.length ? `${assumptions.length} assumption(s)` : 'No assumptions recorded',
+		'Estimate draft prepared for review before send'
+	].join(' · ');
+
+const parseDraftRecord = (formData: FormData, overrides?: Partial<EstimateDraftRecord>): EstimateDraftRecord => {
+	const scopeLineItems = parseLines(formData.get('scopeLineItems'));
+	const assumptions = parseLines(formData.get('assumptions'));
+	const savedAtUtc = overrides?.savedAtUtc ?? new Date().toISOString();
+	return {
+		requestId: String(formData.get('requestId') ?? '').trim(),
+		customerName: String(formData.get('customerName') ?? '').trim(),
+		siteName: String(formData.get('siteName') ?? '').trim(),
+		serviceSummary: String(formData.get('serviceSummary') ?? '').trim(),
+		visitFindings: String(formData.get('visitFindings') ?? '').trim(),
+		scopeLineItems,
+		notes: String(formData.get('notes') ?? '').trim(),
+		assumptions,
+		status: overrides?.status ?? parseDraftStatus(formData.get('draftStatus')),
+		commercialSummary: overrides?.commercialSummary ?? buildCommercialSummary(scopeLineItems, assumptions),
+		savedAtUtc,
+		sentAtUtc: overrides?.sentAtUtc,
+		sentBy: overrides?.sentBy
+	};
+};
+
 export const load = async ({ fetch }) => {
 	const { requests } = await loadQuoteRequests(fetch);
 	return {
@@ -70,18 +108,7 @@ export const actions = {
 			});
 		}
 
-		const savedAtUtc = new Date().toISOString();
-		const nextDraft: EstimateDraftRecord = {
-			requestId,
-			customerName: String(formData.get('customerName') ?? '').trim(),
-			siteName: String(formData.get('siteName') ?? '').trim(),
-			serviceSummary: String(formData.get('serviceSummary') ?? '').trim(),
-			visitFindings: String(formData.get('visitFindings') ?? '').trim(),
-			scopeLineItems: parseLines(formData.get('scopeLineItems')),
-			notes: String(formData.get('notes') ?? '').trim(),
-			assumptions: parseLines(formData.get('assumptions')),
-			savedAtUtc
-		};
+		const nextDraft = parseDraftRecord(formData);
 
 		const drafts = await readEstimateDrafts();
 		drafts[requestId] = nextDraft;
@@ -90,7 +117,77 @@ export const actions = {
 		return {
 			draftSaved: true,
 			savedRequestId: requestId,
-			draftSavedAtUtc: savedAtUtc
+			draftSavedAtUtc: nextDraft.savedAtUtc
+		};
+	},
+	sendDraft: async ({ fetch, request }) => {
+		const formData = await request.formData();
+		const requestId = String(formData.get('requestId') ?? '').trim();
+		const draftStatus = parseDraftStatus(formData.get('draftStatus'));
+
+		if (!requestId) {
+			return fail(400, {
+				draftMessage: 'Choose a source request before sending the estimate.',
+				savedRequestId: requestId
+			});
+		}
+
+		if (draftStatus !== 'ready-to-send') {
+			return fail(400, {
+				draftMessage: 'Move the estimate draft to Ready to Send before sending it to the customer.',
+				savedRequestId: requestId
+			});
+		}
+
+		const { requests } = await loadQuoteRequests(fetch);
+		const sourceRequest = requests.find((entry) => entry.id === requestId);
+		if (!sourceRequest) {
+			return fail(404, {
+				draftMessage: 'The source request could not be found for this estimate send.',
+				savedRequestId: requestId
+			});
+		}
+
+		const sentAtUtc = new Date().toISOString();
+		const sentBy = 'Internal Admin';
+		const nextDraft = parseDraftRecord(formData, {
+			status: 'sent',
+			savedAtUtc: sentAtUtc,
+			sentAtUtc,
+			sentBy,
+			commercialSummary: buildCommercialSummary(
+				parseLines(formData.get('scopeLineItems')),
+				parseLines(formData.get('assumptions'))
+			)
+		});
+
+		const drafts = await readEstimateDrafts();
+		drafts[requestId] = nextDraft;
+		await writeEstimateDrafts(drafts);
+
+		await updateQuoteRequest(fetch, {
+			id: sourceRequest.id,
+			status: 'estimate-sent',
+			assignedTo: sourceRequest.assignedTo,
+			nextAction: `Estimate sent by ${sentBy} on ${new Date(sentAtUtc).toLocaleString('en-US', {
+				month: 'short',
+				day: 'numeric',
+				hour: 'numeric',
+				minute: '2-digit'
+			})}.`,
+			missingInfoReasonCodes: sourceRequest.qualification.missingInfoReasonCodes,
+			contactName: sourceRequest.contactName,
+			email: sourceRequest.email,
+			phone: sourceRequest.phone,
+			siteName: sourceRequest.siteName,
+			serviceAddress: sourceRequest.serviceAddress,
+			requestedTimeline: sourceRequest.requestedTimeline
+		});
+
+		return {
+			draftSent: true,
+			savedRequestId: requestId,
+			draftSentAtUtc: sentAtUtc
 		};
 	}
 };
