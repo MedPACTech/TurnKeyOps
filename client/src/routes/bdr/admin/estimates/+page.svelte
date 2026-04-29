@@ -42,6 +42,12 @@
 		quoteRequests?: QuoteRequest[];
 		estimateDrafts?: Record<string, EstimateDraftRecord>;
 	};
+	type RevenueDeskState = 'Pending review' | 'Sent' | 'Revision needed' | 'Approved / Deposit';
+	type BobMove = {
+		label: string;
+		detail: string;
+		href: string;
+	};
 
 	let { data, form }: PageProps = $props();
 	const estimatePageData = $derived(data as EstimateDraftPageData);
@@ -138,6 +144,52 @@
 			detail: 'Estimates closest to schedule lock'
 		}
 	]);
+	const getRevenueDeskState = (estimate: EstimateView): RevenueDeskState => {
+		const signature = estimate.signatureStatus.toLowerCase();
+		const deposit = estimate.depositStatus.toLowerCase();
+		const contract = estimate.contractStatus.toLowerCase();
+		const readiness = estimate.productionReadiness.toLowerCase();
+
+		if (signature.includes('pending revised') || contract.includes('revision')) return 'Revision needed';
+		if (deposit.includes('received') || deposit.includes('expected')) return 'Approved / Deposit';
+		if (signature.includes('sent')) return 'Sent';
+		if (readiness.includes('awaiting') || signature.includes('pending')) return 'Pending review';
+		return 'Pending review';
+	};
+	const revenueDeskStateTone = (state: RevenueDeskState) => {
+		switch (state) {
+			case 'Sent':
+				return 'border-sky-400/35 bg-sky-400/10 text-sky-300';
+			case 'Revision needed':
+				return 'border-amber-400/35 bg-amber-400/10 text-amber-700';
+			case 'Approved / Deposit':
+				return 'border-emerald-400/35 bg-emerald-400/10 text-emerald-300';
+			default:
+				return 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-text)]';
+		}
+	};
+	const revenueDeskSummary = $derived([
+		{
+			label: 'Drafts',
+			value: String(Object.values(estimateDrafts).filter((draft) => draft.status !== 'sent').length),
+			detail: 'Draft and send-ready work'
+		},
+		{
+			label: 'Pending review',
+			value: String(allEstimates.filter((estimate) => getRevenueDeskState(estimate) === 'Pending review').length),
+			detail: 'Needs office action'
+		},
+		{
+			label: 'Revision needed',
+			value: String(allEstimates.filter((estimate) => getRevenueDeskState(estimate) === 'Revision needed').length),
+			detail: 'Blocked on update'
+		},
+		{
+			label: 'Approved / Deposit',
+			value: String(allEstimates.filter((estimate) => getRevenueDeskState(estimate) === 'Approved / Deposit').length),
+			detail: 'Closest to handoff'
+		}
+	]);
 
 	$effect(() => {
 		if (selectedEstimate && selectedEstimateId !== selectedEstimate.id) {
@@ -208,6 +260,56 @@
 			draftStatus === 'sent' ? 'Customer-visible send completed' : 'Review before send'
 		].join(' · ');
 	});
+	const bobMoves = $derived.by(() => {
+		if (selectedSavedDraft && draftStatus !== 'sent') {
+			return [
+				{
+					label: draftStatus === 'ready-to-send' ? 'Send estimate' : 'Finish draft review',
+					detail: draftCommercialSummary,
+					href: '#estimate-draft-desk'
+				},
+				{
+					label: 'Summarize revision history',
+					detail: `${selectedRevisionHistory.length} prior revision${selectedRevisionHistory.length === 1 ? '' : 's'}`,
+					href: '#estimate-revisions'
+				},
+				{
+					label: 'Open request intake',
+					detail: selectedDraftRequest?.customerName ?? 'Return to request workspace',
+					href: '/bdr/admin/requests?role=office-admin'
+				}
+			] satisfies BobMove[];
+		}
+
+		if (selectedEstimate) {
+			const state = getRevenueDeskState(selectedEstimate);
+			return [
+				{
+					label: state === 'Revision needed' ? 'Prep revision summary' : 'Review next revenue move',
+					detail: selectedEstimate.nextStep,
+					href: '#estimate-record'
+				},
+				{
+					label: state === 'Approved / Deposit' ? 'Check deposit readiness' : 'Check send posture',
+					detail: selectedEstimate.depositStatus,
+					href: '#estimate-record'
+				},
+				{
+					label: 'Open request intake',
+					detail: selectedEstimate.customer?.displayName ?? 'Estimate source request',
+					href: '/bdr/admin/requests?role=office-admin'
+				}
+			] satisfies BobMove[];
+		}
+
+		return [
+			{
+				label: 'Review revenue desk',
+				detail: `${allEstimates.length} estimate${allEstimates.length === 1 ? '' : 's'} in queue`,
+				href: '/bdr/admin/estimates?role=office-admin'
+			}
+		] satisfies BobMove[];
+	});
 
 	$effect(() => {
 		if (!selectedDraftRequestId && draftSourceRequests[0]) {
@@ -240,9 +342,9 @@
 </script>
 
 <AdminWorkspace
-	kicker="Estimates"
-	title="Estimate queue with search, workflow filters, and full record detail"
-	description="The estimate route now opens directly into the working queue. Operators can search, switch between open and blocked work, and inspect a complete estimate record without leaving the lane."
+	kicker="External Admin / Estimates"
+	title="Focused revenue desk for drafts, reviews, revisions, and approvals"
+	description="Keep estimate work centered on state, value, and the next revenue move without burying the queue in form-heavy detail."
 	{metrics}
 	contextLabel="Queue context"
 	focusLabel="Estimate list"
@@ -265,17 +367,42 @@
 			</div>
 
 			<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
-				<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Queue posture</p>
-				<div class="mt-3 space-y-2 text-sm text-[var(--text-base)]">
-					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2">
-						{allEstimates.filter((estimate) => filterMatches(estimate)).length} estimate(s) match the active status filter
+				<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Revenue states</p>
+				<div class="mt-3 grid gap-2">
+					{#each revenueDeskSummary as item}
+						<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5">
+							<div class="flex items-center justify-between gap-3">
+								<p class="text-sm font-semibold text-[var(--text-strong)]">{item.label}</p>
+								<span class="text-sm font-semibold text-[var(--text-strong)]">{item.value}</span>
+							</div>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
+						</div>
+					{/each}
+				</div>
+			</div>
+
+			<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+				<div class="flex items-start justify-between gap-3">
+					<div>
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Bob revenue assist</p>
+						<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">
+							{selectedEstimate?.estimateNumber ?? selectedDraftRequest?.customerName ?? 'Revenue queue'}
+						</p>
 					</div>
-					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2">
-						Newest estimate stays at the top of the focus rail
-					</div>
-					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2">
-						Customer packet and internal costing stay on the same record
-					</div>
+					<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm">
+						✨
+					</span>
+				</div>
+				<div class="mt-3 space-y-2">
+					{#each bobMoves as move}
+						<a
+							href={move.href}
+							class="block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
+						>
+							<p class="text-sm font-semibold text-[var(--text-strong)]">{move.label}</p>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{move.detail}</p>
+						</a>
+					{/each}
 				</div>
 			</div>
 		</div>
@@ -284,7 +411,7 @@
 	{#snippet focus()}
 		<div class="space-y-4">
 			<label class="grid gap-1">
-				<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Search estimates</span>
+				<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Search revenue desk</span>
 				<input
 					bind:value={search}
 					placeholder="Estimate number, customer, scope"
@@ -293,7 +420,11 @@
 			</label>
 
 			<div class="space-y-2">
+				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+					{filteredEstimates.length} estimates
+				</p>
 				{#each filteredEstimates as estimate}
+					{@const state = getRevenueDeskState(estimate)}
 					<button
 						type="button"
 						class={`w-full rounded-md border px-3 py-3 text-left transition ${selectedEstimate?.id === estimate.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
@@ -306,7 +437,15 @@
 							</div>
 							<p class="text-xs font-semibold text-[var(--text-base)]">{formatCurrency(estimate.totalAmount)}</p>
 						</div>
-						<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{estimate.status} · {estimate.productionReadiness}</p>
+						<div class="mt-3 flex flex-wrap items-center gap-2">
+							<span class={`rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${revenueDeskStateTone(state)}`}>
+								{state}
+							</span>
+							<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
+								{estimate.status}
+							</span>
+						</div>
+						<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{estimate.nextStep}</p>
 					</button>
 				{/each}
 			</div>
@@ -316,15 +455,15 @@
 	{#snippet work()}
 		<div class="space-y-4">
 			{#if selectedDraftRequest}
-				<form method="POST" action="?/saveDraft" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+				<form id="estimate-draft-desk" method="POST" action="?/saveDraft" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<input type="hidden" name="requestId" value={selectedDraftRequest.id} />
 					<input type="hidden" name="revisionNumber" value={String(selectedSavedDraft?.revisionNumber ?? 1)} />
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div class="max-w-3xl">
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Estimate draft from request + visit</p>
-							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">Seed an editable draft without re-entering intake data</h4>
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Draft desk</p>
+							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">Start or revise a customer-ready estimate</h4>
 							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-								Pull customer, site, service summary, and visit context from the Internal Admin request workflow, then save a local draft before anything is sent.
+								Pull request and visit context forward, then save, revise, or send without rebuilding the estimate by hand.
 							</p>
 						</div>
 						<div class="w-full max-w-sm">
@@ -424,9 +563,6 @@
 								</span>
 							</div>
 							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{draftCommercialSummary}</p>
-							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-								Review the customer/site seed, visit findings, line items, and assumptions here before promoting the draft to customer-visible status.
-							</p>
 							{#if selectedSavedDraft?.sentAtUtc}
 								<p class="mt-3 text-xs text-[var(--text-muted)]">
 									Sent by {selectedSavedDraft.sentBy} on {formatDate(selectedSavedDraft.sentAtUtc)}.
@@ -459,13 +595,10 @@
 						{/if}
 					</div>
 
-					<div class="mt-5 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
+					<div id="estimate-revisions" class="mt-5 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
 						<div class="flex flex-wrap items-center justify-between gap-3">
 							<div>
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Revision history</p>
-								<p class="mt-2 text-sm text-[var(--text-muted)]">
-									Previous estimate versions stay visible here when Internal Admin creates a new revision.
-								</p>
 							</div>
 							<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
 								Current revision · v{selectedSavedDraft?.revisionNumber ?? 1}
@@ -515,7 +648,7 @@
 			{/if}
 
 			{#if selectedEstimate}
-			<div class="space-y-4">
+				<div id="estimate-record" class="space-y-4">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div>
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Estimate record</p>
@@ -525,6 +658,21 @@
 					<div class="text-right">
 						<p class="text-xl font-semibold text-[var(--text-strong)]">{formatCurrency(selectedEstimate.totalAmount)}</p>
 						<p class="mt-1 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">{selectedEstimate.status}</p>
+					</div>
+				</div>
+
+				<div class="grid gap-3 md:grid-cols-3">
+					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Revenue state</p>
+						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{getRevenueDeskState(selectedEstimate)}</p>
+					</div>
+					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Next move</p>
+						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedEstimate.nextStep}</p>
+					</div>
+					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Production posture</p>
+						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedEstimate.productionReadiness}</p>
 					</div>
 				</div>
 
@@ -576,7 +724,7 @@
 			</div>
 			{:else}
 			<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
-				No estimates match the current filters.
+				No estimates match this view. Clear search or switch filters.
 			</div>
 			{/if}
 		</div>
