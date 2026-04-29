@@ -46,30 +46,30 @@
 
 	const summaryCards = $derived([
 		{
-			label: 'Quote requests',
-			value: String(data.requestInbox.length),
-			detail: `${data.requestMetrics.newCount} new waiting for first response`,
-			href: '/bdr/admin/requests?role=office-admin',
-			icon: Users
-		},
-		{
-			label: 'Estimate queue',
-			value: String(data.snapshot.summary.estimateCount),
-			detail: `${formatCurrency(data.snapshot.summary.estimateValue)} in active estimate value`,
-			href: '/bdr/admin/estimates?role=office-admin',
-			icon: FileText
-		},
-		{
-			label: 'Calendar',
+			label: 'Active jobs',
 			value: String(activeMetrics.upcomingJobs),
-			detail: `Jobs and visits in the next ${rangeLabel}`,
+			detail: `Scheduled in the next ${rangeLabel}`,
 			href: '/bdr/admin/calendar?role=office-admin',
 			icon: CalendarDays
 		},
 		{
-			label: 'Invoices',
+			label: 'Pending estimates',
+			value: String(data.snapshot.summary.estimateCount),
+			detail: `${formatCurrency(data.snapshot.summary.estimateValue)} in active value`,
+			href: '/bdr/admin/estimates?role=office-admin',
+			icon: FileText
+		},
+		{
+			label: 'Quote requests',
+			value: String(data.requestInbox.length),
+			detail: `${data.requestMetrics.newCount} new waiting`,
+			href: '/bdr/admin/requests?role=office-admin',
+			icon: Users
+		},
+		{
+			label: 'Open invoices',
 			value: String(data.snapshot.summary.invoiceCount),
-			detail: 'Collections, payment holds, and billing follow-through',
+			detail: 'Billing follow-through and collections',
 			href: '/bdr/admin/invoices?role=office-admin',
 			icon: Receipt
 		}
@@ -108,21 +108,24 @@
 		{ label: 'Close rate', value: `${activeMetrics.closeRate}%`, detail: 'Quote-to-job conversion' }
 	]);
 
-	const bobQueue = $derived([
+	const followUpQueue = $derived([
 		{
-			label: `${data.requestMetrics.newCount} new request(s) need a first response`,
-			detail: 'Open the request inbox before leads cool off.',
+			label: 'New requests',
+			value: String(data.requestMetrics.newCount),
+			detail: 'Need first response',
 			href: '/bdr/admin/requests?role=office-admin'
 		},
 		{
-			label: `${data.snapshot.summary.estimateCount} estimate(s) are active`,
-			detail: 'Review ready-to-send work and revision follow-up.',
+			label: 'Estimate value',
+			value: formatCurrency(data.snapshot.summary.estimateValue),
+			detail: 'Pending estimate pipeline',
 			href: '/bdr/admin/estimates?role=office-admin'
 		},
 		{
-			label: `${data.snapshot.summary.invoiceCount} invoice record(s) need visibility`,
-			detail: 'Check collections and payment holds without leaving the office surface.',
-			href: '/bdr/admin/invoices?role=office-admin'
+			label: 'Scheduled yards',
+			value: activeMetrics.scheduledYards.toLocaleString(),
+			detail: `Current ${activeRange} load`,
+			href: '/bdr/admin/calendar?role=office-admin'
 		}
 	]);
 </script>
@@ -136,7 +139,6 @@
 		<div>
 			<p class="text-sm font-semibold text-[var(--accent-text)]">Dashboard</p>
 			<h1 class="mt-1 text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">Contractor office dashboard</h1>
-			<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Pipeline, schedule, billing, and Bob’s next actions in one clean operating surface.</p>
 		</div>
 		<a
 			href="/bdr/admin/estimates?role=office-admin"
@@ -178,20 +180,20 @@
 					<Bot class="h-5 w-5" aria-hidden="true" />
 				</div>
 				<div>
-					<p class="text-sm font-semibold text-[var(--text-muted)]">Bob</p>
-					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Back-office next actions</h2>
-					<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Practical help for follow-up, scheduling, and collections. No chat pitch.</p>
+					<p class="text-sm font-semibold text-[var(--text-muted)]">Follow-up queue</p>
+					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">What needs attention now</h2>
 				</div>
 			</div>
 
 			<div class="mt-4 space-y-2">
-				{#each bobQueue as item}
+				{#each followUpQueue as item}
 					<a
 						href={item.href}
 						class="flex items-start justify-between gap-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 transition hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)]"
 					>
 						<div class="min-w-0">
 							<p class="text-sm font-semibold text-[var(--text-strong)]">{item.label}</p>
+							<p class="mt-1 text-2xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{item.value}</p>
 							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
 						</div>
 						<ArrowRight class="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-text)]" aria-hidden="true" />
@@ -243,7 +245,7 @@
 		</article>
 
 		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
-			<p class="text-sm font-semibold text-[var(--text-muted)]">Office board</p>
+			<p class="text-sm font-semibold text-[var(--text-muted)]">Operations snapshot</p>
 			<div class="mt-4 space-y-3">
 				{#each operations as metric}
 					<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
