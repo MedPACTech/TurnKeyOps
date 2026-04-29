@@ -31,6 +31,11 @@
 			actions?: string[];
 		}>;
 	};
+	type BobMove = {
+		label: string;
+		detail: string;
+		href: string;
+	};
 
 	let { data }: PageProps = $props();
 
@@ -319,6 +324,25 @@
 		{ label: 'Editable areas', value: String(websiteSections.reduce((sum, section) => sum + section.areas.length, 0)), detail: 'Clickable areas in preview switch the lower work surface into edit mode' },
 		{ label: 'Preview mode', value: 'Live scaffold', detail: 'Work area preview is rendered from the same structured content used by the public site' }
 	]);
+	const bobMoves = $derived.by(() => {
+		return [
+			{
+				label: 'Polish current section',
+				detail: selectedSection.previewTitle,
+				href: '#content-preview'
+			},
+			{
+				label: 'Review selected area',
+				detail: selectedArea.label,
+				href: '#content-editor'
+			},
+			{
+				label: 'Check missing content',
+				detail: selectedSection.actions?.join(' · ') ?? 'Review publish readiness',
+				href: '#content-editor'
+			}
+		] satisfies BobMove[];
+	});
 
 	const selectSection = (section: WebsiteSection) => {
 		selectedSectionId = section.id;
@@ -454,22 +478,34 @@
 </script>
 
 <AdminWorkspace
-	kicker="Website"
-	title="Public site sections in a section-first editing workspace"
-	description="Website uses the 4-part admin pattern with no context rail. The focus rail represents public site sections, the upper work area shows the current section preview, and clicking an editable area opens the lower editing surface."
+	kicker="External Admin / Website"
+	title="Practical content desk for public site review and edits"
+	description="Keep website sections, edit targets, and publish-readiness visible in one compact utility workflow."
 	{metrics}
 	focusLabel="Site sections"
 >
 	{#snippet focus()}
 		<div class="space-y-2">
+			<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+				{websiteSections.length} sections
+			</p>
 			{#each websiteSections as section}
 				<button
 					type="button"
 					class={`w-full rounded-md border px-3 py-3 text-left transition ${selectedSection.id === section.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
 					onclick={() => selectSection(section)}
 				>
-					<p class="text-sm font-semibold text-[var(--text-strong)]">{section.label}</p>
-					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{section.description}</p>
+					<div class="flex items-start justify-between gap-3">
+						<div class="min-w-0">
+							<p class="text-sm font-semibold text-[var(--text-strong)]">{section.label}</p>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{section.previewTitle}</p>
+						</div>
+						{#if section.previewMeta}
+							<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
+								{section.previewMeta}
+							</span>
+						{/if}
+					</div>
 				</button>
 			{/each}
 		</div>
@@ -478,11 +514,34 @@
 	{#snippet work()}
 		<div class="space-y-4">
 			<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+				<div class="flex items-start justify-between gap-3">
+					<div>
+						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Bob content assist</p>
+						<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{selectedSection.label}</p>
+					</div>
+					<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm">
+						✨
+					</span>
+				</div>
+				<div class="mt-3 grid gap-2 md:grid-cols-3">
+					{#each bobMoves as move}
+						<a
+							href={move.href}
+							class="block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
+						>
+							<p class="text-sm font-semibold text-[var(--text-strong)]">{move.label}</p>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{move.detail}</p>
+						</a>
+					{/each}
+				</div>
+			</div>
+
+			<div id="content-preview" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div>
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section preview</p>
 						<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedSection.label}</h4>
-						<p class="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{selectedSection.description}</p>
+						<p class="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{selectedSection.previewTitle}</p>
 					</div>
 					{#if selectedSection.previewMeta}
 						<div class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -491,44 +550,42 @@
 					{/if}
 				</div>
 
-				<div class="mt-5 rounded-lg border border-[var(--shell-border)] bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.06))] p-5">
-					<div class="rounded-lg border border-[var(--shell-border)] bg-white/80 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
-						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Live representation</p>
-						<h5 class="mt-3 text-2xl font-semibold text-slate-900">{selectedSection.previewTitle}</h5>
-						<p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{selectedSection.previewBody}</p>
+				<div class="mt-5 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-5">
+					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Live representation</p>
+					<h5 class="mt-3 text-2xl font-semibold text-[var(--text-strong)]">{selectedSection.previewTitle}</h5>
+					<p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-base)]">{selectedSection.previewBody}</p>
 
-						<div class="mt-6 grid gap-3 lg:grid-cols-2">
-							{#each selectedSection.areas as area}
-									<button
-										type="button"
-										class={`rounded-lg border p-4 text-left transition ${selectedArea.id === area.id ? 'border-indigo-300 bg-indigo-50 shadow-[0_12px_24px_rgba(64,80,230,0.12)]' : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/40'}`}
-										onclick={() => {
-											selectedAreaId = area.id;
-											if (area.id === 'services-items') {
-												openServicesCrud();
-											}
-										}}
-									>
-										<div class="flex items-start justify-between gap-3">
-											<div>
-												<p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Editable area</p>
-											<p class="mt-2 text-base font-semibold text-slate-900">{area.label}</p>
-										</div>
-										<span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-500">Edit</span>
+					<div class="mt-6 grid gap-3 lg:grid-cols-2">
+						{#each selectedSection.areas as area}
+							<button
+								type="button"
+								class={`rounded-lg border p-4 text-left transition ${selectedArea.id === area.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel-strong)]'}`}
+								onclick={() => {
+									selectedAreaId = area.id;
+									if (area.id === 'services-items') {
+										openServicesCrud();
+									}
+								}}
+							>
+								<div class="flex items-start justify-between gap-3">
+									<div>
+										<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Editable area</p>
+										<p class="mt-2 text-base font-semibold text-[var(--text-strong)]">{area.label}</p>
 									</div>
-									<p class="mt-3 text-sm leading-6 text-slate-700">{area.value}</p>
-									{#if area.detail}
-										<p class="mt-2 text-sm leading-6 text-slate-500">{area.detail}</p>
-									{/if}
-								</button>
-							{/each}
-						</div>
+									<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Edit</span>
+								</div>
+								<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">{area.value}</p>
+								{#if area.detail}
+									<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">{area.detail}</p>
+								{/if}
+							</button>
+						{/each}
 					</div>
-				</div>
 				</div>
 
 				{#if isServicesCrudSelected}
 					<article
+						id="content-editor"
 						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
 						data-testid="cms-service-crud-panel"
 					>
@@ -536,7 +593,7 @@
 							<div>
 								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Services · CRUD surface</p>
 								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Service catalog</h4>
-								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Select a customer-facing service, edit its label, add a new service, delete stale entries, or reorder the public services list.</p>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Add, edit, delete, or reorder the public service list.</p>
 							</div>
 							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">Interactive CRUD</span>
 						</div>
@@ -679,16 +736,19 @@
 						</div>
 					</article>
 				{:else}
-					<ContentEditorCard
-						eyebrow={`${selectedSection.label} · Editing surface`}
-						title={selectedArea.label}
-						description={selectedArea.detail ?? `Editing controls for the ${selectedArea.label.toLowerCase()} area.`}
-						fields={selectedArea.fields ?? selectedSection.fields ?? []}
-						listTitle={selectedArea.listTitle ?? selectedSection.listTitle}
-						listItems={selectedArea.listItems ?? selectedSection.listItems ?? []}
-						actions={selectedArea.actions ?? selectedSection.actions ?? []}
-					/>
+					<div id="content-editor">
+						<ContentEditorCard
+							eyebrow={`${selectedSection.label} · Editing surface`}
+							title={selectedArea.label}
+							description={selectedArea.detail ?? `Editing controls for the ${selectedArea.label.toLowerCase()} area.`}
+							fields={selectedArea.fields ?? selectedSection.fields ?? []}
+							listTitle={selectedArea.listTitle ?? selectedSection.listTitle}
+							listItems={selectedArea.listItems ?? selectedSection.listItems ?? []}
+							actions={selectedArea.actions ?? selectedSection.actions ?? []}
+						/>
+					</div>
 				{/if}
 			</div>
-		{/snippet}
-	</AdminWorkspace>
+		</div>
+	{/snippet}
+</AdminWorkspace>
