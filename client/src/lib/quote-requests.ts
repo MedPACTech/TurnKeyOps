@@ -239,43 +239,67 @@ export const isQuoteRequestSiteVisitCancellationReasonCode = (
 export const quoteRequestWorkflowPhases: {
 	key: QuoteRequestWorkflowPhaseKey;
 	lane: QuoteRequestWorkflowLane;
+	entity: 'Request' | 'Site visit' | 'Estimate';
 	label: string;
 	detail: string;
+	entryCriteria: string;
+	exitCriteria: string;
+	timelineSignals: string[];
 	statuses: QuoteRequestStatus[];
 }[] = [
 	{
 		key: 'intake',
 		lane: 'new',
+		entity: 'Request',
 		label: 'Intake',
 		detail: 'Fresh requests waiting on office triage and first response.',
+		entryCriteria: 'A new public-site or office-created request has arrived and still needs first-touch review.',
+		exitCriteria: 'Office review assigns the request into qualification with a clear owner or blocker path.',
+		timelineSignals: ['submitted', 'operator-updated'],
 		statuses: ['new', 'in-review']
 	},
 	{
 		key: 'qualification',
 		lane: 'active',
+		entity: 'Request',
 		label: 'Qualification',
 		detail: 'Owner assignment, follow-up, and blocker cleanup before a visit is booked.',
+		entryCriteria: 'Initial intake review is complete and the office is working contact, scope, or missing-info cleanup.',
+		exitCriteria: 'Qualification clears into a scheduled site visit, or the request is ready to move directly into estimate work.',
+		timelineSignals: ['operator-updated', 'site-visit-cancelled'],
 		statuses: ['needs-info', 'qualified', 'contacted']
 	},
 	{
 		key: 'inspection',
 		lane: 'active',
+		entity: 'Site visit',
 		label: 'Site visit',
 		detail: 'Field work is scheduled and the request is moving toward estimate prep.',
+		entryCriteria: 'The request is qualified and a site visit schedule has been assigned.',
+		exitCriteria: 'The visit is either completed into estimate prep or cancelled back into qualification handling.',
+		timelineSignals: ['site-visit-scheduled', 'site-visit-rescheduled', 'site-visit-cancelled'],
 		statuses: ['inspection-scheduled']
 	},
 	{
 		key: 'estimate',
 		lane: 'estimate',
+		entity: 'Estimate',
 		label: 'Estimate desk',
 		detail: 'Scope, revisions, and follow-up are in the quote lane.',
+		entryCriteria: 'Visit findings or direct scope notes are ready for estimate drafting and commercial review.',
+		exitCriteria: 'The estimate is sent to the customer or resolves into won/closed outcome handling.',
+		timelineSignals: ['operator-updated'],
 		statuses: ['estimate-drafted', 'estimate-sent']
 	},
 	{
 		key: 'outcome',
 		lane: 'won',
+		entity: 'Request',
 		label: 'Outcome',
 		detail: 'The request is either handed off as won work or closed out.',
+		entryCriteria: 'A customer-facing commercial outcome is known and the request is no longer active queue work.',
+		exitCriteria: 'The record is handed off, archived, or otherwise left as a final reference state.',
+		timelineSignals: ['operator-updated'],
 		statuses: ['won', 'closed']
 	}
 ];

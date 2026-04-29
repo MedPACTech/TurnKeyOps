@@ -429,9 +429,19 @@
 						<div class="mt-4 grid gap-3 lg:grid-cols-5">
 							{#each selectedWorkflow as phase}
 								<div class={`rounded-md border px-3 py-3 ${phase.isCurrent ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : phase.isComplete ? 'border-emerald-400/25 bg-emerald-400/10' : 'border-[var(--shell-border)] bg-[var(--shell-panel)]'}`}>
-									<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{phase.label}</p>
+									<div class="flex flex-wrap items-center justify-between gap-2">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{phase.label}</p>
+										<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
+											{phase.entity}
+										</span>
+									</div>
 									<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{phase.statuses.map((status) => quoteRequestStatusMeta[status].label).join(' · ')}</p>
 									<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{phase.detail}</p>
+									<div class="mt-3 space-y-2 text-xs leading-5 text-[var(--text-muted)]">
+										<p><span class="font-semibold text-[var(--text-base)]">Entry:</span> {phase.entryCriteria}</p>
+										<p><span class="font-semibold text-[var(--text-base)]">Exit:</span> {phase.exitCriteria}</p>
+										<p><span class="font-semibold text-[var(--text-base)]">Timeline:</span> {phase.timelineSignals.join(' · ')}</p>
+									</div>
 								</div>
 							{/each}
 						</div>
