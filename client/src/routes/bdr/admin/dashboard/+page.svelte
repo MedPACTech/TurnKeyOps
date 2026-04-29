@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CalendarDays, FileText, Receipt, TrendingUp, Users } from 'lucide-svelte';
+	import { ArrowRight, Bot, CalendarDays, FileText, Receipt, Users } from 'lucide-svelte';
 	import { formatCurrency } from '$lib/utils/format';
 	import type { PageProps } from './$types';
 
@@ -42,31 +42,36 @@
 	} as const;
 
 	const activeMetrics = $derived(dashboardRanges[activeRange]);
+	const rangeLabel = $derived(activeRange === 'week' ? '7 days' : activeRange === 'month' ? '30 days' : '12 months');
 
 	const summaryCards = $derived([
 		{
-			label: 'Open opportunities',
-			value: data.metrics[0]?.value ?? String(data.snapshot.summary.leadCount),
-			detail: data.metrics[0]?.detail ?? 'Current scaffold leads',
+			label: 'Quote requests',
+			value: String(data.requestInbox.length),
+			detail: `${data.requestMetrics.newCount} new waiting for first response`,
+			href: '/bdr/admin/requests?role=office-admin',
 			icon: Users
 		},
 		{
-			label: 'Active estimates',
-			value: data.metrics[1]?.value ?? String(data.snapshot.summary.estimateCount),
-			detail: data.metrics[1]?.detail ?? 'Estimate queue value',
+			label: 'Estimate queue',
+			value: String(data.snapshot.summary.estimateCount),
+			detail: `${formatCurrency(data.snapshot.summary.estimateValue)} in active estimate value`,
+			href: '/bdr/admin/estimates?role=office-admin',
 			icon: FileText
 		},
 		{
-			label: 'Quote requests',
-			value: data.metrics[2]?.value ?? String(data.requestInbox.length),
-			detail: data.metrics[2]?.detail ?? 'Incoming request inbox',
-			icon: Receipt
+			label: 'Calendar',
+			value: String(activeMetrics.upcomingJobs),
+			detail: `Jobs and visits in the next ${rangeLabel}`,
+			href: '/bdr/admin/calendar?role=office-admin',
+			icon: CalendarDays
 		},
 		{
-			label: 'Crew utilization',
-			value: `${activeMetrics.crewUtilization}%`,
-			detail: `Forecasted capacity over the selected ${activeRange}`,
-			icon: TrendingUp
+			label: 'Invoices',
+			value: String(data.snapshot.summary.invoiceCount),
+			detail: 'Collections, payment holds, and billing follow-through',
+			href: '/bdr/admin/invoices?role=office-admin',
+			icon: Receipt
 		}
 	]);
 
@@ -103,123 +108,153 @@
 		{ label: 'Close rate', value: `${activeMetrics.closeRate}%`, detail: 'Quote-to-job conversion' }
 	]);
 
-	const nextMoves = [
-		'Confirm crew availability for high-value jobs in the next 14 days.',
-		'Review new quote requests before end of day.',
-		'Push ready estimates into the schedule lane.'
-	];
+	const bobQueue = $derived([
+		{
+			label: `${data.requestMetrics.newCount} new request(s) need a first response`,
+			detail: 'Open the request inbox before leads cool off.',
+			href: '/bdr/admin/requests?role=office-admin'
+		},
+		{
+			label: `${data.snapshot.summary.estimateCount} estimate(s) are active`,
+			detail: 'Review ready-to-send work and revision follow-up.',
+			href: '/bdr/admin/estimates?role=office-admin'
+		},
+		{
+			label: `${data.snapshot.summary.invoiceCount} invoice record(s) need visibility`,
+			detail: 'Check collections and payment holds without leaving the office surface.',
+			href: '/bdr/admin/invoices?role=office-admin'
+		}
+	]);
 </script>
 
 <svelte:head>
 	<title>BDR Admin · Dashboard</title>
 </svelte:head>
 
-<div class="space-y-5">
-	<section class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
-		<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-			<div class="max-w-3xl">
-				<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">Dashboard</p>
-				<h1 class="mt-2 text-2xl font-bold tracking-tight text-[var(--text-strong)]">Concrete business snapshot</h1>
-				<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">A focused operations view for pipeline, scheduling, invoicing, and quote momentum.</p>
-			</div>
-
-			<div class="inline-flex self-start rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-1 lg:self-auto">
-				{#each rangeOptions as option}
-					<button
-						type="button"
-						class={`rounded-md px-4 py-2 text-sm font-semibold transition ${
-							activeRange === option.key
-								? 'bg-[var(--accent-solid)] text-white shadow-sm'
-								: 'text-[var(--text-muted)] hover:text-[var(--text-strong)]'
-						}`}
-						onclick={() => (activeRange = option.key)}
-					>
-						{option.label}
-					</button>
-				{/each}
-			</div>
+<div class="space-y-4">
+	<section class="flex flex-col gap-4 rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+		<div>
+			<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">Dashboard</p>
+			<h1 class="mt-1 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">Contractor office dashboard</h1>
+			<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Pipeline, schedule, billing, and Bob’s next actions in one clean operating surface.</p>
 		</div>
+		<a
+			href="/bdr/admin/estimates?role=office-admin"
+			class="inline-flex items-center justify-center rounded-lg bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+		>
+			+ New Estimate
+		</a>
 	</section>
 
-	<section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+	<section class="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+		<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
 		{#each summaryCards as card}
 			{@const Icon = card.icon}
-			<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
+			<a
+				href={card.href}
+				class="rounded-lg border border-[var(--shell-border)] bg-white p-4 shadow-sm transition hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)]"
+			>
 				<div class="flex items-start justify-between gap-3">
-					<div>
+					<div class="min-w-0">
 						<p class="text-xs font-medium text-[var(--text-muted)]">{card.label}</p>
-						<p class="mt-2 text-3xl font-bold tracking-tight text-[var(--text-strong)]">{card.value}</p>
+						<p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">{card.value}</p>
+						<p class="mt-2 text-sm leading-5 text-[var(--text-muted)]">{card.detail}</p>
 					</div>
-					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
-						<Icon class="h-5 w-5" aria-hidden="true" />
+					<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+						<Icon class="h-4 w-4" aria-hidden="true" />
 					</div>
 				</div>
-				<p class="mt-3 text-sm leading-5 text-[var(--text-muted)]">{card.detail}</p>
-			</article>
+				<div class="mt-4 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
+					Open
+					<ArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
+				</div>
+			</a>
 		{/each}
-	</section>
+		</div>
 
-	<section class="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
 		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
-			<div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-				<div>
-					<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Revenue trend</p>
-					<h2 class="mt-1 text-xl font-bold text-[var(--text-strong)]">Year-over-year revenue and projection</h2>
+			<div class="flex items-start gap-3">
+				<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
+					<Bot class="h-5 w-5" aria-hidden="true" />
 				</div>
-				<div class="text-sm text-[var(--text-muted)]">Actual vs prior year vs projected</div>
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Bob</p>
+					<h2 class="text-xl font-semibold text-[var(--text-strong)]">Back-office next actions</h2>
+					<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Practical help for follow-up, scheduling, and collections. No chat pitch.</p>
+				</div>
 			</div>
 
-			<div class="mt-5 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-				<svg viewBox="0 0 100 100" class="h-72 w-full overflow-visible" preserveAspectRatio="none" aria-label="Revenue line graph">
-					{#each [20, 40, 60, 80] as line}
-						<line x1="0" y1={line} x2="100" y2={line} stroke="rgba(148,163,184,0.24)" stroke-width="0.6" />
+			<div class="mt-4 space-y-2">
+				{#each bobQueue as item}
+					<a
+						href={item.href}
+						class="flex items-start justify-between gap-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 transition hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)]"
+					>
+						<div class="min-w-0">
+							<p class="text-sm font-semibold text-[var(--text-strong)]">{item.label}</p>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
+						</div>
+						<ArrowRight class="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-text)]" aria-hidden="true" />
+					</a>
+				{/each}
+			</div>
+		</article>
+	</section>
+
+	<section class="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Revenue trend</p>
+					<h2 class="text-xl font-semibold text-[var(--text-strong)]">Quiet revenue view</h2>
+				</div>
+				<div class="inline-flex rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-1">
+					{#each rangeOptions as option}
+						<button
+							type="button"
+							class={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+								activeRange === option.key
+									? 'bg-[var(--accent-solid)] text-white shadow-sm'
+									: 'text-[var(--text-muted)] hover:text-[var(--text-strong)]'
+							}`}
+							onclick={() => (activeRange = option.key)}
+						>
+							{option.label}
+						</button>
 					{/each}
-					<polyline fill="none" stroke="#94a3b8" stroke-width="1.6" points={chartPoints('prior')} />
-					<polyline fill="none" stroke="#4050e6" stroke-width="2.2" points={chartPoints('actual')} />
-					<polyline fill="none" stroke="#22c55e" stroke-dasharray="2.5 2.5" stroke-width="1.8" points={chartPoints('projected')} />
+				</div>
+			</div>
+
+			<div class="mt-4 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
+				<svg viewBox="0 0 100 100" class="h-40 w-full overflow-visible" preserveAspectRatio="none" aria-label="Revenue line graph">
+					{#each [20, 40, 60, 80] as line}
+						<line x1="0" y1={line} x2="100" y2={line} stroke="rgba(148,163,184,0.22)" stroke-width="0.6" />
+					{/each}
+					<polyline fill="none" stroke="#94a3b8" stroke-width="1.4" points={chartPoints('prior')} />
+					<polyline fill="none" stroke="#4050e6" stroke-width="1.8" points={chartPoints('actual')} />
+					<polyline fill="none" stroke="#22c55e" stroke-dasharray="2.5 2.5" stroke-width="1.6" points={chartPoints('projected')} />
 				</svg>
-				<div class="mt-4 flex flex-wrap gap-4 text-sm text-[var(--text-muted)]">
-					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#4050e6]"></span>Current year actual</div>
-					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#94a3b8]"></span>Prior year</div>
-					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#22c55e]"></span>Projection</div>
+				<div class="mt-3 flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
+					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#4050e6]"></span>Actual</div>
+					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#94a3b8]"></span>Prior</div>
+					<div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-[#22c55e]"></span>Projected</div>
 				</div>
 			</div>
 		</article>
 
 		<article class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
-			<div class="flex items-center gap-3">
-				<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]">
-					<CalendarDays class="h-5 w-5" aria-hidden="true" />
-				</div>
-				<div>
-					<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Operations</p>
-					<h2 class="text-xl font-bold text-[var(--text-strong)]">Current range</h2>
-				</div>
-			</div>
-
-			<div class="mt-5 space-y-3">
+			<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Office board</p>
+			<div class="mt-4 space-y-3">
 				{#each operations as metric}
 					<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
 						<p class="text-xs font-medium text-[var(--text-muted)]">{metric.label}</p>
 						<div class="mt-1 flex items-end justify-between gap-3">
-							<p class="text-2xl font-bold text-[var(--text-strong)]">{metric.value}</p>
+							<p class="text-2xl font-semibold text-[var(--text-strong)]">{metric.value}</p>
 						</div>
 						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{metric.detail}</p>
 					</div>
 				{/each}
 			</div>
 		</article>
-	</section>
-
-	<section class="rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm">
-		<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Next moves</p>
-		<div class="mt-4 grid gap-3 md:grid-cols-3">
-			{#each nextMoves as move, index}
-				<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-					<p class="text-xs font-semibold text-[var(--accent-text)]">0{index + 1}</p>
-					<p class="mt-2 text-sm leading-6 text-[var(--text-base)]">{move}</p>
-				</div>
-			{/each}
-		</div>
 	</section>
 </div>

@@ -81,6 +81,9 @@
 		})[slug] ?? '🔧';
 
 	const isActive = (item: BdrAdminNavItem) => activePath === item.href;
+	const roleLabel = $derived(
+		role === 'owner' ? 'Owner' : role === 'office-admin' ? 'Office Admin' : 'Estimator Crew Lite'
+	);
 </script>
 
 <div class="concept-admin-shell min-h-screen bg-[var(--app-bg)] text-[var(--text-base)]">
@@ -117,7 +120,6 @@
 						<div class={sectionIndex === 0 ? '' : 'mt-5'}>
 							<div class="mb-2 px-3">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/40">{section.label}</p>
-								<p class="mt-1 text-[0.7rem] leading-4 text-white/35">{section.description}</p>
 							</div>
 							<div class="space-y-1">
 								{#each section.items as item}
@@ -220,7 +222,6 @@
 							<div class={sectionIndex === 0 ? '' : 'mt-5'}>
 								<div class="mb-2 px-3">
 									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/40">{section.label}</p>
-									<p class="mt-1 text-[0.7rem] leading-4 text-white/35">{section.description}</p>
 								</div>
 								<div class="space-y-1">
 									{#each section.items as item}
@@ -258,13 +259,15 @@
 							<Menu class="h-5 w-5" aria-hidden="true" />
 						</button>
 						<div class="min-w-0">
-							<p class="truncate text-sm font-semibold text-[var(--text-strong)]">{activeNav.label}</p>
-							<p class="truncate text-xs text-[var(--text-muted)]">{title}</p>
+							<p class="truncate text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{activeNav.label}</p>
+							<p class="truncate text-sm font-semibold text-[var(--text-strong)]">{title}</p>
 						</div>
 					</div>
 
-					<div class="hidden min-w-0 max-w-xl flex-1 justify-end sm:flex">
-						<p class="truncate text-right text-xs leading-5 text-[var(--text-muted)]">{description}</p>
+					<div class="hidden items-center gap-2 sm:flex">
+						<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
+							{roleLabel}
+						</span>
 					</div>
 				</div>
 			</header>
