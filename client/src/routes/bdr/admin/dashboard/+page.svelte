@@ -137,14 +137,13 @@
 </svelte:head>
 
 <div class="space-y-4">
-	<section class="flex flex-col gap-4 rounded-lg border border-[var(--shell-border)] bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+	<section class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<div>
-			<p class="text-sm font-semibold text-[var(--accent-text)]">Dashboard</p>
-			<h1 class="mt-1 text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">Contractor office dashboard</h1>
+			<h1 class="text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">Dashboard</h1>
 		</div>
 		<a
 			href="/bdr/admin/estimates?role=office-admin"
-			class="inline-flex items-center justify-center rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold leading-5 text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:ring-offset-2"
+			class="inline-flex items-center justify-center rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold leading-5 text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:ring-offset-2 sm:w-auto"
 		>
 			+ New Estimate
 		</a>

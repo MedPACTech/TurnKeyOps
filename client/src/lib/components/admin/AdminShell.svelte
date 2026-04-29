@@ -276,8 +276,7 @@
 							<Menu class="h-5 w-5" aria-hidden="true" />
 						</button>
 						<div class="min-w-0">
-							<p class="truncate text-[0.7rem] font-medium text-[var(--text-muted)]">{activeNav.label}</p>
-							<p class="truncate text-sm font-semibold leading-5 text-[var(--text-strong)]">{title}</p>
+							<p class="truncate text-sm font-semibold leading-5 text-[var(--text-strong)]">{activeNav.label}</p>
 						</div>
 					</div>
 
