@@ -268,6 +268,20 @@
 			{ label: 'Requested timeline', value: selectedRequest.requestedTimeline, detail: selectedRequest.preferredTimeline }
 		];
 	});
+	const operationalStatePatterns = [
+		{
+			label: 'Loading',
+			detail: 'Keep the queue frame visible and preserve the current lane filter while request data refreshes in place.'
+		},
+		{
+			label: 'Empty',
+			detail: 'Show a direct no-match or no-request message inside the queue rail without collapsing the surrounding workspace.'
+		},
+		{
+			label: 'Error',
+			detail: 'Surface inline action feedback in the current workspace so triage, scheduling, and edit flows do not depend on interruptive modals.'
+		}
+	];
 
 	$effect(() => {
 		resetDetailDraft(selectedRequest);
@@ -332,6 +346,18 @@
 					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{lane.detail}</p>
 				</button>
 			{/each}
+
+			<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+				<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Operational states</p>
+				<div class="mt-3 space-y-2 text-sm text-[var(--text-base)]">
+					{#each operationalStatePatterns as state}
+						<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2">
+							<p class="font-semibold text-[var(--text-strong)]">{state.label}</p>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{state.detail}</p>
+						</div>
+					{/each}
+				</div>
+			</div>
 		</div>
 	{/snippet}
 
