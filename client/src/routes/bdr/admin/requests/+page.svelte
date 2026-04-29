@@ -19,6 +19,12 @@
 	import { AlertTriangle, CalendarCheck, CheckCircle2, ExternalLink, FileText, Lock, Pencil } from 'lucide-svelte';
 	import type { ActionData, PageProps } from './$types';
 
+	type BobMove = {
+		label: string;
+		detail: string;
+		href: string;
+	};
+
 	let { data, form }: { data: PageProps['data']; form: ActionData } = $props();
 
 	const requests = $derived(data.requests);
@@ -158,6 +164,15 @@
 		}
 	});
 
+	const laneOptions = $derived([
+		{ key: 'all' as const, label: 'All queue', count: requests.length },
+		...quoteRequestWorkflowLaneMeta.map((lane) => ({
+			key: lane.key,
+			label: lane.label,
+			count: requests.filter((request) => getQuoteRequestWorkflowLane(request.status) === lane.key).length
+		}))
+	]);
+
 	const resetDetailDraft = (request: QuoteRequest | null | undefined) => {
 		detailRequestedTimeline = request?.requestedTimeline ?? '';
 		detailNextAction = request?.nextAction ?? '';
@@ -233,6 +248,61 @@
 	const formatScheduleWindow = (windowStart: string, windowEnd: string) =>
 		`${formatScheduleTime(windowStart)} – ${formatScheduleTime(windowEnd)}`;
 
+	const bobMoves = $derived.by(() => {
+		if (!selectedRequest) {
+			return [
+				{
+					label: 'Review queue',
+					detail: `${filteredRequests.length} request${filteredRequests.length === 1 ? '' : 's'} in view`,
+					href: '/bdr/admin/requests?role=office-admin'
+				}
+			] satisfies BobMove[];
+		}
+
+		const moves: BobMove[] = [];
+		const blockers = selectedQualification?.blockerLabels ?? [];
+		const attachmentCount = selectedRequest.attachments.length;
+
+		if (blockers.length) {
+			moves.push({
+				label: 'Chase missing intake',
+				detail: blockers.slice(0, 2).join(' · '),
+				href: `#request-triage-${selectedRequest.id}`
+			});
+		} else if (!selectedRequest.siteVisitSchedule && selectedRequestCanOpenScheduler) {
+			moves.push({
+				label: 'Book site visit',
+				detail: selectedRequest.requestedTimeline || 'Qualified and ready to schedule',
+				href: `#${selectedRequestScheduleSectionId}`
+			});
+		} else if (selectedRequest.siteVisitSchedule) {
+			moves.push({
+				label: 'Hand off to estimate',
+				detail: `${selectedRequest.siteVisitSchedule.visitDate} · ${selectedRequest.siteVisitSchedule.assignedFieldResource}`,
+				href: '/bdr/admin/estimates?role=office-admin'
+			});
+		} else {
+			moves.push({
+				label: 'Confirm queue owner',
+				detail: selectedRequest.assignedTo || 'Unassigned intake',
+				href: `#request-triage-${selectedRequest.id}`
+			});
+		}
+
+		moves.push({
+			label: `Call ${selectedRequest.contactName.split(' ')[0] || 'customer'}`,
+			detail: selectedRequest.phone || selectedRequest.email || selectedRequest.siteName,
+			href: `#contact-site-${selectedRequest.id}`
+		});
+		moves.push({
+			label: 'Review scope and files',
+			detail: `${attachmentCount} file${attachmentCount === 1 ? '' : 's'} · ${selectedRequest.serviceType}`,
+			href: `#request-details-${selectedRequest.id}`
+		});
+
+		return moves;
+	});
+
 	const quoteCardStateClass = (request: QuoteRequest, isSelected: boolean) => {
 		const stateClass = request.status === 'new' ? 'border-t-4 border-t-emerald-400' : 'border-t border-t-[var(--shell-border)]';
 		const selectionClass = isSelected
@@ -268,20 +338,6 @@
 			{ label: 'Requested timeline', value: selectedRequest.requestedTimeline, detail: selectedRequest.preferredTimeline }
 		];
 	});
-	const operationalStatePatterns = [
-		{
-			label: 'Loading',
-			detail: 'Keep the queue frame visible and preserve the current lane filter while request data refreshes in place.'
-		},
-		{
-			label: 'Empty',
-			detail: 'Show a direct no-match or no-request message inside the queue rail without collapsing the surrounding workspace.'
-		},
-		{
-			label: 'Error',
-			detail: 'Surface inline action feedback in the current workspace so triage, scheduling, and edit flows do not depend on interruptive modals.'
-		}
-	];
 
 	$effect(() => {
 		resetDetailDraft(selectedRequest);
@@ -326,35 +382,51 @@
 </svelte:head>
 
 <AdminWorkspace
+	kicker="External Admin / Requests"
+	title="Simple intake desk for quote requests"
+	description="Work the request queue, clear blockers, schedule site visits, and hand off estimate-ready jobs without leaving the record."
 	{metrics}
 	contextLabel="Queue lanes"
-	focusLabel="Request focus"
+	focusLabel="Request list"
 >
 	{#snippet context()}
 		<div class="space-y-3">
-			{#each [{ key: 'all' as const, label: 'All queue', detail: `${requests.length} total requests` }, ...quoteRequestWorkflowLaneMeta.map((lane) => ({
-				key: lane.key,
-				label: lane.label,
-				detail: `${requests.filter((request) => getQuoteRequestWorkflowLane(request.status) === lane.key).length} ${lane.detail.toLowerCase()}`
-			}))] as lane}
+			{#each laneOptions as lane}
 				<button
 					type="button"
 					class={`w-full rounded-md border px-3 py-3 text-left transition ${laneFilter === lane.key ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
 					onclick={() => (laneFilter = lane.key)}
 				>
-					<p class="text-sm font-semibold text-[var(--text-strong)]">{lane.label}</p>
-					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{lane.detail}</p>
+					<div class="flex items-center justify-between gap-3">
+						<p class="text-sm font-semibold text-[var(--text-strong)]">{lane.label}</p>
+						<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
+							{lane.count}
+						</span>
+					</div>
 				</button>
 			{/each}
 
 			<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
-				<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Operational states</p>
-				<div class="mt-3 space-y-2 text-sm text-[var(--text-base)]">
-					{#each operationalStatePatterns as state}
-						<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2">
-							<p class="font-semibold text-[var(--text-strong)]">{state.label}</p>
-							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{state.detail}</p>
-						</div>
+				<div class="flex items-start justify-between gap-3">
+					<div>
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Bob intake assist</p>
+						<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">
+							{selectedRequest ? selectedRequest.companyName : 'Select a request'}
+						</p>
+					</div>
+					<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm">
+						✨
+					</span>
+				</div>
+				<div class="mt-3 space-y-2">
+					{#each bobMoves as move}
+						<a
+							href={move.href}
+							class="block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
+						>
+							<p class="text-sm font-semibold text-[var(--text-strong)]">{move.label}</p>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{move.detail}</p>
+						</a>
 					{/each}
 				</div>
 			</div>
@@ -364,7 +436,7 @@
 	{#snippet focus()}
 		<div class="space-y-4">
 			<label class="grid gap-1">
-				<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Search requests</span>
+				<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Search queue</span>
 				<input
 					bind:value={search}
 					placeholder="Name, scope, address, owner"
@@ -374,7 +446,7 @@
 
 			<div class="space-y-2">
 				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-					{filteredRequests.length} matching quotes
+					{filteredRequests.length} requests
 				</p>
 				{#if filteredRequests.length}
 					{#each filteredRequests as request}
@@ -411,7 +483,7 @@
 					{/each}
 				{:else}
 					<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-4 text-center text-sm text-[var(--text-muted)]">
-						No quotes match this queue and search.
+						No requests match this lane. Clear search or switch queues.
 					</div>
 				{/if}
 			</div>
@@ -425,7 +497,7 @@
 					<input type="hidden" name="id" value={selectedRequest.id} />
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div>
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Triage</p>
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Intake desk</p>
 							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedRequest.companyName}</h4>
 							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">{selectedRequest.contactName} · {selectedRequest.serviceType} · {selectedRequest.siteName}</p>
 						</div>
@@ -444,9 +516,9 @@
 					<div class="mt-5 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
 						<div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
 							<div>
-								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Workflow status model</p>
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Workflow</p>
 								<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{selectedWorkflowPhase?.label ?? 'Workflow'}</p>
-								<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{selectedWorkflowPhase?.detail ?? 'Track the request from intake through outcome without losing context.'}</p>
+								<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{selectedWorkflowPhase?.detail ?? 'Track intake through estimate handoff.'}</p>
 							</div>
 							<span class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
 								{quoteRequestStatusMeta[selectedRequest.status].label}
@@ -462,12 +534,9 @@
 										</span>
 									</div>
 									<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{phase.statuses.map((status) => quoteRequestStatusMeta[status].label).join(' · ')}</p>
-									<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{phase.detail}</p>
-									<div class="mt-3 space-y-2 text-xs leading-5 text-[var(--text-muted)]">
-										<p><span class="font-semibold text-[var(--text-base)]">Entry:</span> {phase.entryCriteria}</p>
-										<p><span class="font-semibold text-[var(--text-base)]">Exit:</span> {phase.exitCriteria}</p>
-										<p><span class="font-semibold text-[var(--text-base)]">Timeline:</span> {phase.timelineSignals.join(' · ')}</p>
-									</div>
+									{#if phase.isCurrent}
+										<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{phase.detail}</p>
+									{/if}
 								</div>
 							{/each}
 						</div>
@@ -545,10 +614,10 @@
 				<section id={selectedRequestScheduleSectionId} class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div class="max-w-3xl">
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Site visit scheduling workspace</p>
-							<h5 class="mt-1 text-xl font-semibold text-[var(--text-strong)]">Book the field handoff without leaving the quote request detail flow</h5>
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Site visit</p>
+							<h5 class="mt-1 text-xl font-semibold text-[var(--text-strong)]">Book the field handoff</h5>
 							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-								Propose the visit date, time window, site contact, and assigned field resource here. Saving this workspace moves the request to Site Visit Scheduled and writes the confirmation into the activity timeline.
+								Set the date, window, contact, and field owner from the intake desk.
 							</p>
 						</div>
 						{#if selectedRequest.siteVisitSchedule}
@@ -699,13 +768,12 @@
 					{/if}
 				</section>
 
-				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
+				<section id={`request-details-${selectedRequest.id}`} class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
 						<div class="space-y-5">
 							<div class="flex items-start justify-between gap-3">
 								<div>
 									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Request details</p>
-									<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Dense record view for the scope summary, timing, and next-step posture.</p>
 								</div>
 								<button
 									type="button"
@@ -773,9 +841,8 @@
 							{:else}
 								<div class="grid gap-3 md:grid-cols-2">
 									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Request timeframe</p>
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Timeline</p>
 										<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.requestedTimeline}</p>
-										<p class="mt-1 text-xs text-[var(--text-muted)]">Customer-facing expectation window</p>
 									</div>
 									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
 										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Next action</p>
@@ -788,7 +855,6 @@
 								<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 									<div>
 										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Qualification checklist</p>
-										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Service fit, site readiness, attachments, contact readiness, and scheduling readiness.</p>
 									</div>
 									<span class={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${selectedQualification?.isQualified ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-700'}`}>
 										{#if selectedQualification?.isQualified}
@@ -818,11 +884,10 @@
 								{/if}
 							</div>
 						</div>
-						<div class="space-y-4 border-t border-[var(--shell-border)] pt-5 text-sm xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+						<div id={`contact-site-${selectedRequest.id}`} class="space-y-4 border-t border-[var(--shell-border)] pt-5 text-sm xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
 							<div class="flex items-center justify-between gap-3">
 								<div>
 									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Contact and site</p>
-									<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Keep customer, site, and address edits in the same dense workspace.</p>
 								</div>
 								<button
 									type="button"
@@ -1004,7 +1069,6 @@
 
 				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Activity history</p>
-					<p class="mt-2 text-sm text-[var(--text-muted)]">Submission, ownership, status, scheduling, and estimate activity stay visible from the main request workspace.</p>
 					<div class="mt-4 space-y-3">
 						{#each selectedRequest.timeline as event}
 							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
@@ -1045,7 +1109,7 @@
 				</section>
 			{:else}
 				<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
-					Pick a request from the queue to open the workspace.
+					Select a request to work intake, schedule a visit, or prep estimate handoff.
 				</div>
 			{/if}
 		</div>
