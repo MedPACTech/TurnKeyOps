@@ -86,6 +86,7 @@ export type QuoteRequestTimelineEvent = {
 	type:
 		| 'submitted'
 		| 'operator-updated'
+		| 'estimate-revised'
 		| 'site-visit-scheduled'
 		| 'site-visit-rescheduled'
 		| 'site-visit-cancelled';

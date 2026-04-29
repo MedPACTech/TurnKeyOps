@@ -802,6 +802,71 @@ export const updateQuoteRequest = async (
 	}
 };
 
+export const recordQuoteRequestActivity = async (
+	fetch: typeof globalThis.fetch,
+	params: {
+		id: string;
+		label: string;
+		note?: string;
+		type?: QuoteRequestTimelineEvent['type'];
+		nextAction?: string;
+	}
+) => {
+	const occurredAtUtc = new Date().toISOString();
+
+	const buildUpdatedRequest = (existingRequest: QuoteRequest): QuoteRequest => ({
+		...existingRequest,
+		nextAction: params.nextAction ?? existingRequest.nextAction,
+		timeline: [
+			...existingRequest.timeline,
+			createActivityEvent({
+				occurredAtUtc,
+				label: params.label,
+				note: params.note,
+				type: params.type
+			})
+		]
+	});
+
+	try {
+		const existingResponse = await fetch(`${getApiBaseUrl()}/api/quote-requests/${params.id}`, {
+			headers: getApiHeaders()
+		});
+		const existingRecord = await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(existingResponse);
+		const existingRequest = toQuoteRequest(existingRecord);
+
+		if (!existingRequest) {
+			throw error(404, 'Quote request record was not found in the API');
+		}
+
+		const updatedRequest = buildUpdatedRequest(existingRequest);
+		const body = isQuoteRequestDto(existingRecord)
+			? toQuoteRequestDto(updatedRequest, existingRecord)
+			: toLegacyLeadDto(updatedRequest, existingRecord);
+
+		const response = await fetch(`${getApiBaseUrl()}/api/quote-requests/${params.id}`, {
+			method: 'PUT',
+			headers: getApiHeaders(),
+			body: JSON.stringify(body)
+		});
+
+		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		await updateLocalQuoteRequest(updatedRequest);
+		return updatedRequest;
+	} catch (cause) {
+		console.warn('Quote request API unavailable; trying local activity append.', cause);
+		const localRequests = await readLocalQuoteRequests();
+		const existingRequest = localRequests.find((request) => request.id === params.id);
+		if (!existingRequest) {
+			throw error(404, 'Quote request record was not found locally');
+		}
+
+		const updatedRequest = buildUpdatedRequest(existingRequest);
+		await updateLocalQuoteRequest(updatedRequest);
+		return updatedRequest;
+	}
+};
+
 export const scheduleQuoteRequestSiteVisit = async (
 	fetch: typeof globalThis.fetch,
 	params: {

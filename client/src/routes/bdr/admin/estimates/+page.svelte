@@ -8,6 +8,7 @@
 	type EstimateView = ReturnType<typeof buildEstimateViews>[number];
 	type EstimateDraftRecord = {
 		requestId: string;
+		revisionNumber: number;
 		customerName: string;
 		siteName: string;
 		serviceSummary: string;
@@ -20,21 +21,38 @@
 		savedAtUtc: string;
 		sentAtUtc?: string;
 		sentBy?: string;
+		revisionHistory: EstimateRevisionRecord[];
+	};
+	type EstimateRevisionRecord = {
+		revisionNumber: number;
+		customerName: string;
+		siteName: string;
+		serviceSummary: string;
+		visitFindings: string;
+		scopeLineItems: string[];
+		notes: string;
+		assumptions: string[];
+		status: EstimateDraftRecord['status'];
+		commercialSummary: string;
+		savedAtUtc: string;
+		sentAtUtc?: string;
+		sentBy?: string;
 	};
 	type EstimateDraftPageData = PageProps['data'] & {
 		quoteRequests?: QuoteRequest[];
 		estimateDrafts?: Record<string, EstimateDraftRecord>;
 	};
 
-	let { data, form }: { data: EstimateDraftPageData; form: PageProps['form'] } = $props();
+	let { data, form }: PageProps = $props();
+	const estimatePageData = $derived(data as EstimateDraftPageData);
 
 	const allEstimates = $derived(
-		[...buildEstimateViews(data.estimates, data.customers)].sort((left, right) =>
+		[...buildEstimateViews(estimatePageData.estimates, estimatePageData.customers)].sort((left, right) =>
 			String(right.validUntilUtc ?? '').localeCompare(String(left.validUntilUtc ?? ''))
 		)
 	);
-	const quoteRequests = $derived((data.quoteRequests ?? []) as QuoteRequest[]);
-	const estimateDrafts = $derived((data.estimateDrafts ?? {}) as Record<string, EstimateDraftRecord>);
+	const quoteRequests = $derived((estimatePageData.quoteRequests ?? []) as QuoteRequest[]);
+	const estimateDrafts = $derived((estimatePageData.estimateDrafts ?? {}) as Record<string, EstimateDraftRecord>);
 	const totalValue = $derived(allEstimates.reduce((sum, estimate) => sum + estimate.totalAmount, 0));
 
 	let search = $state('');
@@ -112,7 +130,7 @@
 	);
 
 	const metrics = $derived([
-		{ label: 'Estimate queue', value: String(allEstimates.length), detail: getScaffoldBanner(data.source) },
+		{ label: 'Estimate queue', value: String(allEstimates.length), detail: getScaffoldBanner(estimatePageData.source) },
 		{ label: 'Pipeline value', value: formatCurrency(totalValue), detail: 'Visible value across active and closing estimate work' },
 		{
 			label: 'Ready to hand off',
@@ -171,6 +189,9 @@
 	const selectedDraftTrace = $derived(buildDraftTrace(selectedDraftRequest));
 	const selectedSavedDraft = $derived(
 		selectedDraftRequest ? estimateDrafts[selectedDraftRequest.id] ?? null : null
+	);
+	const selectedRevisionHistory = $derived(
+		(selectedSavedDraft?.revisionHistory ?? []).toSorted((left, right) => right.revisionNumber - left.revisionNumber)
 	);
 	const draftCommercialSummary = $derived.by(() => {
 		const scopeCount = draftScopeLineItems
@@ -297,6 +318,7 @@
 			{#if selectedDraftRequest}
 				<form method="POST" action="?/saveDraft" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
 					<input type="hidden" name="requestId" value={selectedDraftRequest.id} />
+					<input type="hidden" name="revisionNumber" value={String(selectedSavedDraft?.revisionNumber ?? 1)} />
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div class="max-w-3xl">
 							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Estimate draft from request + visit</p>
@@ -320,6 +342,10 @@
 					{#if form?.draftSaved && form.savedRequestId === selectedDraftRequest.id}
 						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
 							Draft saved locally
+						</p>
+					{:else if form?.revisionCreated && form.savedRequestId === selectedDraftRequest.id}
+						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
+							Revision v{form.revisionNumber} created
 						</p>
 					{:else if form?.draftSent && form.savedRequestId === selectedDraftRequest.id}
 						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
@@ -391,6 +417,12 @@
 						</label>
 						<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
 							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Commercial review</p>
+							<div class="mt-2 flex flex-wrap items-center gap-2">
+								<p class="text-sm font-semibold text-[var(--text-strong)]">Revision v{selectedSavedDraft?.revisionNumber ?? 1}</p>
+								<span class="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+									Latest version
+								</span>
+							</div>
 							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{draftCommercialSummary}</p>
 							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
 								Review the customer/site seed, visit findings, line items, and assumptions here before promoting the draft to customer-visible status.
@@ -407,6 +439,14 @@
 						<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save draft</button>
 						<button
 							type="submit"
+							formaction="?/createRevision"
+							class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)] disabled:cursor-not-allowed disabled:opacity-50"
+							disabled={!selectedSavedDraft}
+						>
+							Create revision
+						</button>
+						<button
+							type="submit"
 							formaction="?/sendDraft"
 							class="rounded-md border border-emerald-400/35 bg-emerald-500 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
 							disabled={draftStatus !== 'ready-to-send'}
@@ -416,6 +456,59 @@
 						<a href="/bdr/admin/requests?role=office-admin" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Open request workspace</a>
 						{#if estimateDrafts[selectedDraftRequest.id]?.savedAtUtc}
 							<p class="text-xs leading-5 text-[var(--text-muted)]">Last saved {formatDate(estimateDrafts[selectedDraftRequest.id].savedAtUtc)}</p>
+						{/if}
+					</div>
+
+					<div class="mt-5 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
+						<div class="flex flex-wrap items-center justify-between gap-3">
+							<div>
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Revision history</p>
+								<p class="mt-2 text-sm text-[var(--text-muted)]">
+									Previous estimate versions stay visible here when Internal Admin creates a new revision.
+								</p>
+							</div>
+							<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+								Current revision · v{selectedSavedDraft?.revisionNumber ?? 1}
+							</p>
+						</div>
+
+						{#if selectedRevisionHistory.length}
+							<div class="mt-4 grid gap-3 xl:grid-cols-2">
+								{#each selectedRevisionHistory as revision}
+									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+										<div class="flex items-start justify-between gap-3">
+											<div>
+												<p class="text-sm font-semibold text-[var(--text-strong)]">Revision v{revision.revisionNumber}</p>
+												<p class="mt-1 text-xs text-[var(--text-muted)]">
+													Saved {formatDate(revision.savedAtUtc)}
+													{#if revision.sentAtUtc}
+														· Sent {formatDate(revision.sentAtUtc)}
+													{/if}
+												</p>
+											</div>
+											<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-base)]">
+												{revision.status.replaceAll('-', ' ')}
+											</span>
+										</div>
+										<p class="mt-3 text-sm font-semibold text-[var(--text-strong)]">{revision.commercialSummary}</p>
+										<div class="mt-3 grid gap-2 text-xs text-[var(--text-muted)] md:grid-cols-2">
+											<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2">
+												{revision.scopeLineItems.length} scope line item(s)
+											</div>
+											<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2">
+												{revision.assumptions.length} assumption(s)
+											</div>
+										</div>
+										{#if revision.notes}
+											<p class="mt-3 text-sm leading-6 text-[var(--text-muted)]">{revision.notes}</p>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<div class="mt-4 rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-5 text-sm text-[var(--text-muted)]">
+								No prior revisions yet. Save the estimate, then create a revision when internal or customer feedback requires a controlled update.
+							</div>
 						{/if}
 					</div>
 				</form>

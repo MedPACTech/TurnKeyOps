@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { loadQuoteRequests, updateQuoteRequest } from '$lib/server/quote-requests';
+import { loadQuoteRequests, recordQuoteRequestActivity, updateQuoteRequest } from '$lib/server/quote-requests';
 
 const fsModuleName = 'node:fs/promises';
 const getCwd = () =>
@@ -15,6 +15,7 @@ type FsPromises = {
 
 type EstimateDraftRecord = {
 	requestId: string;
+	revisionNumber: number;
 	customerName: string;
 	siteName: string;
 	serviceSummary: string;
@@ -27,16 +28,123 @@ type EstimateDraftRecord = {
 	savedAtUtc: string;
 	sentAtUtc?: string;
 	sentBy?: string;
+	revisionHistory: EstimateRevisionRecord[];
+};
+
+type EstimateRevisionRecord = {
+	revisionNumber: number;
+	customerName: string;
+	siteName: string;
+	serviceSummary: string;
+	visitFindings: string;
+	scopeLineItems: string[];
+	notes: string;
+	assumptions: string[];
+	status: EstimateDraftRecord['status'];
+	commercialSummary: string;
+	savedAtUtc: string;
+	sentAtUtc?: string;
+	sentBy?: string;
 };
 
 const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
+
+const parseRevisionNumber = (value: FormDataEntryValue | null) => {
+	const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+};
+
+const normalizeRevisionRecord = (
+	revision: Partial<EstimateRevisionRecord> | undefined,
+	fallbackRevisionNumber: number
+): EstimateRevisionRecord => ({
+	revisionNumber:
+		typeof revision?.revisionNumber === 'number' && revision.revisionNumber > 0
+			? revision.revisionNumber
+			: fallbackRevisionNumber,
+	customerName: revision?.customerName?.trim() ?? '',
+	siteName: revision?.siteName?.trim() ?? '',
+	serviceSummary: revision?.serviceSummary?.trim() ?? '',
+	visitFindings: revision?.visitFindings?.trim() ?? '',
+	scopeLineItems: Array.isArray(revision?.scopeLineItems)
+		? revision.scopeLineItems.map((entry) => String(entry).trim()).filter(Boolean)
+		: [],
+	notes: revision?.notes?.trim() ?? '',
+	assumptions: Array.isArray(revision?.assumptions)
+		? revision.assumptions.map((entry) => String(entry).trim()).filter(Boolean)
+		: [],
+	status:
+		revision?.status === 'ready-to-send' || revision?.status === 'sent' ? revision.status : 'draft',
+	commercialSummary: revision?.commercialSummary?.trim() ?? '',
+	savedAtUtc: revision?.savedAtUtc?.trim() ?? new Date().toISOString(),
+	sentAtUtc: revision?.sentAtUtc?.trim() || undefined,
+	sentBy: revision?.sentBy?.trim() || undefined
+});
+
+const normalizeDraftRecord = (
+	requestId: string,
+	record: Partial<EstimateDraftRecord> | undefined
+): EstimateDraftRecord => {
+	const revisionHistory = Array.isArray(record?.revisionHistory)
+		? record.revisionHistory.map((entry, index) =>
+				normalizeRevisionRecord(entry, Number(index) + 1)
+			)
+		: [];
+	const revisionNumber =
+		typeof record?.revisionNumber === 'number' && record.revisionNumber > 0
+			? record.revisionNumber
+			: revisionHistory.reduce((max, entry) => Math.max(max, entry.revisionNumber), 0) + 1;
+	const scopeLineItems = Array.isArray(record?.scopeLineItems)
+		? record.scopeLineItems.map((entry) => String(entry).trim()).filter(Boolean)
+		: [];
+	const assumptions = Array.isArray(record?.assumptions)
+		? record.assumptions.map((entry) => String(entry).trim()).filter(Boolean)
+		: [];
+	return {
+		requestId,
+		revisionNumber,
+		customerName: record?.customerName?.trim() ?? '',
+		siteName: record?.siteName?.trim() ?? '',
+		serviceSummary: record?.serviceSummary?.trim() ?? '',
+		visitFindings: record?.visitFindings?.trim() ?? '',
+		scopeLineItems,
+		notes: record?.notes?.trim() ?? '',
+		assumptions,
+		status: record?.status === 'ready-to-send' || record?.status === 'sent' ? record.status : 'draft',
+		commercialSummary:
+			record?.commercialSummary?.trim() ?? buildCommercialSummary(scopeLineItems, assumptions),
+		savedAtUtc: record?.savedAtUtc?.trim() ?? new Date().toISOString(),
+		sentAtUtc: record?.sentAtUtc?.trim() || undefined,
+		sentBy: record?.sentBy?.trim() || undefined,
+		revisionHistory
+	};
+};
+
+const toRevisionRecord = (draft: EstimateDraftRecord): EstimateRevisionRecord => ({
+	revisionNumber: draft.revisionNumber,
+	customerName: draft.customerName,
+	siteName: draft.siteName,
+	serviceSummary: draft.serviceSummary,
+	visitFindings: draft.visitFindings,
+	scopeLineItems: [...draft.scopeLineItems],
+	notes: draft.notes,
+	assumptions: [...draft.assumptions],
+	status: draft.status,
+	commercialSummary: draft.commercialSummary,
+	savedAtUtc: draft.savedAtUtc,
+	sentAtUtc: draft.sentAtUtc,
+	sentBy: draft.sentBy
+});
 
 const readEstimateDrafts = async (): Promise<Record<string, EstimateDraftRecord>> => {
 	try {
 		const fs = await getFs();
 		const raw = await fs.readFile(draftStorePath, 'utf-8');
 		const parsed = JSON.parse(raw) as Record<string, EstimateDraftRecord>;
-		return parsed && typeof parsed === 'object' ? parsed : {};
+		if (!parsed || typeof parsed !== 'object') return {};
+		return Object.fromEntries(
+			Object.entries(parsed).map(([requestId, record]) => [requestId, normalizeDraftRecord(requestId, record)])
+		);
 	} catch {
 		return {};
 	}
@@ -71,8 +179,10 @@ const parseDraftRecord = (formData: FormData, overrides?: Partial<EstimateDraftR
 	const scopeLineItems = parseLines(formData.get('scopeLineItems'));
 	const assumptions = parseLines(formData.get('assumptions'));
 	const savedAtUtc = overrides?.savedAtUtc ?? new Date().toISOString();
+	const revisionHistory = Array.isArray(overrides?.revisionHistory) ? overrides.revisionHistory : [];
 	return {
 		requestId: String(formData.get('requestId') ?? '').trim(),
+		revisionNumber: overrides?.revisionNumber ?? parseRevisionNumber(formData.get('revisionNumber')),
 		customerName: String(formData.get('customerName') ?? '').trim(),
 		siteName: String(formData.get('siteName') ?? '').trim(),
 		serviceSummary: String(formData.get('serviceSummary') ?? '').trim(),
@@ -84,7 +194,8 @@ const parseDraftRecord = (formData: FormData, overrides?: Partial<EstimateDraftR
 		commercialSummary: overrides?.commercialSummary ?? buildCommercialSummary(scopeLineItems, assumptions),
 		savedAtUtc,
 		sentAtUtc: overrides?.sentAtUtc,
-		sentBy: overrides?.sentBy
+		sentBy: overrides?.sentBy,
+		revisionHistory
 	};
 };
 
@@ -108,9 +219,12 @@ export const actions = {
 			});
 		}
 
-		const nextDraft = parseDraftRecord(formData);
-
 		const drafts = await readEstimateDrafts();
+		const existingDraft = drafts[requestId];
+		const nextDraft = parseDraftRecord(formData, {
+			revisionNumber: existingDraft?.revisionNumber ?? parseRevisionNumber(formData.get('revisionNumber')),
+			revisionHistory: existingDraft?.revisionHistory ?? []
+		});
 		drafts[requestId] = nextDraft;
 		await writeEstimateDrafts(drafts);
 
@@ -150,8 +264,12 @@ export const actions = {
 
 		const sentAtUtc = new Date().toISOString();
 		const sentBy = 'Internal Admin';
+		const drafts = await readEstimateDrafts();
+		const existingDraft = drafts[requestId];
 		const nextDraft = parseDraftRecord(formData, {
 			status: 'sent',
+			revisionNumber: existingDraft?.revisionNumber ?? parseRevisionNumber(formData.get('revisionNumber')),
+			revisionHistory: existingDraft?.revisionHistory ?? [],
 			savedAtUtc: sentAtUtc,
 			sentAtUtc,
 			sentBy,
@@ -161,7 +279,6 @@ export const actions = {
 			)
 		});
 
-		const drafts = await readEstimateDrafts();
 		drafts[requestId] = nextDraft;
 		await writeEstimateDrafts(drafts);
 
@@ -188,6 +305,67 @@ export const actions = {
 			draftSent: true,
 			savedRequestId: requestId,
 			draftSentAtUtc: sentAtUtc
+		};
+	},
+	createRevision: async ({ fetch, request }) => {
+		const formData = await request.formData();
+		const requestId = String(formData.get('requestId') ?? '').trim();
+
+		if (!requestId) {
+			return fail(400, {
+				draftMessage: 'Choose a source request before creating a revision.',
+				savedRequestId: requestId
+			});
+		}
+
+		const { requests } = await loadQuoteRequests(fetch);
+		const sourceRequest = requests.find((entry) => entry.id === requestId);
+		if (!sourceRequest) {
+			return fail(404, {
+				draftMessage: 'The source request could not be found for this estimate revision.',
+				savedRequestId: requestId
+			});
+		}
+
+		const drafts = await readEstimateDrafts();
+		const currentDraft = parseDraftRecord(formData, {
+			revisionNumber: drafts[requestId]?.revisionNumber ?? parseRevisionNumber(formData.get('revisionNumber')),
+			revisionHistory: drafts[requestId]?.revisionHistory ?? [],
+			savedAtUtc: drafts[requestId]?.savedAtUtc ?? new Date().toISOString(),
+			sentAtUtc: drafts[requestId]?.sentAtUtc,
+			sentBy: drafts[requestId]?.sentBy,
+			commercialSummary: buildCommercialSummary(
+				parseLines(formData.get('scopeLineItems')),
+				parseLines(formData.get('assumptions'))
+			)
+		});
+		const nextRevisionNumber = currentDraft.revisionNumber + 1;
+		const createdAtUtc = new Date().toISOString();
+		const nextDraft: EstimateDraftRecord = {
+			...currentDraft,
+			revisionNumber: nextRevisionNumber,
+			status: 'draft',
+			savedAtUtc: createdAtUtc,
+			sentAtUtc: undefined,
+			sentBy: undefined,
+			revisionHistory: [...currentDraft.revisionHistory, toRevisionRecord(currentDraft)]
+		};
+
+		drafts[requestId] = nextDraft;
+		await writeEstimateDrafts(drafts);
+
+		await recordQuoteRequestActivity(fetch, {
+			id: sourceRequest.id,
+			type: 'estimate-revised',
+			label: `Estimate revision v${nextRevisionNumber} created`,
+			note: `Internal Admin created revision v${nextRevisionNumber} from v${currentDraft.revisionNumber}.`,
+			nextAction: `Estimate revision v${nextRevisionNumber} opened for review.`
+		});
+
+		return {
+			revisionCreated: true,
+			savedRequestId: requestId,
+			revisionNumber: nextRevisionNumber
 		};
 	}
 };
