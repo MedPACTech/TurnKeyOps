@@ -108,24 +108,26 @@
 		{ label: 'Close rate', value: `${activeMetrics.closeRate}%`, detail: 'Quote-to-job conversion' }
 	]);
 
-	const followUpQueue = $derived([
+	const bobMoves = $derived([
 		{
-			label: 'New requests',
-			value: String(data.requestMetrics.newCount),
-			detail: 'Need first response',
+			label: 'Draft estimate from request',
+			detail: `${data.requestInbox.length} intake item(s) can move into scoped estimate work`,
 			href: '/bdr/admin/requests?role=office-admin'
 		},
 		{
-			label: 'Estimate value',
-			value: formatCurrency(data.snapshot.summary.estimateValue),
-			detail: 'Pending estimate pipeline',
+			label: 'Summarize quote request',
+			detail: `${data.requestMetrics.newCount} new request(s) need a callback brief`,
+			href: '/bdr/admin/requests?role=office-admin'
+		},
+		{
+			label: 'Chase estimate follow-up',
+			detail: `${data.snapshot.summary.estimateCount} pending estimate(s) need send or revision work`,
 			href: '/bdr/admin/estimates?role=office-admin'
 		},
 		{
-			label: 'Scheduled yards',
-			value: activeMetrics.scheduledYards.toLocaleString(),
-			detail: `Current ${activeRange} load`,
-			href: '/bdr/admin/calendar?role=office-admin'
+			label: 'Prep invoice follow-up',
+			detail: `${data.snapshot.summary.invoiceCount} invoice record(s) still need collections follow-through`,
+			href: '/bdr/admin/invoices?role=office-admin'
 		}
 	]);
 </script>
@@ -180,20 +182,19 @@
 					<Bot class="h-5 w-5" aria-hidden="true" />
 				</div>
 				<div>
-					<p class="text-sm font-semibold text-[var(--text-muted)]">Follow-up queue</p>
-					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">What needs attention now</h2>
+					<p class="text-sm font-semibold text-[var(--accent-text)]">AI work lane</p>
+					<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Bob&apos;s next moves</h2>
 				</div>
 			</div>
 
 			<div class="mt-4 space-y-2">
-				{#each followUpQueue as item}
+				{#each bobMoves as item}
 					<a
 						href={item.href}
 						class="flex items-start justify-between gap-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 transition hover:border-[var(--accent-border)] hover:bg-[var(--accent-soft)]"
 					>
 						<div class="min-w-0">
 							<p class="text-sm font-semibold text-[var(--text-strong)]">{item.label}</p>
-							<p class="mt-1 text-2xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{item.value}</p>
 							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
 						</div>
 						<ArrowRight class="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-text)]" aria-hidden="true" />
