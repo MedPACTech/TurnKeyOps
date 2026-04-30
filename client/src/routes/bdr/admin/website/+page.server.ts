@@ -9,6 +9,7 @@ import type {
 	BdrCtaType,
 	BdrHeroMediaOverride,
 	BdrHeroTrustBadge,
+	BdrSocialLink,
 	ContentLink
 } from '$lib/bdr-site-content';
 
@@ -77,6 +78,23 @@ const parseHeroMediaOverrides = (value: string): BdrHeroMediaOverride[] =>
 		})
 		.filter((override): override is BdrHeroMediaOverride => override !== null);
 
+const parseSocialLinks = (value: string): BdrSocialLink[] =>
+	value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line): BdrSocialLink | null => {
+			const [platform = '', url = '', iconAssetKey = ''] = line.split('|').map((part) => part.trim());
+			if (!platform || !url || !iconAssetKey) return null;
+
+			return {
+				platform,
+				url,
+				iconAssetKey
+			};
+		})
+		.filter((link): link is BdrSocialLink => link !== null);
+
 const parseCtaType = (value: string, fallback: BdrCtaType): BdrCtaType =>
 	value === 'anchor' || value === 'link' || value === 'phone' ? value : fallback;
 
@@ -87,6 +105,63 @@ export const load = async () => {
 };
 
 export const actions = {
+	updateFooter: async ({ request }) => {
+		const formData = await request.formData();
+		const navigationLinks = parseNavigationLinks(getValue(formData, 'footerNavigationLinks'));
+		const servicesLinks = parseNavigationLinks(getValue(formData, 'footerServicesLinks'));
+		const legalLinks = parseNavigationLinks(getValue(formData, 'footerLegalLinks'));
+		const socialLinks = parseSocialLinks(getValue(formData, 'footerSocialLinks'));
+		const brandName = getValue(formData, 'footerBrandName');
+		const body = getValue(formData, 'footerBody');
+
+		if (!brandName || !body) {
+			return fail(400, {
+				savedSectionId: 'footer',
+				message: 'Footer brand name and company description are required.'
+			});
+		}
+
+		try {
+			return {
+				content: await updateBdrSiteContent((content) => {
+					content.footer = {
+						eyebrow: getValue(formData, 'footerEyebrow') || content.footer.eyebrow,
+						logoAssetKey: getValue(formData, 'footerLogoAssetKey') || content.footer.logoAssetKey,
+						brandName,
+						body,
+						serviceAreaText: getValue(formData, 'footerServiceAreaText'),
+						navigationEyebrow:
+							getValue(formData, 'footerNavigationEyebrow') || content.footer.navigationEyebrow,
+						navigationLinks,
+						servicesEyebrow:
+							getValue(formData, 'footerServicesEyebrow') || content.footer.servicesEyebrow,
+						servicesLinks,
+						contactEyebrow:
+							getValue(formData, 'footerContactEyebrow') || content.footer.contactEyebrow,
+						phone: getValue(formData, 'footerPhone'),
+						email: getValue(formData, 'footerEmail'),
+						address: getValue(formData, 'footerAddress'),
+						socialLinks
+					};
+					content.postFooter = {
+						legalLinksEyebrow:
+							getValue(formData, 'footerLegalEyebrow') || content.postFooter.legalLinksEyebrow,
+						legalLinks,
+						copyright:
+							getValue(formData, 'footerCopyright') || content.postFooter.copyright
+					};
+				}),
+				savedSectionId: 'footer',
+				savedMessage: 'Footer settings saved to the local contractor-site content store.'
+			};
+		} catch (cause) {
+			console.error('Unable to save footer content.', cause);
+			return fail(500, {
+				savedSectionId: 'footer',
+				message: 'Could not save footer settings.'
+			});
+		}
+	},
 	updateHero: async ({ request }) => {
 		const formData = await request.formData();
 		const eyebrow = getValue(formData, 'eyebrow');

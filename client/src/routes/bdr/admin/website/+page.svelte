@@ -65,6 +65,9 @@
 			asset.type === 'project-photo'
 		)
 	);
+	const footerLogoAssets = $derived(
+		assetLibrary.filter((asset) => asset.type === 'logo' || asset.type === 'icon')
+	);
 	const textureAssets = $derived(
 		assetLibrary.filter((asset) => asset.type === 'texture' || asset.type === 'background-image')
 	);
@@ -455,10 +458,10 @@
 		{
 			id: 'footer',
 			label: 'Footer',
-			description: 'Footer brand summary, managed links, and utility strip.',
+			description: 'Footer brand, service links, contact info, social links, and legal row.',
 			previewTitle: content.footer.brandName,
 			previewBody: content.footer.body,
-			previewMeta: `${content.footer.links.length} footer links`,
+			previewMeta: `${content.footer.navigationLinks.length + content.footer.servicesLinks.length} managed links · ${content.footer.socialLinks.length} social links`,
 			areas: [
 				{
 					id: 'footer-brand',
@@ -467,27 +470,52 @@
 					detail: content.footer.body,
 					fields: [
 						{ label: 'Eyebrow', value: content.footer.eyebrow },
+						{ label: 'Logo asset', value: content.footer.logoAssetKey },
 						{ label: 'Brand name', value: content.footer.brandName },
-						{ label: 'Body copy', value: content.footer.body, multiline: true }
+						{ label: 'Body copy', value: content.footer.body, multiline: true },
+						{ label: 'Service area text', value: content.footer.serviceAreaText, multiline: true }
 					]
 				},
 				{
 					id: 'footer-links',
-					label: 'Footer links',
-					value: content.footer.links.map((link) => link.label).join(' · '),
-					fields: [{ label: 'Links label', value: content.footer.linksEyebrow }],
-					listTitle: 'Footer links',
-					listItems: content.footer.links.map((link) => ({ label: 'Footer link', value: link.label, detail: link.href }))
+					label: 'Navigation and service links',
+					value: [...content.footer.navigationLinks, ...content.footer.servicesLinks].map((link) => link.label).join(' · '),
+					fields: [
+						{ label: 'Navigation label', value: content.footer.navigationEyebrow },
+						{ label: 'Services label', value: content.footer.servicesEyebrow }
+					],
+					listTitle: 'Managed links',
+					listItems: [
+						...content.footer.navigationLinks.map((link) => ({ label: 'Quick link', value: link.label, detail: link.href })),
+						...content.footer.servicesLinks.map((link) => ({ label: 'Service link', value: link.label, detail: link.href }))
+					]
+				},
+				{
+					id: 'footer-contact',
+					label: 'Contact and social details',
+					value: [content.footer.phone, content.footer.email, content.footer.address].filter(Boolean).join(' · '),
+					fields: [
+						{ label: 'Contact label', value: content.footer.contactEyebrow },
+						{ label: 'Phone', value: content.footer.phone || 'Not set' },
+						{ label: 'Email', value: content.footer.email || 'Not set' },
+						{ label: 'Address', value: content.footer.address || 'Not set' }
+					],
+					listTitle: 'Social links',
+					listItems: content.footer.socialLinks.map((link) => ({
+						label: link.platform,
+						value: link.url,
+						detail: link.iconAssetKey
+					}))
 				},
 				{
 					id: 'footer-utility',
-					label: 'Post-footer utility',
-					value: resolveBdrCopyright(year),
+					label: 'Post-footer legal row',
+					value: resolveBdrCopyright(content, year),
 					fields: [
 						{ label: 'Copyright template', value: content.postFooter.copyright, help: 'Use {{year}} to keep the year dynamic.' }
 					],
-					listTitle: 'Utility links',
-					listItems: content.postFooter.utilityLinks.map((link) => ({ label: 'Utility link', value: link.label, detail: link.href }))
+					listTitle: 'Legal links',
+					listItems: content.postFooter.legalLinks.map((link) => ({ label: 'Legal link', value: link.label, detail: link.href }))
 				}
 			]
 		}
@@ -1088,6 +1116,151 @@
 										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save hero
+									</button>
+								</div>
+							</section>
+						</form>
+					</article>
+				{:else if selectedSection.id === 'footer'}
+					<article
+						id="content-editor"
+						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
+						data-testid="cms-footer-panel"
+					>
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Footer · CMS controls</p>
+								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Footer content and legal row</h4>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Manage the brand summary, quick links, service links, contact details, social icons, and copyright/legal links from one footer editor.</p>
+							</div>
+							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+								{content.footer.socialLinks.length} social links
+							</span>
+						</div>
+
+						{#if form?.savedSectionId === 'footer' && form?.savedMessage}
+							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+								{form.savedMessage}
+							</div>
+						{/if}
+
+						{#if form?.savedSectionId === 'footer' && form?.message}
+							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+								{form.message}
+							</div>
+						{/if}
+
+						<form method="POST" action="?/updateFooter" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Brand and contact columns</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Footer eyebrow</span>
+										<input name="footerEyebrow" value={content.footer.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Logo asset</span>
+										<select name="footerLogoAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											{#each footerLogoAssets as asset}
+												<option value={asset.key} selected={content.footer.logoAssetKey === asset.key}>{asset.name} · {asset.key}</option>
+											{/each}
+										</select>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Brand name</span>
+										<input name="footerBrandName" value={content.footer.brandName} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Company description</span>
+										<textarea name="footerBody" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.footer.body}</textarea>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Service-area text</span>
+										<input name="footerServiceAreaText" value={content.footer.serviceAreaText} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Phone</span>
+											<input name="footerPhone" value={content.footer.phone} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Email</span>
+											<input name="footerEmail" value={content.footer.email} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+									</div>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Address</span>
+										<input name="footerAddress" value={content.footer.address} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Contact column label</span>
+										<input name="footerContactEyebrow" value={content.footer.contactEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+								</div>
+							</section>
+
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Link groups, social icons, and legal row</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Navigation group label</span>
+										<input name="footerNavigationEyebrow" value={content.footer.navigationEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Navigation links</span>
+										<textarea name="footerNavigationLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.footer.navigationLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One per line: `Label|href|openInNewTab`.</span>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Services group label</span>
+										<input name="footerServicesEyebrow" value={content.footer.servicesEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Service links</span>
+										<textarea name="footerServicesLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.footer.servicesLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One per line: `Label|href|openInNewTab`.</span>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Social links</span>
+										<textarea name="footerSocialLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.footer.socialLinks.map((link) => `${link.platform}|${link.url}|${link.iconAssetKey}`).join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One per line: `platform|url|iconAssetKey`.</span>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Legal group label</span>
+										<input name="footerLegalEyebrow" value={content.postFooter.legalLinksEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Legal links</span>
+										<textarea name="footerLegalLinks" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.postFooter.legalLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One per line: `Label|href|openInNewTab`.</span>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Copyright text</span>
+										<input name="footerCopyright" value={content.postFooter.copyright} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+								</div>
+
+								<div class="mt-4 grid gap-3 md:grid-cols-2">
+									<div class="rounded-md bg-[var(--shell-panel-strong)] p-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Logo and icon assets</p>
+										<ul class="mt-2 space-y-1.5 text-sm text-[var(--text-base)]">
+											{#each footerLogoAssets as asset}
+												<li>{asset.key} · {asset.name}</li>
+											{/each}
+										</ul>
+									</div>
+									<div class="rounded-md bg-[var(--shell-panel-strong)] p-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Live copyright</p>
+										<p class="mt-2 text-sm text-[var(--text-base)]">{resolveBdrCopyright(content, year)}</p>
+									</div>
+								</div>
+
+								<div class="mt-4 flex justify-end">
+									<button
+										type="submit"
+										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+									>
+										Save footer
 									</button>
 								</div>
 							</section>

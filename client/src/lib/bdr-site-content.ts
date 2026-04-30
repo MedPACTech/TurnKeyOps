@@ -64,6 +64,12 @@ export type BdrHeroMediaOverride = {
 	heroImageAltText?: string;
 };
 
+export type BdrSocialLink = {
+	platform: string;
+	url: string;
+	iconAssetKey: string;
+};
+
 export type BdrThemeSettings = {
 	mode: 'Light' | 'Dark' | 'System';
 	preset: 'Clean' | 'Industrial' | 'Premium' | 'Minimal' | 'Bold';
@@ -163,13 +169,23 @@ export type BdrSiteContent = {
 	};
 	footer: {
 		eyebrow: string;
+		logoAssetKey: string;
 		brandName: string;
 		body: string;
-		linksEyebrow: string;
-		links: ContentLink[];
+		serviceAreaText: string;
+		navigationEyebrow: string;
+		navigationLinks: ContentLink[];
+		servicesEyebrow: string;
+		servicesLinks: ContentLink[];
+		contactEyebrow: string;
+		phone: string;
+		email: string;
+		address: string;
+		socialLinks: BdrSocialLink[];
 	};
 	postFooter: {
-		utilityLinks: ContentLink[];
+		legalLinksEyebrow: string;
+		legalLinks: ContentLink[];
 		copyright: string;
 	};
 };
@@ -197,6 +213,36 @@ export const bdrSiteContent: BdrSiteContent = {
 			sortOrder: 2
 		},
 		{
+			key: 'social-facebook-icon',
+			name: 'Facebook social icon',
+			type: 'icon',
+			file: '/clientFiles/assets/social-facebook-icon.svg',
+			altText: 'Facebook icon',
+			contractorCategory: 'shared',
+			tags: ['social', 'footer', 'icon'],
+			sortOrder: 3
+		},
+		{
+			key: 'social-instagram-icon',
+			name: 'Instagram social icon',
+			type: 'icon',
+			file: '/clientFiles/assets/social-instagram-icon.svg',
+			altText: 'Instagram icon',
+			contractorCategory: 'shared',
+			tags: ['social', 'footer', 'icon'],
+			sortOrder: 4
+		},
+		{
+			key: 'social-linkedin-icon',
+			name: 'LinkedIn social icon',
+			type: 'icon',
+			file: '/clientFiles/assets/social-linkedin-icon.svg',
+			altText: 'LinkedIn icon',
+			contractorCategory: 'shared',
+			tags: ['social', 'footer', 'icon'],
+			sortOrder: 5
+		},
+		{
 			key: 'hero-driveway-scene',
 			name: 'Modern home driveway hero',
 			type: 'hero-image',
@@ -204,7 +250,7 @@ export const bdrSiteContent: BdrSiteContent = {
 			altText: 'Modern home with a finished concrete driveway',
 			contractorCategory: 'concrete',
 			tags: ['hero', 'driveway', 'mockup'],
-			sortOrder: 3
+			sortOrder: 6
 		},
 		{
 			key: 'cta-finishing-scene',
@@ -214,7 +260,7 @@ export const bdrSiteContent: BdrSiteContent = {
 			altText: 'Concrete finishing equipment at work on site',
 			contractorCategory: 'concrete',
 			tags: ['cta', 'banner', 'equipment', 'mockup'],
-			sortOrder: 4
+			sortOrder: 7
 		},
 		{
 			key: 'dark-grid-texture',
@@ -813,33 +859,70 @@ export const bdrSiteContent: BdrSiteContent = {
 	},
 	footer: {
 		eyebrow: 'Footer',
+		logoAssetKey: 'bdr-crest-logo',
 		brandName: 'BDR Construction',
 		body:
 			'Residential and commercial roofing, exterior work, and storm restoration backed by a dependable process from intake to closeout.',
-		linksEyebrow: 'Footer links',
-		links: [
-			{ href: '#hero', label: 'Home' },
-			{ href: '#services', label: 'Services' },
-			{ href: '#process', label: 'Process' },
-			{ href: '#quote-request', label: 'Request a Quote' },
-			{ href: '#contact', label: 'Contact' }
-		]
-	},
-	postFooter: {
-		utilityLinks: [
-			{ href: '#top', label: 'Top' },
+		serviceAreaText: 'Serving Charlotte, Concord, Mooresville, and surrounding communities.',
+		navigationEyebrow: 'Quick links',
+		navigationLinks: [
 			{ href: '#hero', label: 'Home' },
 			{ href: '#services', label: 'Services' },
 			{ href: '#process', label: 'Process' },
 			{ href: '#quote-request', label: 'Request a Quote' },
 			{ href: '#contact', label: 'Contact' }
 		],
+		servicesEyebrow: 'Services',
+		servicesLinks: [
+			{ href: '#services', label: 'Roof replacement' },
+			{ href: '#services', label: 'Exterior repair' },
+			{ href: '#services', label: 'Storm restoration' },
+			{ href: '#services', label: 'Commercial work' }
+		],
+		contactEyebrow: 'Contact',
+		phone: '(220) 217-7026',
+		email: 'office@bdrconstruction.com',
+		address: 'Charlotte, NC',
+		socialLinks: [
+			{
+				platform: 'Facebook',
+				url: 'https://facebook.com/bdrconstruction',
+				iconAssetKey: 'social-facebook-icon'
+			},
+			{
+				platform: 'Instagram',
+				url: 'https://instagram.com/bdrconstruction',
+				iconAssetKey: 'social-instagram-icon'
+			},
+			{
+				platform: 'LinkedIn',
+				url: 'https://linkedin.com/company/bdrconstruction',
+				iconAssetKey: 'social-linkedin-icon'
+			}
+		]
+	},
+	postFooter: {
+		legalLinksEyebrow: 'Legal',
+		legalLinks: [
+			{ href: '#hero', label: 'Back to top' },
+			{ href: '/privacy-policy', label: 'Privacy Policy' },
+			{ href: '/terms-of-service', label: 'Terms of Service' }
+		],
 		copyright: '© {{year}} BDR Construction. All rights reserved.'
 	}
 };
 
-export const resolveBdrCopyright = (year: number) =>
-	bdrSiteContent.postFooter.copyright.replace('{{year}}', String(year));
+export const resolveBdrCopyright = (
+	contentOrYear: BdrSiteContent | number,
+	year?: number
+) => {
+	const template =
+		typeof contentOrYear === 'number'
+			? bdrSiteContent.postFooter.copyright
+			: contentOrYear.postFooter.copyright;
+	const resolvedYear = typeof contentOrYear === 'number' ? contentOrYear : year ?? new Date().getFullYear();
+	return template.replace('{{year}}', String(resolvedYear));
+};
 
 export const getBdrAsset = (content: BdrSiteContent, key: string) =>
 	content.assetLibrary.find((asset) => asset.key === key) ?? null;

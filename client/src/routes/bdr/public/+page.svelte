@@ -21,6 +21,9 @@
 	const faviconAsset = $derived(
 		getBdrAsset(content, content.navigation.faviconAssetKey) ?? navigationLogoAsset
 	);
+	const footerLogoAsset = $derived(
+		getBdrAsset(content, content.footer.logoAssetKey) ?? navigationLogoAsset
+	);
 	const serviceCategories = $derived(getBdrServiceCategories(content));
 	const activeContractorPreset = $derived(getBdrActiveContractorPreset(content));
 	const themeSettings = $derived(content.themeSettings);
@@ -515,31 +518,92 @@
 			</div>
 		</section>
 
-		<footer class="mt-8 rounded-[2rem] border border-white/10 bg-slate-950/60 p-6 backdrop-blur">
-			<div class="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+		<footer class="mt-8 rounded-[2rem] border border-white/10 bg-slate-950/68 p-6 backdrop-blur">
+			<div class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr_0.8fr_0.9fr]">
 				<div>
 					<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-200/75">{content.footer.eyebrow}</p>
-					<p class="mt-3 text-xl font-semibold text-white">{content.footer.brandName}</p>
-					<p class="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{content.footer.body}</p>
-				</div>
-				<div>
-					<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">{content.footer.linksEyebrow}</p>
-					<div class="mt-3 flex flex-wrap gap-2">
-						{#each content.footer.links as link}
-							<a href={link.href} class="rounded-full border border-white/12 px-4 py-2 text-sm text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6 hover:text-white">{link.label}</a>
-						{/each}
+					<div class="mt-4 flex items-center gap-3">
+						<div class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white p-2">
+							<img src={footerLogoAsset?.file ?? '/clientFiles/BDRLogo.jpeg'} alt={footerLogoAsset?.altText ?? 'BDR Construction logo'} class="h-full w-full object-contain" />
+						</div>
+						<div>
+							<p class="text-xl font-semibold text-white">{content.footer.brandName}</p>
+							{#if content.footer.serviceAreaText}
+								<p class="mt-1 text-sm text-slate-400">{content.footer.serviceAreaText}</p>
+							{/if}
+						</div>
 					</div>
+					<p class="mt-4 max-w-2xl text-sm leading-6 text-slate-300">{content.footer.body}</p>
+					{#if content.footer.socialLinks.length}
+						<div class="mt-4 flex flex-wrap gap-3">
+							{#each content.footer.socialLinks as social}
+								{@const socialAsset = getBdrAsset(content, social.iconAssetKey)}
+								<a
+									href={social.url}
+									target="_blank"
+									rel="noreferrer"
+									aria-label={social.platform}
+									class="flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/4 transition hover:border-orange-300/40 hover:bg-white/8"
+								>
+									{#if socialAsset}
+										<img src={socialAsset.file} alt={social.platform} class="h-5 w-5 object-contain" />
+									{:else}
+										<span class="text-xs font-semibold uppercase text-white">{social.platform.slice(0, 2)}</span>
+									{/if}
+								</a>
+							{/each}
+						</div>
+					{/if}
 				</div>
+
+				{#if content.footer.servicesLinks.length}
+					<div>
+						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">{content.footer.servicesEyebrow}</p>
+						<div class="mt-3 grid gap-2">
+							{#each content.footer.servicesLinks as link}
+								<a href={link.href} class="text-sm text-slate-200 transition hover:text-white">{link.label}</a>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				{#if content.footer.navigationLinks.length}
+					<div>
+						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">{content.footer.navigationEyebrow}</p>
+						<div class="mt-3 grid gap-2">
+							{#each content.footer.navigationLinks as link}
+								<a href={link.href} class="text-sm text-slate-200 transition hover:text-white">{link.label}</a>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				{#if content.footer.phone || content.footer.email || content.footer.address}
+					<div>
+						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">{content.footer.contactEyebrow}</p>
+						<div class="mt-3 grid gap-2 text-sm text-slate-200">
+							{#if content.footer.phone}
+								<a href={`tel:${content.footer.phone.replace(/[^0-9+]/g, '')}`} class="transition hover:text-white">{content.footer.phone}</a>
+							{/if}
+							{#if content.footer.email}
+								<a href={`mailto:${content.footer.email}`} class="transition hover:text-white">{content.footer.email}</a>
+							{/if}
+							{#if content.footer.address}
+								<p class="leading-6 text-slate-300">{content.footer.address}</p>
+							{/if}
+						</div>
+					</div>
+				{/if}
 			</div>
 		</footer>
 
 		<div class="mt-4 flex flex-col gap-3 rounded-xl border border-white/8 bg-black/35 px-4 py-3 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
 			<div class="flex flex-wrap gap-3">
-				{#each content.postFooter.utilityLinks as link}
+				{#each content.postFooter.legalLinks as link}
 					<a href={link.href} class="transition hover:text-white">{link.label}</a>
 				{/each}
 			</div>
-			<p>{resolveBdrCopyright(year)}</p>
+			<p>{resolveBdrCopyright(content, year)}</p>
 		</div>
 	</div>
 </div>

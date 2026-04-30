@@ -6,6 +6,7 @@ import {
 	type BdrContractorPreset,
 	type BdrHeroMediaOverride,
 	type BdrHeroTrustBadge,
+	type BdrSocialLink,
 	type ContentLink,
 	type BdrServiceCategory,
 	type BdrSiteContent,
@@ -153,6 +154,26 @@ const normalizeHeroMediaOverrides = (items: unknown): BdrHeroMediaOverride[] | n
 		.filter((override): override is BdrHeroMediaOverride => override !== null);
 
 	return overrides;
+};
+
+const normalizeSocialLinks = (items: unknown): BdrSocialLink[] | null => {
+	if (!Array.isArray(items)) return null;
+
+	const links = items
+		.map((item): BdrSocialLink | null => {
+			if (!item || typeof item !== 'object') return null;
+			const candidate = item as Partial<BdrSocialLink>;
+			if (!candidate.platform || !candidate.url || !candidate.iconAssetKey) return null;
+
+			return {
+				platform: String(candidate.platform),
+				url: String(candidate.url),
+				iconAssetKey: String(candidate.iconAssetKey)
+			};
+		})
+		.filter((link): link is BdrSocialLink => link !== null);
+
+	return links;
 };
 
 const normalizeContractorPresets = (items: unknown): BdrContractorPreset[] | null => {
@@ -328,6 +349,53 @@ const normalizeNavigation = (
 	};
 };
 
+const normalizeFooter = (
+	value: unknown,
+	fallback: BdrSiteContent['footer']
+): BdrSiteContent['footer'] => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrSiteContent['footer']> & {
+		linksEyebrow?: string;
+		links?: ContentLink[];
+	};
+
+	return {
+		eyebrow: String(candidate.eyebrow ?? fallback.eyebrow),
+		logoAssetKey: String(candidate.logoAssetKey ?? fallback.logoAssetKey),
+		brandName: String(candidate.brandName ?? fallback.brandName),
+		body: String(candidate.body ?? fallback.body),
+		serviceAreaText: String(candidate.serviceAreaText ?? fallback.serviceAreaText),
+		navigationEyebrow: String(candidate.navigationEyebrow ?? candidate.linksEyebrow ?? fallback.navigationEyebrow),
+		navigationLinks:
+			normalizeLinks(candidate.navigationLinks ?? candidate.links) ?? fallback.navigationLinks,
+		servicesEyebrow: String(candidate.servicesEyebrow ?? fallback.servicesEyebrow),
+		servicesLinks: normalizeLinks(candidate.servicesLinks) ?? fallback.servicesLinks,
+		contactEyebrow: String(candidate.contactEyebrow ?? fallback.contactEyebrow),
+		phone: String(candidate.phone ?? fallback.phone),
+		email: String(candidate.email ?? fallback.email),
+		address: String(candidate.address ?? fallback.address),
+		socialLinks: normalizeSocialLinks(candidate.socialLinks) ?? fallback.socialLinks
+	};
+};
+
+const normalizePostFooter = (
+	value: unknown,
+	fallback: BdrSiteContent['postFooter']
+): BdrSiteContent['postFooter'] => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrSiteContent['postFooter']> & {
+		utilityLinks?: ContentLink[];
+	};
+
+	return {
+		legalLinksEyebrow: String(candidate.legalLinksEyebrow ?? fallback.legalLinksEyebrow),
+		legalLinks: normalizeLinks(candidate.legalLinks ?? candidate.utilityLinks) ?? fallback.legalLinks,
+		copyright: String(candidate.copyright ?? fallback.copyright)
+	};
+};
+
 const normalizeContent = (value: unknown): BdrSiteContent => {
 	const content = cloneDefaultContent();
 
@@ -343,6 +411,8 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const themeSettings = normalizeThemeSettings(candidate.themeSettings, content.themeSettings);
 	const navigation = normalizeNavigation(candidate.navigation, content.navigation);
 	const hero = normalizeHero(candidate.hero, content.hero);
+	const footer = normalizeFooter(candidate.footer, content.footer);
+	const postFooter = normalizePostFooter(candidate.postFooter, content.postFooter);
 
 	if (services) {
 		content.services.items = services;
@@ -370,6 +440,8 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	content.themeSettings = themeSettings;
 	content.navigation = navigation;
 	content.hero = hero;
+	content.footer = footer;
+	content.postFooter = postFooter;
 
 	return content;
 };
