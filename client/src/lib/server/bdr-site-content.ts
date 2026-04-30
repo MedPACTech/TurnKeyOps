@@ -3,6 +3,7 @@ import {
 	bdrSiteContent,
 	type BdrAsset,
 	type BdrContractorPreset,
+	type ContentLink,
 	type BdrServiceCategory,
 	type BdrSiteContent,
 	type BdrThemeSettings
@@ -32,6 +33,24 @@ const normalizeServices = (items: unknown): string[] | null => {
 		.filter(Boolean);
 
 	return services;
+};
+
+const normalizeLinks = (items: unknown): ContentLink[] | null => {
+	if (!Array.isArray(items)) return null;
+
+	return items
+		.map((item): ContentLink | null => {
+			if (!item || typeof item !== 'object') return null;
+			const candidate = item as Partial<ContentLink>;
+			if (!candidate.label || !candidate.href) return null;
+
+			return {
+				label: String(candidate.label),
+				href: String(candidate.href),
+				openInNewTab: Boolean(candidate.openInNewTab)
+			} satisfies ContentLink;
+		})
+		.filter((link): link is ContentLink => link !== null);
 };
 
 const normalizeAssetLibrary = (items: unknown): BdrAsset[] | null => {
@@ -182,6 +201,43 @@ const normalizeThemeSettings = (value: unknown, fallback: BdrThemeSettings): Bdr
 	};
 };
 
+const normalizeNavigation = (
+	value: unknown,
+	fallback: BdrSiteContent['navigation']
+): BdrSiteContent['navigation'] => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrSiteContent['navigation']>;
+	return {
+		announcement: String(candidate.announcement ?? fallback.announcement),
+		brandName: String(candidate.brandName ?? fallback.brandName),
+		logoAssetKey: String(candidate.logoAssetKey ?? fallback.logoAssetKey),
+		faviconAssetKey: String(candidate.faviconAssetKey ?? fallback.faviconAssetKey),
+		links: normalizeLinks(candidate.links) ?? fallback.links,
+		primaryCtaLabel: String(candidate.primaryCtaLabel ?? fallback.primaryCtaLabel),
+		primaryCtaHref: String(candidate.primaryCtaHref ?? fallback.primaryCtaHref),
+		phoneNumber: String(candidate.phoneNumber ?? fallback.phoneNumber),
+		showPhoneButton:
+			typeof candidate.showPhoneButton === 'boolean'
+				? candidate.showPhoneButton
+				: fallback.showPhoneButton,
+		showThemeControl:
+			typeof candidate.showThemeControl === 'boolean'
+				? candidate.showThemeControl
+				: fallback.showThemeControl,
+		stickyHeader:
+			typeof candidate.stickyHeader === 'boolean'
+				? candidate.stickyHeader
+				: fallback.stickyHeader,
+		layout:
+			candidate.layout === 'centered' ||
+			candidate.layout === 'right-aligned' ||
+			candidate.layout === 'logo-left'
+				? candidate.layout
+				: fallback.layout
+	};
+};
+
 const normalizeContent = (value: unknown): BdrSiteContent => {
 	const content = cloneDefaultContent();
 
@@ -195,6 +251,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const serviceCategories = normalizeServiceCategories(candidate.serviceCategories);
 	const contractorPresets = normalizeContractorPresets(candidate.contractorPresets);
 	const themeSettings = normalizeThemeSettings(candidate.themeSettings, content.themeSettings);
+	const navigation = normalizeNavigation(candidate.navigation, content.navigation);
 
 	if (services) {
 		content.services.items = services;
@@ -220,6 +277,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	}
 
 	content.themeSettings = themeSettings;
+	content.navigation = navigation;
 
 	return content;
 };
@@ -230,6 +288,14 @@ const writeBdrSiteContent = async (content: BdrSiteContent): Promise<BdrSiteCont
 	await fs.writeFile(localStorePath, JSON.stringify(content, null, 2));
 
 	return content;
+};
+
+export const updateBdrSiteContent = async (
+	updater: (content: BdrSiteContent) => void
+): Promise<BdrSiteContent> => {
+	const content = await loadBdrSiteContent();
+	updater(content);
+	return writeBdrSiteContent(content);
 };
 
 type BdrThemeSettingsPatch = {
@@ -258,10 +324,9 @@ export const loadBdrSiteContent = async (): Promise<BdrSiteContent> => {
 
 export const saveBdrServices = async (items: string[]): Promise<BdrSiteContent> => {
 	const services = normalizeServices(items) ?? [];
-	const content = await loadBdrSiteContent();
-	content.services.items = services;
-
-	return writeBdrSiteContent(content);
+	return updateBdrSiteContent((content) => {
+		content.services.items = services;
+	});
 };
 
 export const saveBdrThemeSettings = async (
@@ -298,12 +363,11 @@ export const saveBdrThemeSettings = async (
 export const applyBdrContractorPresetSelection = async (
 	presetId: string
 ): Promise<BdrSiteContent> => {
-	const content = await loadBdrSiteContent();
-	const appliedPreset = applyBdrContractorPresetToContent(content, presetId);
+	return updateBdrSiteContent((content) => {
+		const appliedPreset = applyBdrContractorPresetToContent(content, presetId);
 
-	if (!appliedPreset) {
-		throw new Error(`Unknown contractor preset: ${presetId}`);
-	}
-
-	return writeBdrSiteContent(content);
+		if (!appliedPreset) {
+			throw new Error(`Unknown contractor preset: ${presetId}`);
+		}
+	});
 };

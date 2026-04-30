@@ -10,6 +10,12 @@
 	const content = $derived(data.content);
 	const year = new Date().getFullYear();
 	const logoAsset = $derived(getBdrAsset(content, 'bdr-crest-logo'));
+	const navigationLogoAsset = $derived(
+		getBdrAsset(content, content.navigation.logoAssetKey) ?? logoAsset
+	);
+	const faviconAsset = $derived(
+		getBdrAsset(content, content.navigation.faviconAssetKey) ?? navigationLogoAsset
+	);
 	const serviceCategories = $derived(getBdrServiceCategories(content));
 	const themeSettings = $derived(content.themeSettings);
 	const publicThemeStyle = $derived(
@@ -37,11 +43,13 @@
 	);
 	const fieldClass =
 		'rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-orange-300/50 focus:bg-black/50';
+	let navMenuOpen = $state(false);
 </script>
 
 <svelte:head>
 	<title>BDR Construction</title>
 	<meta name="description" content="BDR Construction public site for roofing, exterior work, and fast estimate requests." />
+	<link rel="icon" href={faviconAsset?.file ?? '/clientFiles/logo.png'} />
 </svelte:head>
 
 <div
@@ -51,11 +59,16 @@
 	style={`color: var(--bdr-text); background-color: var(--bdr-background); font-family: var(--bdr-body-font); ${publicThemeStyle}`}
 >
 	<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-		<nav id="top" class="sticky top-4 z-30 rounded-xl border border-white/10 bg-slate-950/90 px-4 py-3 shadow-[0_20px_60px_rgba(15,23,42,0.32)] backdrop-blur">
-			<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-				<div class="flex items-center gap-3">
+		<nav
+			id="top"
+			class={`${content.navigation.stickyHeader ? 'sticky top-4' : ''} z-30 rounded-xl border border-white/10 bg-slate-950/90 px-4 py-3 shadow-[0_20px_60px_rgba(15,23,42,0.32)] backdrop-blur`}
+		>
+			<div
+				class={`flex flex-col gap-4 ${content.navigation.layout === 'centered' ? 'items-center text-center' : 'lg:flex-row lg:items-center'} ${content.navigation.layout === 'right-aligned' ? 'lg:justify-end' : 'lg:justify-between'}`}
+			>
+				<div class={`flex items-center gap-3 ${content.navigation.layout === 'centered' ? 'justify-center' : ''}`}>
 					<div class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-orange-300/25 bg-white p-2">
-						<img src={logoAsset?.file ?? '/clientFiles/BDRLogo.jpeg'} alt={logoAsset?.altText ?? 'BDR Construction logo'} class="h-full w-full object-contain" />
+						<img src={navigationLogoAsset?.file ?? '/clientFiles/BDRLogo.jpeg'} alt={navigationLogoAsset?.altText ?? 'BDR Construction logo'} class="h-full w-full object-contain" />
 					</div>
 					<div>
 						<p class="text-[0.68rem] uppercase tracking-[0.22em] text-orange-200/80">{content.navigation.announcement}</p>
@@ -63,19 +76,81 @@
 					</div>
 				</div>
 
-				<div class="flex flex-wrap items-center gap-2">
+				<div class={`hidden flex-wrap items-center gap-2 lg:flex ${content.navigation.layout === 'centered' ? 'justify-center' : ''}`}>
 					{#each content.navigation.links as link}
-						<a href={link.href} class="rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6 hover:text-white">{link.label}</a>
+						<a
+							href={link.href}
+							target={link.openInNewTab ? '_blank' : undefined}
+							rel={link.openInNewTab ? 'noreferrer' : undefined}
+							class="rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6 hover:text-white"
+						>
+							{link.label}
+						</a>
 					{/each}
 					<a
-						href="#quote-request"
+						href={content.navigation.primaryCtaHref}
 						class="px-4 py-2 text-sm font-semibold text-black transition hover:brightness-110"
 						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
 					>
-						Request a Quote
+						{content.navigation.primaryCtaLabel}
 					</a>
+					{#if content.navigation.showPhoneButton}
+						<a href={`tel:${content.navigation.phoneNumber.replace(/[^0-9+]/g, '')}`} class="rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-white transition hover:border-orange-300/40 hover:bg-white/6">
+							{content.navigation.phoneNumber}
+						</a>
+					{/if}
+					{#if content.navigation.showThemeControl}
+						<button type="button" class="rounded-full border border-white/12 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6">
+							{themeSettings.mode}
+						</button>
+					{/if}
+				</div>
+
+				<div class="flex items-center justify-between gap-3 lg:hidden">
+					<div class="flex items-center gap-2">
+						{#if content.navigation.showPhoneButton}
+							<a href={`tel:${content.navigation.phoneNumber.replace(/[^0-9+]/g, '')}`} class="rounded-full border border-white/12 px-3 py-2 text-xs font-semibold text-white">
+								Call
+							</a>
+						{/if}
+						{#if content.navigation.showThemeControl}
+							<button type="button" class="rounded-full border border-white/12 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">
+								{themeSettings.mode}
+							</button>
+						{/if}
+					</div>
+					<button
+						type="button"
+						class="rounded-full border border-white/12 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200"
+						aria-expanded={navMenuOpen}
+						onclick={() => (navMenuOpen = !navMenuOpen)}
+					>
+						{navMenuOpen ? 'Close' : 'Menu'}
+					</button>
 				</div>
 			</div>
+
+			{#if navMenuOpen}
+				<div class="mt-4 grid gap-2 lg:hidden">
+					{#each content.navigation.links as link}
+						<a
+							href={link.href}
+							target={link.openInNewTab ? '_blank' : undefined}
+							rel={link.openInNewTab ? 'noreferrer' : undefined}
+							class="rounded-2xl border border-white/12 px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6 hover:text-white"
+						>
+							{link.label}
+						</a>
+					{/each}
+					<a
+						href={content.navigation.primaryCtaHref}
+						class="px-4 py-3 text-center text-sm font-semibold text-black transition hover:brightness-110"
+						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+					>
+						{content.navigation.primaryCtaLabel}
+					</a>
+				</div>
+			{/if}
 		</nav>
 
 		<section id="hero" class="mt-6 grid gap-6 rounded-3xl border border-white/10 bg-slate-950/55 p-6 shadow-[0_30px_110px_rgba(15,23,42,0.35)] backdrop-blur lg:grid-cols-[1.15fr_0.85fr] lg:p-8">

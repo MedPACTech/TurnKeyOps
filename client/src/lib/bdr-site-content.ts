@@ -1,6 +1,7 @@
 export type ContentLink = {
 	label: string;
 	href: string;
+	openInNewTab?: boolean;
 };
 
 export type ContentItem = {
@@ -84,7 +85,16 @@ export type BdrSiteContent = {
 	navigation: {
 		announcement: string;
 		brandName: string;
+		logoAssetKey: string;
+		faviconAssetKey: string;
 		links: ContentLink[];
+		primaryCtaLabel: string;
+		primaryCtaHref: string;
+		phoneNumber: string;
+		showPhoneButton: boolean;
+		showThemeControl: boolean;
+		stickyHeader: boolean;
+		layout: 'logo-left' | 'centered' | 'right-aligned';
 	};
 	hero: {
 		eyebrow: string;
@@ -629,14 +639,23 @@ export const bdrSiteContent: BdrSiteContent = {
 	navigation: {
 		announcement: 'Navigation',
 		brandName: 'BDR Construction',
+		logoAssetKey: 'bdr-crest-logo',
+		faviconAssetKey: 'bdr-favicon-mark',
 		links: [
-			{ href: '#hero', label: 'Home' },
-			{ href: '#services', label: 'Services' },
-			{ href: '#trust', label: 'Why BDR' },
-			{ href: '#process', label: 'Process' },
-			{ href: '#quote-request', label: 'Request a Quote' },
-			{ href: '#contact', label: 'Contact' }
-		]
+			{ href: '#hero', label: 'Home', openInNewTab: false },
+			{ href: '#services', label: 'Services', openInNewTab: false },
+			{ href: '#process', label: 'Our Process', openInNewTab: false },
+			{ href: '#trust', label: 'Why BDR', openInNewTab: false },
+			{ href: '#supporting', label: 'Projects', openInNewTab: false },
+			{ href: '#contact', label: 'Contact', openInNewTab: false }
+		],
+		primaryCtaLabel: 'Get a Free Quote',
+		primaryCtaHref: '#quote-request',
+		phoneNumber: '(220) 217-7026',
+		showPhoneButton: true,
+		showThemeControl: true,
+		stickyHeader: true,
+		layout: 'logo-left'
 	},
 	hero: {
 		eyebrow: 'Hero',

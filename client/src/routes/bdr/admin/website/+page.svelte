@@ -73,27 +73,47 @@
 			description: 'Top-level wayfinding and utility announcement copy.',
 			previewTitle: content.navigation.brandName,
 			previewBody: content.navigation.announcement,
-			previewMeta: `${content.navigation.links.length} links`,
+			previewMeta: `${content.navigation.layout} · ${content.navigation.links.length} links`,
 			fields: [
 				{ label: 'Announcement', value: content.navigation.announcement },
-				{ label: 'Brand label', value: content.navigation.brandName }
+				{ label: 'Brand label', value: content.navigation.brandName },
+				{ label: 'Primary CTA', value: content.navigation.primaryCtaLabel },
+				{ label: 'Phone CTA', value: content.navigation.showPhoneButton ? content.navigation.phoneNumber : 'Hidden' }
 			],
 			listTitle: 'Navigation links',
-			listItems: content.navigation.links.map((link) => ({ label: 'Link', value: link.label, detail: link.href })),
-			actions: ['Preview anchor flow', 'Reorder nav'],
+			listItems: content.navigation.links.map((link) => ({ label: 'Link', value: link.label, detail: `${link.href}${link.openInNewTab ? ' · new tab' : ''}` })),
+			actions: ['Preview anchor flow', 'Adjust CTA / phone posture', 'Review mobile header'],
 			areas: [
 				{
 					id: 'nav-announcement',
 					label: 'Announcement strip',
 					value: content.navigation.announcement,
-					fields: [{ label: 'Announcement', value: content.navigation.announcement }]
+					fields: [
+						{ label: 'Announcement', value: content.navigation.announcement },
+						{ label: 'Logo asset', value: content.navigation.logoAssetKey },
+						{ label: 'Favicon asset', value: content.navigation.faviconAssetKey }
+					]
 				},
 				{
 					id: 'nav-links',
 					label: 'Primary navigation',
 					value: content.navigation.links.map((link) => link.label).join(' · '),
 					listTitle: 'Navigation links',
-					listItems: content.navigation.links.map((link) => ({ label: 'Link', value: link.label, detail: link.href }))
+					listItems: content.navigation.links.map((link) => ({ label: 'Link', value: link.label, detail: `${link.href}${link.openInNewTab ? ' · new tab' : ''}` })),
+					actions: ['Reorder links', 'Review new-tab behavior']
+				},
+				{
+					id: 'nav-utility',
+					label: 'CTA / utility controls',
+					value: `${content.navigation.primaryCtaLabel} · ${content.navigation.showPhoneButton ? content.navigation.phoneNumber : 'phone hidden'}`,
+					fields: [
+						{ label: 'Primary CTA label', value: content.navigation.primaryCtaLabel },
+						{ label: 'Primary CTA target', value: content.navigation.primaryCtaHref },
+						{ label: 'Phone number', value: content.navigation.phoneNumber },
+						{ label: 'Theme control', value: content.navigation.showThemeControl ? 'Shown' : 'Hidden' },
+						{ label: 'Sticky header', value: content.navigation.stickyHeader ? 'Enabled' : 'Disabled' },
+						{ label: 'Layout', value: content.navigation.layout }
+					]
 				}
 			]
 		},
@@ -732,7 +752,137 @@
 					</div>
 				</div>
 
-				{#if selectedSection.id === 'contractor-presets'}
+				{#if selectedSection.id === 'navigation'}
+					<article
+						id="content-editor"
+						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
+						data-testid="cms-navigation-panel"
+					>
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Navigation · header CMS</p>
+								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Header controls</h4>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Manage brand assets, navigation links, CTA posture, phone CTA, sticky behavior, and the header layout from one compact editor.</p>
+							</div>
+							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+								{content.navigation.layout}
+							</span>
+						</div>
+
+						{#if form?.savedSectionId === 'navigation' && form?.savedMessage}
+							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+								{form.savedMessage}
+							</div>
+						{/if}
+
+						{#if form?.savedSectionId === 'navigation' && form?.message}
+							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+								{form.message}
+							</div>
+						{/if}
+
+						<form method="POST" action="?/updateNavigation" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Brand and utility</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Brand name</span>
+										<input name="brandName" value={content.navigation.brandName} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Announcement</span>
+										<input name="announcement" value={content.navigation.announcement} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Logo asset key</span>
+											<input name="logoAssetKey" value={content.navigation.logoAssetKey} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Favicon asset key</span>
+											<input name="faviconAssetKey" value={content.navigation.faviconAssetKey} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+									</div>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Primary CTA label</span>
+											<input name="primaryCtaLabel" value={content.navigation.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Primary CTA target</span>
+											<input name="primaryCtaHref" value={content.navigation.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+									</div>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Phone number</span>
+											<input name="phoneNumber" value={content.navigation.phoneNumber} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Header layout</span>
+											<select name="layout" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+												<option value="logo-left" selected={content.navigation.layout === 'logo-left'}>Logo left</option>
+												<option value="centered" selected={content.navigation.layout === 'centered'}>Centered</option>
+												<option value="right-aligned" selected={content.navigation.layout === 'right-aligned'}>Right-aligned</option>
+											</select>
+										</label>
+									</div>
+									<div class="grid gap-3 md:grid-cols-3">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Show phone button</span>
+											<select name="showPhoneButton" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+												<option value="true" selected={content.navigation.showPhoneButton}>Yes</option>
+												<option value="false" selected={!content.navigation.showPhoneButton}>No</option>
+											</select>
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Show theme control</span>
+											<select name="showThemeControl" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+												<option value="true" selected={content.navigation.showThemeControl}>Yes</option>
+												<option value="false" selected={!content.navigation.showThemeControl}>No</option>
+											</select>
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Sticky header</span>
+											<select name="stickyHeader" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+												<option value="true" selected={content.navigation.stickyHeader}>Enabled</option>
+												<option value="false" selected={!content.navigation.stickyHeader}>Disabled</option>
+											</select>
+										</label>
+									</div>
+								</div>
+							</section>
+
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Navigation links</p>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">One link per line using `Label|href|openInNewTab`. Reorder lines to change sort order and remove a line to delete it.</p>
+								<textarea
+									name="navigationLinks"
+									rows="10"
+									class="mt-3 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+								>{content.navigation.links.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
+
+								<div class="mt-4 rounded-md bg-[var(--shell-panel-strong)] p-3">
+									<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Current utility posture</p>
+									<ul class="mt-2 space-y-1.5 text-sm text-[var(--text-base)]">
+										<li>Theme control: {content.navigation.showThemeControl ? 'shown' : 'hidden'}</li>
+										<li>Phone button: {content.navigation.showPhoneButton ? content.navigation.phoneNumber : 'hidden'}</li>
+										<li>Primary CTA: {content.navigation.primaryCtaLabel} → {content.navigation.primaryCtaHref}</li>
+									</ul>
+								</div>
+
+								<div class="mt-4 flex justify-end">
+									<button
+										type="submit"
+										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+									>
+										Save navigation
+									</button>
+								</div>
+							</section>
+						</form>
+					</article>
+				{:else if selectedSection.id === 'contractor-presets'}
 					<article
 						id="content-editor"
 						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
