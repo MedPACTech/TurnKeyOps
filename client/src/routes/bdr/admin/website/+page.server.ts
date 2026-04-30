@@ -129,6 +129,49 @@ const parseServiceCards = (value: string): BdrServiceCategory[] =>
 		})
 		.filter((card): card is BdrServiceCategory => card !== null);
 
+const parseProcessSteps = (
+	value: string
+): Array<{
+	step: string;
+	title: string;
+	copy: string;
+	iconAssetKey: string;
+	timeframe?: string;
+}> =>
+	value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line): {
+			step: string;
+			title: string;
+			copy: string;
+			iconAssetKey: string;
+			timeframe?: string;
+		} | null => {
+			const [step = '', title = '', copy = '', iconAssetKey = '', timeframe = ''] = line
+				.split('|')
+				.map((part) => part.trim());
+			if (!step || !title || !copy || !iconAssetKey) return null;
+
+			return {
+				step,
+				title,
+				copy,
+				iconAssetKey,
+				timeframe: timeframe || undefined
+			};
+		})
+		.filter(
+			(step): step is {
+				step: string;
+				title: string;
+				copy: string;
+				iconAssetKey: string;
+				timeframe?: string;
+			} => step !== null
+		);
+
 const parseCtaType = (value: string, fallback: BdrCtaType): BdrCtaType =>
 	value === 'anchor' || value === 'link' || value === 'phone' ? value : fallback;
 
@@ -139,6 +182,38 @@ export const load = async () => {
 };
 
 export const actions = {
+	updateProcessSection: async ({ request }) => {
+		const formData = await request.formData();
+		const steps = parseProcessSteps(getValue(formData, 'processSteps'));
+		if (steps.length < 3 || steps.length > 5) {
+			return fail(400, {
+				savedSectionId: 'process',
+				message: 'Configure between 3 and 5 process steps.'
+			});
+		}
+
+		try {
+			return {
+				content: await updateBdrSiteContent((content) => {
+					content.process = {
+						eyebrow: getValue(formData, 'processEyebrow') || content.process.eyebrow,
+						title: getValue(formData, 'processTitle') || content.process.title,
+						description:
+							getValue(formData, 'processDescription') || content.process.description,
+						steps
+					};
+				}),
+				savedSectionId: 'process',
+				savedMessage: 'Process section saved to the local contractor-site content store.'
+			};
+		} catch (cause) {
+			console.error('Unable to save process section.', cause);
+			return fail(500, {
+				savedSectionId: 'process',
+				message: 'Could not save process section.'
+			});
+		}
+	},
 	updateServicesSection: async ({ request }) => {
 		const formData = await request.formData();
 		const cards = parseServiceCards(getValue(formData, 'serviceCards'));

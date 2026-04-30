@@ -370,14 +370,35 @@
 			</div>
 		</section>
 
-		<section id="process" class="mt-8 rounded-[2rem] border border-white/10 bg-slate-950/45 p-6 backdrop-blur">
-			<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">{content.process.eyebrow}</p>
-			<div class="mt-5 grid gap-4 md:grid-cols-3">
+		<section id="process" class="mt-8 rounded-[2rem] border border-white/10 bg-slate-950/82 p-6 backdrop-blur lg:p-8">
+			<div class="max-w-3xl">
+				<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-200/75">{content.process.eyebrow}</p>
+				<h2 class="mt-3 text-3xl font-semibold text-white" style="font-family: var(--bdr-heading-font);">{content.process.title}</h2>
+				<p class="mt-3 text-sm leading-6 text-slate-300">{content.process.description}</p>
+			</div>
+			<div class="mt-6 grid gap-4 lg:grid-cols-3">
 				{#each content.process.steps as item}
-					<div class="rounded-[1.5rem] border border-white/8 bg-white/4 p-5">
-						<p class="text-sm font-semibold text-orange-200">Step {item.step}</p>
-						<h2 class="mt-2 text-xl font-semibold text-white">{item.title}</h2>
-						<p class="mt-2 text-sm leading-6 text-slate-300">{item.copy}</p>
+					{@const stepIcon = getBdrAsset(content, item.iconAssetKey)}
+					<div class="relative rounded-[1.6rem] border border-white/8 bg-white/5 p-5">
+						<div class="flex items-start gap-4">
+							<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 p-2">
+								{#if stepIcon}
+									<img src={stepIcon.file} alt={stepIcon.altText} class="h-full w-full object-contain" />
+								{:else}
+									<span class="text-lg text-orange-200">▣</span>
+								{/if}
+							</div>
+							<div class="min-w-0 flex-1">
+								<div class="flex flex-wrap items-center gap-3">
+									<p class="text-2xl font-semibold text-orange-200">0{item.step}</p>
+									{#if item.timeframe}
+										<span class="rounded-full border border-white/12 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-300">{item.timeframe}</span>
+									{/if}
+								</div>
+								<h3 class="mt-3 text-xl font-semibold text-white">{item.title}</h3>
+								<p class="mt-2 text-sm leading-6 text-slate-300">{item.copy}</p>
+							</div>
+						</div>
 					</div>
 				{/each}
 			</div>

@@ -153,7 +153,15 @@ export type BdrSiteContent = {
 	};
 	process: {
 		eyebrow: string;
-		steps: Array<{ step: string; title: string; copy: string }>;
+		title: string;
+		description: string;
+		steps: Array<{
+			step: string;
+			title: string;
+			copy: string;
+			iconAssetKey: string;
+			timeframe?: string;
+		}>;
 	};
 	supportingSections: Array<{
 		eyebrow: string;
@@ -794,21 +802,30 @@ export const bdrSiteContent: BdrSiteContent = {
 	},
 	process: {
 		eyebrow: 'Process',
+		title: 'How the project moves',
+		description:
+			'BDR keeps the handoff from intake to scope, approval, and production visible so customers know what happens next.',
 		steps: [
 			{
 				step: '1',
 				title: 'Request an estimate',
-				copy: 'Tell BDR about the property, timing, and damage. Urgent storm and leak calls move to the front of the office queue.'
+				copy: 'Tell BDR about the property, timing, and damage. Urgent storm and leak calls move to the front of the office queue.',
+				iconAssetKey: 'service-driveways-icon',
+				timeframe: 'Day 0'
 			},
 			{
 				step: '2',
 				title: 'Inspection and scope',
-				copy: 'An estimator confirms measurements, photographs conditions, and builds a customer-friendly scope backed by internal costing.'
+				copy: 'An estimator confirms measurements, photographs conditions, and builds a customer-friendly scope backed by internal costing.',
+				iconAssetKey: 'service-sidewalks-icon',
+				timeframe: '1 to 3 days'
 			},
 			{
 				step: '3',
 				title: 'Approve and schedule',
-				copy: 'Customers approve the contract, sign electronically, handle the deposit if required, and lock the production window.'
+				copy: 'Customers approve the contract, sign electronically, handle the deposit if required, and lock the production window.',
+				iconAssetKey: 'service-slabs-icon',
+				timeframe: 'Next available slot'
 			}
 		]
 	},

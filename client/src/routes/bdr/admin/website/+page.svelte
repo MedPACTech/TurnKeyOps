@@ -389,19 +389,27 @@
 		{
 			id: 'process',
 			label: 'Process',
-			description: 'How the public site explains the quote-to-schedule journey.',
-			previewTitle: content.process.steps.map((step) => step.title).join(' → '),
-			previewBody: 'Three steps explain request, inspection, and approval.',
+			description: 'The dark timeline band that explains the customer journey.',
+			previewTitle: content.process.title,
+			previewBody: content.process.description,
 			previewMeta: `${content.process.steps.length} steps`,
 			areas: [
 				{
 					id: 'process-steps',
-					label: 'Process steps',
+					label: 'Process strip',
 					value: content.process.steps.map((step) => `${step.step}. ${step.title}`).join(' · '),
-					fields: [{ label: 'Eyebrow', value: content.process.eyebrow }],
+					fields: [
+						{ label: 'Eyebrow', value: content.process.eyebrow },
+						{ label: 'Heading', value: content.process.title },
+						{ label: 'Description', value: content.process.description, multiline: true }
+					],
 					listTitle: 'Process steps',
-					listItems: content.process.steps.map((step) => ({ label: `Step ${step.step}`, value: step.title, detail: step.copy })),
-					actions: ['Reorder process']
+					listItems: content.process.steps.map((step) => ({
+						label: `Step ${step.step}`,
+						value: step.title,
+						detail: `${step.copy}${step.timeframe ? ` · ${step.timeframe}` : ''}`
+					})),
+					actions: ['Reorder process', 'Adjust timeframe labels']
 				}
 			]
 		},
@@ -1134,6 +1142,89 @@
 										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save footer
+									</button>
+								</div>
+							</section>
+						</form>
+					</article>
+				{:else if selectedSection.id === 'process'}
+					<article
+						id="content-editor"
+						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
+						data-testid="cms-process-panel"
+					>
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Process · CMS controls</p>
+								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Process strip and timeline steps</h4>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Manage the section copy and the repeatable process timeline shown between services and the CTA banner.</p>
+							</div>
+							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+								{content.process.steps.length} steps
+							</span>
+						</div>
+
+						{#if form?.savedSectionId === 'process' && form?.savedMessage}
+							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+								{form.savedMessage}
+							</div>
+						{/if}
+
+						{#if form?.savedSectionId === 'process' && form?.message}
+							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+								{form.message}
+							</div>
+						{/if}
+
+						<form method="POST" action="?/updateProcessSection" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section copy</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
+										<input name="processEyebrow" value={content.process.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Heading</span>
+										<input name="processTitle" value={content.process.title} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Description</span>
+										<textarea name="processDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.process.description}</textarea>
+									</label>
+								</div>
+							</section>
+
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Timeline steps</p>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">One step per line using `stepNumber|title|description|iconAssetKey|timeframe`.</p>
+								<textarea
+									name="processSteps"
+									rows="10"
+									class="mt-3 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+								>{content.process.steps.map((step) => `${step.step}|${step.title}|${step.copy}|${step.iconAssetKey}|${step.timeframe ?? ''}`).join('\n')}</textarea>
+
+								<div class="mt-4 grid gap-3 md:grid-cols-2">
+									<div class="rounded-md bg-[var(--shell-panel-strong)] p-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Available icons</p>
+										<ul class="mt-2 space-y-1.5 text-sm text-[var(--text-base)]">
+											{#each assetLibrary.filter((asset) => asset.type === 'icon') as asset}
+												<li>{asset.key} · {asset.name}</li>
+											{/each}
+										</ul>
+									</div>
+									<div class="rounded-md bg-[var(--shell-panel-strong)] p-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Timeline guidance</p>
+										<p class="mt-2 text-sm text-[var(--text-base)]">Keep this between 3 and 5 steps so the desktop timeline stays balanced and mobile stacking stays readable.</p>
+									</div>
+								</div>
+
+								<div class="mt-4 flex justify-end">
+									<button
+										type="submit"
+										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+									>
+										Save process
 									</button>
 								</div>
 							</section>

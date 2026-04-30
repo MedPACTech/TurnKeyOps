@@ -330,6 +330,41 @@ const normalizeHero = (
 	};
 };
 
+const normalizeProcess = (
+	value: unknown,
+	fallback: BdrSiteContent['process']
+): BdrSiteContent['process'] => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrSiteContent['process']>;
+	const steps = Array.isArray(candidate.steps)
+		? candidate.steps
+				.map((item): BdrSiteContent['process']['steps'][number] | null => {
+					if (!item || typeof item !== 'object') return null;
+					const entry = item as Partial<BdrSiteContent['process']['steps'][number]>;
+					if (!entry.step || !entry.title || !entry.copy || !entry.iconAssetKey) return null;
+
+					return {
+						step: String(entry.step),
+						title: String(entry.title),
+						copy: String(entry.copy),
+						iconAssetKey: String(entry.iconAssetKey),
+						timeframe: entry.timeframe ? String(entry.timeframe) : undefined
+					};
+				})
+				.filter(
+					(step): step is BdrSiteContent['process']['steps'][number] => step !== null
+				)
+		: fallback.steps;
+
+	return {
+		eyebrow: String(candidate.eyebrow ?? fallback.eyebrow),
+		title: String(candidate.title ?? fallback.title),
+		description: String(candidate.description ?? fallback.description),
+		steps
+	};
+};
+
 const normalizeNavigation = (
 	value: unknown,
 	fallback: BdrSiteContent['navigation']
@@ -429,6 +464,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const themeSettings = normalizeThemeSettings(candidate.themeSettings, content.themeSettings);
 	const navigation = normalizeNavigation(candidate.navigation, content.navigation);
 	const hero = normalizeHero(candidate.hero, content.hero);
+	const process = normalizeProcess(candidate.process, content.process);
 	const footer = normalizeFooter(candidate.footer, content.footer);
 	const postFooter = normalizePostFooter(candidate.postFooter, content.postFooter);
 
@@ -456,6 +492,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	content.themeSettings = themeSettings;
 	content.navigation = navigation;
 	content.hero = hero;
+	content.process = process;
 	content.footer = footer;
 	content.postFooter = postFooter;
 
