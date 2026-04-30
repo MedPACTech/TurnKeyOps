@@ -4,7 +4,13 @@
 		type EditableField,
 		type EditableListItem
 	} from '$lib/components/admin/ContentEditorCard.svelte';
-	import { getBdrAsset, getBdrServiceCategories, resolveBdrCopyright } from '$lib/bdr-site-content';
+	import {
+		getBdrActiveContractorPreset,
+		getBdrAsset,
+		getBdrContractorPresets,
+		getBdrServiceCategories,
+		resolveBdrCopyright
+	} from '$lib/bdr-site-content';
 	import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-svelte';
 	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
@@ -37,15 +43,25 @@
 		href: string;
 	};
 
-	let { data }: PageProps = $props();
+	type WebsitePageForm = {
+		content?: PageProps['data']['content'];
+		savedSectionId?: string;
+		savedMessage?: string;
+		message?: string;
+	};
+
+	let { data, form }: { data: PageProps['data']; form?: WebsitePageForm } = $props();
+	const content = $derived(form?.content ?? data.content);
 
 	const year = new Date().getFullYear();
-	const assetLibrary = $derived([...data.content.assetLibrary].sort((left, right) => left.sortOrder - right.sortOrder));
-	const serviceCategories = $derived(getBdrServiceCategories(data.content));
+	const assetLibrary = $derived([...content.assetLibrary].sort((left, right) => left.sortOrder - right.sortOrder));
+	const serviceCategories = $derived(getBdrServiceCategories(content));
+	const contractorPresets = $derived(getBdrContractorPresets(content));
+	const activeContractorPreset = $derived(getBdrActiveContractorPreset(content));
 
-	let serviceItems = $state(untrack(() => [...data.content.services.items]));
+	let serviceItems = $state(untrack(() => [...content.services.items]));
 	let selectedServiceIndex = $state(0);
-	let serviceDraft = $state(untrack(() => data.content.services.items[0] ?? ''));
+	let serviceDraft = $state(untrack(() => content.services.items[0] ?? ''));
 	let serviceError = $state('');
 	let serviceStatus = $state('Select a service to edit it.');
 	let serviceIsSaving = $state(false);
@@ -55,29 +71,29 @@
 			id: 'navigation',
 			label: 'Navigation',
 			description: 'Top-level wayfinding and utility announcement copy.',
-			previewTitle: data.content.navigation.brandName,
-			previewBody: data.content.navigation.announcement,
-			previewMeta: `${data.content.navigation.links.length} links`,
+			previewTitle: content.navigation.brandName,
+			previewBody: content.navigation.announcement,
+			previewMeta: `${content.navigation.links.length} links`,
 			fields: [
-				{ label: 'Announcement', value: data.content.navigation.announcement },
-				{ label: 'Brand label', value: data.content.navigation.brandName }
+				{ label: 'Announcement', value: content.navigation.announcement },
+				{ label: 'Brand label', value: content.navigation.brandName }
 			],
 			listTitle: 'Navigation links',
-			listItems: data.content.navigation.links.map((link) => ({ label: 'Link', value: link.label, detail: link.href })),
+			listItems: content.navigation.links.map((link) => ({ label: 'Link', value: link.label, detail: link.href })),
 			actions: ['Preview anchor flow', 'Reorder nav'],
 			areas: [
 				{
 					id: 'nav-announcement',
 					label: 'Announcement strip',
-					value: data.content.navigation.announcement,
-					fields: [{ label: 'Announcement', value: data.content.navigation.announcement }]
+					value: content.navigation.announcement,
+					fields: [{ label: 'Announcement', value: content.navigation.announcement }]
 				},
 				{
 					id: 'nav-links',
 					label: 'Primary navigation',
-					value: data.content.navigation.links.map((link) => link.label).join(' · '),
+					value: content.navigation.links.map((link) => link.label).join(' · '),
 					listTitle: 'Navigation links',
-					listItems: data.content.navigation.links.map((link) => ({ label: 'Link', value: link.label, detail: link.href }))
+					listItems: content.navigation.links.map((link) => ({ label: 'Link', value: link.label, detail: link.href }))
 				}
 			]
 		},
@@ -85,36 +101,36 @@
 			id: 'hero',
 			label: 'Hero',
 			description: 'The first-screen sales message and CTA pair.',
-			previewTitle: data.content.hero.headline,
-			previewBody: data.content.hero.body,
-			previewMeta: `${data.content.hero.primaryCtaLabel} + ${data.content.hero.secondaryCtaLabel}`,
+			previewTitle: content.hero.headline,
+			previewBody: content.hero.body,
+			previewMeta: `${content.hero.primaryCtaLabel} + ${content.hero.secondaryCtaLabel}`,
 			fields: [
-				{ label: 'Eyebrow', value: data.content.hero.eyebrow },
-				{ label: 'Headline', value: data.content.hero.headline, multiline: true },
-				{ label: 'Body copy', value: data.content.hero.body, multiline: true }
+				{ label: 'Eyebrow', value: content.hero.eyebrow },
+				{ label: 'Headline', value: content.hero.headline, multiline: true },
+				{ label: 'Body copy', value: content.hero.body, multiline: true }
 			],
 			actions: ['Preview hero', 'Create seasonal variant'],
 			areas: [
 				{
 					id: 'hero-copy',
 					label: 'Hero copy',
-					value: data.content.hero.headline,
-					detail: data.content.hero.body,
+					value: content.hero.headline,
+					detail: content.hero.body,
 					fields: [
-						{ label: 'Eyebrow', value: data.content.hero.eyebrow },
-						{ label: 'Headline', value: data.content.hero.headline, multiline: true },
-						{ label: 'Body copy', value: data.content.hero.body, multiline: true }
+						{ label: 'Eyebrow', value: content.hero.eyebrow },
+						{ label: 'Headline', value: content.hero.headline, multiline: true },
+						{ label: 'Body copy', value: content.hero.body, multiline: true }
 					]
 				},
 				{
 					id: 'hero-cta',
 					label: 'Hero CTAs',
-					value: `${data.content.hero.primaryCtaLabel} / ${data.content.hero.secondaryCtaLabel}`,
+					value: `${content.hero.primaryCtaLabel} / ${content.hero.secondaryCtaLabel}`,
 					fields: [
-						{ label: 'Primary CTA', value: data.content.hero.primaryCtaLabel },
-						{ label: 'Primary target', value: data.content.hero.primaryCtaHref },
-						{ label: 'Secondary CTA', value: data.content.hero.secondaryCtaLabel },
-						{ label: 'Secondary target', value: data.content.hero.secondaryCtaHref }
+						{ label: 'Primary CTA', value: content.hero.primaryCtaLabel },
+						{ label: 'Primary target', value: content.hero.primaryCtaHref },
+						{ label: 'Secondary CTA', value: content.hero.secondaryCtaLabel },
+						{ label: 'Secondary target', value: content.hero.secondaryCtaHref }
 					]
 				}
 			]
@@ -123,13 +139,13 @@
 			id: 'services',
 			label: 'Services',
 			description: 'The demand-facing summary of service lines.',
-			previewTitle: data.content.services.title,
-			previewBody: data.content.services.copy,
+			previewTitle: content.services.title,
+			previewBody: content.services.copy,
 			previewMeta: `${serviceItems.length} service bullets`,
 			fields: [
-				{ label: 'Eyebrow', value: data.content.services.eyebrow },
-				{ label: 'Title', value: data.content.services.title },
-				{ label: 'Body copy', value: data.content.services.copy, multiline: true }
+				{ label: 'Eyebrow', value: content.services.eyebrow },
+				{ label: 'Title', value: content.services.title },
+				{ label: 'Body copy', value: content.services.copy, multiline: true }
 			],
 			listTitle: 'Service bullets',
 			listItems: serviceItems.map((item) => ({ label: 'Service', value: item })),
@@ -138,12 +154,12 @@
 				{
 					id: 'services-copy',
 					label: 'Services intro',
-					value: data.content.services.title,
-					detail: data.content.services.copy,
+					value: content.services.title,
+					detail: content.services.copy,
 					fields: [
-						{ label: 'Eyebrow', value: data.content.services.eyebrow },
-						{ label: 'Title', value: data.content.services.title },
-						{ label: 'Body copy', value: data.content.services.copy, multiline: true }
+						{ label: 'Eyebrow', value: content.services.eyebrow },
+						{ label: 'Title', value: content.services.title },
+						{ label: 'Body copy', value: content.services.copy, multiline: true }
 					]
 				},
 				{
@@ -225,9 +241,47 @@
 					listTitle: 'Linked assets',
 					listItems: serviceCategories.map((category) => ({
 						label: category.name,
-						value: getBdrAsset(data.content, category.iconAssetKey)?.name ?? category.iconAssetKey,
-						detail: getBdrAsset(data.content, category.iconAssetKey)?.file ?? 'Asset not found'
+						value: getBdrAsset(content, category.iconAssetKey)?.name ?? category.iconAssetKey,
+						detail: getBdrAsset(content, category.iconAssetKey)?.file ?? 'Asset not found'
 					}))
+				}
+			]
+		},
+		{
+			id: 'contractor-presets',
+			label: 'Contractor presets',
+			description: 'Reusable trade-specific defaults that can initialize the shared site template without structural rewrites.',
+			previewTitle: activeContractorPreset?.label ?? 'No active preset',
+			previewBody: activeContractorPreset?.defaultHeroHeadline ?? 'Preset defaults define hero messaging, services, and icons.',
+			previewMeta: `${contractorPresets.length} presets`,
+			areas: [
+				{
+					id: 'preset-library',
+					label: 'Preset catalog',
+					value: contractorPresets.map((preset) => preset.label).join(' · '),
+					fields: [
+						{ label: 'Active preset', value: activeContractorPreset?.label ?? 'No preset selected' },
+						{ label: 'Shared structure', value: 'Presets swap content defaults while the site shell stays intact.' }
+					],
+					listTitle: 'Available presets',
+					listItems: contractorPresets.map((preset) => ({
+						label: preset.id === content.activeContractorPresetId ? 'Active' : preset.contractorType,
+						value: preset.label,
+						detail: preset.defaultHeroHeadline
+					})),
+					actions: ['Apply preset', 'Review trade-specific service defaults']
+				},
+				{
+					id: 'preset-services',
+					label: 'Preset service defaults',
+					value: activeContractorPreset?.defaultServices.map((service) => service.name).join(' · ') ?? 'No services configured',
+					listTitle: 'Default service cards',
+					listItems:
+						activeContractorPreset?.defaultServices.map((service) => ({
+							label: service.slug,
+							value: service.name,
+							detail: `${service.description} · ${service.iconAssetKey}`
+						})) ?? []
 				}
 			]
 		},
@@ -235,35 +289,35 @@
 			id: 'trust',
 			label: 'Trust',
 			description: 'Credibility framing and proof points.',
-			previewTitle: data.content.trust.title,
-			previewBody: data.content.trust.copy,
-			previewMeta: `${data.content.trust.points.length} trust points`,
+			previewTitle: content.trust.title,
+			previewBody: content.trust.copy,
+			previewMeta: `${content.trust.points.length} trust points`,
 			fields: [
-				{ label: 'Eyebrow', value: data.content.trust.eyebrow },
-				{ label: 'Title', value: data.content.trust.title },
-				{ label: 'Body copy', value: data.content.trust.copy, multiline: true }
+				{ label: 'Eyebrow', value: content.trust.eyebrow },
+				{ label: 'Title', value: content.trust.title },
+				{ label: 'Body copy', value: content.trust.copy, multiline: true }
 			],
 			listTitle: 'Trust points',
-			listItems: data.content.trust.points.map((point) => ({ label: 'Point', value: point })),
+			listItems: content.trust.points.map((point) => ({ label: 'Point', value: point })),
 			actions: ['Review proof tone'],
 			areas: [
 				{
 					id: 'trust-copy',
 					label: 'Trust headline',
-					value: data.content.trust.title,
-					detail: data.content.trust.copy,
+					value: content.trust.title,
+					detail: content.trust.copy,
 					fields: [
-						{ label: 'Eyebrow', value: data.content.trust.eyebrow },
-						{ label: 'Title', value: data.content.trust.title },
-						{ label: 'Body copy', value: data.content.trust.copy, multiline: true }
+						{ label: 'Eyebrow', value: content.trust.eyebrow },
+						{ label: 'Title', value: content.trust.title },
+						{ label: 'Body copy', value: content.trust.copy, multiline: true }
 					]
 				},
 				{
 					id: 'trust-points',
 					label: 'Trust points',
-					value: data.content.trust.points.join(' · '),
+					value: content.trust.points.join(' · '),
 					listTitle: 'Trust points',
-					listItems: data.content.trust.points.map((point) => ({ label: 'Point', value: point }))
+					listItems: content.trust.points.map((point) => ({ label: 'Point', value: point }))
 				}
 			]
 		},
@@ -271,17 +325,17 @@
 			id: 'process',
 			label: 'Process',
 			description: 'How the public site explains the quote-to-schedule journey.',
-			previewTitle: data.content.process.steps.map((step) => step.title).join(' → '),
+			previewTitle: content.process.steps.map((step) => step.title).join(' → '),
 			previewBody: 'Three steps explain request, inspection, and approval.',
-			previewMeta: `${data.content.process.steps.length} steps`,
+			previewMeta: `${content.process.steps.length} steps`,
 			areas: [
 				{
 					id: 'process-steps',
 					label: 'Process steps',
-					value: data.content.process.steps.map((step) => `${step.step}. ${step.title}`).join(' · '),
-					fields: [{ label: 'Eyebrow', value: data.content.process.eyebrow }],
+					value: content.process.steps.map((step) => `${step.step}. ${step.title}`).join(' · '),
+					fields: [{ label: 'Eyebrow', value: content.process.eyebrow }],
 					listTitle: 'Process steps',
-					listItems: data.content.process.steps.map((step) => ({ label: `Step ${step.step}`, value: step.title, detail: step.copy })),
+					listItems: content.process.steps.map((step) => ({ label: `Step ${step.step}`, value: step.title, detail: step.copy })),
 					actions: ['Reorder process']
 				}
 			]
@@ -290,16 +344,16 @@
 			id: 'supporting',
 			label: 'Supporting',
 			description: 'Featured work and supporting narrative blocks.',
-			previewTitle: data.content.supportingSections.map((section) => section.title).join(' · '),
+			previewTitle: content.supportingSections.map((section) => section.title).join(' · '),
 			previewBody: 'Secondary modules round out the sales story.',
-			previewMeta: `${data.content.supportingSections.reduce((sum, section) => sum + section.items.length, 0)} support items`,
+			previewMeta: `${content.supportingSections.reduce((sum, section) => sum + section.items.length, 0)} support items`,
 			areas: [
 				{
 					id: 'support-blocks',
 					label: 'Supporting modules',
-					value: data.content.supportingSections.map((section) => section.title).join(' · '),
+					value: content.supportingSections.map((section) => section.title).join(' · '),
 					listTitle: 'Support blocks',
-					listItems: data.content.supportingSections.flatMap((section) =>
+					listItems: content.supportingSections.flatMap((section) =>
 						section.items.map((item) => ({ label: section.title, value: item.title, detail: item.copy }))
 					),
 					actions: ['Add support block']
@@ -310,30 +364,30 @@
 			id: 'contact',
 			label: 'Contact CTA',
 			description: 'Bottom conversion block and direct-response controls.',
-			previewTitle: data.content.contact.title,
-			previewBody: data.content.contact.body,
-			previewMeta: `${data.content.contact.primaryCtaLabel} + ${data.content.contact.secondaryCtaLabel}`,
+			previewTitle: content.contact.title,
+			previewBody: content.contact.body,
+			previewMeta: `${content.contact.primaryCtaLabel} + ${content.contact.secondaryCtaLabel}`,
 			areas: [
 				{
 					id: 'contact-copy',
 					label: 'Contact CTA copy',
-					value: data.content.contact.title,
-					detail: data.content.contact.body,
+					value: content.contact.title,
+					detail: content.contact.body,
 					fields: [
-						{ label: 'Eyebrow', value: data.content.contact.eyebrow },
-						{ label: 'Title', value: data.content.contact.title },
-						{ label: 'Body copy', value: data.content.contact.body, multiline: true }
+						{ label: 'Eyebrow', value: content.contact.eyebrow },
+						{ label: 'Title', value: content.contact.title },
+						{ label: 'Body copy', value: content.contact.body, multiline: true }
 					]
 				},
 				{
 					id: 'contact-cta',
 					label: 'Contact CTA buttons',
-					value: `${data.content.contact.primaryCtaLabel} / ${data.content.contact.secondaryCtaLabel}`,
+					value: `${content.contact.primaryCtaLabel} / ${content.contact.secondaryCtaLabel}`,
 					fields: [
-						{ label: 'Primary CTA', value: data.content.contact.primaryCtaLabel },
-						{ label: 'Primary target', value: data.content.contact.primaryCtaHref },
-						{ label: 'Secondary CTA', value: data.content.contact.secondaryCtaLabel },
-						{ label: 'Secondary target', value: data.content.contact.secondaryCtaHref }
+						{ label: 'Primary CTA', value: content.contact.primaryCtaLabel },
+						{ label: 'Primary target', value: content.contact.primaryCtaHref },
+						{ label: 'Secondary CTA', value: content.contact.secondaryCtaLabel },
+						{ label: 'Secondary target', value: content.contact.secondaryCtaHref }
 					]
 				}
 			]
@@ -342,38 +396,38 @@
 			id: 'footer',
 			label: 'Footer',
 			description: 'Footer brand summary, managed links, and utility strip.',
-			previewTitle: data.content.footer.brandName,
-			previewBody: data.content.footer.body,
-			previewMeta: `${data.content.footer.links.length} footer links`,
+			previewTitle: content.footer.brandName,
+			previewBody: content.footer.body,
+			previewMeta: `${content.footer.links.length} footer links`,
 			areas: [
 				{
 					id: 'footer-brand',
 					label: 'Footer brand block',
-					value: data.content.footer.brandName,
-					detail: data.content.footer.body,
+					value: content.footer.brandName,
+					detail: content.footer.body,
 					fields: [
-						{ label: 'Eyebrow', value: data.content.footer.eyebrow },
-						{ label: 'Brand name', value: data.content.footer.brandName },
-						{ label: 'Body copy', value: data.content.footer.body, multiline: true }
+						{ label: 'Eyebrow', value: content.footer.eyebrow },
+						{ label: 'Brand name', value: content.footer.brandName },
+						{ label: 'Body copy', value: content.footer.body, multiline: true }
 					]
 				},
 				{
 					id: 'footer-links',
 					label: 'Footer links',
-					value: data.content.footer.links.map((link) => link.label).join(' · '),
-					fields: [{ label: 'Links label', value: data.content.footer.linksEyebrow }],
+					value: content.footer.links.map((link) => link.label).join(' · '),
+					fields: [{ label: 'Links label', value: content.footer.linksEyebrow }],
 					listTitle: 'Footer links',
-					listItems: data.content.footer.links.map((link) => ({ label: 'Footer link', value: link.label, detail: link.href }))
+					listItems: content.footer.links.map((link) => ({ label: 'Footer link', value: link.label, detail: link.href }))
 				},
 				{
 					id: 'footer-utility',
 					label: 'Post-footer utility',
 					value: resolveBdrCopyright(year),
 					fields: [
-						{ label: 'Copyright template', value: data.content.postFooter.copyright, help: 'Use {{year}} to keep the year dynamic.' }
+						{ label: 'Copyright template', value: content.postFooter.copyright, help: 'Use {{year}} to keep the year dynamic.' }
 					],
 					listTitle: 'Utility links',
-					listItems: data.content.postFooter.utilityLinks.map((link) => ({ label: 'Utility link', value: link.label, detail: link.href }))
+					listItems: content.postFooter.utilityLinks.map((link) => ({ label: 'Utility link', value: link.label, detail: link.href }))
 				}
 			]
 		}
@@ -393,6 +447,24 @@
 	$effect(() => {
 		if (selectedSection && !selectedSection.areas.some((area) => area.id === selectedAreaId)) {
 			selectedAreaId = selectedSection.areas[0]?.id ?? '';
+		}
+	});
+
+	$effect(() => {
+		if (!serviceIsSaving) {
+			serviceItems = [...content.services.items];
+			selectedServiceIndex = Math.max(0, Math.min(selectedServiceIndex, serviceItems.length - 1));
+			serviceDraft = serviceItems[selectedServiceIndex] ?? '';
+		}
+	});
+
+	$effect(() => {
+		if (form?.savedSectionId && form.savedSectionId !== selectedSectionId) {
+			selectedSectionId = form.savedSectionId;
+			selectedAreaId =
+				form.savedSectionId === 'contractor-presets'
+					? 'preset-library'
+					: (websiteSections.find((section) => section.id === form.savedSectionId)?.areas[0]?.id ?? selectedAreaId);
 		}
 	});
 
@@ -660,7 +732,80 @@
 					</div>
 				</div>
 
-				{#if isServicesCrudSelected}
+				{#if selectedSection.id === 'contractor-presets'}
+					<article
+						id="content-editor"
+						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
+						data-testid="cms-contractor-preset-panel"
+					>
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Contractor presets · apply surface</p>
+								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Preset launcher</h4>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Initialize the shared site template with trade-specific defaults for hero messaging, featured services, and icon mapping.</p>
+							</div>
+							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+								{activeContractorPreset?.label ?? 'No active preset'}
+							</span>
+						</div>
+
+						{#if form?.savedMessage}
+							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+								{form.savedMessage}
+							</div>
+						{/if}
+
+						{#if form?.message}
+							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+								{form.message}
+							</div>
+						{/if}
+
+						<div class="mt-5 grid gap-4 xl:grid-cols-2">
+							{#each contractorPresets as preset}
+								<form method="POST" action="?/applyContractorPreset" class="rounded-lg bg-white/80 p-4 shadow-sm">
+									<input type="hidden" name="presetId" value={preset.id} />
+									<div class="flex items-start justify-between gap-3">
+										<div>
+											<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{preset.contractorType}</p>
+											<h5 class="mt-1 text-lg font-semibold text-[var(--text-strong)]">{preset.label}</h5>
+										</div>
+										<span class={`rounded-full px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] ${preset.id === content.activeContractorPresetId ? 'bg-[#fff4ea] text-[var(--accent-text)] ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-[var(--shell-panel-strong)] text-[var(--text-muted)]'}`}>
+											{preset.id === content.activeContractorPresetId ? 'Active' : 'Ready'}
+										</span>
+									</div>
+									<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">{preset.defaultHeroHeadline}</p>
+									<div class="mt-4 grid gap-3 md:grid-cols-2">
+										<div class="rounded-md bg-[var(--shell-panel-strong)] p-3">
+											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Default services</p>
+											<ul class="mt-2 space-y-1.5 text-sm text-[var(--text-base)]">
+												{#each preset.defaultServices as service}
+													<li>{service.name}</li>
+												{/each}
+											</ul>
+										</div>
+										<div class="rounded-md bg-[var(--shell-panel-strong)] p-3">
+											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Default icons</p>
+											<ul class="mt-2 space-y-1.5 text-sm text-[var(--text-base)]">
+												{#each preset.defaultIconAssetKeys as iconKey}
+													<li>{getBdrAsset(content, iconKey)?.name ?? iconKey}</li>
+												{/each}
+											</ul>
+										</div>
+									</div>
+									<div class="mt-4 flex justify-end">
+										<button
+											type="submit"
+											class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+										>
+											Apply preset
+										</button>
+									</div>
+								</form>
+							{/each}
+						</div>
+					</article>
+				{:else if isServicesCrudSelected}
 					<article
 						id="content-editor"
 						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"

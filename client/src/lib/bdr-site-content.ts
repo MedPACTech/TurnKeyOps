@@ -30,6 +30,23 @@ export type BdrServiceCategory = {
 	sortOrder: number;
 };
 
+export type BdrPresetService = {
+	name: string;
+	slug: string;
+	description: string;
+	iconAssetKey: string;
+	imageAssetKey?: string;
+};
+
+export type BdrContractorPreset = {
+	id: string;
+	label: string;
+	contractorType: string;
+	defaultHeroHeadline: string;
+	defaultServices: BdrPresetService[];
+	defaultIconAssetKeys: string[];
+};
+
 export type BdrThemeSettings = {
 	mode: 'Light' | 'Dark' | 'System';
 	preset: 'Clean' | 'Industrial' | 'Premium' | 'Minimal' | 'Bold';
@@ -61,6 +78,8 @@ export type BdrThemeSettings = {
 export type BdrSiteContent = {
 	assetLibrary: BdrAsset[];
 	serviceCategories: BdrServiceCategory[];
+	contractorPresets: BdrContractorPreset[];
+	activeContractorPresetId: string;
 	themeSettings: BdrThemeSettings;
 	navigation: {
 		announcement: string;
@@ -262,6 +281,66 @@ export const bdrSiteContent: BdrSiteContent = {
 			contractorCategory: 'shared',
 			tags: ['social', 'instagram', 'footer'],
 			sortOrder: 14
+		},
+		{
+			key: 'preset-roofing-icon',
+			name: 'Roofing preset icon',
+			type: 'icon',
+			file: '/clientFiles/assets/roofing-icon.svg',
+			altText: 'Line icon for roofing work',
+			contractorCategory: 'roofing',
+			tags: ['preset', 'roofing', 'icon'],
+			sortOrder: 15
+		},
+		{
+			key: 'preset-masonry-icon',
+			name: 'Masonry preset icon',
+			type: 'icon',
+			file: '/clientFiles/assets/masonry-icon.svg',
+			altText: 'Line icon for masonry work',
+			contractorCategory: 'masonry',
+			tags: ['preset', 'masonry', 'icon'],
+			sortOrder: 16
+		},
+		{
+			key: 'preset-landscaping-icon',
+			name: 'Landscaping preset icon',
+			type: 'icon',
+			file: '/clientFiles/assets/landscaping-icon.svg',
+			altText: 'Line icon for landscaping work',
+			contractorCategory: 'landscaping',
+			tags: ['preset', 'landscaping', 'icon'],
+			sortOrder: 17
+		},
+		{
+			key: 'preset-hvac-icon',
+			name: 'HVAC preset icon',
+			type: 'icon',
+			file: '/clientFiles/assets/hvac-icon.svg',
+			altText: 'Line icon for HVAC work',
+			contractorCategory: 'hvac',
+			tags: ['preset', 'hvac', 'icon'],
+			sortOrder: 18
+		},
+		{
+			key: 'preset-remodeling-icon',
+			name: 'Remodeling preset icon',
+			type: 'icon',
+			file: '/clientFiles/assets/remodeling-icon.svg',
+			altText: 'Line icon for remodeling work',
+			contractorCategory: 'remodeling',
+			tags: ['preset', 'remodeling', 'icon'],
+			sortOrder: 19
+		},
+		{
+			key: 'preset-exterior-icon',
+			name: 'Exterior services preset icon',
+			type: 'icon',
+			file: '/clientFiles/assets/exterior-services-icon.svg',
+			altText: 'Line icon for exterior services work',
+			contractorCategory: 'exterior-services',
+			tags: ['preset', 'exterior-services', 'icon'],
+			sortOrder: 20
 		}
 	],
 	serviceCategories: [
@@ -321,6 +400,205 @@ export const bdrSiteContent: BdrSiteContent = {
 			sortOrder: 6
 		}
 	],
+	contractorPresets: [
+		{
+			id: 'concrete-flatwork',
+			label: 'Concrete / Flatwork',
+			contractorType: 'concrete',
+			defaultHeroHeadline: 'Concrete driveways, patios, and flatwork handled with a clear path from request to finished pour.',
+			defaultServices: [
+				{
+					name: 'Driveways',
+					slug: 'driveways',
+					description: 'New pours, replacements, widening, and apron tie-ins.',
+					iconAssetKey: 'service-driveways-icon',
+					imageAssetKey: 'hero-driveway-scene'
+				},
+				{
+					name: 'Patios',
+					slug: 'patios',
+					description: 'Backyard entertainment slabs, extensions, and broom-finish installs.',
+					iconAssetKey: 'service-patios-icon'
+				},
+				{
+					name: 'Sidewalks',
+					slug: 'sidewalks',
+					description: 'Walkways, repair sections, and pedestrian flatwork.',
+					iconAssetKey: 'service-sidewalks-icon'
+				},
+				{
+					name: 'Decorative Concrete',
+					slug: 'decorative-concrete',
+					description: 'Stamped, colored, and upgraded finishes for high-visual-impact surfaces.',
+					iconAssetKey: 'service-decorative-icon'
+				}
+			],
+			defaultIconAssetKeys: ['service-driveways-icon', 'service-patios-icon', 'service-sidewalks-icon', 'service-decorative-icon']
+		},
+		{
+			id: 'roofing-restoration',
+			label: 'Roofing / Restoration',
+			contractorType: 'roofing',
+			defaultHeroHeadline: 'Roofing and storm-restoration work with fast intake, clear scopes, and dependable schedule follow-through.',
+			defaultServices: [
+				{
+					name: 'Roof replacement',
+					slug: 'roof-replacement',
+					description: 'Full tear-off and replacement scopes with ventilation and cleanup coordination.',
+					iconAssetKey: 'preset-roofing-icon'
+				},
+				{
+					name: 'Leak repair',
+					slug: 'leak-repair',
+					description: 'Urgent repairs, flashing fixes, and storm-damage response.',
+					iconAssetKey: 'preset-roofing-icon'
+				},
+				{
+					name: 'Storm restoration',
+					slug: 'storm-restoration',
+					description: 'Insurance support, photo sets, and supplement-ready documentation.',
+					iconAssetKey: 'preset-roofing-icon'
+				}
+			],
+			defaultIconAssetKeys: ['preset-roofing-icon']
+		},
+		{
+			id: 'masonry-hardscape',
+			label: 'Masonry / Hardscape',
+			contractorType: 'masonry',
+			defaultHeroHeadline: 'Masonry and hardscape crews with a cleaner handoff from design questions to field-ready scope.',
+			defaultServices: [
+				{
+					name: 'Brick repair',
+					slug: 'brick-repair',
+					description: 'Repointing, repairs, and selective rebuilds for worn masonry areas.',
+					iconAssetKey: 'preset-masonry-icon'
+				},
+				{
+					name: 'Retaining walls',
+					slug: 'retaining-walls',
+					description: 'Structural and decorative wall scopes with drainage planning.',
+					iconAssetKey: 'preset-masonry-icon'
+				},
+				{
+					name: 'Fire pits and veneer',
+					slug: 'fire-pits-veneer',
+					description: 'Outdoor masonry focal points and facade upgrades.',
+					iconAssetKey: 'preset-masonry-icon'
+				}
+			],
+			defaultIconAssetKeys: ['preset-masonry-icon']
+		},
+		{
+			id: 'landscaping-outdoor',
+			label: 'Landscaping / Outdoor',
+			contractorType: 'landscaping',
+			defaultHeroHeadline: 'Landscaping sites launched with service defaults that keep seasonal crews and outdoor work organized.',
+			defaultServices: [
+				{
+					name: 'Landscape installs',
+					slug: 'landscape-installs',
+					description: 'Planting, bed refreshes, grading, and outdoor cleanup packages.',
+					iconAssetKey: 'preset-landscaping-icon'
+				},
+				{
+					name: 'Drainage work',
+					slug: 'drainage-work',
+					description: 'Yard drainage corrections, swales, and runoff control.',
+					iconAssetKey: 'preset-landscaping-icon'
+				},
+				{
+					name: 'Outdoor maintenance',
+					slug: 'outdoor-maintenance',
+					description: 'Seasonal care plans and repeat maintenance visits.',
+					iconAssetKey: 'preset-landscaping-icon'
+				}
+			],
+			defaultIconAssetKeys: ['preset-landscaping-icon']
+		},
+		{
+			id: 'hvac-comfort',
+			label: 'HVAC / Comfort',
+			contractorType: 'hvac',
+			defaultHeroHeadline: 'HVAC replacements, repairs, and maintenance work launched from a consistent contractor-site baseline.',
+			defaultServices: [
+				{
+					name: 'System replacement',
+					slug: 'system-replacement',
+					description: 'Full equipment change-outs with options and installation scheduling.',
+					iconAssetKey: 'preset-hvac-icon'
+				},
+				{
+					name: 'Repair service',
+					slug: 'repair-service',
+					description: 'Diagnostic visits, urgent repair calls, and component replacements.',
+					iconAssetKey: 'preset-hvac-icon'
+				},
+				{
+					name: 'Maintenance plans',
+					slug: 'maintenance-plans',
+					description: 'Seasonal tune-ups and recurring service agreements.',
+					iconAssetKey: 'preset-hvac-icon'
+				}
+			],
+			defaultIconAssetKeys: ['preset-hvac-icon']
+		},
+		{
+			id: 'remodeling-interiors',
+			label: 'Remodeling / Interiors',
+			contractorType: 'remodeling',
+			defaultHeroHeadline: 'Remodeling sites with clearer default messaging for consultation, scope, and build planning.',
+			defaultServices: [
+				{
+					name: 'Kitchen remodels',
+					slug: 'kitchen-remodels',
+					description: 'Cabinet, surface, and fixture renovation projects.',
+					iconAssetKey: 'preset-remodeling-icon'
+				},
+				{
+					name: 'Bathroom remodels',
+					slug: 'bathroom-remodels',
+					description: 'Bath upgrades, tile, plumbing fixtures, and layout improvements.',
+					iconAssetKey: 'preset-remodeling-icon'
+				},
+				{
+					name: 'Interior finish work',
+					slug: 'interior-finish-work',
+					description: 'Trim, paint, flooring, and room refresh packages.',
+					iconAssetKey: 'preset-remodeling-icon'
+				}
+			],
+			defaultIconAssetKeys: ['preset-remodeling-icon']
+		},
+		{
+			id: 'exterior-services',
+			label: 'Exterior Services',
+			contractorType: 'exterior-services',
+			defaultHeroHeadline: 'Exterior services that keep siding, gutters, trim, and facade projects moving through a shared workflow.',
+			defaultServices: [
+				{
+					name: 'Siding repair',
+					slug: 'siding-repair',
+					description: 'Selective repairs and full siding refresh scopes.',
+					iconAssetKey: 'preset-exterior-icon'
+				},
+				{
+					name: 'Gutter systems',
+					slug: 'gutter-systems',
+					description: 'Replacement gutters, guards, and drainage improvements.',
+					iconAssetKey: 'preset-exterior-icon'
+				},
+				{
+					name: 'Trim and fascia',
+					slug: 'trim-fascia',
+					description: 'Exterior trim, fascia, and detail work that protects the envelope.',
+					iconAssetKey: 'preset-exterior-icon'
+				}
+			],
+			defaultIconAssetKeys: ['preset-exterior-icon']
+		}
+	],
+	activeContractorPresetId: 'concrete-flatwork',
 	themeSettings: {
 		mode: 'Dark',
 		preset: 'Industrial',
@@ -501,3 +779,37 @@ export const getBdrAsset = (content: BdrSiteContent, key: string) =>
 
 export const getBdrServiceCategories = (content: BdrSiteContent) =>
 	[...content.serviceCategories].sort((left, right) => left.sortOrder - right.sortOrder);
+
+export const getBdrContractorPresets = (content: BdrSiteContent) => [...content.contractorPresets];
+
+export const getBdrActiveContractorPreset = (content: BdrSiteContent) =>
+	content.contractorPresets.find((preset) => preset.id === content.activeContractorPresetId) ??
+	content.contractorPresets[0] ??
+	null;
+
+export const applyBdrContractorPresetToContent = (
+	content: BdrSiteContent,
+	presetId: string
+) => {
+	const preset = content.contractorPresets.find((candidate) => candidate.id === presetId);
+
+	if (!preset) {
+		return null;
+	}
+
+	content.activeContractorPresetId = preset.id;
+	content.hero.headline = preset.defaultHeroHeadline;
+	content.services.items = preset.defaultServices.map((service) => service.name);
+	content.serviceCategories = preset.defaultServices.map((service, index) => ({
+		name: service.name,
+		slug: service.slug,
+		description: service.description,
+		iconAssetKey: service.iconAssetKey,
+		imageAssetKey: service.imageAssetKey,
+		contractorType: preset.contractorType,
+		featured: true,
+		sortOrder: index + 1
+	}));
+
+	return preset;
+};

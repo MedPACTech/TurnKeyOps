@@ -1,4 +1,12 @@
-import { bdrSiteContent, type BdrAsset, type BdrServiceCategory, type BdrSiteContent, type BdrThemeSettings } from '$lib/bdr-site-content';
+import {
+	applyBdrContractorPresetToContent,
+	bdrSiteContent,
+	type BdrAsset,
+	type BdrContractorPreset,
+	type BdrServiceCategory,
+	type BdrSiteContent,
+	type BdrThemeSettings
+} from '$lib/bdr-site-content';
 
 const fsModuleName = 'node:fs/promises';
 const getCwd = () =>
@@ -76,6 +84,61 @@ const normalizeServiceCategories = (items: unknown): BdrServiceCategory[] | null
 	return categories;
 };
 
+const normalizeContractorPresets = (items: unknown): BdrContractorPreset[] | null => {
+	if (!Array.isArray(items)) return null;
+
+	const presets = items
+		.map((item): BdrContractorPreset | null => {
+			if (!item || typeof item !== 'object') return null;
+			const candidate = item as Partial<BdrContractorPreset>;
+			if (
+				!candidate.id ||
+				!candidate.label ||
+				!candidate.contractorType ||
+				!candidate.defaultHeroHeadline ||
+				!Array.isArray(candidate.defaultServices)
+			) {
+				return null;
+			}
+
+			const defaultServices = candidate.defaultServices
+				.map((service): BdrContractorPreset['defaultServices'][number] | null => {
+					if (!service || typeof service !== 'object') return null;
+					const entry = service as BdrContractorPreset['defaultServices'][number];
+					if (!entry.name || !entry.slug || !entry.description || !entry.iconAssetKey) {
+						return null;
+					}
+
+					return {
+						name: String(entry.name),
+						slug: String(entry.slug),
+						description: String(entry.description),
+						iconAssetKey: String(entry.iconAssetKey),
+						imageAssetKey: entry.imageAssetKey ? String(entry.imageAssetKey) : undefined
+					};
+				})
+				.filter(
+					(
+						service
+					): service is BdrContractorPreset['defaultServices'][number] => service !== null
+				);
+
+			return {
+				id: String(candidate.id),
+				label: String(candidate.label),
+				contractorType: String(candidate.contractorType),
+				defaultHeroHeadline: String(candidate.defaultHeroHeadline),
+				defaultServices,
+				defaultIconAssetKeys: Array.isArray(candidate.defaultIconAssetKeys)
+					? candidate.defaultIconAssetKeys.map((icon) => String(icon)).filter(Boolean)
+					: []
+			};
+		})
+		.filter((preset): preset is BdrContractorPreset => preset !== null);
+
+	return presets;
+};
+
 const normalizeThemeSettings = (value: unknown, fallback: BdrThemeSettings): BdrThemeSettings => {
 	if (!value || typeof value !== 'object') return fallback;
 
@@ -130,6 +193,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const services = normalizeServices(candidate.services?.items);
 	const assetLibrary = normalizeAssetLibrary(candidate.assetLibrary);
 	const serviceCategories = normalizeServiceCategories(candidate.serviceCategories);
+	const contractorPresets = normalizeContractorPresets(candidate.contractorPresets);
 	const themeSettings = normalizeThemeSettings(candidate.themeSettings, content.themeSettings);
 
 	if (services) {
@@ -142,6 +206,17 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 
 	if (serviceCategories) {
 		content.serviceCategories = serviceCategories;
+	}
+
+	if (contractorPresets?.length) {
+		content.contractorPresets = contractorPresets;
+	}
+
+	if (
+		typeof candidate.activeContractorPresetId === 'string' &&
+		content.contractorPresets.some((preset) => preset.id === candidate.activeContractorPresetId)
+	) {
+		content.activeContractorPresetId = candidate.activeContractorPresetId;
 	}
 
 	content.themeSettings = themeSettings;
@@ -216,6 +291,19 @@ export const saveBdrThemeSettings = async (
 		},
 		content.themeSettings
 	);
+
+	return writeBdrSiteContent(content);
+};
+
+export const applyBdrContractorPresetSelection = async (
+	presetId: string
+): Promise<BdrSiteContent> => {
+	const content = await loadBdrSiteContent();
+	const appliedPreset = applyBdrContractorPresetToContent(content, presetId);
+
+	if (!appliedPreset) {
+		throw new Error(`Unknown contractor preset: ${presetId}`);
+	}
 
 	return writeBdrSiteContent(content);
 };
