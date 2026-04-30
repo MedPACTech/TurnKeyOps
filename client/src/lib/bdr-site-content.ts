@@ -30,9 +30,38 @@ export type BdrServiceCategory = {
 	sortOrder: number;
 };
 
+export type BdrThemeSettings = {
+	mode: 'Light' | 'Dark' | 'System';
+	preset: 'Clean' | 'Industrial' | 'Premium' | 'Minimal' | 'Bold';
+	colors: {
+		primary: string;
+		secondary: string;
+		accent: string;
+		background: string;
+		surface: string;
+		text: string;
+		border: string;
+	};
+	typography: {
+		headingFont: string;
+		bodyFont: string;
+	};
+	sizing: {
+		buttonRadius: string;
+		cardRadius: string;
+		logoSize: string;
+	};
+	iconStyle: string;
+	brandAssets: {
+		logoAssetKey: string;
+		faviconAssetKey: string;
+	};
+};
+
 export type BdrSiteContent = {
 	assetLibrary: BdrAsset[];
 	serviceCategories: BdrServiceCategory[];
+	themeSettings: BdrThemeSettings;
 	navigation: {
 		announcement: string;
 		brandName: string;
@@ -292,6 +321,33 @@ export const bdrSiteContent: BdrSiteContent = {
 			sortOrder: 6
 		}
 	],
+	themeSettings: {
+		mode: 'Dark',
+		preset: 'Industrial',
+		colors: {
+			primary: '#F97316',
+			secondary: '#171717',
+			accent: '#F5F5F5',
+			background: '#0F1111',
+			surface: '#1F1F1F',
+			text: '#FFFFFF',
+			border: '#2A2A2A'
+		},
+		typography: {
+			headingFont: 'Oswald',
+			bodyFont: 'Inter'
+		},
+		sizing: {
+			buttonRadius: '999px',
+			cardRadius: '1.5rem',
+			logoSize: 'Medium'
+		},
+		iconStyle: 'Line',
+		brandAssets: {
+			logoAssetKey: 'bdr-crest-logo',
+			faviconAssetKey: 'bdr-favicon-mark'
+		}
+	},
 	navigation: {
 		announcement: 'Navigation',
 		brandName: 'BDR Construction',

@@ -11,6 +11,22 @@
 	const year = new Date().getFullYear();
 	const logoAsset = $derived(getBdrAsset(content, 'bdr-crest-logo'));
 	const serviceCategories = $derived(getBdrServiceCategories(content));
+	const themeSettings = $derived(content.themeSettings);
+	const publicThemeStyle = $derived(
+		[
+			`--bdr-primary:${themeSettings.colors.primary}`,
+			`--bdr-secondary:${themeSettings.colors.secondary}`,
+			`--bdr-accent:${themeSettings.colors.accent}`,
+			`--bdr-background:${themeSettings.colors.background}`,
+			`--bdr-surface:${themeSettings.colors.surface}`,
+			`--bdr-text:${themeSettings.colors.text}`,
+			`--bdr-border:${themeSettings.colors.border}`,
+			`--bdr-button-radius:${themeSettings.sizing.buttonRadius}`,
+			`--bdr-card-radius:${themeSettings.sizing.cardRadius}`,
+			`--bdr-heading-font:${themeSettings.typography.headingFont}, Inter, sans-serif`,
+			`--bdr-body-font:${themeSettings.typography.bodyFont}, Inter, sans-serif`
+		].join(';')
+	);
 	const priorityOptions = [
 		{ value: 'standard', label: 'Standard project' },
 		{ value: 'priority', label: 'Priority quote' },
@@ -28,7 +44,12 @@
 	<meta name="description" content="BDR Construction public site for roofing, exterior work, and fast estimate requests." />
 </svelte:head>
 
-<div class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.16),_transparent_24%),linear-gradient(180deg,_#050505_0%,_#101010_46%,_#181818_100%)] text-white">
+<div
+	class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.16),_transparent_24%),linear-gradient(180deg,_#050505_0%,_#101010_46%,_#181818_100%)] text-white"
+	data-theme={themeSettings.mode.toLowerCase()}
+	data-style-preset={themeSettings.preset.toLowerCase()}
+	style={`color: var(--bdr-text); background-color: var(--bdr-background); font-family: var(--bdr-body-font); ${publicThemeStyle}`}
+>
 	<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 		<nav id="top" class="sticky top-4 z-30 rounded-xl border border-white/10 bg-slate-950/90 px-4 py-3 shadow-[0_20px_60px_rgba(15,23,42,0.32)] backdrop-blur">
 			<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -46,7 +67,13 @@
 					{#each content.navigation.links as link}
 						<a href={link.href} class="rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6 hover:text-white">{link.label}</a>
 					{/each}
-					<a href="#quote-request" class="rounded-full bg-orange-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-orange-300">Request a Quote</a>
+					<a
+						href="#quote-request"
+						class="px-4 py-2 text-sm font-semibold text-black transition hover:brightness-110"
+						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+					>
+						Request a Quote
+					</a>
 				</div>
 			</div>
 		</nav>
@@ -54,10 +81,16 @@
 		<section id="hero" class="mt-6 grid gap-6 rounded-3xl border border-white/10 bg-slate-950/55 p-6 shadow-[0_30px_110px_rgba(15,23,42,0.35)] backdrop-blur lg:grid-cols-[1.15fr_0.85fr] lg:p-8">
 			<div class="space-y-5">
 				<p class="text-[0.72rem] uppercase tracking-[0.28em] text-orange-200/80">{content.hero.eyebrow}</p>
-				<h1 class="max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">{content.hero.headline}</h1>
+				<h1 class="max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl" style="font-family: var(--bdr-heading-font);">{content.hero.headline}</h1>
 				<p class="max-w-2xl text-base leading-7 text-slate-300">{content.hero.body}</p>
 				<div class="flex flex-wrap gap-3">
-					<a href="#quote-request" class="rounded-full bg-orange-400 px-5 py-3 text-sm font-semibold text-black transition hover:bg-orange-300">Get a Free Quote</a>
+					<a
+						href="#quote-request"
+						class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+					>
+						Get a Free Quote
+					</a>
 					<a href={content.hero.secondaryCtaHref} class="rounded-full border border-white/14 px-5 py-3 text-sm font-semibold text-white transition hover:border-orange-300/45 hover:bg-white/6">{content.hero.secondaryCtaLabel}</a>
 				</div>
 			</div>
@@ -285,7 +318,13 @@
 
 					<div class="flex flex-col gap-3 rounded-[1.2rem] border border-white/10 bg-white/4 p-4 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
 						<p>Use this form to put the project in front of BDR quickly with the details needed for first follow-up and quote prep.</p>
-						<button type="submit" class="rounded-full bg-orange-400 px-5 py-3 text-sm font-semibold text-black transition hover:bg-orange-300">Submit quote request</button>
+						<button
+							type="submit"
+							class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+							style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+						>
+							Submit quote request
+						</button>
 					</div>
 				</form>
 			</div>

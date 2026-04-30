@@ -1,4 +1,4 @@
-import { bdrSiteContent, type BdrAsset, type BdrServiceCategory, type BdrSiteContent } from '$lib/bdr-site-content';
+import { bdrSiteContent, type BdrAsset, type BdrServiceCategory, type BdrSiteContent, type BdrThemeSettings } from '$lib/bdr-site-content';
 
 const fsModuleName = 'node:fs/promises';
 const getCwd = () =>
@@ -76,6 +76,49 @@ const normalizeServiceCategories = (items: unknown): BdrServiceCategory[] | null
 	return categories;
 };
 
+const normalizeThemeSettings = (value: unknown, fallback: BdrThemeSettings): BdrThemeSettings => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrThemeSettings>;
+	return {
+		mode:
+			candidate.mode === 'Light' || candidate.mode === 'Dark' || candidate.mode === 'System'
+				? candidate.mode
+				: fallback.mode,
+		preset:
+			candidate.preset === 'Clean' ||
+			candidate.preset === 'Industrial' ||
+			candidate.preset === 'Premium' ||
+			candidate.preset === 'Minimal' ||
+			candidate.preset === 'Bold'
+				? candidate.preset
+				: fallback.preset,
+		colors: {
+			primary: String(candidate.colors?.primary ?? fallback.colors.primary),
+			secondary: String(candidate.colors?.secondary ?? fallback.colors.secondary),
+			accent: String(candidate.colors?.accent ?? fallback.colors.accent),
+			background: String(candidate.colors?.background ?? fallback.colors.background),
+			surface: String(candidate.colors?.surface ?? fallback.colors.surface),
+			text: String(candidate.colors?.text ?? fallback.colors.text),
+			border: String(candidate.colors?.border ?? fallback.colors.border)
+		},
+		typography: {
+			headingFont: String(candidate.typography?.headingFont ?? fallback.typography.headingFont),
+			bodyFont: String(candidate.typography?.bodyFont ?? fallback.typography.bodyFont)
+		},
+		sizing: {
+			buttonRadius: String(candidate.sizing?.buttonRadius ?? fallback.sizing.buttonRadius),
+			cardRadius: String(candidate.sizing?.cardRadius ?? fallback.sizing.cardRadius),
+			logoSize: String(candidate.sizing?.logoSize ?? fallback.sizing.logoSize)
+		},
+		iconStyle: String(candidate.iconStyle ?? fallback.iconStyle),
+		brandAssets: {
+			logoAssetKey: String(candidate.brandAssets?.logoAssetKey ?? fallback.brandAssets.logoAssetKey),
+			faviconAssetKey: String(candidate.brandAssets?.faviconAssetKey ?? fallback.brandAssets.faviconAssetKey)
+		}
+	};
+};
+
 const normalizeContent = (value: unknown): BdrSiteContent => {
 	const content = cloneDefaultContent();
 
@@ -87,6 +130,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const services = normalizeServices(candidate.services?.items);
 	const assetLibrary = normalizeAssetLibrary(candidate.assetLibrary);
 	const serviceCategories = normalizeServiceCategories(candidate.serviceCategories);
+	const themeSettings = normalizeThemeSettings(candidate.themeSettings, content.themeSettings);
 
 	if (services) {
 		content.services.items = services;
@@ -100,7 +144,27 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 		content.serviceCategories = serviceCategories;
 	}
 
+	content.themeSettings = themeSettings;
+
 	return content;
+};
+
+const writeBdrSiteContent = async (content: BdrSiteContent): Promise<BdrSiteContent> => {
+	const fs = await getFs();
+	await fs.mkdir(localStoreDir, { recursive: true });
+	await fs.writeFile(localStorePath, JSON.stringify(content, null, 2));
+
+	return content;
+};
+
+type BdrThemeSettingsPatch = {
+	mode?: BdrThemeSettings['mode'];
+	preset?: BdrThemeSettings['preset'];
+	colors?: Partial<BdrThemeSettings['colors']>;
+	typography?: Partial<BdrThemeSettings['typography']>;
+	sizing?: Partial<BdrThemeSettings['sizing']>;
+	iconStyle?: string;
+	brandAssets?: Partial<BdrThemeSettings['brandAssets']>;
 };
 
 export const loadBdrSiteContent = async (): Promise<BdrSiteContent> => {
@@ -122,9 +186,36 @@ export const saveBdrServices = async (items: string[]): Promise<BdrSiteContent> 
 	const content = await loadBdrSiteContent();
 	content.services.items = services;
 
-	const fs = await getFs();
-	await fs.mkdir(localStoreDir, { recursive: true });
-	await fs.writeFile(localStorePath, JSON.stringify(content, null, 2));
+	return writeBdrSiteContent(content);
+};
 
-	return content;
+export const saveBdrThemeSettings = async (
+	value: BdrThemeSettingsPatch
+): Promise<BdrSiteContent> => {
+	const content = await loadBdrSiteContent();
+	content.themeSettings = normalizeThemeSettings(
+		{
+			...content.themeSettings,
+			...value,
+			colors: {
+				...content.themeSettings.colors,
+				...value.colors
+			},
+			typography: {
+				...content.themeSettings.typography,
+				...value.typography
+			},
+			sizing: {
+				...content.themeSettings.sizing,
+				...value.sizing
+			},
+			brandAssets: {
+				...content.themeSettings.brandAssets,
+				...value.brandAssets
+			}
+		},
+		content.themeSettings
+	);
+
+	return writeBdrSiteContent(content);
 };
