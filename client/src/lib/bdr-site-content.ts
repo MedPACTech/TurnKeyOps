@@ -163,6 +163,19 @@ export type BdrSiteContent = {
 			timeframe?: string;
 		}>;
 	};
+	ctaBanner: {
+		eyebrow: string;
+		title: string;
+		description: string;
+		backgroundImageAssetKey: string;
+		backgroundImageAltText: string;
+		overlayOpacity: number;
+		primaryCtaLabel: string;
+		primaryCtaHref: string;
+		secondaryCtaLabel: string;
+		secondaryCtaType: BdrCtaType;
+		secondaryCtaHref: string;
+	};
 	supportingSections: Array<{
 		eyebrow: string;
 		title: string;
@@ -828,6 +841,20 @@ export const bdrSiteContent: BdrSiteContent = {
 				timeframe: 'Next available slot'
 			}
 		]
+	},
+	ctaBanner: {
+		eyebrow: 'CTA banner',
+		title: 'Need a clear next step before the quote form?',
+		description:
+			'Use the banner CTA to move urgent prospects straight into the estimate flow or pick up the phone when the job needs faster attention.',
+		backgroundImageAssetKey: 'cta-finishing-scene',
+		backgroundImageAltText: 'Concrete finishing equipment active on a work site',
+		overlayOpacity: 0.74,
+		primaryCtaLabel: 'Request a quote',
+		primaryCtaHref: '#quote-request',
+		secondaryCtaLabel: 'Call BDR',
+		secondaryCtaType: 'phone',
+		secondaryCtaHref: '(220) 217-7026'
 	},
 	supportingSections: [
 		{

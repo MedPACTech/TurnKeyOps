@@ -414,6 +414,39 @@
 			]
 		},
 		{
+			id: 'cta-banner',
+			label: 'CTA Banner',
+			description: 'The full-width conversion banner between process and the quote form.',
+			previewTitle: content.ctaBanner.title,
+			previewBody: content.ctaBanner.description,
+			previewMeta: `${content.ctaBanner.primaryCtaLabel} / ${content.ctaBanner.secondaryCtaLabel}`,
+			areas: [
+				{
+					id: 'cta-banner-copy',
+					label: 'Banner copy',
+					value: content.ctaBanner.title,
+					detail: content.ctaBanner.description,
+					fields: [
+						{ label: 'Eyebrow', value: content.ctaBanner.eyebrow },
+						{ label: 'Heading', value: content.ctaBanner.title },
+						{ label: 'Description', value: content.ctaBanner.description, multiline: true }
+					]
+				},
+				{
+					id: 'cta-banner-media',
+					label: 'Banner media and CTAs',
+					value: content.ctaBanner.backgroundImageAssetKey,
+					detail: `${content.ctaBanner.primaryCtaLabel} / ${content.ctaBanner.secondaryCtaLabel}`,
+					fields: [
+						{ label: 'Background image', value: content.ctaBanner.backgroundImageAssetKey },
+						{ label: 'Overlay opacity', value: String(content.ctaBanner.overlayOpacity) },
+						{ label: 'Primary CTA', value: `${content.ctaBanner.primaryCtaLabel} → ${content.ctaBanner.primaryCtaHref}` },
+						{ label: 'Secondary CTA', value: `${content.ctaBanner.secondaryCtaLabel} (${content.ctaBanner.secondaryCtaType}) → ${content.ctaBanner.secondaryCtaHref}` }
+					]
+				}
+			]
+		},
+		{
 			id: 'supporting',
 			label: 'Supporting',
 			description: 'Featured work and supporting narrative blocks.',
@@ -1225,6 +1258,123 @@
 										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save process
+									</button>
+								</div>
+							</section>
+						</form>
+					</article>
+				{:else if selectedSection.id === 'cta-banner'}
+					<article
+						id="content-editor"
+						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
+						data-testid="cms-cta-banner-panel"
+					>
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">CTA Banner · CMS controls</p>
+								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Full-width CTA banner</h4>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Manage the full-width dark banner that reinforces conversion before the quote form.</p>
+							</div>
+							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+								Overlay {content.ctaBanner.overlayOpacity}
+							</span>
+						</div>
+
+						{#if form?.savedSectionId === 'cta-banner' && form?.savedMessage}
+							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+								{form.savedMessage}
+							</div>
+						{/if}
+
+						{#if form?.savedSectionId === 'cta-banner' && form?.message}
+							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+								{form.message}
+							</div>
+						{/if}
+
+						<form method="POST" action="?/updateCtaBanner" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Copy and CTAs</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
+										<input name="ctaBannerEyebrow" value={content.ctaBanner.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Heading</span>
+										<input name="ctaBannerTitle" value={content.ctaBanner.title} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Description</span>
+										<textarea name="ctaBannerDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.ctaBanner.description}</textarea>
+									</label>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Primary CTA label</span>
+											<input name="ctaBannerPrimaryCtaLabel" value={content.ctaBanner.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Primary CTA target</span>
+											<input name="ctaBannerPrimaryCtaHref" value={content.ctaBanner.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+									</div>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Secondary CTA label</span>
+											<input name="ctaBannerSecondaryCtaLabel" value={content.ctaBanner.secondaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Secondary CTA type</span>
+											<select name="ctaBannerSecondaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+												<option value="anchor" selected={content.ctaBanner.secondaryCtaType === 'anchor'}>Anchor</option>
+												<option value="link" selected={content.ctaBanner.secondaryCtaType === 'link'}>Link</option>
+												<option value="phone" selected={content.ctaBanner.secondaryCtaType === 'phone'}>Phone</option>
+											</select>
+										</label>
+									</div>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Secondary CTA value</span>
+										<input name="ctaBannerSecondaryCtaHref" value={content.ctaBanner.secondaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+								</div>
+							</section>
+
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Background image and overlay</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Background image asset</span>
+										<select name="ctaBannerBackgroundImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											{#each heroImageAssets as asset}
+												<option value={asset.key} selected={content.ctaBanner.backgroundImageAssetKey === asset.key}>{asset.name} · {asset.key}</option>
+											{/each}
+										</select>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Background image alt text</span>
+										<input name="ctaBannerBackgroundImageAltText" value={content.ctaBanner.backgroundImageAltText} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Overlay opacity (0 to 1)</span>
+										<input name="ctaBannerOverlayOpacity" value={String(content.ctaBanner.overlayOpacity)} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+								</div>
+
+								<div class="mt-4 rounded-md bg-[var(--shell-panel-strong)] p-3">
+									<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Banner-ready images</p>
+									<ul class="mt-2 space-y-1.5 text-sm text-[var(--text-base)]">
+										{#each heroImageAssets as asset}
+											<li>{asset.key} · {asset.name}</li>
+										{/each}
+									</ul>
+								</div>
+
+								<div class="mt-4 flex justify-end">
+									<button
+										type="submit"
+										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+									>
+										Save CTA banner
 									</button>
 								</div>
 							</section>

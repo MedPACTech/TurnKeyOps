@@ -365,6 +365,37 @@ const normalizeProcess = (
 	};
 };
 
+const normalizeCtaBanner = (
+	value: unknown,
+	fallback: BdrSiteContent['ctaBanner']
+): BdrSiteContent['ctaBanner'] => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrSiteContent['ctaBanner']>;
+	const overlayOpacity = Number(candidate.overlayOpacity);
+
+	return {
+		eyebrow: String(candidate.eyebrow ?? fallback.eyebrow),
+		title: String(candidate.title ?? fallback.title),
+		description: String(candidate.description ?? fallback.description),
+		backgroundImageAssetKey: String(
+			candidate.backgroundImageAssetKey ?? fallback.backgroundImageAssetKey
+		),
+		backgroundImageAltText: String(
+			candidate.backgroundImageAltText ?? fallback.backgroundImageAltText
+		),
+		overlayOpacity:
+			Number.isFinite(overlayOpacity) && overlayOpacity >= 0 && overlayOpacity <= 1
+				? overlayOpacity
+				: fallback.overlayOpacity,
+		primaryCtaLabel: String(candidate.primaryCtaLabel ?? fallback.primaryCtaLabel),
+		primaryCtaHref: String(candidate.primaryCtaHref ?? fallback.primaryCtaHref),
+		secondaryCtaLabel: String(candidate.secondaryCtaLabel ?? fallback.secondaryCtaLabel),
+		secondaryCtaType: normalizeCtaType(candidate.secondaryCtaType, fallback.secondaryCtaType),
+		secondaryCtaHref: String(candidate.secondaryCtaHref ?? fallback.secondaryCtaHref)
+	};
+};
+
 const normalizeNavigation = (
 	value: unknown,
 	fallback: BdrSiteContent['navigation']
@@ -465,6 +496,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const navigation = normalizeNavigation(candidate.navigation, content.navigation);
 	const hero = normalizeHero(candidate.hero, content.hero);
 	const process = normalizeProcess(candidate.process, content.process);
+	const ctaBanner = normalizeCtaBanner(candidate.ctaBanner, content.ctaBanner);
 	const footer = normalizeFooter(candidate.footer, content.footer);
 	const postFooter = normalizePostFooter(candidate.postFooter, content.postFooter);
 
@@ -493,6 +525,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	content.navigation = navigation;
 	content.hero = hero;
 	content.process = process;
+	content.ctaBanner = ctaBanner;
 	content.footer = footer;
 	content.postFooter = postFooter;
 

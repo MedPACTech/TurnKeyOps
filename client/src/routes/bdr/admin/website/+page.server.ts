@@ -182,6 +182,61 @@ export const load = async () => {
 };
 
 export const actions = {
+	updateCtaBanner: async ({ request }) => {
+		const formData = await request.formData();
+		const overlayOpacity = Number(getValue(formData, 'ctaBannerOverlayOpacity'));
+
+		if (
+			!getValue(formData, 'ctaBannerTitle') ||
+			!getValue(formData, 'ctaBannerDescription') ||
+			!getValue(formData, 'ctaBannerBackgroundImageAssetKey') ||
+			!getValue(formData, 'ctaBannerPrimaryCtaLabel') ||
+			!getValue(formData, 'ctaBannerPrimaryCtaHref') ||
+			!getValue(formData, 'ctaBannerSecondaryCtaLabel') ||
+			!getValue(formData, 'ctaBannerSecondaryCtaHref')
+		) {
+			return fail(400, {
+				savedSectionId: 'cta-banner',
+				message: 'CTA banner copy, image, and CTA fields are required.'
+			});
+		}
+
+		try {
+			return {
+				content: await updateBdrSiteContent((content) => {
+					content.ctaBanner = {
+						eyebrow: getValue(formData, 'ctaBannerEyebrow') || content.ctaBanner.eyebrow,
+						title: getValue(formData, 'ctaBannerTitle'),
+						description: getValue(formData, 'ctaBannerDescription'),
+						backgroundImageAssetKey: getValue(formData, 'ctaBannerBackgroundImageAssetKey'),
+						backgroundImageAltText:
+							getValue(formData, 'ctaBannerBackgroundImageAltText') ||
+							content.ctaBanner.backgroundImageAltText,
+						overlayOpacity:
+							Number.isFinite(overlayOpacity) && overlayOpacity >= 0 && overlayOpacity <= 1
+								? overlayOpacity
+								: content.ctaBanner.overlayOpacity,
+						primaryCtaLabel: getValue(formData, 'ctaBannerPrimaryCtaLabel'),
+						primaryCtaHref: getValue(formData, 'ctaBannerPrimaryCtaHref'),
+						secondaryCtaLabel: getValue(formData, 'ctaBannerSecondaryCtaLabel'),
+						secondaryCtaType: parseCtaType(
+							getValue(formData, 'ctaBannerSecondaryCtaType'),
+							content.ctaBanner.secondaryCtaType
+						),
+						secondaryCtaHref: getValue(formData, 'ctaBannerSecondaryCtaHref')
+					};
+				}),
+				savedSectionId: 'cta-banner',
+				savedMessage: 'CTA banner settings saved to the local contractor-site content store.'
+			};
+		} catch (cause) {
+			console.error('Unable to save CTA banner content.', cause);
+			return fail(500, {
+				savedSectionId: 'cta-banner',
+				message: 'Could not save CTA banner settings.'
+			});
+		}
+	},
 	updateProcessSection: async ({ request }) => {
 		const formData = await request.formData();
 		const steps = parseProcessSteps(getValue(formData, 'processSteps'));

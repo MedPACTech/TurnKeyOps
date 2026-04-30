@@ -51,6 +51,9 @@
 			activeHeroMediaOverride?.backgroundTextureAssetKey || content.hero.backgroundTextureAssetKey
 		)
 	);
+	const ctaBannerImageAsset = $derived(
+		getBdrAsset(content, content.ctaBanner.backgroundImageAssetKey)
+	);
 	const heroImageAltText = $derived(
 		activeHeroMediaOverride?.heroImageAltText?.trim() ||
 			content.hero.heroImageAltText.trim() ||
@@ -112,6 +115,9 @@
 	);
 	const secondaryHeroHref = $derived(
 		resolveHeroCtaHref(content.hero.secondaryCtaType, content.hero.secondaryCtaHref)
+	);
+	const ctaBannerSecondaryHref = $derived(
+		resolveHeroCtaHref(content.ctaBanner.secondaryCtaType, content.ctaBanner.secondaryCtaHref)
 	);
 </script>
 
@@ -401,6 +407,34 @@
 						</div>
 					</div>
 				{/each}
+			</div>
+		</section>
+
+		<section
+			class="relative mt-8 overflow-hidden rounded-[2rem] px-6 py-8 lg:px-8"
+			style={`background-image:linear-gradient(rgba(2,6,23,${content.ctaBanner.overlayOpacity}),rgba(2,6,23,${content.ctaBanner.overlayOpacity})),url(${ctaBannerImageAsset?.file ?? ''}); background-size:cover; background-position:center;`}
+		>
+			<div class="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+				<div class="max-w-3xl">
+					<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-200/80">{content.ctaBanner.eyebrow}</p>
+					<h2 class="mt-3 text-3xl font-semibold text-white" style="font-family: var(--bdr-heading-font);">{content.ctaBanner.title}</h2>
+					<p class="mt-3 max-w-3xl text-sm leading-6 text-slate-200">{content.ctaBanner.description}</p>
+				</div>
+				<div class="flex flex-wrap gap-3">
+					<a
+						href={content.ctaBanner.primaryCtaHref}
+						class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+					>
+						{content.ctaBanner.primaryCtaLabel}
+					</a>
+					<a
+						href={ctaBannerSecondaryHref}
+						class="rounded-full border border-white/14 px-5 py-3 text-sm font-semibold text-white transition hover:border-orange-300/45 hover:bg-white/6"
+					>
+						{content.ctaBanner.secondaryCtaLabel}
+					</a>
+				</div>
 			</div>
 		</section>
 
