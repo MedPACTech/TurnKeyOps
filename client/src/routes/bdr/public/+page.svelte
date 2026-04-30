@@ -310,32 +310,52 @@
 		<section id="services" class="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
 			<SectionCard title={content.services.title} eyebrow={content.services.eyebrow} copy={content.services.copy}>
 				{#if serviceCategories.length}
-					<ul class="mt-4 grid gap-3 sm:grid-cols-2">
+					<ul class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 						{#each serviceCategories as category}
 							{@const iconAsset = getBdrAsset(content, category.iconAssetKey)}
-							<li class="rounded-[1.1rem] border border-white/8 bg-white/4 px-4 py-4 text-sm text-slate-200">
+							<li class="rounded-[1.4rem] bg-white/90 px-4 py-4 text-sm text-slate-700 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
 								<div class="flex items-start gap-3">
-									<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-300/18 bg-black/25 p-2">
+									<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950/5 p-2">
 										{#if iconAsset}
 											<img src={iconAsset.file} alt={iconAsset.altText} class="h-full w-full object-contain" />
 										{:else}
-											<span class="text-lg text-orange-200">▣</span>
+											<span class="text-lg text-[color:var(--bdr-primary)]">▣</span>
 										{/if}
 									</div>
 									<div>
-										<p class="text-base font-semibold text-white">{category.name}</p>
-										<p class="mt-1 text-sm leading-6 text-slate-300">{category.description}</p>
+										<div class="flex flex-wrap items-center gap-2">
+											<p class="text-base font-semibold text-slate-950">{category.name}</p>
+											{#if category.featured}
+												<span class="rounded-full bg-[color:var(--bdr-primary)]/12 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[color:var(--bdr-primary)]">Featured</span>
+											{/if}
+										</div>
+										<p class="mt-1 text-sm leading-6 text-slate-600">{category.description}</p>
+										{#if category.detailPageUrl}
+											<a href={category.detailPageUrl} class="mt-3 inline-flex text-sm font-semibold text-[color:var(--bdr-primary)] transition hover:brightness-90">Learn more</a>
+										{/if}
 									</div>
 								</div>
 							</li>
 						{/each}
 					</ul>
 				{:else}
-					<ul class="mt-4 grid gap-3 sm:grid-cols-2">
+					<ul class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 						{#each content.services.items as item}
-							<li class="rounded-[1.1rem] border border-white/8 bg-white/4 px-4 py-3 text-sm text-slate-200">{item}</li>
+							<li class="rounded-[1.4rem] bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">{item}</li>
 						{/each}
 					</ul>
+				{/if}
+
+				{#if content.services.ctaLabel && content.services.ctaHref}
+					<div class="mt-5">
+						<a
+							href={content.services.ctaHref}
+							class="inline-flex px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+							style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+						>
+							{content.services.ctaLabel}
+						</a>
+					</div>
 				{/if}
 			</SectionCard>
 

@@ -9,6 +9,7 @@ import type {
 	BdrCtaType,
 	BdrHeroMediaOverride,
 	BdrHeroTrustBadge,
+	BdrServiceCategory,
 	BdrSocialLink,
 	ContentLink
 } from '$lib/bdr-site-content';
@@ -95,6 +96,39 @@ const parseSocialLinks = (value: string): BdrSocialLink[] =>
 		})
 		.filter((link): link is BdrSocialLink => link !== null);
 
+const parseServiceCards = (value: string): BdrServiceCategory[] =>
+	value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line, index): BdrServiceCategory | null => {
+			const [
+				name = '',
+				slug = '',
+				description = '',
+				iconAssetKey = '',
+				imageAssetKey = '',
+				detailPageUrl = '',
+				featured = 'true',
+				sortOrder = String(index + 1)
+			] = line.split('|').map((part) => part.trim());
+
+			if (!name || !slug || !description || !iconAssetKey) return null;
+
+			return {
+				name,
+				slug,
+				description,
+				iconAssetKey,
+				imageAssetKey: imageAssetKey || undefined,
+				detailPageUrl: detailPageUrl || undefined,
+				contractorType: 'shared',
+				featured: featured === 'true',
+				sortOrder: Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : index + 1
+			};
+		})
+		.filter((card): card is BdrServiceCategory => card !== null);
+
 const parseCtaType = (value: string, fallback: BdrCtaType): BdrCtaType =>
 	value === 'anchor' || value === 'link' || value === 'phone' ? value : fallback;
 
@@ -105,6 +139,47 @@ export const load = async () => {
 };
 
 export const actions = {
+	updateServicesSection: async ({ request }) => {
+		const formData = await request.formData();
+		const cards = parseServiceCards(getValue(formData, 'serviceCards'));
+		if (cards.length < 3 || cards.length > 8) {
+			return fail(400, {
+				savedSectionId: 'services',
+				message: 'Configure between 3 and 8 service cards.'
+			});
+		}
+
+		try {
+			return {
+				content: await updateBdrSiteContent((content) => {
+					const activeContractorType =
+						content.contractorPresets.find((preset) => preset.id === content.activeContractorPresetId)
+							?.contractorType ?? 'shared';
+					content.services = {
+						eyebrow: getValue(formData, 'servicesEyebrow') || content.services.eyebrow,
+						title: getValue(formData, 'servicesTitle') || content.services.title,
+						copy: getValue(formData, 'servicesCopy') || content.services.copy,
+						items: cards.map((card) => card.name),
+						ctaLabel: getValue(formData, 'servicesCtaLabel'),
+						ctaHref: getValue(formData, 'servicesCtaHref')
+					};
+					content.serviceCategories = cards.map((card, index) => ({
+						...card,
+						contractorType: activeContractorType,
+						sortOrder: index + 1
+					}));
+				}),
+				savedSectionId: 'services',
+				savedMessage: 'Services section saved to the local contractor-site content store.'
+			};
+		} catch (cause) {
+			console.error('Unable to save services section.', cause);
+			return fail(500, {
+				savedSectionId: 'services',
+				message: 'Could not save services section.'
+			});
+		}
+	},
 	updateFooter: async ({ request }) => {
 		const formData = await request.formData();
 		const navigationLinks = parseNavigationLinks(getValue(formData, 'footerNavigationLinks'));

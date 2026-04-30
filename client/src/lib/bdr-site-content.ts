@@ -26,6 +26,7 @@ export type BdrServiceCategory = {
 	description: string;
 	iconAssetKey: string;
 	imageAssetKey?: string;
+	detailPageUrl?: string;
 	contractorType: string;
 	featured: boolean;
 	sortOrder: number;
@@ -141,6 +142,8 @@ export type BdrSiteContent = {
 		title: string;
 		copy: string;
 		items: string[];
+		ctaLabel: string;
+		ctaHref: string;
 	};
 	trust: {
 		eyebrow: string;
@@ -773,7 +776,9 @@ export const bdrSiteContent: BdrSiteContent = {
 			'Commercial roofing and repair',
 			'Siding, gutters, and exterior restoration',
 			'Insurance and storm-damage coordination'
-		]
+		],
+		ctaLabel: 'Request a quote',
+		ctaHref: '#quote-request'
 	},
 	trust: {
 		eyebrow: 'Trust signals',

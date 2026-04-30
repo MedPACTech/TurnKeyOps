@@ -100,6 +100,7 @@ const normalizeServiceCategories = (items: unknown): BdrServiceCategory[] | null
 				description: String(candidate.description),
 				iconAssetKey: String(candidate.iconAssetKey),
 				imageAssetKey: candidate.imageAssetKey ? String(candidate.imageAssetKey) : undefined,
+				detailPageUrl: candidate.detailPageUrl ? String(candidate.detailPageUrl) : undefined,
 				contractorType: String(candidate.contractorType ?? 'shared'),
 				featured: Boolean(candidate.featured),
 				sortOrder: Number.isFinite(candidate.sortOrder) ? Number(candidate.sortOrder) : 0
@@ -108,6 +109,23 @@ const normalizeServiceCategories = (items: unknown): BdrServiceCategory[] | null
 		.filter(Boolean) as BdrServiceCategory[];
 
 	return categories;
+};
+
+const normalizeServicesSection = (
+	value: unknown,
+	fallback: BdrSiteContent['services']
+): BdrSiteContent['services'] => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrSiteContent['services']>;
+	return {
+		eyebrow: String(candidate.eyebrow ?? fallback.eyebrow),
+		title: String(candidate.title ?? fallback.title),
+		copy: String(candidate.copy ?? fallback.copy),
+		items: normalizeServices(candidate.items) ?? fallback.items,
+		ctaLabel: String(candidate.ctaLabel ?? fallback.ctaLabel),
+		ctaHref: String(candidate.ctaHref ?? fallback.ctaHref)
+	};
 };
 
 const normalizeHeroTrustBadges = (items: unknown): BdrHeroTrustBadge[] | null => {
@@ -404,7 +422,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	}
 
 	const candidate = value as Partial<BdrSiteContent>;
-	const services = normalizeServices(candidate.services?.items);
+	const services = normalizeServicesSection(candidate.services, content.services);
 	const assetLibrary = normalizeAssetLibrary(candidate.assetLibrary);
 	const serviceCategories = normalizeServiceCategories(candidate.serviceCategories);
 	const contractorPresets = normalizeContractorPresets(candidate.contractorPresets);
@@ -414,9 +432,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const footer = normalizeFooter(candidate.footer, content.footer);
 	const postFooter = normalizePostFooter(candidate.postFooter, content.postFooter);
 
-	if (services) {
-		content.services.items = services;
-	}
+	content.services = services;
 
 	if (assetLibrary) {
 		content.assetLibrary = assetLibrary;
