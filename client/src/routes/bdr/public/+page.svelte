@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { resolveBdrCopyright } from '$lib/bdr-site-content';
+	import { getBdrAsset, getBdrServiceCategories, resolveBdrCopyright } from '$lib/bdr-site-content';
 	import SectionCard from '$lib/components/SectionCard.svelte';
 	import { fallbackMvpSnapshot } from '$lib/mvp-data';
 	import { buildPublicProof } from '$lib/mvp-display';
@@ -9,12 +9,16 @@
 
 	const content = $derived(data.content);
 	const year = new Date().getFullYear();
+	const logoAsset = $derived(getBdrAsset(content, 'bdr-crest-logo'));
+	const serviceCategories = $derived(getBdrServiceCategories(content));
 	const priorityOptions = [
 		{ value: 'standard', label: 'Standard project' },
 		{ value: 'priority', label: 'Priority quote' },
 		{ value: 'emergency', label: 'Storm / leak emergency' }
 	] as const;
-	const serviceTypeOptions = $derived(content.services.items);
+	const serviceTypeOptions = $derived(
+		serviceCategories.length ? serviceCategories.map((category) => category.name) : content.services.items
+	);
 	const fieldClass =
 		'rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-orange-300/50 focus:bg-black/50';
 </script>
@@ -30,7 +34,7 @@
 			<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 				<div class="flex items-center gap-3">
 					<div class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-orange-300/25 bg-white p-2">
-						<img src="/clientFiles/BDRLogo.jpeg" alt="BDR Construction logo" class="h-full w-full object-contain" />
+						<img src={logoAsset?.file ?? '/clientFiles/BDRLogo.jpeg'} alt={logoAsset?.altText ?? 'BDR Construction logo'} class="h-full w-full object-contain" />
 					</div>
 					<div>
 						<p class="text-[0.68rem] uppercase tracking-[0.22em] text-orange-200/80">{content.navigation.announcement}</p>
@@ -60,7 +64,7 @@
 
 			<div class="grid gap-4">
 				<div class="overflow-hidden rounded-[1.8rem] border border-orange-400/20 bg-black/60">
-					<img src="/clientFiles/BDRLogo.jpeg" alt="BDR Construction logo" class="h-full w-full object-contain bg-white p-4" />
+					<img src={logoAsset?.file ?? '/clientFiles/BDRLogo.jpeg'} alt={logoAsset?.altText ?? 'BDR Construction logo'} class="h-full w-full object-contain bg-white p-4" />
 				</div>
 				<div class="rounded-[1.8rem] border border-orange-300/14 bg-orange-300/8 p-5">
 					<p class="text-[0.66rem] uppercase tracking-[0.24em] text-orange-100/75">{content.hero.proofEyebrow}</p>
@@ -84,11 +88,34 @@
 
 		<section id="services" class="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
 			<SectionCard title={content.services.title} eyebrow={content.services.eyebrow} copy={content.services.copy}>
-				<ul class="mt-4 grid gap-3 sm:grid-cols-2">
-					{#each content.services.items as item}
-						<li class="rounded-[1.1rem] border border-white/8 bg-white/4 px-4 py-3 text-sm text-slate-200">{item}</li>
-					{/each}
-				</ul>
+				{#if serviceCategories.length}
+					<ul class="mt-4 grid gap-3 sm:grid-cols-2">
+						{#each serviceCategories as category}
+							{@const iconAsset = getBdrAsset(content, category.iconAssetKey)}
+							<li class="rounded-[1.1rem] border border-white/8 bg-white/4 px-4 py-4 text-sm text-slate-200">
+								<div class="flex items-start gap-3">
+									<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-300/18 bg-black/25 p-2">
+										{#if iconAsset}
+											<img src={iconAsset.file} alt={iconAsset.altText} class="h-full w-full object-contain" />
+										{:else}
+											<span class="text-lg text-orange-200">▣</span>
+										{/if}
+									</div>
+									<div>
+										<p class="text-base font-semibold text-white">{category.name}</p>
+										<p class="mt-1 text-sm leading-6 text-slate-300">{category.description}</p>
+									</div>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<ul class="mt-4 grid gap-3 sm:grid-cols-2">
+						{#each content.services.items as item}
+							<li class="rounded-[1.1rem] border border-white/8 bg-white/4 px-4 py-3 text-sm text-slate-200">{item}</li>
+						{/each}
+					</ul>
+				{/if}
 			</SectionCard>
 
 			<div id="trust">

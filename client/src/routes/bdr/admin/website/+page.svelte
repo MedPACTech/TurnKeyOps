@@ -4,7 +4,7 @@
 		type EditableField,
 		type EditableListItem
 	} from '$lib/components/admin/ContentEditorCard.svelte';
-	import { resolveBdrCopyright } from '$lib/bdr-site-content';
+	import { getBdrAsset, getBdrServiceCategories, resolveBdrCopyright } from '$lib/bdr-site-content';
 	import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-svelte';
 	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
@@ -40,6 +40,8 @@
 	let { data }: PageProps = $props();
 
 	const year = new Date().getFullYear();
+	const assetLibrary = $derived([...data.content.assetLibrary].sort((left, right) => left.sortOrder - right.sortOrder));
+	const serviceCategories = $derived(getBdrServiceCategories(data.content));
 
 	let serviceItems = $state(untrack(() => [...data.content.services.items]));
 	let selectedServiceIndex = $state(0);
@@ -151,6 +153,81 @@
 					listTitle: 'Service bullets',
 					listItems: serviceItems.map((item) => ({ label: 'Service', value: item })),
 					actions: ['Add service', 'Edit selected', 'Delete selected', 'Reorder services']
+				}
+			]
+		},
+		{
+			id: 'asset-library',
+			label: 'Asset library',
+			description: 'Reusable brand, hero, texture, and icon assets for contractor templates.',
+			previewTitle: assetLibrary.slice(0, 3).map((asset) => asset.name).join(' · '),
+			previewBody: 'Reusable media is modeled separately so sections and presets can reference shared assets.',
+			previewMeta: `${assetLibrary.length} assets`,
+			areas: [
+				{
+					id: 'asset-inventory',
+					label: 'Asset inventory',
+					value: assetLibrary.map((asset) => asset.type).join(' · '),
+					fields: [
+						{ label: 'Reusable asset types', value: 'logo · icon · hero image · background image · texture · project photo' }
+					],
+					listTitle: 'Assets',
+					listItems: assetLibrary.map((asset) => ({
+						label: asset.type,
+						value: asset.name,
+						detail: `${asset.contractorCategory} · ${asset.tags.join(' / ')}`
+					})),
+					actions: ['Review tags', 'Check reusable image mapping']
+				},
+				{
+					id: 'brand-assets',
+					label: 'Brand and social assets',
+					value: assetLibrary
+						.filter((asset) => asset.tags.includes('brand') || asset.tags.includes('social'))
+						.map((asset) => asset.name)
+						.join(' · '),
+					listTitle: 'Brand assets',
+					listItems: assetLibrary
+						.filter((asset) => asset.tags.includes('brand') || asset.tags.includes('social'))
+						.map((asset) => ({
+							label: asset.tags.includes('social') ? 'Social' : 'Brand',
+							value: asset.name,
+							detail: asset.file
+						}))
+				}
+			]
+		},
+		{
+			id: 'service-taxonomy',
+			label: 'Service taxonomy',
+			description: 'Structured service categories that can be reused across sections and contractor presets.',
+			previewTitle: serviceCategories.map((category) => category.name).join(' · '),
+			previewBody: 'Categories now carry slug, description, icon, image, contractor type, featured state, and sort order.',
+			previewMeta: `${serviceCategories.length} categories`,
+			areas: [
+				{
+					id: 'service-categories',
+					label: 'Service categories',
+					value: serviceCategories.map((category) => category.slug).join(' · '),
+					fields: [{ label: 'Contractor coverage', value: 'Concrete first, expandable to additional trades' }],
+					listTitle: 'Categories',
+					listItems: serviceCategories.map((category) => ({
+						label: category.featured ? 'Featured' : 'Category',
+						value: category.name,
+						detail: `${category.slug} · ${category.description}`
+					})),
+					actions: ['Review service mix', 'Confirm icon mapping']
+				},
+				{
+					id: 'service-assets',
+					label: 'Category asset mapping',
+					value: serviceCategories.map((category) => category.iconAssetKey).join(' · '),
+					listTitle: 'Linked assets',
+					listItems: serviceCategories.map((category) => ({
+						label: category.name,
+						value: getBdrAsset(data.content, category.iconAssetKey)?.name ?? category.iconAssetKey,
+						detail: getBdrAsset(data.content, category.iconAssetKey)?.file ?? 'Asset not found'
+					}))
 				}
 			]
 		},
@@ -479,7 +556,7 @@
 
 <AdminWorkspace
 	kicker="External Admin / Website"
-	title="Practical content desk for public site review and edits"
+	title="Website"
 	description="Keep website sections, edit targets, and publish-readiness visible in one compact utility workflow."
 	{metrics}
 	focusLabel="Site sections"
@@ -492,7 +569,7 @@
 			{#each websiteSections as section}
 				<button
 					type="button"
-					class={`w-full rounded-md border px-3 py-3 text-left transition ${selectedSection.id === section.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
+					class={`w-full rounded-lg border px-3 py-3 text-left transition ${selectedSection.id === section.id ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
 					onclick={() => selectSection(section)}
 				>
 					<div class="flex items-start justify-between gap-3">
@@ -513,7 +590,7 @@
 
 	{#snippet work()}
 		<div class="space-y-4">
-			<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+			<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
 				<div class="flex items-start justify-between gap-3">
 					<div>
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Bob content assist</p>
@@ -527,7 +604,7 @@
 					{#each bobMoves as move}
 						<a
 							href={move.href}
-							class="block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
+							class="block rounded-lg bg-[var(--shell-panel-strong)] px-3 py-2.5 shadow-sm transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
 						>
 							<p class="text-sm font-semibold text-[var(--text-strong)]">{move.label}</p>
 							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{move.detail}</p>
@@ -536,7 +613,7 @@
 				</div>
 			</div>
 
-			<div id="content-preview" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+			<div id="content-preview" class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div>
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section preview</p>
@@ -559,7 +636,7 @@
 						{#each selectedSection.areas as area}
 							<button
 								type="button"
-								class={`rounded-lg border p-4 text-left transition ${selectedArea.id === area.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel-strong)]'}`}
+								class={`rounded-lg border p-4 text-left transition ${selectedArea.id === area.id ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
 								onclick={() => {
 									selectedAreaId = area.id;
 									if (area.id === 'services-items') {
@@ -599,7 +676,7 @@
 						</div>
 
 						<div class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-							<section class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+							<section class="rounded-lg bg-white/80 p-3 shadow-sm">
 								<div class="flex flex-wrap items-center justify-between gap-3">
 									<div>
 										<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Managed services</p>
@@ -625,7 +702,7 @@
 
 									{#each serviceItems as service, index}
 										<div
-											class={`rounded-md border p-3 transition ${selectedServiceIndex === index ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel-strong)]'}`}
+											class={`rounded-lg border p-3 transition ${selectedServiceIndex === index ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm'}`}
 											data-testid={`cms-service-row-${index}`}
 										>
 											<div class="flex items-start justify-between gap-3">
@@ -664,7 +741,7 @@
 								</div>
 							</section>
 
-							<section class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
+							<section class="rounded-lg bg-white/80 p-3 shadow-sm">
 								<div class="flex flex-wrap items-start justify-between gap-3">
 									<div>
 										<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Selected service</p>
@@ -675,7 +752,7 @@
 									</span>
 								</div>
 
-								<label class="mt-4 block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-3">
+								<label class="mt-4 block rounded-lg bg-[var(--shell-panel-strong)] p-3 shadow-sm">
 									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Service name</span>
 									<input
 										class="mt-2 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm text-[var(--text-base)] outline-none focus:border-[var(--accent-border)]"

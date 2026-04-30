@@ -8,7 +8,31 @@ export type ContentItem = {
 	copy: string;
 };
 
+export type BdrAsset = {
+	key: string;
+	name: string;
+	type: 'logo' | 'icon' | 'hero-image' | 'background-image' | 'texture' | 'project-photo';
+	file: string;
+	altText: string;
+	contractorCategory: string;
+	tags: string[];
+	sortOrder: number;
+};
+
+export type BdrServiceCategory = {
+	name: string;
+	slug: string;
+	description: string;
+	iconAssetKey: string;
+	imageAssetKey?: string;
+	contractorType: string;
+	featured: boolean;
+	sortOrder: number;
+};
+
 export type BdrSiteContent = {
+	assetLibrary: BdrAsset[];
+	serviceCategories: BdrServiceCategory[];
 	navigation: {
 		announcement: string;
 		brandName: string;
@@ -69,6 +93,205 @@ export type BdrSiteContent = {
 };
 
 export const bdrSiteContent: BdrSiteContent = {
+	assetLibrary: [
+		{
+			key: 'bdr-crest-logo',
+			name: 'Company crest logo',
+			type: 'logo',
+			file: '/clientFiles/BDRLogo.jpeg',
+			altText: 'BDR Construction crest logo',
+			contractorCategory: 'concrete',
+			tags: ['brand', 'logo', 'header', 'footer'],
+			sortOrder: 1
+		},
+		{
+			key: 'bdr-favicon-mark',
+			name: 'Favicon mark',
+			type: 'icon',
+			file: '/clientFiles/logo.png',
+			altText: 'BDR Construction favicon mark',
+			contractorCategory: 'concrete',
+			tags: ['brand', 'favicon', 'logo-mark'],
+			sortOrder: 2
+		},
+		{
+			key: 'hero-driveway-scene',
+			name: 'Modern home driveway hero',
+			type: 'hero-image',
+			file: '/clientFiles/image0.jpeg',
+			altText: 'Modern home with a finished concrete driveway',
+			contractorCategory: 'concrete',
+			tags: ['hero', 'driveway', 'mockup'],
+			sortOrder: 3
+		},
+		{
+			key: 'cta-finishing-scene',
+			name: 'Concrete finishing CTA banner',
+			type: 'background-image',
+			file: '/clientFiles/image1.jpeg',
+			altText: 'Concrete finishing equipment at work on site',
+			contractorCategory: 'concrete',
+			tags: ['cta', 'banner', 'equipment', 'mockup'],
+			sortOrder: 4
+		},
+		{
+			key: 'dark-grid-texture',
+			name: 'Dark grid texture',
+			type: 'texture',
+			file: '/clientFiles/assets/dark-grid-texture.svg',
+			altText: 'Subtle dark grid texture',
+			contractorCategory: 'shared',
+			tags: ['texture', 'dark-surface', 'background'],
+			sortOrder: 5
+		},
+		{
+			key: 'grain-overlay-texture',
+			name: 'Concrete grain overlay',
+			type: 'texture',
+			file: '/clientFiles/assets/grain-overlay-texture.svg',
+			altText: 'Subtle concrete grain overlay texture',
+			contractorCategory: 'shared',
+			tags: ['texture', 'grain', 'overlay'],
+			sortOrder: 6
+		},
+		{
+			key: 'service-driveways-icon',
+			name: 'Driveways service icon',
+			type: 'icon',
+			file: '/clientFiles/assets/driveways-icon.svg',
+			altText: 'Line icon for driveway work',
+			contractorCategory: 'concrete',
+			tags: ['service', 'icon', 'driveways'],
+			sortOrder: 7
+		},
+		{
+			key: 'service-patios-icon',
+			name: 'Patios service icon',
+			type: 'icon',
+			file: '/clientFiles/assets/patios-icon.svg',
+			altText: 'Line icon for patio work',
+			contractorCategory: 'concrete',
+			tags: ['service', 'icon', 'patios'],
+			sortOrder: 8
+		},
+		{
+			key: 'service-sidewalks-icon',
+			name: 'Sidewalks service icon',
+			type: 'icon',
+			file: '/clientFiles/assets/sidewalks-icon.svg',
+			altText: 'Line icon for sidewalk work',
+			contractorCategory: 'concrete',
+			tags: ['service', 'icon', 'sidewalks'],
+			sortOrder: 9
+		},
+		{
+			key: 'service-steps-icon',
+			name: 'Steps and stoops service icon',
+			type: 'icon',
+			file: '/clientFiles/assets/steps-stoops-icon.svg',
+			altText: 'Line icon for steps and stoops work',
+			contractorCategory: 'concrete',
+			tags: ['service', 'icon', 'steps', 'stoops'],
+			sortOrder: 10
+		},
+		{
+			key: 'service-slabs-icon',
+			name: 'Concrete slabs service icon',
+			type: 'icon',
+			file: '/clientFiles/assets/slabs-icon.svg',
+			altText: 'Line icon for slab work',
+			contractorCategory: 'concrete',
+			tags: ['service', 'icon', 'slabs'],
+			sortOrder: 11
+		},
+		{
+			key: 'service-decorative-icon',
+			name: 'Decorative concrete service icon',
+			type: 'icon',
+			file: '/clientFiles/assets/decorative-concrete-icon.svg',
+			altText: 'Line icon for decorative concrete work',
+			contractorCategory: 'concrete',
+			tags: ['service', 'icon', 'decorative'],
+			sortOrder: 12
+		},
+		{
+			key: 'footer-facebook-icon',
+			name: 'Facebook social icon',
+			type: 'icon',
+			file: '/clientFiles/assets/facebook-icon.svg',
+			altText: 'Facebook icon',
+			contractorCategory: 'shared',
+			tags: ['social', 'facebook', 'footer'],
+			sortOrder: 13
+		},
+		{
+			key: 'footer-instagram-icon',
+			name: 'Instagram social icon',
+			type: 'icon',
+			file: '/clientFiles/assets/instagram-icon.svg',
+			altText: 'Instagram icon',
+			contractorCategory: 'shared',
+			tags: ['social', 'instagram', 'footer'],
+			sortOrder: 14
+		}
+	],
+	serviceCategories: [
+		{
+			name: 'Driveways',
+			slug: 'driveways',
+			description: 'New pours, replacements, widening, and driveway apron tie-ins.',
+			iconAssetKey: 'service-driveways-icon',
+			imageAssetKey: 'hero-driveway-scene',
+			contractorType: 'concrete',
+			featured: true,
+			sortOrder: 1
+		},
+		{
+			name: 'Patios',
+			slug: 'patios',
+			description: 'Backyard entertainment slabs, extensions, and clean broom-finish installs.',
+			iconAssetKey: 'service-patios-icon',
+			contractorType: 'concrete',
+			featured: true,
+			sortOrder: 2
+		},
+		{
+			name: 'Sidewalks',
+			slug: 'sidewalks',
+			description: 'Walkways, repair sections, and city-style pedestrian flatwork.',
+			iconAssetKey: 'service-sidewalks-icon',
+			contractorType: 'concrete',
+			featured: true,
+			sortOrder: 3
+		},
+		{
+			name: 'Steps & Stoops',
+			slug: 'steps-stoops',
+			description: 'Safe access upgrades with formed steps, stoops, and landing work.',
+			iconAssetKey: 'service-steps-icon',
+			contractorType: 'concrete',
+			featured: true,
+			sortOrder: 4
+		},
+		{
+			name: 'Concrete Slabs',
+			slug: 'concrete-slabs',
+			description: 'Pads, sheds, garages, and work areas that need solid flatwork.',
+			iconAssetKey: 'service-slabs-icon',
+			contractorType: 'concrete',
+			featured: true,
+			sortOrder: 5
+		},
+		{
+			name: 'Decorative Concrete',
+			slug: 'decorative-concrete',
+			description: 'Stamped, colored, and upgraded finishes for higher-visual-impact surfaces.',
+			iconAssetKey: 'service-decorative-icon',
+			contractorType: 'concrete',
+			featured: true,
+			sortOrder: 6
+		}
+	],
 	navigation: {
 		announcement: 'Navigation',
 		brandName: 'BDR Construction',
@@ -216,3 +439,9 @@ export const bdrSiteContent: BdrSiteContent = {
 
 export const resolveBdrCopyright = (year: number) =>
 	bdrSiteContent.postFooter.copyright.replace('{{year}}', String(year));
+
+export const getBdrAsset = (content: BdrSiteContent, key: string) =>
+	content.assetLibrary.find((asset) => asset.key === key) ?? null;
+
+export const getBdrServiceCategories = (content: BdrSiteContent) =>
+	[...content.serviceCategories].sort((left, right) => left.sortOrder - right.sortOrder);

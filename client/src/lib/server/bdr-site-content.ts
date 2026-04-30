@@ -1,4 +1,4 @@
-import { bdrSiteContent, type BdrSiteContent } from '$lib/bdr-site-content';
+import { bdrSiteContent, type BdrAsset, type BdrServiceCategory, type BdrSiteContent } from '$lib/bdr-site-content';
 
 const fsModuleName = 'node:fs/promises';
 const getCwd = () =>
@@ -26,6 +26,56 @@ const normalizeServices = (items: unknown): string[] | null => {
 	return services;
 };
 
+const normalizeAssetLibrary = (items: unknown): BdrAsset[] | null => {
+	if (!Array.isArray(items)) return null;
+
+	const assets = items
+		.map((item) => {
+			if (!item || typeof item !== 'object') return null;
+			const candidate = item as Partial<BdrAsset>;
+			if (!candidate.key || !candidate.name || !candidate.type || !candidate.file) return null;
+
+			return {
+				key: String(candidate.key),
+				name: String(candidate.name),
+				type: candidate.type,
+				file: String(candidate.file),
+				altText: String(candidate.altText ?? ''),
+				contractorCategory: String(candidate.contractorCategory ?? 'shared'),
+				tags: Array.isArray(candidate.tags) ? candidate.tags.map((tag) => String(tag)).filter(Boolean) : [],
+				sortOrder: Number.isFinite(candidate.sortOrder) ? Number(candidate.sortOrder) : 0
+			} satisfies BdrAsset;
+		})
+		.filter((asset): asset is BdrAsset => Boolean(asset));
+
+	return assets;
+};
+
+const normalizeServiceCategories = (items: unknown): BdrServiceCategory[] | null => {
+	if (!Array.isArray(items)) return null;
+
+	const categories = items
+		.map((item) => {
+			if (!item || typeof item !== 'object') return null;
+			const candidate = item as Partial<BdrServiceCategory>;
+			if (!candidate.name || !candidate.slug || !candidate.description || !candidate.iconAssetKey) return null;
+
+			return {
+				name: String(candidate.name),
+				slug: String(candidate.slug),
+				description: String(candidate.description),
+				iconAssetKey: String(candidate.iconAssetKey),
+				imageAssetKey: candidate.imageAssetKey ? String(candidate.imageAssetKey) : undefined,
+				contractorType: String(candidate.contractorType ?? 'shared'),
+				featured: Boolean(candidate.featured),
+				sortOrder: Number.isFinite(candidate.sortOrder) ? Number(candidate.sortOrder) : 0
+			} satisfies BdrServiceCategory;
+		})
+		.filter(Boolean) as BdrServiceCategory[];
+
+	return categories;
+};
+
 const normalizeContent = (value: unknown): BdrSiteContent => {
 	const content = cloneDefaultContent();
 
@@ -35,9 +85,19 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 
 	const candidate = value as Partial<BdrSiteContent>;
 	const services = normalizeServices(candidate.services?.items);
+	const assetLibrary = normalizeAssetLibrary(candidate.assetLibrary);
+	const serviceCategories = normalizeServiceCategories(candidate.serviceCategories);
 
 	if (services) {
 		content.services.items = services;
+	}
+
+	if (assetLibrary) {
+		content.assetLibrary = assetLibrary;
+	}
+
+	if (serviceCategories) {
+		content.serviceCategories = serviceCategories;
 	}
 
 	return content;
