@@ -75,14 +75,6 @@
 			`--bdr-body-font:${themeSettings.typography.bodyFont}, Inter, sans-serif`
 		].join(';')
 	);
-	const priorityOptions = [
-		{ value: 'standard', label: 'Standard project' },
-		{ value: 'priority', label: 'Priority quote' },
-		{ value: 'emergency', label: 'Storm / leak emergency' }
-	] as const;
-	const serviceTypeOptions = $derived(
-		serviceCategories.length ? serviceCategories.map((category) => category.name) : content.services.items
-	);
 	const fieldClass =
 		'rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-orange-300/50 focus:bg-black/50';
 	let navMenuOpen = $state(false);
@@ -119,6 +111,23 @@
 	const ctaBannerSecondaryHref = $derived(
 		resolveHeroCtaHref(content.ctaBanner.secondaryCtaType, content.ctaBanner.secondaryCtaHref)
 	);
+	const quoteFormBenefits = $derived(content.quoteForm.benefits);
+	const quoteFormFields = $derived(content.quoteForm.fields);
+	const serviceTypeOptions = $derived(
+		serviceCategories.length
+			? serviceCategories.map((category) => category.name)
+			: content.services.items
+	);
+	const getQuoteFormFieldOptions = (field: (typeof content.quoteForm.fields)[number]) =>
+		field.options?.length
+			? field.options
+			: field.key === 'serviceType'
+				? serviceTypeOptions
+				: field.key === 'priority'
+					? ['standard', 'priority', 'emergency']
+					: [];
+	const isQuoteFormFieldFullWidth = (field: (typeof content.quoteForm.fields)[number]) =>
+		field.type === 'textarea' || field.type === 'file';
 </script>
 
 <svelte:head>
@@ -455,21 +464,28 @@
 
 		<section id="contact" class="mt-8 grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
 			<div class="rounded-[2rem] border border-orange-300/16 bg-orange-300/8 p-6 backdrop-blur">
-				<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-100/75">{content.contact.eyebrow}</p>
-				<h2 class="mt-3 text-3xl font-semibold text-white">{content.contact.title}</h2>
-				<p class="mt-3 max-w-3xl text-base leading-7 text-slate-200">{content.contact.body}</p>
+				<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-100/75">{content.quoteForm.eyebrow}</p>
+				<h2 class="mt-3 text-3xl font-semibold text-white">{content.quoteForm.title}</h2>
+				<p class="mt-3 max-w-3xl text-base leading-7 text-slate-200">{content.quoteForm.description}</p>
 				<div class="mt-5 grid gap-3 text-sm text-slate-200">
-					<div class="rounded-[1.2rem] border border-white/10 bg-black/20 p-4">
-						<p class="text-[0.64rem] uppercase tracking-[0.2em] text-orange-100/70">Fastest path</p>
-						<p class="mt-2 text-base font-semibold text-white">Use the quote form and BDR can drop your request directly into the admin queue.</p>
-					</div>
+					{#each quoteFormBenefits as benefit}
+						{@const benefitIcon = getBdrAsset(content, benefit.iconAssetKey)}
+						<div class="rounded-[1.2rem] border border-white/10 bg-black/20 p-4">
+							<div class="flex items-start gap-3">
+								<div class="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/6 p-2">
+									{#if benefitIcon}
+										<img src={benefitIcon.file} alt="" class="h-full w-full object-contain" />
+									{:else}
+										<span class="text-sm font-semibold text-orange-100">•</span>
+									{/if}
+								</div>
+								<p class="leading-6 text-slate-200">{benefit.text}</p>
+							</div>
+						</div>
+					{/each}
 					<div class="rounded-[1.2rem] border border-white/10 bg-black/20 p-4">
 						<p class="text-[0.64rem] uppercase tracking-[0.2em] text-orange-100/70">Need a human right now?</p>
-						<a href={content.contact.secondaryCtaHref} class="mt-2 inline-flex text-base font-semibold text-white underline decoration-orange-300/50 underline-offset-4">Call BDR</a>
-					</div>
-					<div class="rounded-[1.2rem] border border-white/10 bg-black/20 p-4">
-						<p class="text-[0.64rem] uppercase tracking-[0.2em] text-orange-100/70">Office follow-through</p>
-						<p class="mt-2">Requests move from intake to contact, inspection scheduling, estimate drafting, and quote delivery in the same workflow.</p>
+						<a href={content.contact.secondaryCtaHref} class="mt-2 inline-flex text-base font-semibold text-white underline decoration-orange-300/50 underline-offset-4">{content.contact.secondaryCtaLabel}</a>
 					</div>
 				</div>
 			</div>
@@ -477,20 +493,20 @@
 			<div id="quote-request" class="rounded-[2rem] border border-white/10 bg-slate-950/65 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.38)] backdrop-blur">
 				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 					<div>
-						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-100/75">Request a quote</p>
-						<h3 class="mt-2 text-2xl font-semibold text-white">Tell BDR about the project</h3>
-						<p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Share the property, timing, and what is going on. The BDR office can review the request, follow up, schedule the inspection, and move your project toward a quote.</p>
+						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-100/75">Quote request form</p>
+						<h3 class="mt-2 text-2xl font-semibold text-white">{content.quoteForm.title}</h3>
+						<p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{content.quoteForm.description}</p>
 					</div>
 					<div class="rounded-[1.2rem] border border-white/10 bg-white/4 px-4 py-3 text-sm text-slate-200 lg:max-w-sm">
-						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-orange-100/75">What happens next</p>
-						<p class="mt-2 leading-6">After you submit, BDR can review the request, contact you, confirm scope, and move the job into inspection and estimate follow-up.</p>
+						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-orange-100/75">Privacy reassurance</p>
+						<p class="mt-2 leading-6">{content.quoteForm.privacyReassurance}</p>
 					</div>
 				</div>
 
 				{#if data.submitted}
 					<div class="mt-5 rounded-[1.2rem] border border-emerald-400/25 bg-emerald-400/10 p-4 text-sm text-emerald-100">
 						<p class="font-semibold">Quote request sent.</p>
-						<p class="mt-1">BDR now has your project details and can follow up, confirm scope, and move the request into inspection and estimate handling.</p>
+						<p class="mt-1">{content.quoteForm.successMessage}</p>
 					</div>
 				{/if}
 
@@ -499,94 +515,56 @@
 						<div class="rounded-[1.2rem] border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">{form.errors.form}</div>
 					{/if}
 					<div class="grid gap-4 md:grid-cols-2">
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="companyName">Company / customer</label>
-							<input id="companyName" name="companyName" class={fieldClass} value={form?.values?.companyName ?? ''} placeholder="Lakeview HOA or Jane Smith" />
-							{#if form?.errors?.companyName}<p class="text-xs text-orange-200">{form.errors.companyName}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="contactName">Contact</label>
-							<input id="contactName" name="contactName" class={fieldClass} value={form?.values?.contactName ?? ''} placeholder="Jane Smith" />
-							{#if form?.errors?.contactName}<p class="text-xs text-orange-200">{form.errors.contactName}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="email">Email</label>
-							<input id="email" name="email" type="email" class={fieldClass} value={form?.values?.email ?? ''} placeholder="jane@example.com" />
-							{#if form?.errors?.email}<p class="text-xs text-orange-200">{form.errors.email}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="phone">Phone</label>
-							<input id="phone" name="phone" type="tel" class={fieldClass} value={form?.values?.phone ?? ''} placeholder="(704) 555-0100" />
-							{#if form?.errors?.phone}<p class="text-xs text-orange-200">{form.errors.phone}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="siteName">Site</label>
-							<input id="siteName" name="siteName" class={fieldClass} value={form?.values?.siteName ?? ''} placeholder="Building A, main clubhouse, retail center…" />
-							{#if form?.errors?.siteName}<p class="text-xs text-orange-200">{form.errors.siteName}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="serviceAddress">Site address</label>
-							<input id="serviceAddress" name="serviceAddress" class={fieldClass} value={form?.values?.serviceAddress ?? ''} placeholder="123 Main St, Charlotte, NC" />
-							{#if form?.errors?.serviceAddress}<p class="text-xs text-orange-200">{form.errors.serviceAddress}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="serviceType">Service type</label>
-							<select id="serviceType" name="serviceType" class={fieldClass}>
-								<option value="">Select service type</option>
-								{#each serviceTypeOptions as option}
-									<option value={option} selected={form?.values?.serviceType === option}>{option}</option>
-								{/each}
-							</select>
-							{#if form?.errors?.serviceType}<p class="text-xs text-orange-200">{form.errors.serviceType}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="propertyType">Property type</label>
-							<input id="propertyType" name="propertyType" class={fieldClass} value={form?.values?.propertyType ?? ''} placeholder="Residential, commercial, HOA…" />
-							{#if form?.errors?.propertyType}<p class="text-xs text-orange-200">{form.errors.propertyType}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="requestedTimeline">Requested timeline</label>
-							<input id="requestedTimeline" name="requestedTimeline" class={fieldClass} value={form?.values?.requestedTimeline ?? ''} placeholder="ASAP, this week, before board meeting…" />
-							{#if form?.errors?.requestedTimeline}<p class="text-xs text-orange-200">{form.errors.requestedTimeline}</p>{/if}
-						</div>
-						<div class="grid gap-2">
-							<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="priority">Request priority</label>
-							<select id="priority" name="priority" class={fieldClass}>
-								<option value="">Select priority</option>
-								{#each priorityOptions as option}
-									<option value={option.value} selected={form?.values?.priority === option.value}>{option.label}</option>
-								{/each}
-							</select>
-							{#if form?.errors?.priority}<p class="text-xs text-orange-200">{form.errors.priority}</p>{/if}
-						</div>
-					</div>
-
-					<div class="grid gap-2">
-						<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="need">What do you need?</label>
-						<textarea id="need" name="need" rows="5" class={`${fieldClass} min-h-32`} placeholder="Tell BDR what is happening, any damage, insurance context, access notes, and the best time to reach you.">{form?.values?.need ?? ''}</textarea>
-						{#if form?.errors?.need}<p class="text-xs text-orange-200">{form.errors.need}</p>{/if}
-					</div>
-
-					<div class="grid gap-2">
-						<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for="attachments">Attachments</label>
-						<input
-							id="attachments"
-							name="attachments"
-							type="file"
-							multiple
-							class="rounded-2xl border border-dashed border-white/14 bg-black/25 px-4 py-4 text-sm text-slate-200 file:mr-4 file:rounded-full file:border-0 file:bg-orange-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-black hover:border-orange-300/35"
-						/>
-						<p class="text-xs leading-5 text-slate-400">Attach photos, reports, drawings, or insurance files. The operator queue records file names and sizes with the submitted payload.</p>
+						{#each quoteFormFields as field}
+							<div class={`grid gap-2 ${isQuoteFormFieldFullWidth(field) ? 'md:col-span-2' : ''}`}>
+								<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for={field.key}>{field.label}</label>
+								{#if field.type === 'textarea'}
+									<textarea
+										id={field.key}
+										name={field.key}
+										rows="5"
+										class={`${fieldClass} min-h-32`}
+										placeholder={field.placeholder ?? ''}
+									>{form?.values?.[field.key] ?? ''}</textarea>
+								{:else if field.type === 'select'}
+									<select id={field.key} name={field.key} class={fieldClass}>
+										<option value="">Select {field.label.toLowerCase()}</option>
+										{#each getQuoteFormFieldOptions(field) as option}
+											<option value={option} selected={form?.values?.[field.key] === option}>{option}</option>
+										{/each}
+									</select>
+								{:else if field.type === 'file'}
+									<input
+										id={field.key}
+										name={field.key}
+										type="file"
+										multiple
+										class="rounded-2xl border border-dashed border-white/14 bg-black/25 px-4 py-4 text-sm text-slate-200 file:mr-4 file:rounded-full file:border-0 file:bg-orange-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-black hover:border-orange-300/35"
+									/>
+									<p class="text-xs leading-5 text-slate-400">Attach photos, reports, drawings, or insurance files. The operator queue records file names and sizes with the submitted payload.</p>
+								{:else}
+									<input
+										id={field.key}
+										name={field.key}
+										type={field.type}
+										class={fieldClass}
+										value={form?.values?.[field.key] ?? ''}
+										placeholder={field.placeholder ?? ''}
+									/>
+								{/if}
+								{#if form?.errors?.[field.key]}<p class="text-xs text-orange-200">{form.errors[field.key]}</p>{/if}
+							</div>
+						{/each}
 					</div>
 
 					<div class="flex flex-col gap-3 rounded-[1.2rem] border border-white/10 bg-white/4 p-4 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
-						<p>Use this form to put the project in front of BDR quickly with the details needed for first follow-up and quote prep.</p>
+						<p>{content.quoteForm.privacyReassurance}</p>
 						<button
 							type="submit"
 							class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
 							style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
 						>
-							Submit quote request
+							{content.quoteForm.submitButtonLabel}
 						</button>
 					</div>
 				</form>

@@ -22,50 +22,65 @@ export const load = async ({ url }) => {
 
 export const actions = {
 	submitQuoteRequest: async ({ fetch, request }) => {
+		const content = await loadBdrSiteContent();
+		const configuredFields = content.quoteForm.fields;
 		const formData = await request.formData();
-		const contactName = getValue(formData, 'contactName');
-		const companyName = getValue(formData, 'companyName') || contactName;
-		const email = getValue(formData, 'email');
-		const phone = getValue(formData, 'phone');
-		const siteName = getValue(formData, 'siteName');
-		const serviceAddress = getValue(formData, 'serviceAddress');
-		const serviceType = getValue(formData, 'serviceType');
-		const propertyType = getValue(formData, 'propertyType');
-		const requestedTimeline = getValue(formData, 'requestedTimeline');
-		const need = getValue(formData, 'need');
-		const priorityValue = getValue(formData, 'priority') as QuoteRequestPriority;
-		const attachmentFiles = getAttachmentFiles(formData);
+		const values: Record<string, string> = {};
+		for (const field of configuredFields) {
+			if (field.type !== 'file') {
+				values[field.key] = getValue(formData, field.key);
+			}
+		}
 
-		const errors = {
-			contactName: contactName ? '' : 'Contact name is required.',
-			email: email ? '' : 'Email is required.',
-			phone: phone ? '' : 'Phone is required.',
-			siteName: siteName ? '' : 'Site name is required.',
-			serviceAddress: serviceAddress ? '' : 'Service address is required.',
-			serviceType: serviceType ? '' : 'Service type is required.',
-			propertyType: propertyType ? '' : 'Property type is required.',
-			requestedTimeline: requestedTimeline ? '' : 'Requested timeline is required.',
-			need: need ? '' : 'A short description of the need is required.',
-			priority: priorities.has(priorityValue) ? '' : 'Priority is required.'
-		};
+		const contactName = values.contactName || values.companyName || 'Website lead';
+		const companyName = values.companyName || values.contactName || 'Website lead';
+		const email = values.email || '';
+		const phone = values.phone || '';
+		const siteName = values.siteName || companyName || contactName || 'Website lead';
+		const serviceAddress = values.serviceAddress || 'Collected during follow-up';
+		const serviceType = values.serviceType || 'General request';
+		const propertyType = values.propertyType || 'Needs scoping';
+		const requestedTimeline = values.requestedTimeline || 'Needs follow-up';
+		const need = values.need || 'Project details to follow.';
+		const priorityValue = values.priority as QuoteRequestPriority;
+		const attachmentFiles = getAttachmentFiles(formData);
+		const errors: Record<string, string> = {};
+
+		for (const field of configuredFields) {
+			if (field.type === 'file') {
+				if (field.required && attachmentFiles.length === 0) {
+					errors.attachments = `${field.label} is required.`;
+				}
+				continue;
+			}
+
+			const value = values[field.key] ?? '';
+			if (field.required && !value) {
+				errors[field.key] = `${field.label} is required.`;
+				continue;
+			}
+
+			if (field.key === 'priority' && value && !priorities.has(value as QuoteRequestPriority)) {
+				errors.priority = 'Priority must be standard, priority, or emergency.';
+			}
+		}
 
 		if (Object.values(errors).some(Boolean)) {
 			return fail(400, {
 				errors,
-				values: {
-					companyName,
-					contactName,
-					email,
-					phone,
-					siteName,
-					serviceAddress,
-					serviceType,
-					propertyType,
-					requestedTimeline,
-					need,
-					priority: priorityValue
-				}
+				values
 			});
+		}
+
+		const normalizedPriority = priorities.has(priorityValue) ? priorityValue : 'standard';
+		const routingNoteParts = [];
+		if (content.quoteForm.queueDestination) {
+			routingNoteParts.push(`Queue destination: ${content.quoteForm.queueDestination}`);
+		}
+		if (content.quoteForm.notificationRecipients.length) {
+			routingNoteParts.push(
+				`Notification recipients: ${content.quoteForm.notificationRecipients.join(', ')}`
+			);
 		}
 
 		try {
@@ -87,9 +102,14 @@ export const actions = {
 				serviceType,
 				propertyType,
 				requestedTimeline,
-				priority: priorityValue,
+				priority: normalizedPriority,
 				need,
-				attachments
+				attachments,
+				assignedTo: content.quoteForm.queueDestination || 'Office intake',
+				nextAction: content.quoteForm.notificationRecipients.length
+					? `Notify ${content.quoteForm.notificationRecipients.join(', ')} and review submission.`
+					: undefined,
+				routingNote: routingNoteParts.join('. ') || undefined
 			});
 		} catch (cause) {
 			console.error('Failed to submit quote request through API.', cause);
@@ -97,19 +117,7 @@ export const actions = {
 				errors: {
 					form: 'BDR could not submit your quote request right now. Please try again in a moment.'
 				},
-				values: {
-					companyName,
-					contactName,
-					email,
-					phone,
-					siteName,
-					serviceAddress,
-					serviceType,
-					propertyType,
-					requestedTimeline,
-					need,
-					priority: priorityValue
-				}
+				values
 			});
 		}
 

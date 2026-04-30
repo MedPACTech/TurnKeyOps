@@ -71,6 +71,22 @@ export type BdrSocialLink = {
 	iconAssetKey: string;
 };
 
+export type BdrQuoteFormFieldType = 'text' | 'email' | 'tel' | 'textarea' | 'select' | 'file';
+
+export type BdrQuoteFormField = {
+	key: string;
+	label: string;
+	type: BdrQuoteFormFieldType;
+	placeholder?: string;
+	required: boolean;
+	options?: string[];
+};
+
+export type BdrQuoteFormBenefit = {
+	iconAssetKey: string;
+	text: string;
+};
+
 export type BdrThemeSettings = {
 	mode: 'Light' | 'Dark' | 'System';
 	preset: 'Clean' | 'Industrial' | 'Premium' | 'Minimal' | 'Bold';
@@ -175,6 +191,18 @@ export type BdrSiteContent = {
 		secondaryCtaLabel: string;
 		secondaryCtaType: BdrCtaType;
 		secondaryCtaHref: string;
+	};
+	quoteForm: {
+		eyebrow: string;
+		title: string;
+		description: string;
+		privacyReassurance: string;
+		benefits: BdrQuoteFormBenefit[];
+		fields: BdrQuoteFormField[];
+		submitButtonLabel: string;
+		successMessage: string;
+		notificationRecipients: string[];
+		queueDestination: string;
 	};
 	supportingSections: Array<{
 		eyebrow: string;
@@ -855,6 +883,84 @@ export const bdrSiteContent: BdrSiteContent = {
 		secondaryCtaLabel: 'Call BDR',
 		secondaryCtaType: 'phone',
 		secondaryCtaHref: '(220) 217-7026'
+	},
+	quoteForm: {
+		eyebrow: 'Request a quote',
+		title: 'Tell BDR about the project',
+		description:
+			'Share the property, timing, and what is going on. The BDR office can review the request, follow up, schedule the inspection, and move your project toward a quote.',
+		privacyReassurance:
+			'We only use this information to review the request, follow up, and route the job into the right admin workflow.',
+		benefits: [
+			{
+				iconAssetKey: 'service-slabs-icon',
+				text: 'The intake lands in the External Admin queue with the core details needed for first follow-up.'
+			},
+			{
+				iconAssetKey: 'preset-exterior-icon',
+				text: 'Scope, inspection scheduling, and estimate drafting stay in one operating workflow instead of scattered notes.'
+			},
+			{
+				iconAssetKey: 'preset-roofing-icon',
+				text: 'Photos and supporting files can travel with the request so field and estimate handoff starts with better context.'
+			}
+		],
+		fields: [
+			{
+				key: 'contactName',
+				label: 'Full Name',
+				type: 'text',
+				placeholder: 'Jane Smith',
+				required: true
+			},
+			{
+				key: 'phone',
+				label: 'Phone Number',
+				type: 'tel',
+				placeholder: '(704) 555-0100',
+				required: true
+			},
+			{
+				key: 'email',
+				label: 'Email Address',
+				type: 'email',
+				placeholder: 'jane@example.com',
+				required: true
+			},
+			{
+				key: 'serviceType',
+				label: 'Service Needed',
+				type: 'select',
+				required: true,
+				options: ['Roof replacement', 'Exterior repair', 'Storm restoration', 'Commercial work']
+			},
+			{
+				key: 'propertyType',
+				label: 'Project Type',
+				type: 'select',
+				required: true,
+				options: ['Residential', 'Commercial', 'HOA / property management', 'Multi-site / portfolio']
+			},
+			{
+				key: 'need',
+				label: 'Project Details',
+				type: 'textarea',
+				placeholder:
+					'Tell BDR what is happening, any access notes, and the best time to reach you.',
+				required: true
+			},
+			{
+				key: 'attachments',
+				label: 'Photos or files',
+				type: 'file',
+				required: false
+			}
+		],
+		submitButtonLabel: 'Get My Free Quote',
+		successMessage:
+			'BDR now has your project details and can follow up, confirm scope, and move the request into inspection and estimate handling.',
+		notificationRecipients: ['office@bdrconstruction.com', 'estimating@bdrconstruction.com'],
+		queueDestination: 'External Admin Intake Queue'
 	},
 	supportingSections: [
 		{

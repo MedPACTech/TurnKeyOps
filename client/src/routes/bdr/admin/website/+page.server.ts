@@ -9,6 +9,9 @@ import type {
 	BdrCtaType,
 	BdrHeroMediaOverride,
 	BdrHeroTrustBadge,
+	BdrQuoteFormBenefit,
+	BdrQuoteFormField,
+	BdrQuoteFormFieldType,
 	BdrServiceCategory,
 	BdrSocialLink,
 	ContentLink
@@ -172,6 +175,63 @@ const parseProcessSteps = (
 			} => step !== null
 		);
 
+const quoteFormFieldTypes = new Set<BdrQuoteFormFieldType>([
+	'text',
+	'email',
+	'tel',
+	'textarea',
+	'select',
+	'file'
+]);
+
+const parseQuoteFormBenefits = (value: string): BdrQuoteFormBenefit[] =>
+	value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line): BdrQuoteFormBenefit | null => {
+			const [iconAssetKey = '', text = ''] = line.split('|').map((part) => part.trim());
+			if (!iconAssetKey || !text) return null;
+
+			return {
+				iconAssetKey,
+				text
+			};
+		})
+		.filter((benefit): benefit is BdrQuoteFormBenefit => benefit !== null);
+
+const parseQuoteFormFields = (value: string): BdrQuoteFormField[] =>
+	value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line): BdrQuoteFormField | null => {
+			const [
+				key = '',
+				label = '',
+				type = '',
+				placeholder = '',
+				required = 'false',
+				options = ''
+			] = line.split('|').map((part) => part.trim());
+			if (!key || !label || !quoteFormFieldTypes.has(type as BdrQuoteFormFieldType)) {
+				return null;
+			}
+
+			return {
+				key,
+				label,
+				type: type as BdrQuoteFormFieldType,
+				placeholder: placeholder || undefined,
+				required: required === 'true',
+				options: options
+					.split(',')
+					.map((option) => option.trim())
+					.filter(Boolean)
+			};
+		})
+		.filter((field): field is BdrQuoteFormField => field !== null);
+
 const parseCtaType = (value: string, fallback: BdrCtaType): BdrCtaType =>
 	value === 'anchor' || value === 'link' || value === 'phone' ? value : fallback;
 
@@ -182,6 +242,65 @@ export const load = async () => {
 };
 
 export const actions = {
+	updateQuoteForm: async ({ request }) => {
+		const formData = await request.formData();
+		const benefits = parseQuoteFormBenefits(getValue(formData, 'quoteFormBenefits'));
+		const fields = parseQuoteFormFields(getValue(formData, 'quoteFormFields'));
+		const notificationRecipients = getValue(formData, 'quoteFormNotificationRecipients')
+			.split(/[\n,]/)
+			.map((value) => value.trim())
+			.filter(Boolean);
+
+		if (
+			!getValue(formData, 'quoteFormTitle') ||
+			!getValue(formData, 'quoteFormDescription') ||
+			!getValue(formData, 'quoteFormPrivacyReassurance') ||
+			!getValue(formData, 'quoteFormSubmitButtonLabel') ||
+			!getValue(formData, 'quoteFormSuccessMessage') ||
+			!getValue(formData, 'quoteFormQueueDestination') ||
+			fields.length === 0
+		) {
+			return fail(400, {
+				savedSectionId: 'quote-form',
+				message:
+					'Quote form copy, privacy text, queue destination, and at least one form field are required.'
+			});
+		}
+
+		try {
+			return {
+				content: await updateBdrSiteContent((content) => {
+					content.quoteForm = {
+						eyebrow:
+							getValue(formData, 'quoteFormEyebrow') || content.quoteForm.eyebrow,
+						title: getValue(formData, 'quoteFormTitle'),
+						description: getValue(formData, 'quoteFormDescription'),
+						privacyReassurance: getValue(
+							formData,
+							'quoteFormPrivacyReassurance'
+						),
+						benefits,
+						fields,
+						submitButtonLabel: getValue(
+							formData,
+							'quoteFormSubmitButtonLabel'
+						),
+						successMessage: getValue(formData, 'quoteFormSuccessMessage'),
+						notificationRecipients,
+						queueDestination: getValue(formData, 'quoteFormQueueDestination')
+					};
+				}),
+				savedSectionId: 'quote-form',
+				savedMessage: 'Quote form settings saved to the local contractor-site content store.'
+			};
+		} catch (cause) {
+			console.error('Unable to save quote form content.', cause);
+			return fail(500, {
+				savedSectionId: 'quote-form',
+				message: 'Could not save quote form settings.'
+			});
+		}
+	},
 	updateCtaBanner: async ({ request }) => {
 		const formData = await request.formData();
 		const overlayOpacity = Number(getValue(formData, 'ctaBannerOverlayOpacity'));

@@ -141,6 +141,9 @@ export type QuoteRequestFormInput = {
 	priority: QuoteRequestPriority;
 	need: string;
 	attachments: QuoteRequestAttachment[];
+	assignedTo?: string;
+	nextAction?: string;
+	routingNote?: string;
 };
 
 export const quoteRequestStatuses: QuoteRequestStatus[] = [
@@ -910,8 +913,10 @@ export const createQuoteRequestFromForm = (form: QuoteRequestFormInput): QuoteRe
 		attachments: form.attachments,
 		source: 'public-site',
 		status: 'new',
-		assignedTo: 'Office intake',
-		nextAction: 'Review submission, call customer, and assign inspection owner.',
+		assignedTo: form.assignedTo?.trim() || 'Office intake',
+		nextAction:
+			form.nextAction?.trim() ||
+			'Review submission, call customer, and assign inspection owner.',
 		intakeSummary: `${form.companyName} · ${form.serviceType} · ${form.requestedTimeline}`,
 		qualification: {
 			missingInfoReasonCodes: []
@@ -924,7 +929,8 @@ export const createQuoteRequestFromForm = (form: QuoteRequestFormInput): QuoteRe
 				type: 'submitted',
 				actor: 'Customer Admin',
 				label: 'Quote request submitted',
-				payload: submittedPayload
+				payload: submittedPayload,
+				note: form.routingNote?.trim() || undefined
 			}
 		],
 		siteVisitSchedule: null

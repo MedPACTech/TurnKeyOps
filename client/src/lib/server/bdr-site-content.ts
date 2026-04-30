@@ -6,6 +6,9 @@ import {
 	type BdrContractorPreset,
 	type BdrHeroMediaOverride,
 	type BdrHeroTrustBadge,
+	type BdrQuoteFormBenefit,
+	type BdrQuoteFormField,
+	type BdrQuoteFormFieldType,
 	type BdrSocialLink,
 	type ContentLink,
 	type BdrServiceCategory,
@@ -365,6 +368,83 @@ const normalizeProcess = (
 	};
 };
 
+const normalizeQuoteFormFieldType = (
+	value: unknown,
+	fallback: BdrQuoteFormFieldType
+): BdrQuoteFormFieldType =>
+	value === 'text' ||
+	value === 'email' ||
+	value === 'tel' ||
+	value === 'textarea' ||
+	value === 'select' ||
+	value === 'file'
+		? value
+		: fallback;
+
+const normalizeQuoteForm = (
+	value: unknown,
+	fallback: BdrSiteContent['quoteForm']
+): BdrSiteContent['quoteForm'] => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrSiteContent['quoteForm']>;
+	const benefits = Array.isArray(candidate.benefits)
+		? candidate.benefits
+				.map((item): BdrQuoteFormBenefit | null => {
+					if (!item || typeof item !== 'object') return null;
+					const entry = item as Partial<BdrQuoteFormBenefit>;
+					if (!entry.iconAssetKey || !entry.text) return null;
+
+					return {
+						iconAssetKey: String(entry.iconAssetKey),
+						text: String(entry.text)
+					};
+				})
+				.filter((item): item is BdrQuoteFormBenefit => item !== null)
+		: fallback.benefits;
+	const fields = Array.isArray(candidate.fields)
+		? candidate.fields
+				.map((item): BdrQuoteFormField | null => {
+					if (!item || typeof item !== 'object') return null;
+					const entry = item as Partial<BdrQuoteFormField>;
+					if (!entry.key || !entry.label || !entry.type) return null;
+
+					return {
+						key: String(entry.key),
+						label: String(entry.label),
+						type: normalizeQuoteFormFieldType(entry.type, 'text'),
+						placeholder: entry.placeholder ? String(entry.placeholder) : undefined,
+						required:
+							typeof entry.required === 'boolean'
+								? entry.required
+								: fallback.fields.find((field) => field.key === entry.key)?.required ?? false,
+						options: Array.isArray(entry.options)
+							? entry.options.map((option) => String(option)).filter(Boolean)
+							: []
+					};
+				})
+				.filter((item): item is BdrQuoteFormField => item !== null)
+		: fallback.fields;
+	const notificationRecipients = Array.isArray(candidate.notificationRecipients)
+		? candidate.notificationRecipients.map((item) => String(item).trim()).filter(Boolean)
+		: fallback.notificationRecipients;
+
+	return {
+		eyebrow: String(candidate.eyebrow ?? fallback.eyebrow),
+		title: String(candidate.title ?? fallback.title),
+		description: String(candidate.description ?? fallback.description),
+		privacyReassurance: String(
+			candidate.privacyReassurance ?? fallback.privacyReassurance
+		),
+		benefits,
+		fields,
+		submitButtonLabel: String(candidate.submitButtonLabel ?? fallback.submitButtonLabel),
+		successMessage: String(candidate.successMessage ?? fallback.successMessage),
+		notificationRecipients,
+		queueDestination: String(candidate.queueDestination ?? fallback.queueDestination)
+	};
+};
+
 const normalizeCtaBanner = (
 	value: unknown,
 	fallback: BdrSiteContent['ctaBanner']
@@ -497,6 +577,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const hero = normalizeHero(candidate.hero, content.hero);
 	const process = normalizeProcess(candidate.process, content.process);
 	const ctaBanner = normalizeCtaBanner(candidate.ctaBanner, content.ctaBanner);
+	const quoteForm = normalizeQuoteForm(candidate.quoteForm, content.quoteForm);
 	const footer = normalizeFooter(candidate.footer, content.footer);
 	const postFooter = normalizePostFooter(candidate.postFooter, content.postFooter);
 
@@ -526,6 +607,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	content.hero = hero;
 	content.process = process;
 	content.ctaBanner = ctaBanner;
+	content.quoteForm = quoteForm;
 	content.footer = footer;
 	content.postFooter = postFooter;
 

@@ -73,6 +73,9 @@
 	const heroBadgeAssets = $derived(
 		assetLibrary.filter((asset) => asset.type === 'icon' || asset.type === 'logo')
 	);
+	const quoteFormIconAssets = $derived(
+		assetLibrary.filter((asset) => asset.type === 'icon' || asset.type === 'logo')
+	);
 
 	let serviceItems = $state(untrack(() => [...content.services.items]));
 
@@ -443,6 +446,60 @@
 						{ label: 'Primary CTA', value: `${content.ctaBanner.primaryCtaLabel} → ${content.ctaBanner.primaryCtaHref}` },
 						{ label: 'Secondary CTA', value: `${content.ctaBanner.secondaryCtaLabel} (${content.ctaBanner.secondaryCtaType}) → ${content.ctaBanner.secondaryCtaHref}` }
 					]
+				}
+			]
+		},
+		{
+			id: 'quote-form',
+			label: 'Quote Form',
+			description: 'The split reassurance + quote request section above the footer.',
+			previewTitle: content.quoteForm.title,
+			previewBody: content.quoteForm.description,
+			previewMeta: `${content.quoteForm.fields.length} fields · ${content.quoteForm.benefits.length} benefits`,
+			areas: [
+				{
+					id: 'quote-form-copy',
+					label: 'Section copy',
+					value: content.quoteForm.title,
+					detail: content.quoteForm.description,
+					fields: [
+						{ label: 'Eyebrow', value: content.quoteForm.eyebrow },
+						{ label: 'Heading', value: content.quoteForm.title },
+						{
+							label: 'Privacy reassurance',
+							value: content.quoteForm.privacyReassurance,
+							multiline: true
+						}
+					]
+				},
+				{
+					id: 'quote-form-benefits',
+					label: 'Benefits and routing',
+					value: content.quoteForm.benefits.map((benefit) => benefit.text).join(' · '),
+					listTitle: 'Benefit bullets',
+					listItems: content.quoteForm.benefits.map((benefit) => ({
+						label: benefit.iconAssetKey,
+						value: benefit.text
+					})),
+					fields: [
+						{
+							label: 'Notification recipients',
+							value: content.quoteForm.notificationRecipients.join(', ') || 'Not set'
+						},
+						{ label: 'Queue destination', value: content.quoteForm.queueDestination }
+					]
+				},
+				{
+					id: 'quote-form-fields',
+					label: 'Form fields',
+					value: content.quoteForm.fields.map((field) => field.label).join(' · '),
+					listTitle: 'Configured fields',
+					listItems: content.quoteForm.fields.map((field) => ({
+						label: `${field.key} · ${field.type}`,
+						value: field.label,
+						detail: `${field.required ? 'required' : 'optional'}${field.options?.length ? ` · ${field.options.join(', ')}` : ''}`
+					})),
+					actions: ['Reorder fields', 'Adjust required state', 'Review select options']
 				}
 			]
 		},
@@ -1375,6 +1432,107 @@
 										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save CTA banner
+									</button>
+								</div>
+							</section>
+						</form>
+					</article>
+				{:else if selectedSection.id === 'quote-form'}
+					<article
+						id="content-editor"
+						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
+						data-testid="cms-quote-form-panel"
+					>
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Quote Form · CMS controls</p>
+								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Public quote request section</h4>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Manage the reassurance copy, benefit bullets, form fields, and routing settings for the External Client quote request section.</p>
+							</div>
+							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+								{content.quoteForm.fields.length} fields
+							</span>
+						</div>
+
+						{#if form?.savedSectionId === 'quote-form' && form?.savedMessage}
+							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+								{form.savedMessage}
+							</div>
+						{/if}
+
+						{#if form?.savedSectionId === 'quote-form' && form?.message}
+							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+								{form.message}
+							</div>
+						{/if}
+
+						<form method="POST" action="?/updateQuoteForm" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section copy and routing</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
+										<input name="quoteFormEyebrow" value={content.quoteForm.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Heading</span>
+										<input name="quoteFormTitle" value={content.quoteForm.title} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Description</span>
+										<textarea name="quoteFormDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.description}</textarea>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Privacy reassurance</span>
+										<textarea name="quoteFormPrivacyReassurance" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.privacyReassurance}</textarea>
+									</label>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Submit button label</span>
+											<input name="quoteFormSubmitButtonLabel" value={content.quoteForm.submitButtonLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Queue destination</span>
+											<input name="quoteFormQueueDestination" value={content.quoteForm.queueDestination} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+									</div>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Success message</span>
+										<textarea name="quoteFormSuccessMessage" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.successMessage}</textarea>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Notification recipients</span>
+										<textarea name="quoteFormNotificationRecipients" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.notificationRecipients.join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One recipient per line. This controls routing metadata for the request intake path.</span>
+									</label>
+								</div>
+							</section>
+
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Benefit bullets and fields</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Benefit bullets</span>
+										<textarea name="quoteFormBenefits" rows="6" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.benefits.map((benefit) => `${benefit.iconAssetKey}|${benefit.text}`).join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One benefit per line: `iconAssetKey|text`.</span>
+									</label>
+									<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-white/60 p-3 text-xs leading-6 text-[var(--text-muted)]">
+										<p class="font-semibold text-[var(--text-strong)]">Available icon asset keys</p>
+										<p class="mt-1">{quoteFormIconAssets.map((asset) => asset.key).join(', ')}</p>
+									</div>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Configured form fields</span>
+										<textarea name="quoteFormFields" rows="8" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 font-mono text-xs leading-6">{content.quoteForm.fields.map((field) => `${field.key}|${field.label}|${field.type}|${field.placeholder ?? ''}|${field.required ? 'true' : 'false'}|${field.options?.join(',') ?? ''}`).join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One field per line: `key|label|type|placeholder|required|option1,option2`. Supported keys: `companyName`, `contactName`, `email`, `phone`, `siteName`, `serviceAddress`, `serviceType`, `propertyType`, `requestedTimeline`, `priority`, `need`, `attachments`. Supported types: `text`, `email`, `tel`, `textarea`, `select`, `file`.</span>
+									</label>
+								</div>
+
+								<div class="mt-5 flex justify-end">
+									<button
+										type="submit"
+										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+									>
+										Save quote form
 									</button>
 								</div>
 							</section>
