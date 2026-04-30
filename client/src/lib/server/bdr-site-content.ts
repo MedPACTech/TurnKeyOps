@@ -2,7 +2,10 @@ import {
 	applyBdrContractorPresetToContent,
 	bdrSiteContent,
 	type BdrAsset,
+	type BdrCtaType,
 	type BdrContractorPreset,
+	type BdrHeroMediaOverride,
+	type BdrHeroTrustBadge,
 	type ContentLink,
 	type BdrServiceCategory,
 	type BdrSiteContent,
@@ -34,6 +37,9 @@ const normalizeServices = (items: unknown): string[] | null => {
 
 	return services;
 };
+
+const normalizeCtaType = (value: unknown, fallback: BdrCtaType): BdrCtaType =>
+	value === 'phone' || value === 'link' || value === 'anchor' ? value : fallback;
 
 const normalizeLinks = (items: unknown): ContentLink[] | null => {
 	if (!Array.isArray(items)) return null;
@@ -101,6 +107,52 @@ const normalizeServiceCategories = (items: unknown): BdrServiceCategory[] | null
 		.filter(Boolean) as BdrServiceCategory[];
 
 	return categories;
+};
+
+const normalizeHeroTrustBadges = (items: unknown): BdrHeroTrustBadge[] | null => {
+	if (!Array.isArray(items)) return null;
+
+	const badges = items
+		.map((item): BdrHeroTrustBadge | null => {
+			if (!item || typeof item !== 'object') return null;
+			const candidate = item as Partial<BdrHeroTrustBadge>;
+			if (!candidate.iconAssetKey || !candidate.title || !candidate.description) return null;
+
+			return {
+				iconAssetKey: String(candidate.iconAssetKey),
+				title: String(candidate.title),
+				description: String(candidate.description)
+			};
+		})
+		.filter((badge): badge is BdrHeroTrustBadge => badge !== null);
+
+	return badges;
+};
+
+const normalizeHeroMediaOverrides = (items: unknown): BdrHeroMediaOverride[] | null => {
+	if (!Array.isArray(items)) return null;
+
+	const overrides = items
+		.map((item): BdrHeroMediaOverride | null => {
+			if (!item || typeof item !== 'object') return null;
+			const candidate = item as Partial<BdrHeroMediaOverride>;
+			if (!candidate.contractorType || !candidate.heroImageAssetKey) return null;
+
+			return {
+				contractorType: String(candidate.contractorType),
+				heroImageAssetKey: String(candidate.heroImageAssetKey),
+				backgroundImageAssetKey: candidate.backgroundImageAssetKey
+					? String(candidate.backgroundImageAssetKey)
+					: undefined,
+				backgroundTextureAssetKey: candidate.backgroundTextureAssetKey
+					? String(candidate.backgroundTextureAssetKey)
+					: undefined,
+				heroImageAltText: candidate.heroImageAltText ? String(candidate.heroImageAltText) : undefined
+			};
+		})
+		.filter((override): override is BdrHeroMediaOverride => override !== null);
+
+	return overrides;
 };
 
 const normalizeContractorPresets = (items: unknown): BdrContractorPreset[] | null => {
@@ -201,6 +253,44 @@ const normalizeThemeSettings = (value: unknown, fallback: BdrThemeSettings): Bdr
 	};
 };
 
+const normalizeHero = (
+	value: unknown,
+	fallback: BdrSiteContent['hero']
+): BdrSiteContent['hero'] => {
+	if (!value || typeof value !== 'object') return fallback;
+
+	const candidate = value as Partial<BdrSiteContent['hero']> & {
+		body?: string;
+		proofEyebrow?: string;
+	};
+
+	return {
+		eyebrow: String(candidate.eyebrow ?? fallback.eyebrow),
+		headline: String(candidate.headline ?? fallback.headline),
+		subheadline: String(candidate.subheadline ?? candidate.body ?? fallback.subheadline),
+		primaryCtaLabel: String(candidate.primaryCtaLabel ?? fallback.primaryCtaLabel),
+		primaryCtaHref: String(candidate.primaryCtaHref ?? fallback.primaryCtaHref),
+		primaryCtaType: normalizeCtaType(candidate.primaryCtaType, fallback.primaryCtaType),
+		secondaryCtaLabel: String(candidate.secondaryCtaLabel ?? fallback.secondaryCtaLabel),
+		secondaryCtaHref: String(candidate.secondaryCtaHref ?? fallback.secondaryCtaHref),
+		secondaryCtaType: normalizeCtaType(candidate.secondaryCtaType, fallback.secondaryCtaType),
+		heroImageAssetKey: String(candidate.heroImageAssetKey ?? fallback.heroImageAssetKey),
+		heroImageAltText: String(candidate.heroImageAltText ?? fallback.heroImageAltText),
+		backgroundImageAssetKey: String(
+			candidate.backgroundImageAssetKey ?? fallback.backgroundImageAssetKey
+		),
+		backgroundTextureAssetKey: String(
+			candidate.backgroundTextureAssetKey ?? fallback.backgroundTextureAssetKey
+		),
+		trustBadgeEyebrow: String(
+			candidate.trustBadgeEyebrow ?? candidate.proofEyebrow ?? fallback.trustBadgeEyebrow
+		),
+		trustBadges: normalizeHeroTrustBadges(candidate.trustBadges) ?? fallback.trustBadges,
+		mediaByContractorType:
+			normalizeHeroMediaOverrides(candidate.mediaByContractorType) ?? fallback.mediaByContractorType
+	};
+};
+
 const normalizeNavigation = (
 	value: unknown,
 	fallback: BdrSiteContent['navigation']
@@ -252,6 +342,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	const contractorPresets = normalizeContractorPresets(candidate.contractorPresets);
 	const themeSettings = normalizeThemeSettings(candidate.themeSettings, content.themeSettings);
 	const navigation = normalizeNavigation(candidate.navigation, content.navigation);
+	const hero = normalizeHero(candidate.hero, content.hero);
 
 	if (services) {
 		content.services.items = services;
@@ -278,6 +369,7 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 
 	content.themeSettings = themeSettings;
 	content.navigation = navigation;
+	content.hero = hero;
 
 	return content;
 };

@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { getBdrAsset, getBdrServiceCategories, resolveBdrCopyright } from '$lib/bdr-site-content';
+	import {
+		getBdrActiveContractorPreset,
+		getBdrAsset,
+		getBdrServiceCategories,
+		resolveBdrCopyright
+	} from '$lib/bdr-site-content';
 	import SectionCard from '$lib/components/SectionCard.svelte';
 	import { fallbackMvpSnapshot } from '$lib/mvp-data';
 	import { buildPublicProof } from '$lib/mvp-display';
@@ -17,7 +22,38 @@
 		getBdrAsset(content, content.navigation.faviconAssetKey) ?? navigationLogoAsset
 	);
 	const serviceCategories = $derived(getBdrServiceCategories(content));
+	const activeContractorPreset = $derived(getBdrActiveContractorPreset(content));
 	const themeSettings = $derived(content.themeSettings);
+	const isLightTheme = $derived(themeSettings.mode === 'Light');
+	const activeHeroMediaOverride = $derived(
+		content.hero.mediaByContractorType.find(
+			(override) => override.contractorType === activeContractorPreset?.contractorType
+		) ?? null
+	);
+	const heroImageAsset = $derived(
+		getBdrAsset(
+			content,
+			activeHeroMediaOverride?.heroImageAssetKey || content.hero.heroImageAssetKey
+		)
+	);
+	const heroBackgroundImageAsset = $derived(
+		getBdrAsset(
+			content,
+			activeHeroMediaOverride?.backgroundImageAssetKey || content.hero.backgroundImageAssetKey
+		)
+	);
+	const heroTextureAsset = $derived(
+		getBdrAsset(
+			content,
+			activeHeroMediaOverride?.backgroundTextureAssetKey || content.hero.backgroundTextureAssetKey
+		)
+	);
+	const heroImageAltText = $derived(
+		activeHeroMediaOverride?.heroImageAltText?.trim() ||
+			content.hero.heroImageAltText.trim() ||
+			heroImageAsset?.altText ||
+			'TurnKey contractor hero image'
+	);
 	const publicThemeStyle = $derived(
 		[
 			`--bdr-primary:${themeSettings.colors.primary}`,
@@ -44,6 +80,36 @@
 	const fieldClass =
 		'rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-orange-300/50 focus:bg-black/50';
 	let navMenuOpen = $state(false);
+
+	const resolveHeroCtaHref = (ctaType: 'anchor' | 'link' | 'phone', target: string) => {
+		if (ctaType === 'phone') {
+			if (target.startsWith('tel:')) {
+				return target;
+			}
+
+			return `tel:${target.replace(/[^0-9+]/g, '')}`;
+		}
+
+		return target;
+	};
+
+	const heroBackgroundStyle = $derived(
+		[
+			heroBackgroundImageAsset?.file
+				? `background-image:linear-gradient(135deg, rgba(15,23,42,0.68), rgba(15,23,42,0.18)), url(${heroBackgroundImageAsset.file})`
+				: '',
+			heroBackgroundImageAsset?.file ? 'background-size:cover' : '',
+			heroBackgroundImageAsset?.file ? 'background-position:center' : ''
+		]
+			.filter(Boolean)
+			.join(';')
+	);
+	const primaryHeroHref = $derived(
+		resolveHeroCtaHref(content.hero.primaryCtaType, content.hero.primaryCtaHref)
+	);
+	const secondaryHeroHref = $derived(
+		resolveHeroCtaHref(content.hero.secondaryCtaType, content.hero.secondaryCtaHref)
+	);
 </script>
 
 <svelte:head>
@@ -153,42 +219,86 @@
 			{/if}
 		</nav>
 
-		<section id="hero" class="mt-6 grid gap-6 rounded-3xl border border-white/10 bg-slate-950/55 p-6 shadow-[0_30px_110px_rgba(15,23,42,0.35)] backdrop-blur lg:grid-cols-[1.15fr_0.85fr] lg:p-8">
-			<div class="space-y-5">
-				<p class="text-[0.72rem] uppercase tracking-[0.28em] text-orange-200/80">{content.hero.eyebrow}</p>
-				<h1 class="max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl" style="font-family: var(--bdr-heading-font);">{content.hero.headline}</h1>
-				<p class="max-w-2xl text-base leading-7 text-slate-300">{content.hero.body}</p>
-				<div class="flex flex-wrap gap-3">
-					<a
-						href="#quote-request"
-						class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
-						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
-					>
-						Get a Free Quote
-					</a>
-					<a href={content.hero.secondaryCtaHref} class="rounded-full border border-white/14 px-5 py-3 text-sm font-semibold text-white transition hover:border-orange-300/45 hover:bg-white/6">{content.hero.secondaryCtaLabel}</a>
-				</div>
-			</div>
+		<section
+			id="hero"
+			class={`relative mt-6 overflow-hidden rounded-[2rem] px-6 py-8 lg:px-8 lg:py-10 ${isLightTheme ? 'bg-white/78' : 'bg-slate-950/38'}`}
+			style={heroBackgroundStyle}
+		>
+			<div class={`absolute inset-0 ${isLightTheme ? 'bg-[linear-gradient(120deg,rgba(255,255,255,0.92),rgba(255,255,255,0.78),rgba(255,255,255,0.48))]' : 'bg-[linear-gradient(120deg,rgba(2,6,23,0.88),rgba(2,6,23,0.7),rgba(2,6,23,0.34))]'}`}></div>
+			{#if heroTextureAsset?.file}
+				<div class="absolute inset-0 opacity-35 mix-blend-soft-light" style={`background-image:url(${heroTextureAsset.file}); background-size:cover; background-position:center;`}></div>
+			{/if}
 
-			<div class="grid gap-4">
-				<div class="overflow-hidden rounded-[1.8rem] border border-orange-400/20 bg-black/60">
-					<img src={logoAsset?.file ?? '/clientFiles/BDRLogo.jpeg'} alt={logoAsset?.altText ?? 'BDR Construction logo'} class="h-full w-full object-contain bg-white p-4" />
+			<div class="relative grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+				<div class="space-y-6">
+					<div class="space-y-4">
+						<p class={`text-[0.72rem] uppercase tracking-[0.28em] ${isLightTheme ? 'text-[color:var(--bdr-primary)]' : 'text-orange-200/85'}`}>{content.hero.eyebrow}</p>
+						<h1
+							class={`max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl ${isLightTheme ? 'text-slate-950' : 'text-white'}`}
+							style="font-family: var(--bdr-heading-font);"
+						>
+							{content.hero.headline}
+						</h1>
+						<p class={`max-w-2xl text-base leading-7 ${isLightTheme ? 'text-slate-700' : 'text-slate-200'}`}>
+							{content.hero.subheadline}
+						</p>
+					</div>
+
+					<div class="flex flex-wrap gap-3">
+						<a
+							href={primaryHeroHref}
+							class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+							style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+						>
+							{content.hero.primaryCtaLabel}
+						</a>
+						<a
+							href={secondaryHeroHref}
+							class={`rounded-full px-5 py-3 text-sm font-semibold transition ${isLightTheme ? 'border border-slate-300 text-slate-900 hover:border-[color:var(--bdr-primary)] hover:bg-white' : 'border border-white/14 text-white hover:border-orange-300/45 hover:bg-white/6'}`}
+						>
+							{content.hero.secondaryCtaLabel}
+						</a>
+					</div>
+
+					<div>
+						<p class={`text-[0.66rem] uppercase tracking-[0.24em] ${isLightTheme ? 'text-slate-500' : 'text-orange-100/80'}`}>{content.hero.trustBadgeEyebrow}</p>
+						<div class="mt-4 grid gap-3 sm:grid-cols-3">
+							{#each content.hero.trustBadges as badge}
+								{@const badgeAsset = getBdrAsset(content, badge.iconAssetKey)}
+								<div class={`rounded-[1.35rem] px-4 py-4 ${isLightTheme ? 'bg-white/88 shadow-[0_18px_45px_rgba(15,23,42,0.08)]' : 'bg-white/6 backdrop-blur'}`}>
+									<div class="flex items-start gap-3">
+										<div class={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${isLightTheme ? 'bg-slate-950/5' : 'bg-black/20'} p-2`}>
+											{#if badgeAsset}
+												<img src={badgeAsset.file} alt={badgeAsset.altText} class="h-full w-full object-contain" />
+											{:else}
+												<span class={`text-lg ${isLightTheme ? 'text-[color:var(--bdr-primary)]' : 'text-orange-200'}`}>▣</span>
+											{/if}
+										</div>
+										<div>
+											<p class={`text-sm font-semibold ${isLightTheme ? 'text-slate-950' : 'text-white'}`}>{badge.title}</p>
+											<p class={`mt-1 text-sm leading-6 ${isLightTheme ? 'text-slate-600' : 'text-slate-200'}`}>{badge.description}</p>
+										</div>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
 				</div>
-				<div class="rounded-[1.8rem] border border-orange-300/14 bg-orange-300/8 p-5">
-					<p class="text-[0.66rem] uppercase tracking-[0.24em] text-orange-100/75">{content.hero.proofEyebrow}</p>
-					<div class="mt-4 grid gap-3">
-						<div class="rounded-[1.1rem] border border-white/8 bg-white/4 px-4 py-3">
-							<p class="text-sm font-semibold text-white">Fast response on urgent needs</p>
-							<p class="mt-1 text-sm leading-6 text-slate-200">Storm damage, leaks, and time-sensitive exterior issues can move quickly from intake to follow-up.</p>
-						</div>
-						<div class="rounded-[1.1rem] border border-white/8 bg-white/4 px-4 py-3">
-							<p class="text-sm font-semibold text-white">Residential and commercial experience</p>
-							<p class="mt-1 text-sm leading-6 text-slate-200">From family homes to commercial properties and HOA work, BDR can scope projects clearly and professionally.</p>
-						</div>
-						<div class="rounded-[1.1rem] border border-white/8 bg-white/4 px-4 py-3">
-							<p class="text-sm font-semibold text-white">Clear project follow-through</p>
-							<p class="mt-1 text-sm leading-6 text-slate-200">Customers get a smoother handoff from inspection and scope review into quote, scheduling, and billing communication.</p>
-						</div>
+
+				<div class="relative">
+					<div class={`absolute -inset-6 rounded-[2.2rem] blur-3xl ${isLightTheme ? 'bg-[radial-gradient(circle,rgba(249,115,22,0.14),transparent_65%)]' : 'bg-[radial-gradient(circle,rgba(249,115,22,0.22),transparent_65%)]'}`}></div>
+					<div class={`relative overflow-hidden rounded-[2rem] ${isLightTheme ? 'bg-slate-100/80 shadow-[0_32px_70px_rgba(15,23,42,0.12)]' : 'bg-slate-950/60 shadow-[0_32px_90px_rgba(2,6,23,0.45)]'}`}>
+						{#if heroImageAsset}
+							<img
+								src={heroImageAsset.file}
+								alt={heroImageAltText}
+								class="aspect-[4/3] h-full w-full object-cover"
+							/>
+						{:else}
+							<div class={`flex aspect-[4/3] items-center justify-center ${isLightTheme ? 'text-slate-500' : 'text-slate-300'}`}>
+								Hero image unavailable
+							</div>
+						{/if}
 					</div>
 				</div>
 			</div>

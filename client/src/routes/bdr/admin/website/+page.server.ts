@@ -5,7 +5,12 @@ import {
 	saveBdrServices,
 	updateBdrSiteContent
 } from '$lib/server/bdr-site-content';
-import type { ContentLink } from '$lib/bdr-site-content';
+import type {
+	BdrCtaType,
+	BdrHeroMediaOverride,
+	BdrHeroTrustBadge,
+	ContentLink
+} from '$lib/bdr-site-content';
 
 const getValue = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
 const getBoolean = (formData: FormData, key: string) => getValue(formData, key) === 'true';
@@ -27,6 +32,54 @@ const parseNavigationLinks = (value: string): ContentLink[] =>
 		})
 		.filter((link): link is ContentLink => link !== null);
 
+const parseHeroTrustBadges = (value: string): BdrHeroTrustBadge[] =>
+	value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line): BdrHeroTrustBadge | null => {
+			const [iconAssetKey = '', title = '', description = ''] = line
+				.split('|')
+				.map((part) => part.trim());
+			if (!iconAssetKey || !title || !description) return null;
+
+			return {
+				iconAssetKey,
+				title,
+				description
+			};
+		})
+		.filter((badge): badge is BdrHeroTrustBadge => badge !== null);
+
+const parseHeroMediaOverrides = (value: string): BdrHeroMediaOverride[] =>
+	value
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line): BdrHeroMediaOverride | null => {
+			const [
+				contractorType = '',
+				heroImageAssetKey = '',
+				backgroundImageAssetKey = '',
+				backgroundTextureAssetKey = '',
+				heroImageAltText = ''
+			] = line.split('|').map((part) => part.trim());
+
+			if (!contractorType || !heroImageAssetKey) return null;
+
+			return {
+				contractorType,
+				heroImageAssetKey,
+				backgroundImageAssetKey: backgroundImageAssetKey || undefined,
+				backgroundTextureAssetKey: backgroundTextureAssetKey || undefined,
+				heroImageAltText: heroImageAltText || undefined
+			};
+		})
+		.filter((override): override is BdrHeroMediaOverride => override !== null);
+
+const parseCtaType = (value: string, fallback: BdrCtaType): BdrCtaType =>
+	value === 'anchor' || value === 'link' || value === 'phone' ? value : fallback;
+
 export const load = async () => {
 	return {
 		content: await loadBdrSiteContent()
@@ -34,6 +87,76 @@ export const load = async () => {
 };
 
 export const actions = {
+	updateHero: async ({ request }) => {
+		const formData = await request.formData();
+		const eyebrow = getValue(formData, 'eyebrow');
+		const headline = getValue(formData, 'headline');
+		const subheadline = getValue(formData, 'subheadline');
+		const primaryCtaLabel = getValue(formData, 'primaryCtaLabel');
+		const primaryCtaHref = getValue(formData, 'primaryCtaHref');
+		const secondaryCtaLabel = getValue(formData, 'secondaryCtaLabel');
+		const secondaryCtaHref = getValue(formData, 'secondaryCtaHref');
+		const heroImageAssetKey = getValue(formData, 'heroImageAssetKey');
+		const heroImageAltText = getValue(formData, 'heroImageAltText');
+		const badges = parseHeroTrustBadges(getValue(formData, 'trustBadges'));
+		const mediaByContractorType = parseHeroMediaOverrides(getValue(formData, 'mediaByContractorType'));
+
+		if (
+			!eyebrow ||
+			!headline ||
+			!subheadline ||
+			!primaryCtaLabel ||
+			!primaryCtaHref ||
+			!secondaryCtaLabel ||
+			!secondaryCtaHref ||
+			!heroImageAssetKey
+		) {
+			return fail(400, {
+				savedSectionId: 'hero',
+				message: 'Hero copy, CTA labels/targets, and the primary hero image are required.'
+			});
+		}
+
+		try {
+			return {
+				content: await updateBdrSiteContent((content) => {
+					content.hero = {
+						eyebrow,
+						headline,
+						subheadline,
+						primaryCtaLabel,
+						primaryCtaHref,
+						primaryCtaType: parseCtaType(
+							getValue(formData, 'primaryCtaType'),
+							content.hero.primaryCtaType
+						),
+						secondaryCtaLabel,
+						secondaryCtaHref,
+						secondaryCtaType: parseCtaType(
+							getValue(formData, 'secondaryCtaType'),
+							content.hero.secondaryCtaType
+						),
+						heroImageAssetKey,
+						heroImageAltText,
+						backgroundImageAssetKey: getValue(formData, 'backgroundImageAssetKey'),
+						backgroundTextureAssetKey: getValue(formData, 'backgroundTextureAssetKey'),
+						trustBadgeEyebrow:
+							getValue(formData, 'trustBadgeEyebrow') || content.hero.trustBadgeEyebrow,
+						trustBadges: badges,
+						mediaByContractorType
+					};
+				}),
+				savedSectionId: 'hero',
+				savedMessage: 'Hero settings saved to the local contractor-site content store.'
+			};
+		} catch (cause) {
+			console.error('Unable to save hero content.', cause);
+			return fail(500, {
+				savedSectionId: 'hero',
+				message: 'Could not save hero settings.'
+			});
+		}
+	},
 	updateNavigation: async ({ request }) => {
 		const formData = await request.formData();
 		const navigationLinks = parseNavigationLinks(getValue(formData, 'navigationLinks'));

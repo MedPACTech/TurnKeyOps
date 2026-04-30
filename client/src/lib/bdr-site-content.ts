@@ -48,6 +48,22 @@ export type BdrContractorPreset = {
 	defaultIconAssetKeys: string[];
 };
 
+export type BdrCtaType = 'anchor' | 'link' | 'phone';
+
+export type BdrHeroTrustBadge = {
+	iconAssetKey: string;
+	title: string;
+	description: string;
+};
+
+export type BdrHeroMediaOverride = {
+	contractorType: string;
+	heroImageAssetKey: string;
+	backgroundImageAssetKey?: string;
+	backgroundTextureAssetKey?: string;
+	heroImageAltText?: string;
+};
+
 export type BdrThemeSettings = {
 	mode: 'Light' | 'Dark' | 'System';
 	preset: 'Clean' | 'Industrial' | 'Premium' | 'Minimal' | 'Bold';
@@ -99,12 +115,20 @@ export type BdrSiteContent = {
 	hero: {
 		eyebrow: string;
 		headline: string;
-		body: string;
+		subheadline: string;
 		primaryCtaLabel: string;
 		primaryCtaHref: string;
+		primaryCtaType: BdrCtaType;
 		secondaryCtaLabel: string;
 		secondaryCtaHref: string;
-		proofEyebrow: string;
+		secondaryCtaType: BdrCtaType;
+		heroImageAssetKey: string;
+		heroImageAltText: string;
+		backgroundImageAssetKey: string;
+		backgroundTextureAssetKey: string;
+		trustBadgeEyebrow: string;
+		trustBadges: BdrHeroTrustBadge[];
+		mediaByContractorType: BdrHeroMediaOverride[];
 	};
 	services: {
 		eyebrow: string;
@@ -661,13 +685,37 @@ export const bdrSiteContent: BdrSiteContent = {
 		eyebrow: 'Hero',
 		headline:
 			'Roofing and exterior work with a clear path from inspection to quote, schedule, and completion.',
-		body:
+		subheadline:
 			'BDR Construction helps homeowners, property managers, and commercial clients move from first contact to scoped work with responsive communication and a dependable project process.',
 		primaryCtaLabel: 'Request a quote',
 		primaryCtaHref: '#quote-request',
+		primaryCtaType: 'anchor',
 		secondaryCtaLabel: 'Explore services',
 		secondaryCtaHref: '#services',
-		proofEyebrow: 'Why customers call BDR'
+		secondaryCtaType: 'anchor',
+		heroImageAssetKey: 'hero-driveway-scene',
+		heroImageAltText: 'Modern home with a finished concrete driveway',
+		backgroundImageAssetKey: '',
+		backgroundTextureAssetKey: 'dark-grid-texture',
+		trustBadgeEyebrow: 'Why customers call BDR',
+		trustBadges: [
+			{
+				iconAssetKey: 'service-driveways-icon',
+				title: 'Fast office follow-up',
+				description: 'Requests move from intake to estimate coordination without disappearing into a spreadsheet.'
+			},
+			{
+				iconAssetKey: 'service-sidewalks-icon',
+				title: 'Residential and commercial scope',
+				description: 'BDR can handle homeowners, property managers, and commercial sites from the same workflow.'
+			},
+			{
+				iconAssetKey: 'service-slabs-icon',
+				title: 'Clear handoff to production',
+				description: 'Estimate, approval, schedule, and billing stay connected once the project moves forward.'
+			}
+		],
+		mediaByContractorType: []
 	},
 	services: {
 		eyebrow: 'Services',

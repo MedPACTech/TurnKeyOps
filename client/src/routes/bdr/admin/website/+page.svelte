@@ -58,6 +58,19 @@
 	const serviceCategories = $derived(getBdrServiceCategories(content));
 	const contractorPresets = $derived(getBdrContractorPresets(content));
 	const activeContractorPreset = $derived(getBdrActiveContractorPreset(content));
+	const heroImageAssets = $derived(
+		assetLibrary.filter((asset) =>
+			asset.type === 'hero-image' ||
+			asset.type === 'background-image' ||
+			asset.type === 'project-photo'
+		)
+	);
+	const textureAssets = $derived(
+		assetLibrary.filter((asset) => asset.type === 'texture' || asset.type === 'background-image')
+	);
+	const heroBadgeAssets = $derived(
+		assetLibrary.filter((asset) => asset.type === 'icon' || asset.type === 'logo')
+	);
 
 	let serviceItems = $state(untrack(() => [...content.services.items]));
 	let selectedServiceIndex = $state(0);
@@ -120,26 +133,26 @@
 		{
 			id: 'hero',
 			label: 'Hero',
-			description: 'The first-screen sales message and CTA pair.',
+			description: 'The first-screen message, CTA behavior, media, and trust badges.',
 			previewTitle: content.hero.headline,
-			previewBody: content.hero.body,
-			previewMeta: `${content.hero.primaryCtaLabel} + ${content.hero.secondaryCtaLabel}`,
+			previewBody: content.hero.subheadline,
+			previewMeta: `${content.hero.primaryCtaType} / ${content.hero.secondaryCtaType} · ${content.hero.trustBadges.length} badges`,
 			fields: [
 				{ label: 'Eyebrow', value: content.hero.eyebrow },
 				{ label: 'Headline', value: content.hero.headline, multiline: true },
-				{ label: 'Body copy', value: content.hero.body, multiline: true }
+				{ label: 'Subheadline', value: content.hero.subheadline, multiline: true }
 			],
-			actions: ['Preview hero', 'Create seasonal variant'],
+			actions: ['Preview hero', 'Swap contractor media', 'Review CTA behavior'],
 			areas: [
 				{
 					id: 'hero-copy',
 					label: 'Hero copy',
 					value: content.hero.headline,
-					detail: content.hero.body,
+					detail: content.hero.subheadline,
 					fields: [
 						{ label: 'Eyebrow', value: content.hero.eyebrow },
 						{ label: 'Headline', value: content.hero.headline, multiline: true },
-						{ label: 'Body copy', value: content.hero.body, multiline: true }
+						{ label: 'Subheadline', value: content.hero.subheadline, multiline: true }
 					]
 				},
 				{
@@ -147,10 +160,37 @@
 					label: 'Hero CTAs',
 					value: `${content.hero.primaryCtaLabel} / ${content.hero.secondaryCtaLabel}`,
 					fields: [
-						{ label: 'Primary CTA', value: content.hero.primaryCtaLabel },
+						{ label: 'Primary CTA', value: `${content.hero.primaryCtaLabel} (${content.hero.primaryCtaType})` },
 						{ label: 'Primary target', value: content.hero.primaryCtaHref },
-						{ label: 'Secondary CTA', value: content.hero.secondaryCtaLabel },
+						{ label: 'Secondary CTA', value: `${content.hero.secondaryCtaLabel} (${content.hero.secondaryCtaType})` },
 						{ label: 'Secondary target', value: content.hero.secondaryCtaHref }
+					]
+				},
+				{
+					id: 'hero-media',
+					label: 'Hero media',
+					value: content.hero.heroImageAssetKey,
+					detail: content.hero.heroImageAltText,
+					fields: [
+						{ label: 'Hero image asset', value: content.hero.heroImageAssetKey },
+						{ label: 'Background image', value: content.hero.backgroundImageAssetKey || 'None' },
+						{ label: 'Background texture', value: content.hero.backgroundTextureAssetKey || 'None' }
+					]
+				},
+				{
+					id: 'hero-trust',
+					label: 'Trust badges',
+					value: content.hero.trustBadges.map((badge) => badge.title).join(' · '),
+					listTitle: 'Trust badges',
+					listItems: content.hero.trustBadges.map((badge) => ({
+						label: badge.iconAssetKey,
+						value: badge.title,
+						detail: badge.description
+					})),
+					actions: ['Reorder badges', 'Review contractor overrides'],
+					fields: [
+						{ label: 'Trust badge eyebrow', value: content.hero.trustBadgeEyebrow },
+						{ label: 'Media overrides', value: `${content.hero.mediaByContractorType.length} contractor-specific entries` }
 					]
 				}
 			]
@@ -877,6 +917,177 @@
 										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save navigation
+									</button>
+								</div>
+							</section>
+						</form>
+					</article>
+				{:else if selectedSection.id === 'hero'}
+					<article
+						id="content-editor"
+						class="rounded-md border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]"
+						data-testid="cms-hero-panel"
+					>
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Hero · CMS controls</p>
+								<h4 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Hero content and media</h4>
+								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">Manage the first-screen message, CTA behavior, image treatment, contractor-specific media swaps, and the trust badges shown directly below the CTA row.</p>
+							</div>
+							<span class="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+								{activeContractorPreset?.contractorType ?? 'shared'}
+							</span>
+						</div>
+
+						{#if form?.savedSectionId === 'hero' && form?.savedMessage}
+							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+								{form.savedMessage}
+							</div>
+						{/if}
+
+						{#if form?.savedSectionId === 'hero' && form?.message}
+							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+								{form.message}
+							</div>
+						{/if}
+
+						<form method="POST" action="?/updateHero" class="mt-5 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Copy and CTA behavior</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
+										<input name="eyebrow" value={content.hero.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Headline</span>
+										<textarea name="headline" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.hero.headline}</textarea>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Subheadline</span>
+										<textarea name="subheadline" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.hero.subheadline}</textarea>
+									</label>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Primary CTA label</span>
+											<input name="primaryCtaLabel" value={content.hero.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Primary CTA type</span>
+											<select name="primaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+												<option value="anchor" selected={content.hero.primaryCtaType === 'anchor'}>Anchor</option>
+												<option value="link" selected={content.hero.primaryCtaType === 'link'}>Link</option>
+												<option value="phone" selected={content.hero.primaryCtaType === 'phone'}>Phone</option>
+											</select>
+										</label>
+									</div>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Primary CTA target</span>
+										<input name="primaryCtaHref" value={content.hero.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<div class="grid gap-3 md:grid-cols-2">
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Secondary CTA label</span>
+											<input name="secondaryCtaLabel" value={content.hero.secondaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										</label>
+										<label class="grid gap-1 text-sm text-[var(--text-base)]">
+											<span class="font-semibold text-[var(--text-strong)]">Secondary CTA type</span>
+											<select name="secondaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+												<option value="anchor" selected={content.hero.secondaryCtaType === 'anchor'}>Anchor</option>
+												<option value="link" selected={content.hero.secondaryCtaType === 'link'}>Link</option>
+												<option value="phone" selected={content.hero.secondaryCtaType === 'phone'}>Phone</option>
+											</select>
+										</label>
+									</div>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Secondary CTA target</span>
+										<input name="secondaryCtaHref" value={content.hero.secondaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+								</div>
+							</section>
+
+							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Media and trust badge mapping</p>
+								<div class="mt-3 grid gap-3">
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Hero image asset</span>
+										<select name="heroImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											{#each heroImageAssets as asset}
+												<option value={asset.key} selected={content.hero.heroImageAssetKey === asset.key}>{asset.name} · {asset.key}</option>
+											{/each}
+										</select>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Hero image alt text</span>
+										<input name="heroImageAltText" value={content.hero.heroImageAltText} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Background image asset</span>
+										<select name="backgroundImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<option value="" selected={!content.hero.backgroundImageAssetKey}>None</option>
+											{#each heroImageAssets as asset}
+												<option value={asset.key} selected={content.hero.backgroundImageAssetKey === asset.key}>{asset.name} · {asset.key}</option>
+											{/each}
+										</select>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Background texture / overlay asset</span>
+										<select name="backgroundTextureAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<option value="" selected={!content.hero.backgroundTextureAssetKey}>None</option>
+											{#each textureAssets as asset}
+												<option value={asset.key} selected={content.hero.backgroundTextureAssetKey === asset.key}>{asset.name} · {asset.key}</option>
+											{/each}
+										</select>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Trust badge eyebrow</span>
+										<input name="trustBadgeEyebrow" value={content.hero.trustBadgeEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Trust badges</span>
+										<textarea
+											name="trustBadges"
+											rows="7"
+											class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+										>{content.hero.trustBadges.map((badge) => `${badge.iconAssetKey}|${badge.title}|${badge.description}`).join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One badge per line: `iconAssetKey|title|description`. Line order controls display order.</span>
+									</label>
+									<label class="grid gap-1 text-sm text-[var(--text-base)]">
+										<span class="font-semibold text-[var(--text-strong)]">Contractor-specific media overrides</span>
+										<textarea
+											name="mediaByContractorType"
+											rows="7"
+											class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+										>{content.hero.mediaByContractorType.map((override) => `${override.contractorType}|${override.heroImageAssetKey}|${override.backgroundImageAssetKey ?? ''}|${override.backgroundTextureAssetKey ?? ''}|${override.heroImageAltText ?? ''}`).join('\n')}</textarea>
+										<span class="text-xs leading-5 text-[var(--text-muted)]">One override per line: `contractorType|heroImageAssetKey|backgroundImageAssetKey|backgroundTextureAssetKey|heroImageAltText`.</span>
+									</label>
+								</div>
+
+								<div class="mt-4 grid gap-3 md:grid-cols-2">
+									<div class="rounded-md bg-[var(--shell-panel-strong)] p-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Hero-ready assets</p>
+										<ul class="mt-2 space-y-1.5 text-sm text-[var(--text-base)]">
+											{#each heroImageAssets as asset}
+												<li>{asset.key} · {asset.name}</li>
+											{/each}
+										</ul>
+									</div>
+									<div class="rounded-md bg-[var(--shell-panel-strong)] p-3">
+										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Trust badge icons</p>
+										<ul class="mt-2 space-y-1.5 text-sm text-[var(--text-base)]">
+											{#each heroBadgeAssets as asset}
+												<li>{asset.key} · {asset.name}</li>
+											{/each}
+										</ul>
+									</div>
+								</div>
+
+								<div class="mt-4 flex justify-end">
+									<button
+										type="submit"
+										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+									>
+										Save hero
 									</button>
 								</div>
 							</section>
