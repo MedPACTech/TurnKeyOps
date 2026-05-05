@@ -2,7 +2,11 @@ import { error, type RequestHandler } from '@sveltejs/kit';
 import { readQuoteRequestAttachment } from '$lib/server/quote-request-attachments';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
 
-export const GET: RequestHandler = async ({ fetch, params }) => {
+export const GET: RequestHandler = async ({ fetch, locals, params }) => {
+	if (!locals.bdrAdminSession) {
+		throw error(403, 'Admin attachment access requires owner or office admin privileges.');
+	}
+
 	const { requests } = await loadQuoteRequests(fetch);
 	const request = requests.find((item) => item.id === params.requestId);
 	const attachment = request?.attachments.find((item) => item.id === params.attachmentId);

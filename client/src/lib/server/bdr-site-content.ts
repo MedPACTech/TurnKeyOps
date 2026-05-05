@@ -31,6 +31,15 @@ type FsPromises = {
 const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
 
 const cloneDefaultContent = (): BdrSiteContent => structuredClone(bdrSiteContent);
+const legacyPublicHeroHeadline =
+	'Roofing and exterior work with a clear path from inspection to quote, schedule, and completion.';
+
+const isLegacyPublicSiteDraft = (value: Partial<BdrSiteContent>): boolean => {
+	const headline = value.hero?.headline;
+	const announcement = value.navigation?.announcement;
+
+	return headline === legacyPublicHeroHeadline && (!announcement || announcement === 'Navigation');
+};
 
 const normalizeServices = (items: unknown): string[] | null => {
 	if (!Array.isArray(items)) return null;
@@ -568,6 +577,10 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	}
 
 	const candidate = value as Partial<BdrSiteContent>;
+	if (isLegacyPublicSiteDraft(candidate)) {
+		return content;
+	}
+
 	const services = normalizeServicesSection(candidate.services, content.services);
 	const assetLibrary = normalizeAssetLibrary(candidate.assetLibrary);
 	const serviceCategories = normalizeServiceCategories(candidate.serviceCategories);

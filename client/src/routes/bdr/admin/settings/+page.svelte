@@ -1,581 +1,305 @@
 <script lang="ts">
+	import AdminContextRail from '$lib/components/admin/AdminContextRail.svelte';
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
-	import type { AdminSettingField, AdminSettingGroup } from '$lib/admin-settings';
-	import type { BdrThemeSettings } from '$lib/bdr-site-content';
+	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
-	type SettingsPageData = PageProps['data'] & {
-		themeSettings: BdrThemeSettings;
-	};
-
-	type SettingsPageForm = {
-		themeSettings?: BdrThemeSettings;
-		savedGroupId?: string;
-		savedMessage?: string;
-		saveError?: string;
-	};
-
-	let { data, form }: { data: SettingsPageData; form?: SettingsPageForm } = $props();
-
-	let selectedGroupId = $state('');
-
-	type BobMove = {
+	type EstimateDefaults = PageProps['data']['estimateDefaults'];
+	type DefaultsField = {
+		key: keyof EstimateDefaults;
 		label: string;
-		detail: string;
-		href: string;
+		help?: string;
+		prefix?: string;
+		suffix?: string;
+		step?: string;
+		min?: number;
+	};
+	type DefaultsSection = {
+		title: string;
+		subtitle: string;
+		icon: string;
+		fields: DefaultsField[];
 	};
 
-	const focusRing =
-		'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-panel)]';
+	let { data, form }: PageProps = $props();
 
-	const activeThemeSettings = $derived(form?.themeSettings ?? data.themeSettings);
-	const themeGroupIds = new Set(['theme-preset-mode', 'theme-color-tokens', 'theme-typography-sizing']);
-
-	const themeDesignGroups = $derived<AdminSettingGroup[]>([
+	const sections: DefaultsSection[] = [
 		{
-			id: 'theme-preset-mode',
-			label: 'Theme mode / presets',
-			description: 'Default display mode, style preset, and brand-asset pairing for contractor templates.',
-			outcome: 'Lets the same site structure shift tone without rebuilding the template.',
+			title: 'Concrete Pricing Defaults',
+			subtitle: 'Base concrete and material charges inherited by new estimates.',
+			icon: '🪨',
 			fields: [
-				{
-					id: 'theme-mode',
-					label: 'Default theme mode',
-					value: activeThemeSettings.mode,
-					type: 'select',
-					help: 'Choose Light, Dark, or System as the default template mode.',
-					options: ['Light', 'Dark', 'System']
-				},
-				{
-					id: 'theme-preset',
-					label: 'Site style preset',
-					value: activeThemeSettings.preset,
-					type: 'select',
-					help: 'Preset bundles for concrete-style, cleaner, or more premium visual defaults.',
-					options: ['Clean', 'Industrial', 'Premium', 'Minimal', 'Bold']
-				},
-				{
-					id: 'theme-icon-style',
-					label: 'Icon style',
-					value: activeThemeSettings.iconStyle,
-					type: 'text',
-					help: 'The starter icon family used across trust badges, services, and utility areas.'
-				},
-				{
-					id: 'theme-logo-asset',
-					label: 'Logo asset key',
-					value: activeThemeSettings.brandAssets.logoAssetKey,
-					type: 'text',
-					help: 'References the reusable brand logo from the asset library.'
-				},
-				{
-					id: 'theme-favicon-asset',
-					label: 'Favicon asset key',
-					value: activeThemeSettings.brandAssets.faviconAssetKey,
-					type: 'text',
-					help: 'Keeps the favicon reusable instead of burying it in template code.'
-				}
+				{ key: 'concreteCostPerYard', label: 'Concrete Cost Per Yard', prefix: '$' },
+				{ key: 'minimumLoadFee', label: 'Minimum Load Fee', prefix: '$' },
+				{ key: 'shortLoadFee', label: 'Short Load Fee', prefix: '$' },
+				{ key: 'deliveryFee', label: 'Delivery Fee', prefix: '$' },
+				{ key: 'fuelSurcharge', label: 'Fuel Surcharge', prefix: '$' },
+				{ key: 'defaultPumpFee', label: 'Default Pump Fee', prefix: '$' },
+				{ key: 'additiveCost', label: 'Additive Cost', prefix: '$' },
+				{ key: 'fiberMeshCost', label: 'Fiber Mesh Cost', prefix: '$' },
+				{ key: 'colorCost', label: 'Color Cost', prefix: '$' },
+				{ key: 'sealerCost', label: 'Sealer Cost', prefix: '$' }
 			]
 		},
 		{
-			id: 'theme-color-tokens',
-			label: 'Color tokens',
-			description: 'Shared palette defaults for buttons, surfaces, text, and borders.',
-			outcome: 'Centralizes concrete-theme colors so future contractor sites can swap tokens cleanly.',
+			title: 'Site Prep Defaults',
+			subtitle: 'Prep assumptions for demolition, excavation, grading, and access.',
+			icon: '🚧',
 			fields: [
-				{ id: 'theme-primary', label: 'Primary color', value: activeThemeSettings.colors.primary, type: 'text', help: 'Starter concrete-theme CTA orange.' },
-				{ id: 'theme-secondary', label: 'Secondary color', value: activeThemeSettings.colors.secondary, type: 'text', help: 'Dark secondary control tone.' },
-				{ id: 'theme-accent', label: 'Accent color', value: activeThemeSettings.colors.accent, type: 'text', help: 'Light accent used for contrast and utility copy.' },
-				{ id: 'theme-background', label: 'Background color', value: activeThemeSettings.colors.background, type: 'text', help: 'Primary dark page background token.' },
-				{ id: 'theme-surface', label: 'Surface color', value: activeThemeSettings.colors.surface, type: 'text', help: 'Secondary surface tone used inside cards and bands.' },
-				{ id: 'theme-text', label: 'Text color', value: activeThemeSettings.colors.text, type: 'text', help: 'Primary foreground text token.' },
-				{ id: 'theme-border', label: 'Border color', value: activeThemeSettings.colors.border, type: 'text', help: 'Shared border tone for card and input outlines.' }
+				{ key: 'demoCostRate', label: 'Demo Cost / Rate', prefix: '$' },
+				{ key: 'excavationCostRate', label: 'Excavation Cost / Rate', prefix: '$' },
+				{ key: 'haulOffFee', label: 'Haul Off Fee', prefix: '$' },
+				{ key: 'baseMaterialUnitCost', label: 'Base Material Unit Cost', prefix: '$' },
+				{ key: 'compactionCost', label: 'Compaction Cost', prefix: '$' },
+				{ key: 'vaporBarrierCost', label: 'Vapor Barrier Cost', prefix: '$' },
+				{ key: 'gradingCost', label: 'Grading Cost', prefix: '$' },
+				{ key: 'accessDifficultyEasyPercent', label: 'Easy Access Adjustment', suffix: '%' },
+				{ key: 'accessDifficultyModeratePercent', label: 'Moderate Access Adjustment', suffix: '%' },
+				{ key: 'accessDifficultyHardPercent', label: 'Hard Access Adjustment', suffix: '%' }
 			]
 		},
 		{
-			id: 'theme-typography-sizing',
-			label: 'Typography / sizing',
-			description: 'Heading and body font defaults plus the reusable sizing tokens used by the template.',
-			outcome: 'Makes style changes possible without changing structural layout code.',
+			title: 'Reinforcement Defaults',
+			subtitle: 'Reusable reinforcement pricing assumptions.',
+			icon: '🧱',
 			fields: [
-				{ id: 'theme-heading-font', label: 'Heading font', value: activeThemeSettings.typography.headingFont, type: 'text', help: 'Display font used for H1 / H2 / H3 emphasis.' },
-				{ id: 'theme-body-font', label: 'Body font', value: activeThemeSettings.typography.bodyFont, type: 'text', help: 'Body and utility font used for paragraph and UI copy.' },
-				{ id: 'theme-button-radius', label: 'Button radius', value: activeThemeSettings.sizing.buttonRadius, type: 'text', help: 'Shared button corner radius token.' },
-				{ id: 'theme-card-radius', label: 'Card radius', value: activeThemeSettings.sizing.cardRadius, type: 'text', help: 'Shared card corner radius token.' },
-				{ id: 'theme-logo-size', label: 'Logo size', value: activeThemeSettings.sizing.logoSize, type: 'text', help: 'Default logo sizing treatment for header and footer usage.' }
+				{ key: 'rebarCostPerFoot', label: 'Rebar Cost Per Foot', prefix: '$' },
+				{ key: 'meshCost', label: 'Mesh Cost', prefix: '$' },
+				{ key: 'chairsCost', label: 'Chairs Cost', prefix: '$' },
+				{ key: 'dowelsCost', label: 'Dowels Cost', prefix: '$' },
+				{ key: 'anchorBoltsCost', label: 'Anchor Bolts Cost', prefix: '$' }
+			]
+		},
+		{
+			title: 'Formwork Defaults',
+			subtitle: 'Default form material, complexity, and labor assumptions.',
+			icon: '🪵',
+			fields: [
+				{ key: 'formMaterialCost', label: 'Form Material Cost', prefix: '$' },
+				{ key: 'formComplexitySimpleMultiplier', label: 'Simple Complexity Multiplier', step: '0.05' },
+				{ key: 'formComplexityStandardMultiplier', label: 'Standard Complexity Multiplier', step: '0.05' },
+				{ key: 'formComplexityComplexMultiplier', label: 'Complex Complexity Multiplier', step: '0.05' },
+				{ key: 'formLaborHoursPerLinearFoot', label: 'Form Labor Hours / Linear Ft', suffix: 'hrs', step: '0.05' }
+			]
+		},
+		{
+			title: 'Finish Defaults',
+			subtitle: 'Surface finish and add-on pricing defaults.',
+			icon: '✨',
+			fields: [
+				{ key: 'sawCutCost', label: 'Saw Cut Cost', prefix: '$' },
+				{ key: 'jointMaterialCost', label: 'Joint Material Cost', prefix: '$' },
+				{ key: 'expansionJointCost', label: 'Expansion Joint Cost', prefix: '$' },
+				{ key: 'curingCompoundCost', label: 'Curing Compound Cost', prefix: '$' },
+				{ key: 'stampPatternCost', label: 'Stamp Pattern Cost', prefix: '$' },
+				{ key: 'decorativePremium', label: 'Decorative Premium', prefix: '$' }
+			]
+		},
+		{
+			title: 'Labor Defaults',
+			subtitle: 'Crew assumptions and task-hour defaults used by new estimates.',
+			icon: '👷',
+			fields: [
+				{ key: 'laborRatePerHour', label: 'Labor Rate Per Hour', prefix: '$' },
+				{ key: 'overtimeMultiplier', label: 'Overtime Multiplier', step: '0.05' },
+				{ key: 'defaultCrewSize', label: 'Default Crew Size', step: '1', min: 1 },
+				{ key: 'demoHoursPer100SqFt', label: 'Demo Hours / 100 Sq Ft', suffix: 'hrs', step: '0.1' },
+				{ key: 'prepHoursPer100SqFt', label: 'Prep Hours / 100 Sq Ft', suffix: 'hrs', step: '0.1' },
+				{ key: 'formHoursPer100LinearFt', label: 'Form Hours / 100 Linear Ft', suffix: 'hrs', step: '0.1' },
+				{ key: 'reinforcementHoursPer100SqFt', label: 'Reinforcement Hours / 100 Sq Ft', suffix: 'hrs', step: '0.1' },
+				{ key: 'pourHoursPer100SqFt', label: 'Pour Hours / 100 Sq Ft', suffix: 'hrs', step: '0.1' },
+				{ key: 'finishHoursPer100SqFt', label: 'Finish Hours / 100 Sq Ft', suffix: 'hrs', step: '0.1' }
+			]
+		},
+		{
+			title: 'Equipment Defaults',
+			subtitle: 'Reusable equipment charges loaded into estimate calculations.',
+			icon: '🚚',
+			fields: [
+				{ key: 'skidSteerCost', label: 'Skid Steer Cost', prefix: '$' },
+				{ key: 'excavatorCost', label: 'Excavator Cost', prefix: '$' },
+				{ key: 'compactorCost', label: 'Compactor Cost', prefix: '$' },
+				{ key: 'sawEquipmentCost', label: 'Saw Equipment Cost', prefix: '$' },
+				{ key: 'powerTrowelCost', label: 'Power Trowel Cost', prefix: '$' },
+				{ key: 'trailerTruckCost', label: 'Trailer Truck Cost', prefix: '$' },
+				{ key: 'generatorCost', label: 'Generator Cost', prefix: '$' },
+				{ key: 'buggyCost', label: 'Buggy Cost', prefix: '$' },
+				{ key: 'otherEquipmentCost', label: 'Other Equipment Cost', prefix: '$' }
+			]
+		},
+		{
+			title: 'Margin Defaults',
+			subtitle: 'Overhead, margin, and risk settings for estimate rollups.',
+			icon: '📈',
+			fields: [
+				{ key: 'overheadPercent', label: 'Overhead Percent', suffix: '%' },
+				{ key: 'contingencyPercent', label: 'Contingency Percent', suffix: '%' },
+				{ key: 'profitPercent', label: 'Profit Percent', suffix: '%' },
+				{ key: 'taxPercent', label: 'Tax Percent', suffix: '%' },
+				{ key: 'travelCharge', label: 'Travel Charge', prefix: '$' },
+				{ key: 'rushFee', label: 'Rush Fee', prefix: '$' },
+				{ key: 'weatherRiskAllowance', label: 'Weather Risk Allowance', prefix: '$' }
 			]
 		}
-	]);
+	];
 
-	const findField = (id: string, fallback: AdminSettingField): AdminSettingField =>
-		data.groups.flatMap((group) => group.fields).find((field) => field.id === id) ?? fallback;
+	let savedDefaults = $state<EstimateDefaults>(untrack(() => structuredClone(data.estimateDefaults)));
+	let defaultsForm = $state<EstimateDefaults>(untrack(() => structuredClone(data.estimateDefaults)));
 
-	const rulesDeskGroups = $derived<AdminSettingGroup[]>([
-		...themeDesignGroups,
-		{
-			id: 'estimate-defaults',
-			label: 'Estimate defaults',
-			description: 'Baseline pricing and quote assumptions before an operator steps in.',
-			outcome: 'Sets the standard commercial starting point for new estimate work.',
-			fields: [
-				findField('default-overhead', {
-					id: 'default-overhead',
-					label: 'Default overhead rate',
-					value: '12%',
-					type: 'percent',
-					help: 'Applied before final markup so internal costing starts from a visible baseline.'
-				}),
-				findField('default-profit', {
-					id: 'default-profit',
-					label: 'Default target margin',
-					value: '18%',
-					type: 'percent',
-					help: 'Used by the office when building standard estimate packets.'
-				}),
-				findField('rounding-mode', {
-					id: 'rounding-mode',
-					label: 'Estimate rounding mode',
-					value: 'Round final total only',
-					type: 'select',
-					help: 'Controls how customer-facing totals are normalized.',
-					options: ['Round line items to nearest dollar', 'Round final total only', 'No rounding']
-				}),
-				findField('tax-handling', {
-					id: 'tax-handling',
-					label: 'Sales tax handling',
-					value: 'Apply by taxable material class',
-					type: 'select',
-					help: 'Defines how mixed-material scopes handle tax.',
-					options: ['Apply by taxable material class', 'Apply at estimate total', 'Manual review required']
-				})
-			]
-		},
-		{
-			id: 'scheduling-operations',
-			label: 'Scheduling / operations rules',
-			description: 'Rules that gate release timing, signature readiness, and field coordination.',
-			outcome: 'Keeps schedule locks and production handoff predictable.',
-			fields: [
-				findField('insurance-supplement-window', {
-					id: 'insurance-supplement-window',
-					label: 'Insurance supplement review window',
-					value: '2 days',
-					type: 'days',
-					help: 'How long supplement review can stay pending before escalation.'
-				}),
-				findField('schedule-release', {
-					id: 'schedule-release',
-					label: 'Schedule release buffer',
-					value: '24 hours',
-					type: 'hours',
-					help: 'Minimum time between readiness approval and hard schedule lock.'
-				}),
-				findField('signature-required', {
-					id: 'signature-required',
-					label: 'Require signature before production',
-					value: 'Enabled',
-					type: 'toggle',
-					help: 'Prevents production handoff if the estimate packet is unsigned.'
-				})
-			]
-		},
-		{
-			id: 'billing-rules',
-			label: 'Billing rules',
-			description: 'Deposit, payment hold, and exception defaults used by the office team.',
-			outcome: 'Makes the payment posture visible before work gets released.',
-			fields: [
-				findField('minimum-deposit', {
-					id: 'minimum-deposit',
-					label: 'Minimum deposit request',
-					value: '30%',
-					type: 'percent',
-					help: 'Shown when a job requires material commitment before schedule lock.'
-				}),
-				findField('check-hold', {
-					id: 'check-hold',
-					label: 'Check hold duration',
-					value: '3 days',
-					type: 'days',
-					help: 'Jobs paid by check stay on hold for this period before release.'
-				}),
-				findField('deposit-exception', {
-					id: 'deposit-exception',
-					label: 'Deposit exception owner',
-					value: 'Owner approval',
-					type: 'text',
-					help: 'Who can override the default deposit requirement.'
-				})
-			]
-		},
-		{
-			id: 'team-operator',
-			label: 'Team / operator settings',
-			description: 'Ownership and response defaults that keep the queue operating consistently.',
-			outcome: 'Makes office routing predictable before deeper permissions or automation exist.',
-			fields: [
-				findField('intake-owner', {
-					id: 'intake-owner',
-					label: 'Default quote intake owner',
-					value: 'Office intake',
-					type: 'text',
-					help: 'New website requests start with this owner unless reassigned.'
-				}),
-				findField('follow-up-sla', {
-					id: 'follow-up-sla',
-					label: 'First-response SLA',
-					value: '15 minutes',
-					type: 'hours',
-					help: 'Operational target for emergency or priority web requests.'
-				}),
-				findField('estimate-review', {
-					id: 'estimate-review',
-					label: 'Estimate internal review required',
-					value: 'Enabled',
-					type: 'toggle',
-					help: 'Keeps quote packets in draft until an internal review pass is complete.'
-				})
-			]
-		},
-		{
-			id: 'workspace-identity',
-			label: 'Workspace identity',
-			description: 'Shared business identity defaults for office communication and scheduling context.',
-			outcome: 'Keeps the workspace calm and trustworthy across customer-facing handoff.',
-			fields: [
-				{
-					id: 'workspace-name',
-					label: 'Workspace display name',
-					value: 'Blue Diamond Roofing',
-					type: 'text',
-					help: 'Visible business label used across the External Admin shell.'
-				},
-				{
-					id: 'reply-email',
-					label: 'Default reply email',
-					value: 'dispatch@bdr-demo.local',
-					type: 'text',
-					help: 'Used for outbound office follow-up and schedule coordination.'
-				},
-				{
-					id: 'default-timezone',
-					label: 'Default dispatch time zone',
-					value: 'America/New_York',
-					type: 'select',
-					help: 'Controls the default scheduling context for office staff.',
-					options: ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles']
-				}
-			]
-		}
-	]);
-
-	const selectedGroup = $derived(rulesDeskGroups.find((group) => group.id === selectedGroupId) ?? rulesDeskGroups[0]);
-	const isThemeGroup = $derived(Boolean(selectedGroup && themeGroupIds.has(selectedGroup.id)));
-
-	$effect(() => {
-		if (!selectedGroupId && rulesDeskGroups[0]) {
-			selectedGroupId = form?.savedGroupId ?? rulesDeskGroups[0].id;
-		}
-	});
-
-	$effect(() => {
-		if (form?.savedGroupId && form.savedGroupId !== selectedGroupId) {
-			selectedGroupId = form.savedGroupId;
-		}
-	});
-
+	const hasChanges = $derived(JSON.stringify(savedDefaults) !== JSON.stringify(defaultsForm));
 	const metrics = $derived([
-		{
-			label: 'Rule groups',
-			value: String(rulesDeskGroups.length),
-			detail: 'Estimate, operations, billing, team, and identity controls'
-		},
-		{
-			label: 'Visible controls',
-			value: String(rulesDeskGroups.reduce((sum, group) => sum + group.fields.length, 0)),
-			detail: 'Concise inputs grouped by operational meaning'
-		},
-		{ label: 'Persistence', value: 'Local content store', detail: 'Theme settings save into the contractor-site CMS content payload' }
+		{ label: 'Sections', value: `${sections.length} groups` },
+		{ label: 'Crew size', value: `${defaultsForm.defaultCrewSize} people` },
+		{ label: 'Concrete cost', value: `$${defaultsForm.concreteCostPerYard} / yard` },
+		{ label: 'Status', value: hasChanges ? 'Unsaved changes' : 'All changes saved' }
 	]);
 
-	const typeTone = (type: string) => {
-		if (type === 'toggle') return 'border-emerald-300 bg-emerald-50 text-emerald-700';
-		if (type === 'percent' || type === 'currency') return 'border-sky-300 bg-sky-50 text-sky-700';
-		if (type === 'days' || type === 'hours') return 'border-amber-300 bg-amber-50 text-amber-700';
-		return 'border-slate-300 bg-slate-50 text-slate-700';
+	const displayValue = (key: keyof EstimateDefaults) => {
+		const value = defaultsForm[key];
+		return Number.isFinite(value) ? String(value) : '';
 	};
 
-	const bobMoves = $derived.by(() => {
-		if (!selectedGroup) {
-			return [
-				{
-					label: 'Review rules desk',
-					detail: `${rulesDeskGroups.length} grouped panels available`,
-					href: '#rules-desk'
-				}
-			] satisfies BobMove[];
-		}
+	function updateValue(key: keyof EstimateDefaults, raw: string) {
+		const numeric = raw === '' ? 0 : Number(raw);
+		const value = Number.isFinite(numeric) ? numeric : 0;
+		defaultsForm = {
+			...defaultsForm,
+			[key]: key === 'defaultCrewSize' ? Math.max(1, Math.round(value)) : Math.max(0, value)
+		};
+	}
 
-		switch (selectedGroup.id) {
-			case 'theme-preset-mode':
-				return [
-					{ label: 'Check default visual posture', detail: 'Mode, preset, and brand assets should stay aligned', href: '#theme-mode' },
-					{ label: 'Review reusable brand keys', detail: 'Logo and favicon should reference asset-library records', href: '#theme-logo-asset' },
-					{ label: 'Confirm preset starter values', detail: 'Concrete should stay on the intended starter theme', href: '#theme-preset' }
-				] satisfies BobMove[];
-			case 'theme-color-tokens':
-				return [
-					{ label: 'Audit CTA contrast', detail: 'Primary and text colors should stay readable together', href: '#theme-primary' },
-					{ label: 'Check surface palette', detail: 'Background, surface, and border tokens should remain coherent', href: '#theme-background' },
-					{ label: 'Review light / dark coverage', detail: 'Token choices should still support both template modes', href: '#theme-accent' }
-				] satisfies BobMove[];
-			case 'theme-typography-sizing':
-				return [
-					{ label: 'Review type hierarchy', detail: 'Heading and body defaults should match the design-system board', href: '#theme-heading-font' },
-					{ label: 'Check component sizing', detail: 'Button and card radius should stay consistent across modules', href: '#theme-button-radius' },
-					{ label: 'Confirm logo scale', detail: 'Logo sizing should remain balanced in header and footer treatments', href: '#theme-logo-size' }
-				] satisfies BobMove[];
-			case 'estimate-defaults':
-				return [
-					{ label: 'Check margin baseline', detail: 'Overhead, target margin, and rounding should stay aligned', href: '#default-overhead' },
-					{ label: 'Review customer-facing totals', detail: 'Confirm tax and rounding rules still read cleanly', href: '#rounding-mode' },
-					{ label: 'Flag deposit drift', detail: 'Make sure deposits match the estimate posture', href: '#minimum-deposit' }
-				] satisfies BobMove[];
-			case 'scheduling-operations':
-				return [
-					{ label: 'Check release timing', detail: 'Schedule buffers and supplement windows should not conflict', href: '#insurance-supplement-window' },
-					{ label: 'Review production gate', detail: 'Signature requirement is the main release control here', href: '#signature-required' },
-					{ label: 'Audit field readiness', detail: 'Make sure schedule rules still match office expectations', href: '#schedule-release' }
-				] satisfies BobMove[];
-			case 'billing-rules':
-				return [
-					{ label: 'Review deposit policy', detail: 'Deposit defaults and override ownership should stay explicit', href: '#minimum-deposit' },
-					{ label: 'Check payment holds', detail: 'Hold timing should match actual release behavior', href: '#check-hold' },
-					{ label: 'Look for exception creep', detail: 'Owner-only overrides should remain visible', href: '#deposit-exception' }
-				] satisfies BobMove[];
-			case 'team-operator':
-				return [
-					{ label: 'Confirm intake ownership', detail: 'New request routing should still match office staffing', href: '#intake-owner' },
-					{ label: 'Check response target', detail: 'SLA targets should stay realistic for the team', href: '#follow-up-sla' },
-					{ label: 'Review internal review gate', detail: 'Quote packets should not bypass internal review', href: '#estimate-review' }
-				] satisfies BobMove[];
-			default:
-				return [
-					{ label: 'Check visible identity', detail: 'Workspace naming should match the approved shell baseline', href: '#workspace-name' },
-					{ label: 'Review office reply path', detail: 'Outbound communication defaults should stay trustworthy', href: '#reply-email' },
-					{ label: 'Confirm scheduling context', detail: 'Timezone defaults should match the active office region', href: '#default-timezone' }
-				] satisfies BobMove[];
+	function resetChanges() {
+		defaultsForm = structuredClone(savedDefaults);
+	}
+
+	function saveDefaults() {
+		savedDefaults = structuredClone(defaultsForm);
+	}
+
+	$effect(() => {
+		if (form?.defaultsSaved && form.estimateDefaults) {
+			savedDefaults = structuredClone(form.estimateDefaults);
+			defaultsForm = structuredClone(form.estimateDefaults);
 		}
 	});
 </script>
 
 <AdminWorkspace
-	kicker="Admin / Settings"
-	title="Admin / Settings"
-	description="Adjust business defaults, theme tokens, and operator controls without digging through a settings wall. The workflow stays intact; the framing is calmer and more operational."
-	{metrics}
-	contextLabel="Rule groups"
-	focusLabel="Visible rules"
+	kicker="Admin"
+	title="Admin"
+	description="Manage defaults and public-site controls from one admin utility area."
+	contextLabel="Admin"
 >
 	{#snippet context()}
-		<div class="space-y-3">
-			{#each rulesDeskGroups as group}
-				<button
-					type="button"
-					class={`w-full rounded-lg border px-3 py-3 text-left transition ${focusRing} ${selectedGroup?.id === group.id ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
-					onclick={() => (selectedGroupId = group.id)}
-				>
-					<div class="flex items-center justify-between gap-3">
-						<p class="text-sm font-semibold text-[var(--text-strong)]">{group.label}</p>
-						<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
-							{group.fields.length}
-						</span>
-					</div>
-					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{group.outcome}</p>
-				</button>
-			{/each}
-		</div>
-	{/snippet}
-
-	{#snippet focus()}
-		{#if selectedGroup}
-			<div class="space-y-2">
-				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-					{selectedGroup.fields.length} controls in {selectedGroup.label}
-				</p>
-				{#each selectedGroup.fields as field}
-					<a
-						href={`#${field.id}`}
-						class={`block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3 text-left transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel-strong)] ${focusRing}`}
-					>
-						<div class="flex items-start justify-between gap-3">
-							<p class="text-sm font-semibold text-[var(--text-strong)]">{field.label}</p>
-							<span class={`rounded-full border px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] ${typeTone(field.type)}`}>{field.type}</span>
-						</div>
-						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{field.help}</p>
-					</a>
-				{/each}
-			</div>
-		{/if}
+		<AdminContextRail active="defaults" />
 	{/snippet}
 
 	{#snippet work()}
-		{#if selectedGroup}
-			<div class="space-y-4" id="rules-desk">
-				<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
-					<div class="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-						<div>
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Rule group</p>
-							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedGroup.label}</h4>
-							<p class="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{selectedGroup.description}</p>
-							<div class="mt-4 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 text-sm text-[var(--text-base)]">
-								{selectedGroup.outcome}
-							</div>
-						</div>
-
-						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Controls</p>
-								<p class="mt-2 text-lg font-semibold text-[var(--text-strong)]">{selectedGroup.fields.length}</p>
-								<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Editable rules in this panel</p>
-							</div>
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Control types</p>
-								<p class="mt-2 text-lg font-semibold text-[var(--text-strong)]">{new Set(selectedGroup.fields.map((field) => field.type)).size}</p>
-								<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Toggles, inputs, and segmented choices</p>
-							</div>
-						</div>
-					</div>
+		<form method="POST" action="?/saveDefaults" class="space-y-5">
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Estimator Settings</p>
+					<h2 class="mt-2 text-2xl font-semibold leading-8 text-[var(--text-strong)]">Concrete Estimate Defaults</h2>
+					<p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
+						Manage the default constants that new concrete estimates inherit across the desktop editor and Bob's mobile field flow.
+					</p>
 				</div>
 
-				<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
-					<div class="flex items-start justify-between gap-3">
+				<div class="flex flex-col gap-3 sm:flex-row">
+					<button
+						type="button"
+						class="min-h-12 rounded-lg bg-white px-5 text-sm font-semibold text-[var(--text-strong)] shadow-[var(--shell-shadow)] transition disabled:opacity-50"
+						disabled={!hasChanges}
+						onclick={resetChanges}
+					>
+						Reset changes
+					</button>
+					<button
+						type="submit"
+						class="min-h-12 rounded-lg bg-[var(--accent-text)] px-5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
+						disabled={!hasChanges}
+					>
+						Save defaults
+					</button>
+				</div>
+			</div>
+			{#if form?.message}
+				<p class="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{form.message}</p>
+			{/if}
+
+			<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+				<section class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+					<div class="flex items-start gap-4">
+						<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl">🏢</div>
 						<div>
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Bob rules assist</p>
-							<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{selectedGroup.label}</p>
+							<h3 class="text-lg font-semibold text-[var(--text-strong)]">Admin-Controlled Defaults</h3>
+							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+								These values are the starting point for new concrete estimates. Estimators can still adjust them on individual jobs.
+							</p>
 						</div>
-						<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm">
-							✨
-						</span>
 					</div>
-					<div class="mt-3 grid gap-2">
-						{#each bobMoves as move}
-							<a
-								href={move.href}
-								class={`block rounded-lg bg-[var(--shell-panel-strong)] px-3 py-2.5 shadow-sm transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)] ${focusRing}`}
-							>
-								<p class="text-sm font-semibold text-[var(--text-strong)]">{move.label}</p>
-								<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{move.detail}</p>
-							</a>
+				</section>
+
+				<aside class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+					<p class="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">At a glance</p>
+					<div class="mt-4 space-y-3 text-sm">
+						{#each metrics as metric}
+							<div class="rounded-lg bg-[var(--shell-panel-strong)] px-3 py-2">
+								<p class="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--muted)]">{metric.label}</p>
+								<p class="mt-1 font-medium text-[var(--text-strong)]">{metric.value}</p>
+							</div>
 						{/each}
 					</div>
-				</div>
+				</aside>
+			</div>
 
-				{#if isThemeGroup}
-					<form method="POST" action="?/updateThemeSettings" class="space-y-3">
-						<input type="hidden" name="selectedGroupId" value={selectedGroup.id} />
-						{#if form?.savedMessage}
-							<div class="rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-								{form.savedMessage}
+			<div class="space-y-4">
+				{#each sections as section}
+					<section class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="flex items-start gap-4">
+							<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl">
+								{section.icon}
 							</div>
-						{/if}
-						{#if form?.saveError}
-							<div class="rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-								{form.saveError}
+							<div>
+								<h3 class="text-lg font-semibold text-[var(--text-strong)]">{section.title}</h3>
+								<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{section.subtitle}</p>
 							</div>
-						{/if}
-						<div class="grid gap-3">
-							{#each selectedGroup.fields as field}
-								<div id={field.id} class="scroll-mt-24 rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
-									<div class="flex flex-wrap items-start justify-between gap-3">
-										<div>
-											<p class="text-sm font-semibold text-[var(--text-strong)]">{field.label}</p>
-											<p class="mt-1 max-w-3xl text-xs leading-5 text-[var(--text-muted)]">{field.help}</p>
-										</div>
-										<span class={`rounded-full border px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] ${typeTone(field.type)}`}>{field.type}</span>
-									</div>
+						</div>
 
-									<div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1.35fr)]">
-										<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Current value</p>
-											<p class="mt-2 text-lg font-semibold text-[var(--text-strong)]">{field.value}</p>
-										</div>
-
-										<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-											<label class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for={field.id}>Edit rule</label>
-											{#if field.options?.length}
-												<select
-													id={field.id}
-													name={field.id}
-													class={`mt-3 w-full rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none transition focus:border-[var(--accent-border)] ${focusRing}`}
-												>
-													{#each field.options as option}
-														<option selected={option === field.value} value={option}>{option}</option>
-													{/each}
-												</select>
-											{:else}
-												<input
-													id={field.id}
-													name={field.id}
-													value={field.value}
-													class={`mt-3 w-full rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none transition focus:border-[var(--accent-border)] ${focusRing}`}
-												/>
-											{/if}
-										</div>
-									</div>
-								</div>
+						<div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+							{#each section.fields as field}
+								<label class="block">
+									<span class="mb-2 block text-sm font-medium text-[var(--text-base)]">{field.label}</span>
+									<span class="relative block">
+										{#if field.prefix}
+											<span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-sm font-medium text-[var(--text-muted)]">
+												{field.prefix}
+											</span>
+										{/if}
+										<input
+											class={`min-h-12 w-full rounded-lg border border-[var(--shell-border)] bg-white px-4 text-sm text-[var(--text-base)] shadow-sm outline-none transition focus:border-[var(--accent-border)] focus:ring-2 focus:ring-[var(--accent-border)]/30 ${field.prefix ? 'pl-8' : ''} ${field.suffix ? 'pr-14' : ''}`}
+											type="number"
+											name={field.key}
+											min={field.min ?? 0}
+											step={field.step ?? '0.01'}
+											value={displayValue(field.key)}
+											oninput={(event) => updateValue(field.key, event.currentTarget.value)}
+										/>
+										{#if field.suffix}
+											<span class="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-medium text-[var(--text-muted)]">
+												{field.suffix}
+											</span>
+										{/if}
+									</span>
+									{#if field.help}
+										<span class="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{field.help}</span>
+									{/if}
+								</label>
 							{/each}
 						</div>
-						<div class="flex items-center justify-end">
-							<button
-								type="submit"
-								class={`rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 ${focusRing}`}
-							>
-								Save theme settings
-							</button>
-						</div>
-					</form>
-				{:else}
-					<div class="grid gap-3">
-						{#each selectedGroup.fields as field}
-							<div id={field.id} class="scroll-mt-24 rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
-								<div class="flex flex-wrap items-start justify-between gap-3">
-									<div>
-										<p class="text-sm font-semibold text-[var(--text-strong)]">{field.label}</p>
-										<p class="mt-1 max-w-3xl text-xs leading-5 text-[var(--text-muted)]">{field.help}</p>
-									</div>
-									<span class={`rounded-full border px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] ${typeTone(field.type)}`}>{field.type}</span>
-								</div>
-
-								<div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1.35fr)]">
-									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Current value</p>
-										<p class="mt-2 text-lg font-semibold text-[var(--text-strong)]">{field.value}</p>
-									</div>
-
-									<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Edit rule</p>
-										{#if field.options?.length}
-											<select
-												class={`mt-3 w-full rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none transition focus:border-[var(--accent-border)] ${focusRing}`}
-											>
-												{#each field.options as option}
-													<option selected={option === field.value}>{option}</option>
-												{/each}
-											</select>
-										{:else}
-											<input
-												value={field.value}
-												class={`mt-3 w-full rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none transition focus:border-[var(--accent-border)] ${focusRing}`}
-											/>
-										{/if}
-									</div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
+					</section>
+				{/each}
 			</div>
-		{/if}
+		</form>
 	{/snippet}
 </AdminWorkspace>

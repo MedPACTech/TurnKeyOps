@@ -9,6 +9,7 @@
 	let {
 		role,
 		activePath,
+		activeNav,
 		children
 	} = $props<{
 		role: BdrAdminRole;
@@ -41,7 +42,6 @@
 	let navCollapsed = $state(false);
 	let profileOpen = $state(false);
 
-	const withRole = (href: string) => `${href}?role=${role}`;
 	const navItems = $derived(bdrAdminNavigation);
 
 	const navIconFor = (slug: string) =>
@@ -53,10 +53,11 @@
 			customers: '👥',
 			requests: '📥',
 			content: '🌐',
+			bob: '👷',
 			settings: '⚙️'
 		})[slug] ?? '⚙️';
 
-	const isActive = (item: BdrAdminNavItem) => activePath === item.href;
+	const isActive = (item: BdrAdminNavItem) => activeNav.slug === item.slug || activePath === item.href;
 </script>
 
 <div class="concept-admin-shell min-h-screen bg-[var(--app-bg)] text-[var(--text-base)]">
@@ -90,7 +91,7 @@
 				{#each navItems as item}
 					{@const icon = navIconFor(item.slug)}
 					<a
-						href={withRole(item.href)}
+						href={item.href}
 						title={item.label}
 						class={`group flex min-h-12 items-center ${navCollapsed ? 'justify-center px-2' : 'gap-3 px-3'} rounded-md py-2.5 text-sm font-medium leading-5 transition-colors ${
 							isActive(item)
@@ -175,7 +176,7 @@
 						{#each navItems as item}
 							{@const icon = navIconFor(item.slug)}
 							<a
-								href={withRole(item.href)}
+								href={item.href}
 								class={`flex min-h-12 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium leading-5 transition-colors ${
 									isActive(item)
 										? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] shadow-sm'

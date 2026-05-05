@@ -171,23 +171,13 @@ export const bdrAdminNavigation: BdrAdminNavItem[] = [
 	},
 	{
 		slug: 'requests',
-		label: 'Requests',
+		label: 'Quotes',
 		href: '/bdr/admin/requests',
 		summary: 'Public-site intake, triage, follow-up, and conversion handling',
 		contextLabel: 'Intake Ops',
 		focusLabel: 'Request inbox',
 		canvasLabel: 'Message canvas',
 		section: 'customers'
-	},
-	{
-		slug: 'content',
-		label: 'Website',
-		href: '/bdr/admin/website',
-		summary: 'Navigation, homepage sections, footer links, and utility copy',
-		contextLabel: 'Site Content',
-		focusLabel: 'Content desk',
-		canvasLabel: 'Content canvas',
-		section: 'content'
 	},
 	{
 		slug: 'invoices',
@@ -200,10 +190,20 @@ export const bdrAdminNavigation: BdrAdminNavItem[] = [
 		section: 'revenue'
 	},
 	{
+		slug: 'bob',
+		label: 'Ask Bob',
+		href: '/bdr/admin/bob',
+		summary: 'AI backoffice assistant for business questions and next moves',
+		contextLabel: 'AI Ops',
+		focusLabel: 'Conversation',
+		canvasLabel: 'Answer canvas',
+		section: 'admin'
+	},
+	{
 		slug: 'settings',
-		label: 'Admin / Settings',
+		label: 'Admin',
 		href: '/bdr/admin/settings',
-		summary: 'Estimate parameters, calculation handling, business rules, and admin defaults',
+		summary: 'Defaults, website controls, and admin configuration',
 		contextLabel: 'Admin Ops',
 		focusLabel: 'Config domains',
 		canvasLabel: 'Configuration canvas',
@@ -573,6 +573,40 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			]
 		}
 	},
+	'/bdr/admin/bob': {
+		title: 'Ask Bob questions about the business',
+		description:
+			'Bob should be the contractor backoffice copilot: a calm place to ask what needs attention, what is blocked, and what the office should do next.',
+		context: {
+			label: 'AI context',
+			title: 'What Bob can help with',
+			summary: 'Bob should read across quotes, estimates, schedule, invoices, contacts, and settings so owners can ask plain-language business questions.',
+			metrics: [
+				{ label: 'Connected lanes', value: '6', detail: 'Quotes, estimates, calendar, invoices, contacts, and public-site context.' },
+				{ label: 'Posture', value: 'Assistant', detail: 'Bob suggests next moves without hiding the source workflow.' },
+				{ label: 'Access', value: 'Admin only', detail: 'Business-wide AI answers stay behind owner and office-admin access.' }
+			]
+		},
+		focus: {
+			label: 'Conversation posture',
+			title: 'Business questions should start here',
+			summary: 'The dashboard gives quick signal. Ask Bob is where an operator can ask the follow-up question and get a useful explanation.',
+			notes: [
+				{ title: 'Explain the why', detail: 'Bob should cite the queue or record that drove a recommendation.' },
+				{ title: 'Act after answering', detail: 'Answers should point to the correct surface when the next step belongs in quotes, estimates, schedule, or billing.' },
+				{ title: 'Keep it operational', detail: 'This is not a general chat toy. It is for the contractor business and its backoffice work.' }
+			]
+		},
+		canvas: {
+			label: 'Bob canvas',
+			title: 'AI answers, queue summaries, and next-action guidance',
+			summary: 'The first version can answer from scaffolded context. The production version should call the Bob service with tenant-scoped data and audit-friendly source references.',
+			actions: [
+				{ label: 'Open quote queue', href: '/bdr/admin/requests', variant: 'secondary' },
+				{ label: 'Open invoices', href: '/bdr/admin/invoices' }
+			]
+		}
+	},
 	'/bdr/admin/settings': {
 		title: 'Operate the admin system through explicit rules instead of hidden constants',
 		description:
@@ -612,15 +646,26 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 const bdrAdminPathAliases: Record<string, string> = {
 	'/bdr/admin': '/bdr/admin/dashboard',
 	'/bdr/admin/customers': '/bdr/admin/contact',
-	'/bdr/admin/content': '/bdr/admin/website'
+	'/bdr/admin/content': '/bdr/admin/website',
+	'/bdr/admin/website': '/bdr/admin/settings'
 };
 
 export const normalizeBdrAdminPath = (pathname: string) => bdrAdminPathAliases[pathname] ?? pathname;
+
+export type BdrAdminViewRole = Extract<BdrAdminRole, 'owner' | 'office-admin'>;
 
 export const normalizeBdrAdminRole = (value: string | null | undefined): BdrAdminRole => {
 	if (!value) return 'owner';
 	return bdrAdminRoles.includes(value as BdrAdminRole) ? (value as BdrAdminRole) : 'owner';
 };
+
+export const isBdrAdminViewRole = (value: string | null | undefined): value is BdrAdminViewRole =>
+	value === 'owner' || value === 'office-admin';
+
+export const normalizeBdrAdminViewRole = (value: string | null | undefined): BdrAdminViewRole =>
+	isBdrAdminViewRole(value) ? value : 'owner';
+
+export const hasBdrAdminViewAccess = (value: string | null | undefined) => isBdrAdminViewRole(value);
 
 export const getBdrAdminNav = (pathname: string): BdrAdminNavItem => {
 	const normalizedPath = normalizeBdrAdminPath(pathname);

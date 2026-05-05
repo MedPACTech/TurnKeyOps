@@ -1,4 +1,5 @@
 import { fail } from '@sveltejs/kit';
+import { loadBdrEstimateDefaults } from '$lib/server/bdr-estimate-defaults';
 import { loadQuoteRequests, recordQuoteRequestActivity, updateQuoteRequest } from '$lib/server/quote-requests';
 
 const fsModuleName = 'node:fs/promises';
@@ -25,10 +26,34 @@ type EstimateDraftRecord = {
 	assumptions: string[];
 	status: 'draft' | 'ready-to-send' | 'sent';
 	commercialSummary: string;
+	locations: EstimateLocationRecord[];
 	savedAtUtc: string;
 	sentAtUtc?: string;
 	sentBy?: string;
+	delivery?: EstimateDeliveryRecord;
 	revisionHistory: EstimateRevisionRecord[];
+};
+
+type EstimateDeliveryRecord = {
+	status: 'sent' | 'approved' | 'changes-requested';
+	method: 'review-link';
+	reviewUrl: string;
+	email: string;
+	phone: string;
+	sentAtUtc: string;
+	approvedAtUtc?: string;
+	changesRequestedAtUtc?: string;
+	responseNote?: string;
+};
+
+type EstimateLocationRecord = {
+	id: string;
+	name: string;
+	lengthFeet: number;
+	widthFeet: number;
+	depthInches: number;
+	wastePercent: number;
+	numberOfPours: number;
 };
 
 type EstimateRevisionRecord = {
@@ -42,6 +67,7 @@ type EstimateRevisionRecord = {
 	assumptions: string[];
 	status: EstimateDraftRecord['status'];
 	commercialSummary: string;
+	locations: EstimateLocationRecord[];
 	savedAtUtc: string;
 	sentAtUtc?: string;
 	sentBy?: string;
@@ -76,6 +102,7 @@ const normalizeRevisionRecord = (
 	status:
 		revision?.status === 'ready-to-send' || revision?.status === 'sent' ? revision.status : 'draft',
 	commercialSummary: revision?.commercialSummary?.trim() ?? '',
+	locations: normalizeLocations(revision?.locations),
 	savedAtUtc: revision?.savedAtUtc?.trim() ?? new Date().toISOString(),
 	sentAtUtc: revision?.sentAtUtc?.trim() || undefined,
 	sentBy: revision?.sentBy?.trim() || undefined
@@ -113,9 +140,11 @@ const normalizeDraftRecord = (
 		status: record?.status === 'ready-to-send' || record?.status === 'sent' ? record.status : 'draft',
 		commercialSummary:
 			record?.commercialSummary?.trim() ?? buildCommercialSummary(scopeLineItems, assumptions),
+		locations: normalizeLocations(record?.locations),
 		savedAtUtc: record?.savedAtUtc?.trim() ?? new Date().toISOString(),
 		sentAtUtc: record?.sentAtUtc?.trim() || undefined,
 		sentBy: record?.sentBy?.trim() || undefined,
+		delivery: normalizeDeliveryRecord(record?.delivery),
 		revisionHistory
 	};
 };
@@ -131,6 +160,7 @@ const toRevisionRecord = (draft: EstimateDraftRecord): EstimateRevisionRecord =>
 	assumptions: [...draft.assumptions],
 	status: draft.status,
 	commercialSummary: draft.commercialSummary,
+	locations: [...draft.locations],
 	savedAtUtc: draft.savedAtUtc,
 	sentAtUtc: draft.sentAtUtc,
 	sentBy: draft.sentBy
@@ -156,6 +186,29 @@ const writeEstimateDrafts = async (drafts: Record<string, EstimateDraftRecord>) 
 	await fs.writeFile(draftStorePath, JSON.stringify(drafts, null, 2));
 };
 
+const normalizeDeliveryRecord = (delivery: EstimateDraftRecord['delivery'] | undefined) => {
+	if (!delivery || typeof delivery !== 'object') return undefined;
+	if (
+		delivery.status !== 'sent' &&
+		delivery.status !== 'approved' &&
+		delivery.status !== 'changes-requested'
+	) {
+		return undefined;
+	}
+
+	return {
+		status: delivery.status,
+		method: 'review-link' as const,
+		reviewUrl: String(delivery.reviewUrl ?? '').trim(),
+		email: String(delivery.email ?? '').trim(),
+		phone: String(delivery.phone ?? '').trim(),
+		sentAtUtc: String(delivery.sentAtUtc ?? '').trim() || new Date().toISOString(),
+		approvedAtUtc: delivery.approvedAtUtc?.trim() || undefined,
+		changesRequestedAtUtc: delivery.changesRequestedAtUtc?.trim() || undefined,
+		responseNote: delivery.responseNote?.trim() || undefined
+	};
+};
+
 const parseLines = (value: FormDataEntryValue | null) =>
 	String(value ?? '')
 		.split('\n')
@@ -168,6 +221,41 @@ const parseDraftStatus = (value: FormDataEntryValue | null): EstimateDraftRecord
 	return 'draft';
 };
 
+const parsePositiveNumber = (value: unknown, fallback: number) => {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+};
+
+const normalizeLocations = (value: unknown): EstimateLocationRecord[] => {
+	if (!Array.isArray(value)) return [];
+	return value
+		.map((location, index) => {
+			if (!location || typeof location !== 'object') return null;
+			const record = location as Partial<EstimateLocationRecord>;
+			const id = String(record.id ?? `location-${index + 1}`).trim();
+			const name = String(record.name ?? '').trim();
+			if (!name) return null;
+			return {
+				id,
+				name,
+				lengthFeet: parsePositiveNumber(record.lengthFeet, 0),
+				widthFeet: parsePositiveNumber(record.widthFeet, 0),
+				depthInches: parsePositiveNumber(record.depthInches, 4),
+				wastePercent: parsePositiveNumber(record.wastePercent, 10),
+				numberOfPours: Math.max(1, parsePositiveNumber(record.numberOfPours, 1))
+			};
+		})
+		.filter(Boolean) as EstimateLocationRecord[];
+};
+
+const parseLocations = (value: FormDataEntryValue | null) => {
+	try {
+		return normalizeLocations(JSON.parse(String(value ?? '[]')));
+	} catch {
+		return [];
+	}
+};
+
 const buildCommercialSummary = (scopeLineItems: string[], assumptions: string[]) =>
 	[
 		scopeLineItems.length ? `${scopeLineItems.length} scope line item(s)` : 'No scope line items yet',
@@ -178,6 +266,7 @@ const buildCommercialSummary = (scopeLineItems: string[], assumptions: string[])
 const parseDraftRecord = (formData: FormData, overrides?: Partial<EstimateDraftRecord>): EstimateDraftRecord => {
 	const scopeLineItems = parseLines(formData.get('scopeLineItems'));
 	const assumptions = parseLines(formData.get('assumptions'));
+	const locations = parseLocations(formData.get('locations'));
 	const savedAtUtc = overrides?.savedAtUtc ?? new Date().toISOString();
 	const revisionHistory = Array.isArray(overrides?.revisionHistory) ? overrides.revisionHistory : [];
 	return {
@@ -192,9 +281,11 @@ const parseDraftRecord = (formData: FormData, overrides?: Partial<EstimateDraftR
 		assumptions,
 		status: overrides?.status ?? parseDraftStatus(formData.get('draftStatus')),
 		commercialSummary: overrides?.commercialSummary ?? buildCommercialSummary(scopeLineItems, assumptions),
+		locations,
 		savedAtUtc,
 		sentAtUtc: overrides?.sentAtUtc,
 		sentBy: overrides?.sentBy,
+		delivery: overrides?.delivery,
 		revisionHistory
 	};
 };
@@ -203,12 +294,13 @@ export const load = async ({ fetch }) => {
 	const { requests } = await loadQuoteRequests(fetch);
 	return {
 		quoteRequests: requests,
-		estimateDrafts: await readEstimateDrafts()
+		estimateDrafts: await readEstimateDrafts(),
+		estimateDefaults: await loadBdrEstimateDefaults()
 	};
 };
 
 export const actions = {
-	saveDraft: async ({ request }) => {
+	saveDraft: async ({ fetch, request }) => {
 		const formData = await request.formData();
 		const requestId = String(formData.get('requestId') ?? '').trim();
 
@@ -227,6 +319,24 @@ export const actions = {
 		});
 		drafts[requestId] = nextDraft;
 		await writeEstimateDrafts(drafts);
+
+		const { requests } = await loadQuoteRequests(fetch);
+		const sourceRequest = requests.find((entry) => entry.id === requestId);
+		if (sourceRequest && sourceRequest.status !== 'estimate-sent' && sourceRequest.status !== 'won') {
+			await updateQuoteRequest(fetch, {
+				id: sourceRequest.id,
+				status: 'estimate-drafted',
+				assignedTo: sourceRequest.assignedTo,
+				nextAction: 'Estimate draft saved. Review totals and send when ready.',
+				missingInfoReasonCodes: sourceRequest.qualification.missingInfoReasonCodes,
+				contactName: sourceRequest.contactName,
+				email: sourceRequest.email,
+				phone: sourceRequest.phone,
+				siteName: sourceRequest.siteName,
+				serviceAddress: sourceRequest.serviceAddress,
+				requestedTimeline: sourceRequest.requestedTimeline
+			});
+		}
 
 		return {
 			draftSaved: true,
@@ -264,6 +374,7 @@ export const actions = {
 
 		const sentAtUtc = new Date().toISOString();
 		const sentBy = 'Internal Admin';
+		const reviewUrl = `/bdr/estimate/${encodeURIComponent(requestId)}`;
 		const drafts = await readEstimateDrafts();
 		const existingDraft = drafts[requestId];
 		const nextDraft = parseDraftRecord(formData, {
@@ -273,6 +384,14 @@ export const actions = {
 			savedAtUtc: sentAtUtc,
 			sentAtUtc,
 			sentBy,
+			delivery: {
+				status: 'sent',
+				method: 'review-link',
+				reviewUrl,
+				email: sourceRequest.email,
+				phone: sourceRequest.phone,
+				sentAtUtc
+			},
 			commercialSummary: buildCommercialSummary(
 				parseLines(formData.get('scopeLineItems')),
 				parseLines(formData.get('assumptions'))
@@ -304,7 +423,8 @@ export const actions = {
 		return {
 			draftSent: true,
 			savedRequestId: requestId,
-			draftSentAtUtc: sentAtUtc
+			draftSentAtUtc: sentAtUtc,
+			reviewUrl
 		};
 	},
 	createRevision: async ({ fetch, request }) => {
@@ -348,6 +468,7 @@ export const actions = {
 			savedAtUtc: createdAtUtc,
 			sentAtUtc: undefined,
 			sentBy: undefined,
+			delivery: undefined,
 			revisionHistory: [...currentDraft.revisionHistory, toRevisionRecord(currentDraft)]
 		};
 

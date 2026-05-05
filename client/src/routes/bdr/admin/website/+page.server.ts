@@ -291,7 +291,7 @@ export const actions = {
 					};
 				}),
 				savedSectionId: 'quote-form',
-				savedMessage: 'Quote form settings saved to the local contractor-site content store.'
+				savedMessage: 'Quote form settings saved.'
 			};
 		} catch (cause) {
 			console.error('Unable to save quote form content.', cause);
@@ -346,7 +346,7 @@ export const actions = {
 					};
 				}),
 				savedSectionId: 'cta-banner',
-				savedMessage: 'CTA banner settings saved to the local contractor-site content store.'
+				savedMessage: 'CTA banner settings saved.'
 			};
 		} catch (cause) {
 			console.error('Unable to save CTA banner content.', cause);
@@ -378,7 +378,7 @@ export const actions = {
 					};
 				}),
 				savedSectionId: 'process',
-				savedMessage: 'Process section saved to the local contractor-site content store.'
+				savedMessage: 'Process section saved.'
 			};
 		} catch (cause) {
 			console.error('Unable to save process section.', cause);
@@ -419,7 +419,7 @@ export const actions = {
 					}));
 				}),
 				savedSectionId: 'services',
-				savedMessage: 'Services section saved to the local contractor-site content store.'
+				savedMessage: 'Services section saved.'
 			};
 		} catch (cause) {
 			console.error('Unable to save services section.', cause);
@@ -476,7 +476,7 @@ export const actions = {
 					};
 				}),
 				savedSectionId: 'footer',
-				savedMessage: 'Footer settings saved to the local contractor-site content store.'
+				savedMessage: 'Footer settings saved.'
 			};
 		} catch (cause) {
 			console.error('Unable to save footer content.', cause);
@@ -546,7 +546,7 @@ export const actions = {
 					};
 				}),
 				savedSectionId: 'hero',
-				savedMessage: 'Hero settings saved to the local contractor-site content store.'
+				savedMessage: 'Hero settings saved.'
 			};
 		} catch (cause) {
 			console.error('Unable to save hero content.', cause);
@@ -596,7 +596,7 @@ export const actions = {
 					};
 				}),
 				savedSectionId: 'navigation',
-				savedMessage: 'Navigation settings saved to the local contractor-site content store.'
+				savedMessage: 'Navigation settings saved.'
 			};
 		} catch (cause) {
 			console.error('Unable to save navigation content.', cause);

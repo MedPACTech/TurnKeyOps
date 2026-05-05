@@ -3,7 +3,12 @@
 declare global {
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			bdrAdminSession?: {
+				role: 'owner' | 'office-admin';
+				source: 'session' | 'dev-bootstrap';
+			};
+		}
 		// interface PageData {}
 		// interface PageState {}
 		// interface Platform {}

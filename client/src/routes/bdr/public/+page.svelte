@@ -1,22 +1,22 @@
 <script lang="ts">
+	import { BadgeCheck, CalendarDays, ClipboardList, MessageSquareText, ShieldCheck, Star } from 'lucide-svelte';
 	import {
 		getBdrActiveContractorPreset,
 		getBdrAsset,
 		getBdrServiceCategories,
 		resolveBdrCopyright
 	} from '$lib/bdr-site-content';
-	import SectionCard from '$lib/components/SectionCard.svelte';
-	import { fallbackMvpSnapshot } from '$lib/mvp-data';
-	import { buildPublicProof } from '$lib/mvp-display';
 	import type { PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
 
 	const content = $derived(data.content);
 	const year = new Date().getFullYear();
-	const logoAsset = $derived(getBdrAsset(content, 'bdr-crest-logo'));
+	const serviceCategories = $derived(getBdrServiceCategories(content));
+	const activeContractorPreset = $derived(getBdrActiveContractorPreset(content));
+	const themeSettings = $derived(content.themeSettings);
 	const navigationLogoAsset = $derived(
-		getBdrAsset(content, content.navigation.logoAssetKey) ?? logoAsset
+		getBdrAsset(content, content.navigation.logoAssetKey) ?? getBdrAsset(content, 'bdr-crest-logo')
 	);
 	const faviconAsset = $derived(
 		getBdrAsset(content, content.navigation.faviconAssetKey) ?? navigationLogoAsset
@@ -24,20 +24,13 @@
 	const footerLogoAsset = $derived(
 		getBdrAsset(content, content.footer.logoAssetKey) ?? navigationLogoAsset
 	);
-	const serviceCategories = $derived(getBdrServiceCategories(content));
-	const activeContractorPreset = $derived(getBdrActiveContractorPreset(content));
-	const themeSettings = $derived(content.themeSettings);
-	const isLightTheme = $derived(themeSettings.mode === 'Light');
 	const activeHeroMediaOverride = $derived(
 		content.hero.mediaByContractorType.find(
 			(override) => override.contractorType === activeContractorPreset?.contractorType
 		) ?? null
 	);
 	const heroImageAsset = $derived(
-		getBdrAsset(
-			content,
-			activeHeroMediaOverride?.heroImageAssetKey || content.hero.heroImageAssetKey
-		)
+		getBdrAsset(content, activeHeroMediaOverride?.heroImageAssetKey || content.hero.heroImageAssetKey)
 	);
 	const heroBackgroundImageAsset = $derived(
 		getBdrAsset(
@@ -54,11 +47,17 @@
 	const ctaBannerImageAsset = $derived(
 		getBdrAsset(content, content.ctaBanner.backgroundImageAssetKey)
 	);
-	const heroImageAltText = $derived(
-		activeHeroMediaOverride?.heroImageAltText?.trim() ||
-			content.hero.heroImageAltText.trim() ||
-			heroImageAsset?.altText ||
-			'TurnKey contractor hero image'
+	const heroBackgroundUrl = $derived(
+		heroBackgroundImageAsset?.file ?? heroImageAsset?.file ?? '/clientFiles/image17.jpeg'
+	);
+	const ctaBackgroundUrl = $derived(ctaBannerImageAsset?.file ?? '/clientFiles/image29.jpeg');
+	const headlineLead = $derived(
+		content.hero.headline.toLowerCase().includes('built to last')
+			? 'Built strong.'
+			: content.hero.headline
+	);
+	const headlineAccent = $derived(
+		content.hero.headline.toLowerCase().includes('built to last') ? 'Built to last.' : ''
 	);
 	const publicThemeStyle = $derived(
 		[
@@ -71,53 +70,26 @@
 			`--bdr-border:${themeSettings.colors.border}`,
 			`--bdr-button-radius:${themeSettings.sizing.buttonRadius}`,
 			`--bdr-card-radius:${themeSettings.sizing.cardRadius}`,
-			`--bdr-heading-font:${themeSettings.typography.headingFont}, Inter, sans-serif`,
+			`--bdr-heading-font:${themeSettings.typography.headingFont}, Impact, Arial Narrow, sans-serif`,
 			`--bdr-body-font:${themeSettings.typography.bodyFont}, Inter, sans-serif`
 		].join(';')
 	);
-	const fieldClass =
-		'rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-orange-300/50 focus:bg-black/50';
-	let navMenuOpen = $state(false);
-
-	const resolveHeroCtaHref = (ctaType: 'anchor' | 'link' | 'phone', target: string) => {
-		if (ctaType === 'phone') {
-			if (target.startsWith('tel:')) {
-				return target;
-			}
-
-			return `tel:${target.replace(/[^0-9+]/g, '')}`;
-		}
-
-		return target;
-	};
-
-	const heroBackgroundStyle = $derived(
-		[
-			heroBackgroundImageAsset?.file
-				? `background-image:linear-gradient(135deg, rgba(15,23,42,0.68), rgba(15,23,42,0.18)), url(${heroBackgroundImageAsset.file})`
-				: '',
-			heroBackgroundImageAsset?.file ? 'background-size:cover' : '',
-			heroBackgroundImageAsset?.file ? 'background-position:center' : ''
-		]
-			.filter(Boolean)
-			.join(';')
-	);
-	const primaryHeroHref = $derived(
-		resolveHeroCtaHref(content.hero.primaryCtaType, content.hero.primaryCtaHref)
-	);
-	const secondaryHeroHref = $derived(
-		resolveHeroCtaHref(content.hero.secondaryCtaType, content.hero.secondaryCtaHref)
-	);
-	const ctaBannerSecondaryHref = $derived(
-		resolveHeroCtaHref(content.ctaBanner.secondaryCtaType, content.ctaBanner.secondaryCtaHref)
-	);
-	const quoteFormBenefits = $derived(content.quoteForm.benefits);
-	const quoteFormFields = $derived(content.quoteForm.fields);
 	const serviceTypeOptions = $derived(
 		serviceCategories.length
 			? serviceCategories.map((category) => category.name)
 			: content.services.items
 	);
+	const quoteFormFields = $derived(content.quoteForm.fields);
+	const quoteFormBenefits = $derived(content.quoteForm.benefits);
+
+	let navMenuOpen = $state(false);
+
+	const resolveCtaHref = (ctaType: 'anchor' | 'link' | 'phone', target: string) => {
+		if (ctaType !== 'phone') return target;
+		if (target.startsWith('tel:')) return target;
+		return `tel:${target.replace(/[^0-9+]/g, '')}`;
+	};
+
 	const getQuoteFormFieldOptions = (field: (typeof content.quoteForm.fields)[number]) =>
 		field.options?.length
 			? field.options
@@ -126,320 +98,264 @@
 				: field.key === 'priority'
 					? ['standard', 'priority', 'emergency']
 					: [];
+
 	const isQuoteFormFieldFullWidth = (field: (typeof content.quoteForm.fields)[number]) =>
 		field.type === 'textarea' || field.type === 'file';
 </script>
 
 <svelte:head>
 	<title>BDR Construction</title>
-	<meta name="description" content="BDR Construction public site for roofing, exterior work, and fast estimate requests." />
+	<meta
+		name="description"
+		content="BDR Construction public site for concrete driveways, patios, sidewalks, slabs, and estimate requests."
+	/>
 	<link rel="icon" href={faviconAsset?.file ?? '/clientFiles/logo.png'} />
 </svelte:head>
 
 <div
-	class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.16),_transparent_24%),linear-gradient(180deg,_#050505_0%,_#101010_46%,_#181818_100%)] text-white"
+	class="bdr-public-site"
 	data-theme={themeSettings.mode.toLowerCase()}
 	data-style-preset={themeSettings.preset.toLowerCase()}
-	style={`color: var(--bdr-text); background-color: var(--bdr-background); font-family: var(--bdr-body-font); ${publicThemeStyle}`}
+	style={publicThemeStyle}
 >
-	<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-		<nav
-			id="top"
-			class={`${content.navigation.stickyHeader ? 'sticky top-4' : ''} z-30 rounded-xl border border-white/10 bg-slate-950/90 px-4 py-3 shadow-[0_20px_60px_rgba(15,23,42,0.32)] backdrop-blur`}
-		>
-			<div
-				class={`flex flex-col gap-4 ${content.navigation.layout === 'centered' ? 'items-center text-center' : 'lg:flex-row lg:items-center'} ${content.navigation.layout === 'right-aligned' ? 'lg:justify-end' : 'lg:justify-between'}`}
-			>
-				<div class={`flex items-center gap-3 ${content.navigation.layout === 'centered' ? 'justify-center' : ''}`}>
-					<div class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-orange-300/25 bg-white p-2">
-						<img src={navigationLogoAsset?.file ?? '/clientFiles/BDRLogo.jpeg'} alt={navigationLogoAsset?.altText ?? 'BDR Construction logo'} class="h-full w-full object-contain" />
-					</div>
-					<div>
-						<p class="text-[0.68rem] uppercase tracking-[0.22em] text-orange-200/80">{content.navigation.announcement}</p>
-						<p class="text-base font-semibold text-white">{content.navigation.brandName}</p>
-					</div>
-				</div>
+	<div class="nav-shell">
+		<nav class="top-nav site-frame" aria-label="Primary navigation">
+			<a href="#hero" class="brand-lockup" aria-label="BDR Construction home">
+				<img
+					src={navigationLogoAsset?.file ?? '/clientFiles/BDRLogo-transparent.png'}
+					alt={navigationLogoAsset?.altText ?? 'BDR Construction logo'}
+				/>
+			</a>
 
-				<div class={`hidden flex-wrap items-center gap-2 lg:flex ${content.navigation.layout === 'centered' ? 'justify-center' : ''}`}>
-					{#each content.navigation.links as link}
-						<a
-							href={link.href}
-							target={link.openInNewTab ? '_blank' : undefined}
-							rel={link.openInNewTab ? 'noreferrer' : undefined}
-							class="rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6 hover:text-white"
-						>
-							{link.label}
-						</a>
-					{/each}
+			<div class="nav-links">
+				{#each content.navigation.links as link}
 					<a
-						href={content.navigation.primaryCtaHref}
-						class="px-4 py-2 text-sm font-semibold text-black transition hover:brightness-110"
-						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+						href={link.href}
+						target={link.openInNewTab ? '_blank' : undefined}
+						rel={link.openInNewTab ? 'noreferrer' : undefined}
 					>
-						{content.navigation.primaryCtaLabel}
+						{link.label}
 					</a>
-					{#if content.navigation.showPhoneButton}
-						<a href={`tel:${content.navigation.phoneNumber.replace(/[^0-9+]/g, '')}`} class="rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-white transition hover:border-orange-300/40 hover:bg-white/6">
-							{content.navigation.phoneNumber}
-						</a>
-					{/if}
-					{#if content.navigation.showThemeControl}
-						<button type="button" class="rounded-full border border-white/12 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6">
-							{themeSettings.mode}
-						</button>
-					{/if}
-				</div>
-
-				<div class="flex items-center justify-between gap-3 lg:hidden">
-					<div class="flex items-center gap-2">
-						{#if content.navigation.showPhoneButton}
-							<a href={`tel:${content.navigation.phoneNumber.replace(/[^0-9+]/g, '')}`} class="rounded-full border border-white/12 px-3 py-2 text-xs font-semibold text-white">
-								Call
-							</a>
-						{/if}
-						{#if content.navigation.showThemeControl}
-							<button type="button" class="rounded-full border border-white/12 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">
-								{themeSettings.mode}
-							</button>
-						{/if}
-					</div>
-					<button
-						type="button"
-						class="rounded-full border border-white/12 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200"
-						aria-expanded={navMenuOpen}
-						onclick={() => (navMenuOpen = !navMenuOpen)}
-					>
-						{navMenuOpen ? 'Close' : 'Menu'}
-					</button>
-				</div>
+				{/each}
 			</div>
 
-			{#if navMenuOpen}
-				<div class="mt-4 grid gap-2 lg:hidden">
-					{#each content.navigation.links as link}
-						<a
-							href={link.href}
-							target={link.openInNewTab ? '_blank' : undefined}
-							rel={link.openInNewTab ? 'noreferrer' : undefined}
-							class="rounded-2xl border border-white/12 px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-orange-300/40 hover:bg-white/6 hover:text-white"
-						>
-							{link.label}
-						</a>
-					{/each}
+			<div class="nav-actions">
+				<a class="btn btn-primary btn-small" href={content.navigation.primaryCtaHref}>
+					{content.navigation.primaryCtaLabel}
+				</a>
+				{#if content.navigation.showPhoneButton}
 					<a
-						href={content.navigation.primaryCtaHref}
-						class="px-4 py-3 text-center text-sm font-semibold text-black transition hover:brightness-110"
-						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
+						class="btn btn-outline btn-small"
+						href={`tel:${content.navigation.phoneNumber.replace(/[^0-9+]/g, '')}`}
 					>
-						{content.navigation.primaryCtaLabel}
+						{content.navigation.phoneNumber}
 					</a>
-				</div>
-			{/if}
+				{/if}
+			</div>
+
+			<button
+				type="button"
+				class="menu-toggle"
+				aria-expanded={navMenuOpen}
+				onclick={() => (navMenuOpen = !navMenuOpen)}
+			>
+				{navMenuOpen ? 'Close' : 'Menu'}
+			</button>
 		</nav>
 
-		<section
-			id="hero"
-			class={`relative mt-6 overflow-hidden rounded-[2rem] px-6 py-8 lg:px-8 lg:py-10 ${isLightTheme ? 'bg-white/78' : 'bg-slate-950/38'}`}
-			style={heroBackgroundStyle}
-		>
-			<div class={`absolute inset-0 ${isLightTheme ? 'bg-[linear-gradient(120deg,rgba(255,255,255,0.92),rgba(255,255,255,0.78),rgba(255,255,255,0.48))]' : 'bg-[linear-gradient(120deg,rgba(2,6,23,0.88),rgba(2,6,23,0.7),rgba(2,6,23,0.34))]'}`}></div>
-			{#if heroTextureAsset?.file}
-				<div class="absolute inset-0 opacity-35 mix-blend-soft-light" style={`background-image:url(${heroTextureAsset.file}); background-size:cover; background-position:center;`}></div>
-			{/if}
+		{#if navMenuOpen}
+			<div class="mobile-menu site-frame">
+				{#each content.navigation.links as link}
+					<a href={link.href} onclick={() => (navMenuOpen = false)}>{link.label}</a>
+				{/each}
+				<a class="btn btn-primary" href={content.navigation.primaryCtaHref}>
+					{content.navigation.primaryCtaLabel}
+				</a>
+			</div>
+		{/if}
+	</div>
 
-			<div class="relative grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-				<div class="space-y-6">
-					<div class="space-y-4">
-						<p class={`text-[0.72rem] uppercase tracking-[0.28em] ${isLightTheme ? 'text-[color:var(--bdr-primary)]' : 'text-orange-200/85'}`}>{content.hero.eyebrow}</p>
-						<h1
-							class={`max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl ${isLightTheme ? 'text-slate-950' : 'text-white'}`}
-							style="font-family: var(--bdr-heading-font);"
-						>
-							{content.hero.headline}
-						</h1>
-						<p class={`max-w-2xl text-base leading-7 ${isLightTheme ? 'text-slate-700' : 'text-slate-200'}`}>
-							{content.hero.subheadline}
-						</p>
-					</div>
+	<header id="hero" class="hero" style={`--hero-image:url('${heroBackgroundUrl}')`}>
+		{#if heroTextureAsset?.file}
+			<div
+				class="hero-texture"
+				style={`background-image:url('${heroTextureAsset.file}')`}
+				aria-hidden="true"
+			></div>
+		{/if}
+		<div class="hero-overlay" aria-hidden="true"></div>
 
-					<div class="flex flex-wrap gap-3">
-						<a
-							href={primaryHeroHref}
-							class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
-							style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
-						>
-							{content.hero.primaryCtaLabel}
-						</a>
-						<a
-							href={secondaryHeroHref}
-							class={`rounded-full px-5 py-3 text-sm font-semibold transition ${isLightTheme ? 'border border-slate-300 text-slate-900 hover:border-[color:var(--bdr-primary)] hover:bg-white' : 'border border-white/14 text-white hover:border-orange-300/45 hover:bg-white/6'}`}
-						>
-							{content.hero.secondaryCtaLabel}
-						</a>
-					</div>
+		<div class="site-frame hero-frame">
+			<div class="hero-content">
+				<p class="eyebrow">{content.hero.eyebrow}</p>
+				<h1>
+					<span>{headlineLead}</span>
+					{#if headlineAccent}
+						<span class="accent-line">{headlineAccent}</span>
+					{/if}
+				</h1>
+				<p class="hero-copy">{content.hero.subheadline}</p>
 
-					<div>
-						<p class={`text-[0.66rem] uppercase tracking-[0.24em] ${isLightTheme ? 'text-slate-500' : 'text-orange-100/80'}`}>{content.hero.trustBadgeEyebrow}</p>
-						<div class="mt-4 grid gap-3 sm:grid-cols-3">
-							{#each content.hero.trustBadges as badge}
-								{@const badgeAsset = getBdrAsset(content, badge.iconAssetKey)}
-								<div class={`rounded-[1.35rem] px-4 py-4 ${isLightTheme ? 'bg-white/88 shadow-[0_18px_45px_rgba(15,23,42,0.08)]' : 'bg-white/6 backdrop-blur'}`}>
-									<div class="flex items-start gap-3">
-										<div class={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${isLightTheme ? 'bg-slate-950/5' : 'bg-black/20'} p-2`}>
-											{#if badgeAsset}
-												<img src={badgeAsset.file} alt={badgeAsset.altText} class="h-full w-full object-contain" />
-											{:else}
-												<span class={`text-lg ${isLightTheme ? 'text-[color:var(--bdr-primary)]' : 'text-orange-200'}`}>▣</span>
-											{/if}
-										</div>
-										<div>
-											<p class={`text-sm font-semibold ${isLightTheme ? 'text-slate-950' : 'text-white'}`}>{badge.title}</p>
-											<p class={`mt-1 text-sm leading-6 ${isLightTheme ? 'text-slate-600' : 'text-slate-200'}`}>{badge.description}</p>
-										</div>
-									</div>
-								</div>
-							{/each}
-						</div>
-					</div>
-				</div>
-
-				<div class="relative">
-					<div class={`absolute -inset-6 rounded-[2.2rem] blur-3xl ${isLightTheme ? 'bg-[radial-gradient(circle,rgba(249,115,22,0.14),transparent_65%)]' : 'bg-[radial-gradient(circle,rgba(249,115,22,0.22),transparent_65%)]'}`}></div>
-					<div class={`relative overflow-hidden rounded-[2rem] ${isLightTheme ? 'bg-slate-100/80 shadow-[0_32px_70px_rgba(15,23,42,0.12)]' : 'bg-slate-950/60 shadow-[0_32px_90px_rgba(2,6,23,0.45)]'}`}>
-						{#if heroImageAsset}
-							<img
-								src={heroImageAsset.file}
-								alt={heroImageAltText}
-								class="aspect-[4/3] h-full w-full object-cover"
-							/>
-						{:else}
-							<div class={`flex aspect-[4/3] items-center justify-center ${isLightTheme ? 'text-slate-500' : 'text-slate-300'}`}>
-								Hero image unavailable
-							</div>
-						{/if}
-					</div>
+				<div class="hero-actions">
+					<a
+						href={resolveCtaHref(content.hero.primaryCtaType, content.hero.primaryCtaHref)}
+						class="btn btn-primary"
+					>
+						{content.hero.primaryCtaLabel}
+					</a>
+					<a
+						href={resolveCtaHref(content.hero.secondaryCtaType, content.hero.secondaryCtaHref)}
+						class="btn btn-outline"
+					>
+						{content.hero.secondaryCtaLabel}
+					</a>
 				</div>
 			</div>
-		</section>
 
-		<section id="services" class="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-			<SectionCard title={content.services.title} eyebrow={content.services.eyebrow} copy={content.services.copy}>
-				{#if serviceCategories.length}
-					<ul class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-						{#each serviceCategories as category}
-							{@const iconAsset = getBdrAsset(content, category.iconAssetKey)}
-							<li class="rounded-[1.4rem] bg-white/90 px-4 py-4 text-sm text-slate-700 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-								<div class="flex items-start gap-3">
-									<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950/5 p-2">
-										{#if iconAsset}
-											<img src={iconAsset.file} alt={iconAsset.altText} class="h-full w-full object-contain" />
-										{:else}
-											<span class="text-lg text-[color:var(--bdr-primary)]">▣</span>
-										{/if}
-									</div>
-									<div>
-										<div class="flex flex-wrap items-center gap-2">
-											<p class="text-base font-semibold text-slate-950">{category.name}</p>
-											{#if category.featured}
-												<span class="rounded-full bg-[color:var(--bdr-primary)]/12 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[color:var(--bdr-primary)]">Featured</span>
-											{/if}
-										</div>
-										<p class="mt-1 text-sm leading-6 text-slate-600">{category.description}</p>
-										{#if category.detailPageUrl}
-											<a href={category.detailPageUrl} class="mt-3 inline-flex text-sm font-semibold text-[color:var(--bdr-primary)] transition hover:brightness-90">Learn more</a>
-										{/if}
-									</div>
-								</div>
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<ul class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-						{#each content.services.items as item}
-							<li class="rounded-[1.4rem] bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">{item}</li>
-						{/each}
-					</ul>
-				{/if}
+			{#if content.hero.trustBadges.length}
+				<div class="trust-row" aria-label="BDR trust signals">
+					{#each content.hero.trustBadges as badge}
+						<div class="trust-item">
+							<div class="trust-icon">
+								{#if badge.title.toLowerCase().includes('star')}
+									<Star size={28} strokeWidth={1.8} aria-hidden="true" />
+								{:else if badge.title.toLowerCase().includes('quality')}
+									<BadgeCheck size={28} strokeWidth={1.8} aria-hidden="true" />
+								{:else}
+									<ShieldCheck size={28} strokeWidth={1.8} aria-hidden="true" />
+								{/if}
+							</div>
+							<div>
+								<p>{badge.title}</p>
+								<span>{badge.description}</span>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	</header>
+
+	<main>
+		<section id="services" class="section section-light">
+			<div class="site-frame">
+				<div class="section-heading centered">
+					<p class="eyebrow orange">{content.services.eyebrow}</p>
+					<h2>{content.services.title}</h2>
+					<p>{content.services.copy}</p>
+				</div>
+
+				<div class="service-grid">
+					{#each serviceCategories as category}
+						{@const iconAsset = getBdrAsset(content, category.iconAssetKey)}
+						<article class="service-card">
+							<div class="service-icon">
+								{#if iconAsset}
+									<img src={iconAsset.file} alt={iconAsset.altText} />
+								{:else}
+									<span></span>
+								{/if}
+							</div>
+							<h3>{category.name}</h3>
+							<p>{category.description}</p>
+						</article>
+					{/each}
+				</div>
 
 				{#if content.services.ctaLabel && content.services.ctaHref}
-					<div class="mt-5">
-						<a
-							href={content.services.ctaHref}
-							class="inline-flex px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
-							style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
-						>
+					<div class="section-action">
+						<a href={content.services.ctaHref} class="btn btn-ghost-dark">
 							{content.services.ctaLabel}
 						</a>
 					</div>
 				{/if}
-			</SectionCard>
-
-			<div id="trust">
-				<SectionCard title={content.trust.title} eyebrow={content.trust.eyebrow} copy={content.trust.copy}>
-					<ul class="mt-4 grid gap-3 sm:grid-cols-2">
-						{#each content.trust.points as point}
-							<li class="rounded-[1.1rem] border border-orange-300/14 bg-orange-300/6 px-4 py-3 text-sm text-slate-100">{point}</li>
-						{/each}
-					</ul>
-				</SectionCard>
 			</div>
 		</section>
 
-		<section id="process" class="mt-8 rounded-[2rem] border border-white/10 bg-slate-950/82 p-6 backdrop-blur lg:p-8">
-			<div class="max-w-3xl">
-				<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-200/75">{content.process.eyebrow}</p>
-				<h2 class="mt-3 text-3xl font-semibold text-white" style="font-family: var(--bdr-heading-font);">{content.process.title}</h2>
-				<p class="mt-3 text-sm leading-6 text-slate-300">{content.process.description}</p>
-			</div>
-			<div class="mt-6 grid gap-4 lg:grid-cols-3">
-				{#each content.process.steps as item}
-					{@const stepIcon = getBdrAsset(content, item.iconAssetKey)}
-					<div class="relative rounded-[1.6rem] border border-white/8 bg-white/5 p-5">
-						<div class="flex items-start gap-4">
-							<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 p-2">
-								{#if stepIcon}
-									<img src={stepIcon.file} alt={stepIcon.altText} class="h-full w-full object-contain" />
+		<section id="process" class="section process-section">
+			<div class="site-frame">
+				<div class="section-heading centered dark">
+					<p class="eyebrow orange">{content.process.eyebrow}</p>
+					<h2>{content.process.title}</h2>
+				</div>
+
+				<div class="process-grid">
+					{#each content.process.steps as step}
+						<article class="process-step">
+							<div class="step-number">0{step.step}</div>
+							<div class="process-icon">
+								{#if step.step === '1'}
+									<MessageSquareText size={40} strokeWidth={1.55} aria-hidden="true" />
+								{:else if step.step === '2'}
+									<ClipboardList size={40} strokeWidth={1.55} aria-hidden="true" />
 								{:else}
-									<span class="text-lg text-orange-200">▣</span>
+									<CalendarDays size={40} strokeWidth={1.55} aria-hidden="true" />
 								{/if}
 							</div>
-							<div class="min-w-0 flex-1">
-								<div class="flex flex-wrap items-center gap-3">
-									<p class="text-2xl font-semibold text-orange-200">0{item.step}</p>
-									{#if item.timeframe}
-										<span class="rounded-full border border-white/12 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-300">{item.timeframe}</span>
-									{/if}
-								</div>
-								<h3 class="mt-3 text-xl font-semibold text-white">{item.title}</h3>
-								<p class="mt-2 text-sm leading-6 text-slate-300">{item.copy}</p>
+							<div>
+								<h3>{step.title}</h3>
+								<p>{step.copy}</p>
 							</div>
-						</div>
-					</div>
-				{/each}
+						</article>
+					{/each}
+				</div>
+			</div>
+		</section>
+
+		<section id="trust" class="section section-light proof-section">
+			<div class="site-frame proof-layout">
+				<div>
+					<p class="eyebrow orange">{content.trust.eyebrow}</p>
+					<h2>{content.trust.title}</h2>
+					<p>{content.trust.copy}</p>
+				</div>
+
+				<div class="proof-grid">
+					{#each content.trust.points as point}
+						<article class="proof-card">
+							<BadgeCheck size={22} strokeWidth={1.8} aria-hidden="true" />
+							<p>{point}</p>
+						</article>
+					{/each}
+				</div>
+			</div>
+		</section>
+
+		<section id="supporting" class="section projects-section">
+			<div class="site-frame">
+				<div class="section-heading centered dark">
+					<p class="eyebrow orange">{content.supportingSections[0]?.eyebrow}</p>
+					<h2>{content.supportingSections[0]?.title}</h2>
+					<p>{content.supportingSections[0]?.copy}</p>
+				</div>
+
+				<div class="project-grid">
+					{#each content.supportingSections[0]?.items ?? [] as item}
+						<article class="project-card">
+							<h3>{item.title}</h3>
+							<p>{item.copy}</p>
+						</article>
+					{/each}
+				</div>
 			</div>
 		</section>
 
 		<section
-			class="relative mt-8 overflow-hidden rounded-[2rem] px-6 py-8 lg:px-8"
-			style={`background-image:linear-gradient(rgba(2,6,23,${content.ctaBanner.overlayOpacity}),rgba(2,6,23,${content.ctaBanner.overlayOpacity})),url(${ctaBannerImageAsset?.file ?? ''}); background-size:cover; background-position:center;`}
+			id="contact"
+			class="section cta-band"
+			style={`--cta-image:url('${ctaBackgroundUrl}')`}
 		>
-			<div class="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-				<div class="max-w-3xl">
-					<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-200/80">{content.ctaBanner.eyebrow}</p>
-					<h2 class="mt-3 text-3xl font-semibold text-white" style="font-family: var(--bdr-heading-font);">{content.ctaBanner.title}</h2>
-					<p class="mt-3 max-w-3xl text-sm leading-6 text-slate-200">{content.ctaBanner.description}</p>
-				</div>
-				<div class="flex flex-wrap gap-3">
-					<a
-						href={content.ctaBanner.primaryCtaHref}
-						class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
-						style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
-					>
+			<div class="site-frame cta-content">
+				<p class="eyebrow orange">{content.ctaBanner.eyebrow}</p>
+				<h2>{content.ctaBanner.title}</h2>
+				<p>{content.ctaBanner.description}</p>
+				<div class="hero-actions">
+					<a href={content.ctaBanner.primaryCtaHref} class="btn btn-primary">
 						{content.ctaBanner.primaryCtaLabel}
 					</a>
 					<a
-						href={ctaBannerSecondaryHref}
-						class="rounded-full border border-white/14 px-5 py-3 text-sm font-semibold text-white transition hover:border-orange-300/45 hover:bg-white/6"
+						href={resolveCtaHref(content.ctaBanner.secondaryCtaType, content.ctaBanner.secondaryCtaHref)}
+						class="btn btn-outline"
 					>
 						{content.ctaBanner.secondaryCtaLabel}
 					</a>
@@ -447,216 +363,993 @@
 			</div>
 		</section>
 
-		<section class="mt-8 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-			{#each content.supportingSections as section}
-				<SectionCard title={section.title} eyebrow={section.eyebrow} copy={section.copy}>
-					<div class="mt-4 grid gap-3">
-						{#each section.items as item}
-							<div class="rounded-[1.2rem] border border-white/8 bg-white/4 p-4">
-								<p class="text-lg font-semibold text-white">{item.title}</p>
-								<p class="mt-2 text-sm leading-6 text-slate-300">{item.copy}</p>
-							</div>
+		<section id="quote-request" class="section section-light quote-section">
+			<div class="site-frame quote-layout">
+				<div class="quote-benefits">
+					<p class="eyebrow orange">{content.quoteForm.eyebrow}</p>
+					<h2>{content.quoteForm.title}</h2>
+					<ul>
+						{#each quoteFormBenefits as benefit}
+							{@const benefitIcon = getBdrAsset(content, benefit.iconAssetKey)}
+							<li>
+								{#if benefitIcon}
+									<img src={benefitIcon.file} alt="" />
+								{/if}
+								<span>{benefit.text}</span>
+							</li>
 						{/each}
-					</div>
-				</SectionCard>
-			{/each}
-		</section>
-
-		<section id="contact" class="mt-8 grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
-			<div class="rounded-[2rem] border border-orange-300/16 bg-orange-300/8 p-6 backdrop-blur">
-				<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-100/75">{content.quoteForm.eyebrow}</p>
-				<h2 class="mt-3 text-3xl font-semibold text-white">{content.quoteForm.title}</h2>
-				<p class="mt-3 max-w-3xl text-base leading-7 text-slate-200">{content.quoteForm.description}</p>
-				<div class="mt-5 grid gap-3 text-sm text-slate-200">
-					{#each quoteFormBenefits as benefit}
-						{@const benefitIcon = getBdrAsset(content, benefit.iconAssetKey)}
-						<div class="rounded-[1.2rem] border border-white/10 bg-black/20 p-4">
-							<div class="flex items-start gap-3">
-								<div class="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/6 p-2">
-									{#if benefitIcon}
-										<img src={benefitIcon.file} alt="" class="h-full w-full object-contain" />
-									{:else}
-										<span class="text-sm font-semibold text-orange-100">•</span>
-									{/if}
-								</div>
-								<p class="leading-6 text-slate-200">{benefit.text}</p>
-							</div>
-						</div>
-					{/each}
-					<div class="rounded-[1.2rem] border border-white/10 bg-black/20 p-4">
-						<p class="text-[0.64rem] uppercase tracking-[0.2em] text-orange-100/70">Need a human right now?</p>
-						<a href={content.contact.secondaryCtaHref} class="mt-2 inline-flex text-base font-semibold text-white underline decoration-orange-300/50 underline-offset-4">{content.contact.secondaryCtaLabel}</a>
-					</div>
-				</div>
-			</div>
-
-			<div id="quote-request" class="rounded-[2rem] border border-white/10 bg-slate-950/65 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.38)] backdrop-blur">
-				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-					<div>
-						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-100/75">Quote request form</p>
-						<h3 class="mt-2 text-2xl font-semibold text-white">{content.quoteForm.title}</h3>
-						<p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{content.quoteForm.description}</p>
-					</div>
-					<div class="rounded-[1.2rem] border border-white/10 bg-white/4 px-4 py-3 text-sm text-slate-200 lg:max-w-sm">
-						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-orange-100/75">Privacy reassurance</p>
-						<p class="mt-2 leading-6">{content.quoteForm.privacyReassurance}</p>
-					</div>
+					</ul>
 				</div>
 
-				{#if data.submitted}
-					<div class="mt-5 rounded-[1.2rem] border border-emerald-400/25 bg-emerald-400/10 p-4 text-sm text-emerald-100">
-						<p class="font-semibold">Quote request sent.</p>
-						<p class="mt-1">{content.quoteForm.successMessage}</p>
-					</div>
-				{/if}
-
-				<form method="POST" action="?/submitQuoteRequest" enctype="multipart/form-data" class="mt-6 grid gap-4">
-					{#if form?.errors?.form}
-						<div class="rounded-[1.2rem] border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">{form.errors.form}</div>
+				<form method="POST" action="?/submitQuoteRequest" enctype="multipart/form-data" class="quote-form">
+					{#if data.submitted}
+						<div class="form-message success">{content.quoteForm.successMessage}</div>
 					{/if}
-					<div class="grid gap-4 md:grid-cols-2">
+					{#if form?.errors?.form}
+						<div class="form-message error">{form.errors.form}</div>
+					{/if}
+
+					<div class="form-grid">
 						{#each quoteFormFields as field}
-							<div class={`grid gap-2 ${isQuoteFormFieldFullWidth(field) ? 'md:col-span-2' : ''}`}>
-								<label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" for={field.key}>{field.label}</label>
+							<div class={`field ${isQuoteFormFieldFullWidth(field) ? 'full' : ''}`}>
+								<label for={field.key}>{field.label}</label>
 								{#if field.type === 'textarea'}
 									<textarea
 										id={field.key}
 										name={field.key}
 										rows="5"
-										class={`${fieldClass} min-h-32`}
 										placeholder={field.placeholder ?? ''}
+										required={field.required}
 									>{form?.values?.[field.key] ?? ''}</textarea>
 								{:else if field.type === 'select'}
-									<select id={field.key} name={field.key} class={fieldClass}>
+									<select id={field.key} name={field.key} required={field.required}>
 										<option value="">Select {field.label.toLowerCase()}</option>
 										{#each getQuoteFormFieldOptions(field) as option}
-											<option value={option} selected={form?.values?.[field.key] === option}>{option}</option>
+											<option value={option} selected={form?.values?.[field.key] === option}>
+												{option}
+											</option>
 										{/each}
 									</select>
 								{:else if field.type === 'file'}
-									<input
-										id={field.key}
-										name={field.key}
-										type="file"
-										multiple
-										class="rounded-2xl border border-dashed border-white/14 bg-black/25 px-4 py-4 text-sm text-slate-200 file:mr-4 file:rounded-full file:border-0 file:bg-orange-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-black hover:border-orange-300/35"
-									/>
-									<p class="text-xs leading-5 text-slate-400">Attach photos, reports, drawings, or insurance files. The operator queue records file names and sizes with the submitted payload.</p>
+									<input id={field.key} name={field.key} type="file" multiple />
 								{:else}
 									<input
 										id={field.key}
 										name={field.key}
 										type={field.type}
-										class={fieldClass}
 										value={form?.values?.[field.key] ?? ''}
 										placeholder={field.placeholder ?? ''}
+										required={field.required}
 									/>
 								{/if}
-								{#if form?.errors?.[field.key]}<p class="text-xs text-orange-200">{form.errors[field.key]}</p>{/if}
+								{#if form?.errors?.[field.key]}
+									<p class="field-error">{form.errors[field.key]}</p>
+								{/if}
 							</div>
 						{/each}
 					</div>
 
-					<div class="flex flex-col gap-3 rounded-[1.2rem] border border-white/10 bg-white/4 p-4 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
-						<p>{content.quoteForm.privacyReassurance}</p>
-						<button
-							type="submit"
-							class="px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110"
-							style="background-color: var(--bdr-primary); border-radius: var(--bdr-button-radius);"
-						>
-							{content.quoteForm.submitButtonLabel}
-						</button>
-					</div>
+					<button type="submit" class="btn btn-primary submit-button">
+						{content.quoteForm.submitButtonLabel}
+					</button>
 				</form>
 			</div>
 		</section>
+	</main>
 
-		<footer class="mt-8 rounded-[2rem] border border-white/10 bg-slate-950/68 p-6 backdrop-blur">
-			<div class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr_0.8fr_0.9fr]">
-				<div>
-					<p class="text-[0.68rem] uppercase tracking-[0.24em] text-orange-200/75">{content.footer.eyebrow}</p>
-					<div class="mt-4 flex items-center gap-3">
-						<div class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white p-2">
-							<img src={footerLogoAsset?.file ?? '/clientFiles/BDRLogo.jpeg'} alt={footerLogoAsset?.altText ?? 'BDR Construction logo'} class="h-full w-full object-contain" />
-						</div>
-						<div>
-							<p class="text-xl font-semibold text-white">{content.footer.brandName}</p>
-							{#if content.footer.serviceAreaText}
-								<p class="mt-1 text-sm text-slate-400">{content.footer.serviceAreaText}</p>
-							{/if}
-						</div>
-					</div>
-					<p class="mt-4 max-w-2xl text-sm leading-6 text-slate-300">{content.footer.body}</p>
-					{#if content.footer.socialLinks.length}
-						<div class="mt-4 flex flex-wrap gap-3">
-							{#each content.footer.socialLinks as social}
-								{@const socialAsset = getBdrAsset(content, social.iconAssetKey)}
-								<a
-									href={social.url}
-									target="_blank"
-									rel="noreferrer"
-									aria-label={social.platform}
-									class="flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/4 transition hover:border-orange-300/40 hover:bg-white/8"
-								>
-									{#if socialAsset}
-										<img src={socialAsset.file} alt={social.platform} class="h-5 w-5 object-contain" />
-									{:else}
-										<span class="text-xs font-semibold uppercase text-white">{social.platform.slice(0, 2)}</span>
-									{/if}
-								</a>
-							{/each}
-						</div>
-					{/if}
-				</div>
-
-				{#if content.footer.servicesLinks.length}
-					<div>
-						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">{content.footer.servicesEyebrow}</p>
-						<div class="mt-3 grid gap-2">
-							{#each content.footer.servicesLinks as link}
-								<a href={link.href} class="text-sm text-slate-200 transition hover:text-white">{link.label}</a>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				{#if content.footer.navigationLinks.length}
-					<div>
-						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">{content.footer.navigationEyebrow}</p>
-						<div class="mt-3 grid gap-2">
-							{#each content.footer.navigationLinks as link}
-								<a href={link.href} class="text-sm text-slate-200 transition hover:text-white">{link.label}</a>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				{#if content.footer.phone || content.footer.email || content.footer.address}
-					<div>
-						<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">{content.footer.contactEyebrow}</p>
-						<div class="mt-3 grid gap-2 text-sm text-slate-200">
-							{#if content.footer.phone}
-								<a href={`tel:${content.footer.phone.replace(/[^0-9+]/g, '')}`} class="transition hover:text-white">{content.footer.phone}</a>
-							{/if}
-							{#if content.footer.email}
-								<a href={`mailto:${content.footer.email}`} class="transition hover:text-white">{content.footer.email}</a>
-							{/if}
-							{#if content.footer.address}
-								<p class="leading-6 text-slate-300">{content.footer.address}</p>
-							{/if}
-						</div>
-					</div>
-				{/if}
+	<footer class="site-footer">
+		<div class="site-frame footer-grid">
+			<div>
+				<img
+					src={footerLogoAsset?.file ?? '/clientFiles/BDRLogo-transparent.png'}
+					alt={footerLogoAsset?.altText ?? 'BDR Construction logo'}
+					class="footer-logo"
+				/>
+				<p>{content.footer.body}</p>
 			</div>
-		</footer>
 
-		<div class="mt-4 flex flex-col gap-3 rounded-xl border border-white/8 bg-black/35 px-4 py-3 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-			<div class="flex flex-wrap gap-3">
-				{#each content.postFooter.legalLinks as link}
-					<a href={link.href} class="transition hover:text-white">{link.label}</a>
+			<div>
+				<h3>{content.footer.servicesEyebrow}</h3>
+				{#each content.footer.servicesLinks as link}
+					<a href={link.href}>{link.label}</a>
 				{/each}
 			</div>
-			<p>{resolveBdrCopyright(content, year)}</p>
+
+			<div>
+				<h3>{content.footer.navigationEyebrow}</h3>
+				{#each content.footer.navigationLinks as link}
+					<a href={link.href}>{link.label}</a>
+				{/each}
+			</div>
+
+			<div>
+				<h3>{content.footer.contactEyebrow}</h3>
+				<a href={`tel:${content.footer.phone.replace(/[^0-9+]/g, '')}`}>{content.footer.phone}</a>
+				<a href={`mailto:${content.footer.email}`}>{content.footer.email}</a>
+				<p>{content.footer.address}</p>
+			</div>
 		</div>
-	</div>
+
+		<div class="site-frame footer-bottom">
+			<p>{resolveBdrCopyright(content, year)}</p>
+			<div>
+				{#each content.postFooter.legalLinks as link}
+					<a href={link.href}>{link.label}</a>
+				{/each}
+			</div>
+		</div>
+	</footer>
 </div>
+
+<style>
+	:global(html) {
+		scroll-behavior: smooth;
+	}
+
+	:global(#hero),
+	:global(#services),
+	:global(#process),
+	:global(#trust),
+	:global(#supporting),
+	:global(#contact),
+	:global(#quote-request) {
+		scroll-margin-top: 92px;
+	}
+
+	.bdr-public-site {
+		min-height: 100vh;
+		background: #0b0b0a;
+		color: #fff;
+		font-family: var(--bdr-body-font);
+	}
+
+	.site-frame {
+		width: min(1180px, calc(100vw - 28px));
+		margin: 0 auto;
+	}
+
+	.hero {
+		position: relative;
+		min-height: 690px;
+		overflow: hidden;
+		background-image: linear-gradient(90deg, rgba(8, 8, 7, 0.98) 0%, rgba(9, 9, 8, 0.9) 36%, rgba(9, 9, 8, 0.38) 66%, rgba(9, 9, 8, 0.1) 100%), var(--hero-image);
+		background-position: center;
+		background-size: cover;
+	}
+
+	.hero-overlay {
+		position: absolute;
+		inset: 0;
+		background:
+			radial-gradient(circle at 18% 20%, rgba(249, 115, 22, 0.13), transparent 34%),
+			linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.68));
+	}
+
+	.hero-texture {
+		position: absolute;
+		inset: 0;
+		opacity: 0.46;
+		mix-blend-mode: multiply;
+		background-size: 760px;
+	}
+
+	.hero-frame {
+		position: relative;
+		z-index: 1;
+		padding: 54px 0 30px;
+	}
+
+	.nav-shell {
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		width: 100%;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		background: rgba(10, 9, 8, 0.9);
+		box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+		backdrop-filter: blur(16px);
+	}
+
+	.top-nav {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		align-items: center;
+		gap: 14px;
+		min-height: 94px;
+		padding: 0 12px;
+	}
+
+	.brand-lockup {
+		display: grid;
+		place-items: center;
+		width: 142px;
+		height: 88px;
+		overflow: hidden;
+	}
+
+	.brand-lockup img {
+		display: block;
+		width: 132px;
+		max-height: 86px;
+		object-fit: contain;
+	}
+
+	.nav-links,
+	.nav-actions {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.nav-links {
+		justify-content: center;
+	}
+
+	.nav-links a {
+		color: #fff;
+		font-size: 0.6rem;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		padding: 28px 7px 25px;
+		text-transform: uppercase;
+		transition: color 150ms ease, box-shadow 150ms ease;
+	}
+
+	.nav-links a:hover,
+	.nav-links a:first-child {
+		color: var(--bdr-primary);
+		box-shadow: inset 0 -2px 0 var(--bdr-primary);
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		border-radius: var(--bdr-button-radius);
+		font-size: 0.73rem;
+		font-weight: 900;
+		letter-spacing: 0.035em;
+		line-height: 1;
+		min-height: 44px;
+		padding: 0 20px;
+		text-transform: uppercase;
+		transition: transform 150ms ease, filter 150ms ease, background 150ms ease;
+	}
+
+	.btn:hover {
+		transform: translateY(-1px);
+	}
+
+	.btn-primary {
+		background: var(--bdr-primary);
+		color: #fff;
+		box-shadow: 0 14px 32px rgba(249, 115, 22, 0.22);
+	}
+
+	.btn-outline {
+		border: 1px solid rgba(249, 115, 22, 0.86);
+		color: #fff;
+		background: rgba(0, 0, 0, 0.42);
+	}
+
+	.btn-small {
+		min-height: 36px;
+		padding: 0 12px;
+		font-size: 0.64rem;
+	}
+
+	.btn-ghost-dark {
+		border: 1px solid #111;
+		color: #111;
+		background: transparent;
+	}
+
+	.menu-toggle,
+	.mobile-menu {
+		display: none;
+	}
+
+	.hero-content {
+		max-width: 640px;
+		padding: 74px 0 52px 38px;
+	}
+
+	.eyebrow {
+		margin: 0;
+		color: rgba(255, 255, 255, 0.76);
+		font-size: 0.72rem;
+		font-weight: 900;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+	}
+
+	.eyebrow.orange {
+		color: var(--bdr-primary);
+	}
+
+	.hero h1,
+	.section-heading h2,
+	.cta-content h2,
+	.quote-benefits h2,
+	.proof-layout h2 {
+		font-family: var(--bdr-heading-font);
+		letter-spacing: 0;
+		text-transform: uppercase;
+	}
+
+	.hero h1 {
+		margin: 10px 0 0;
+		color: #fff;
+		font-size: clamp(4.3rem, 8vw, 7.35rem);
+		font-weight: 900;
+		line-height: 0.88;
+		max-width: 680px;
+		text-shadow: 0 24px 48px rgba(0, 0, 0, 0.34);
+	}
+
+	.hero h1 span {
+		display: block;
+	}
+
+	.accent-line {
+		color: var(--bdr-primary);
+	}
+
+	.hero-copy {
+		max-width: 470px;
+		margin: 22px 0 0;
+		color: rgba(255, 255, 255, 0.88);
+		font-size: 0.96rem;
+		line-height: 1.65;
+	}
+
+	.hero-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+		margin-top: 26px;
+	}
+
+	.trust-row {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 24px;
+		margin-top: 34px;
+		padding: 0 28px 0 34px;
+	}
+
+	.trust-item {
+		display: grid;
+		grid-template-columns: 44px 1fr;
+		gap: 12px;
+		align-items: center;
+		color: #fff;
+		min-width: 0;
+	}
+
+	.trust-icon {
+		display: grid;
+		place-items: center;
+		width: 44px;
+		height: 44px;
+		border: 1px solid rgba(255, 255, 255, 0.72);
+		border-radius: 999px;
+		color: #fff;
+	}
+
+	.trust-icon :global(svg) {
+		display: block;
+	}
+
+	.trust-item p {
+		margin: 0;
+		font-size: 0.72rem;
+		font-weight: 900;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.trust-item span {
+		display: block;
+		margin-top: 4px;
+		color: rgba(255, 255, 255, 0.74);
+		font-size: 0.72rem;
+		line-height: 1.4;
+	}
+
+	.section {
+		padding: 54px 0;
+	}
+
+	#services {
+		padding: 30px 0 34px;
+	}
+
+	.section-light {
+		background:
+			radial-gradient(circle at top, rgba(249, 115, 22, 0.08), transparent 30%),
+			#f7f5f1;
+		color: #121212;
+	}
+
+	.section-heading {
+		max-width: 760px;
+		margin-bottom: 32px;
+	}
+
+	.section-heading.centered {
+		margin-right: auto;
+		margin-left: auto;
+		text-align: center;
+	}
+
+	.section-heading.dark {
+		color: #fff;
+	}
+
+	.section-heading h2,
+	.cta-content h2,
+	.quote-benefits h2,
+	.proof-layout h2 {
+		margin: 8px 0 0;
+		font-size: clamp(2rem, 4vw, 3.25rem);
+		font-weight: 900;
+		line-height: 0.95;
+	}
+
+	.section-heading p:not(.eyebrow) {
+		margin: 9px 0 0;
+		color: #555;
+		font-size: 0.92rem;
+	}
+
+	#services .section-heading {
+		margin-bottom: 22px;
+	}
+
+	#services .section-heading h2 {
+		font-size: clamp(1.75rem, 3vw, 2.45rem);
+	}
+
+	#services .section-heading p:not(.eyebrow) {
+		margin-top: 6px;
+	}
+
+	.service-grid {
+		display: grid;
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+		gap: 16px;
+	}
+
+	.service-card {
+		min-height: 182px;
+		border: 1px solid #d8d5cf;
+		background: rgba(255, 255, 255, 0.82);
+		padding: 22px 16px 18px;
+		text-align: center;
+	}
+
+	.service-icon {
+		display: grid;
+		place-items: center;
+		height: 64px;
+		margin: 0 auto 18px;
+	}
+
+	.service-icon img {
+		max-width: 68px;
+		max-height: 60px;
+		filter: brightness(0);
+		object-fit: contain;
+	}
+
+	.service-card h3 {
+		margin: 0;
+		color: #111;
+		font-size: 0.75rem;
+		font-weight: 900;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.service-card p {
+		margin: 10px auto 0;
+		max-width: 142px;
+		color: #4f4f4f;
+		font-size: 0.72rem;
+		line-height: 1.48;
+	}
+
+	.section-action {
+		display: flex;
+		justify-content: center;
+		margin-top: 24px;
+	}
+
+	.section-action .btn {
+		min-height: 34px;
+		border-color: #111;
+		border-radius: 0.12rem;
+		padding: 0 18px;
+		font-size: 0.67rem;
+	}
+
+	.process-section {
+		position: relative;
+		overflow: hidden;
+		background:
+			linear-gradient(90deg, rgba(8, 8, 8, 0.96), rgba(8, 8, 8, 0.9)),
+			url('/clientFiles/assets/grain-overlay-texture.svg');
+		border-top: 1px solid rgba(255, 255, 255, 0.06);
+		border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+		color: #fff;
+		padding: 34px 0 42px;
+	}
+
+	.process-section::before {
+		position: absolute;
+		inset: 0;
+		background:
+			radial-gradient(circle at 12% 20%, rgba(249, 115, 22, 0.1), transparent 28%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 44%);
+		content: '';
+		pointer-events: none;
+	}
+
+	.process-section .site-frame {
+		position: relative;
+		z-index: 1;
+	}
+
+	.process-section .section-heading {
+		margin-bottom: 24px;
+	}
+
+	.process-section .section-heading h2 {
+		font-size: clamp(1.7rem, 3.4vw, 2.55rem);
+	}
+
+	.process-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 32px;
+		margin-top: 0;
+	}
+
+	.process-step {
+		display: grid;
+		grid-template-columns: 44px 56px 1fr;
+		gap: 16px;
+		align-items: center;
+		min-width: 0;
+	}
+
+	.step-number {
+		color: var(--bdr-primary);
+		font-family: var(--bdr-heading-font);
+		font-size: 2.35rem;
+		font-weight: 900;
+		line-height: 1;
+	}
+
+	.process-icon {
+		display: grid;
+		place-items: center;
+		width: 56px;
+		height: 56px;
+		color: #fff;
+	}
+
+	.process-icon :global(svg) {
+		display: block;
+	}
+
+	.process-step h3 {
+		margin: 0;
+		font-size: 0.86rem;
+		font-weight: 900;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+	}
+
+	.process-step p {
+		margin: 7px 0 0;
+		color: rgba(255, 255, 255, 0.76);
+		font-size: 0.78rem;
+		line-height: 1.55;
+	}
+
+	.proof-section {
+		padding: 38px 0;
+	}
+
+	.proof-layout {
+		display: grid;
+		grid-template-columns: 0.9fr 1.35fr;
+		gap: 34px;
+		align-items: center;
+	}
+
+	.proof-layout h2 {
+		color: #111;
+		font-size: clamp(1.8rem, 3vw, 2.55rem);
+	}
+
+	.proof-layout p {
+		max-width: 480px;
+		margin: 12px 0 0;
+		color: #555;
+		font-size: 0.9rem;
+		line-height: 1.6;
+	}
+
+	.proof-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 12px;
+	}
+
+	.proof-card {
+		display: grid;
+		grid-template-columns: 30px 1fr;
+		gap: 12px;
+		align-items: center;
+		border: 1px solid #d9d5cf;
+		background: rgba(255, 255, 255, 0.78);
+		padding: 14px 16px;
+	}
+
+	.proof-card :global(svg) {
+		color: var(--bdr-primary);
+	}
+
+	.proof-card p {
+		margin: 0;
+		color: #191919;
+		font-size: 0.76rem;
+		font-weight: 900;
+		letter-spacing: 0.03em;
+		line-height: 1.35;
+		text-transform: uppercase;
+	}
+
+	.projects-section {
+		background:
+			linear-gradient(rgba(10, 10, 9, 0.88), rgba(10, 10, 9, 0.9)),
+			url('/clientFiles/assets/grain-overlay-texture.svg');
+		color: #fff;
+		padding: 40px 0 48px;
+	}
+
+	.projects-section .section-heading {
+		margin-bottom: 24px;
+	}
+
+	.projects-section .section-heading h2 {
+		font-size: clamp(1.7rem, 3.2vw, 2.55rem);
+	}
+
+	.projects-section .section-heading p:not(.eyebrow) {
+		color: rgba(255, 255, 255, 0.68);
+	}
+
+	.project-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 16px;
+	}
+
+	.project-card {
+		border: 1px solid rgba(255, 255, 255, 0.16);
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+			rgba(16, 16, 15, 0.92);
+		padding: 22px 20px;
+	}
+
+	.project-card h3 {
+		margin: 0;
+		font-size: 0.86rem;
+		font-weight: 900;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+	}
+
+	.project-card p {
+		margin: 10px 0 0;
+		color: rgba(255, 255, 255, 0.72);
+		font-size: 0.78rem;
+		line-height: 1.6;
+	}
+
+	.cta-band {
+		position: relative;
+		overflow: hidden;
+		background-image: linear-gradient(90deg, rgba(10, 10, 9, 0.9), rgba(10, 10, 9, 0.76)), var(--cta-image);
+		background-position: center;
+		background-size: cover;
+		color: #fff;
+	}
+
+	.cta-content {
+		max-width: 760px;
+		padding: 30px 0;
+	}
+
+	.cta-content p:not(.eyebrow) {
+		max-width: 520px;
+		color: rgba(255, 255, 255, 0.78);
+		font-size: 0.95rem;
+		line-height: 1.6;
+	}
+
+	.quote-layout {
+		display: grid;
+		grid-template-columns: 0.9fr 1.55fr;
+		gap: 38px;
+		align-items: start;
+	}
+
+	.quote-benefits h2 {
+		color: #171717;
+		font-size: clamp(1.55rem, 2.8vw, 2.35rem);
+	}
+
+	.quote-benefits ul {
+		display: grid;
+		gap: 12px;
+		margin: 24px 0 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.quote-benefits li {
+		display: grid;
+		grid-template-columns: 24px 1fr;
+		gap: 10px;
+		align-items: center;
+		color: #555;
+		font-size: 0.86rem;
+		line-height: 1.45;
+	}
+
+	.quote-benefits img {
+		width: 20px;
+		height: 20px;
+		object-fit: contain;
+	}
+
+	.quote-form {
+		display: grid;
+		gap: 18px;
+	}
+
+	.form-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 14px;
+	}
+
+	.field {
+		display: grid;
+		gap: 6px;
+	}
+
+	.field.full {
+		grid-column: 1 / -1;
+	}
+
+	.field label {
+		color: #171717;
+		font-size: 0.66rem;
+		font-weight: 900;
+		letter-spacing: 0.04em;
+	}
+
+	.field input,
+	.field select,
+	.field textarea {
+		width: 100%;
+		border: 1px solid #d7d2ca;
+		background: #fff;
+		color: #171717;
+		font: inherit;
+		font-size: 0.82rem;
+		min-height: 42px;
+		outline: none;
+		padding: 0 12px;
+	}
+
+	.field textarea {
+		min-height: 116px;
+		padding: 12px;
+		resize: vertical;
+	}
+
+	.field input:focus,
+	.field select:focus,
+	.field textarea:focus {
+		border-color: var(--bdr-primary);
+		box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.16);
+	}
+
+	.field-error,
+	.form-message.error {
+		color: #b91c1c;
+	}
+
+	.form-message {
+		padding: 12px 14px;
+		font-size: 0.84rem;
+		font-weight: 700;
+	}
+
+	.form-message.success {
+		background: #dcfce7;
+		color: #166534;
+	}
+
+	.form-message.error {
+		background: #fee2e2;
+	}
+
+	.submit-button {
+		justify-self: start;
+		min-width: 210px;
+	}
+
+	.site-footer {
+		background: #101110;
+		color: #fff;
+		padding: 30px 0 18px;
+	}
+
+	.footer-grid {
+		display: grid;
+		grid-template-columns: 1.25fr 0.8fr 0.8fr 1fr;
+		gap: 42px;
+		padding-bottom: 26px;
+	}
+
+	.footer-logo {
+		width: 132px;
+		height: auto;
+	}
+
+	.site-footer h3 {
+		margin: 0 0 12px;
+		color: #fff;
+		font-size: 0.72rem;
+		font-weight: 900;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.site-footer p,
+	.site-footer a {
+		display: block;
+		margin: 0;
+		color: rgba(255, 255, 255, 0.68);
+		font-size: 0.78rem;
+		line-height: 1.65;
+	}
+
+	.site-footer a:hover {
+		color: #fff;
+	}
+
+	.footer-bottom {
+		display: flex;
+		justify-content: space-between;
+		gap: 16px;
+		border-top: 1px solid rgba(255, 255, 255, 0.09);
+		padding-top: 16px;
+	}
+
+	.footer-bottom div {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 14px;
+	}
+
+	@media (max-width: 840px) {
+		.top-nav {
+			grid-template-columns: auto 1fr auto;
+		}
+
+		.nav-links,
+		.nav-actions {
+			display: none;
+		}
+
+		.menu-toggle {
+			display: inline-flex;
+			justify-self: end;
+			border: 1px solid rgba(255, 255, 255, 0.18);
+			background: rgba(0, 0, 0, 0.44);
+			color: #fff;
+			font-size: 0.72rem;
+			font-weight: 900;
+			padding: 10px 14px;
+			text-transform: uppercase;
+		}
+
+		.mobile-menu {
+			display: grid;
+			gap: 8px;
+			border-top: 1px solid rgba(255, 255, 255, 0.08);
+			background: rgba(10, 9, 8, 0.94);
+			padding: 14px 12px 16px;
+		}
+
+		.mobile-menu a:not(.btn) {
+			color: #fff;
+			font-size: 0.82rem;
+			font-weight: 800;
+			padding: 10px 0;
+			text-transform: uppercase;
+		}
+
+		.hero-content {
+			padding-left: 0;
+		}
+
+		.trust-row,
+		.process-grid,
+		.proof-layout,
+		.project-grid,
+		.quote-layout,
+		.footer-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.service-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.form-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.site-frame {
+			width: min(100vw - 24px, 1180px);
+		}
+
+		.hero {
+			min-height: auto;
+		}
+
+		.brand-lockup img {
+			width: 108px;
+			max-height: 74px;
+		}
+
+		.hero h1 {
+			font-size: clamp(3.2rem, 18vw, 4.8rem);
+		}
+
+		.trust-row {
+			gap: 14px;
+			padding: 0;
+		}
+
+		.service-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.process-step {
+			grid-template-columns: auto 1fr;
+		}
+
+		.process-icon {
+			display: none;
+		}
+
+		.footer-bottom {
+			flex-direction: column;
+		}
+	}
+</style>

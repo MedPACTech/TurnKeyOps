@@ -632,7 +632,7 @@ type SiteVisit = {
 							<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Submitted {scheduledRequestDateLabel} · {scheduledRequest.serviceAddress}</p>
 							<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">{scheduledRequest.intakeSummary}</p>
 						</div>
-						<a href="/bdr/admin/requests?role=office-admin" class="inline-flex rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">Back to quote requests</a>
+						<a href="/bdr/admin/requests" class="inline-flex rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">Back to quote requests</a>
 					</div>
 					<div class="mt-4 grid gap-3 lg:grid-cols-3">
 						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
@@ -854,7 +854,7 @@ type SiteVisit = {
 							<p class="mt-1 leading-6 text-[var(--text-muted)]">{selectedEvent.notes}</p>
 						</div>
 						{#if selectedEvent.quoteRequestId}
-							<a href="/bdr/admin/requests?role=office-admin" class="inline-flex rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
+							<a href="/bdr/admin/requests" class="inline-flex rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
 								Open quote request queue
 							</a>
 						{/if}

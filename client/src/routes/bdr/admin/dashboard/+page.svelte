@@ -56,31 +56,31 @@
 		{
 			label: 'Active jobs',
 			value: String(activeMetrics.upcomingJobs),
-			href: '/bdr/admin/calendar?role=office-admin',
+			href: '/bdr/admin/calendar',
 			icon: '🏗️'
 		},
 		{
 			label: 'Pending estimates',
 			value: String(data.snapshot.summary.estimateCount),
-			href: '/bdr/admin/estimates?role=office-admin',
+			href: '/bdr/admin/estimates',
 			icon: '📝'
 		},
 		{
 			label: 'Quote requests',
 			value: String(data.requestInbox.length),
-			href: '/bdr/admin/requests?role=office-admin',
+			href: '/bdr/admin/requests',
 			icon: '📥'
 		},
 		{
 			label: 'Overdue',
 			value: '0',
-			href: '/bdr/admin/invoices?role=office-admin',
+			href: '/bdr/admin/invoices',
 			icon: '⚠️'
 		},
 		{
 			label: 'Revenue (Month)',
 			value: '$0',
-			href: '/bdr/admin/invoices?role=office-admin',
+			href: '/bdr/admin/invoices',
 			icon: '💰',
 			trend: '▲',
 			trendClass: 'text-green-600'
@@ -126,27 +126,27 @@
 			? {
 					label: priorityRequest.contactName ? `Call ${priorityRequest.contactName}` : 'Review newest request',
 					detail: priorityRequest.siteName || priorityRequest.serviceAddress || priorityRequest.nextAction,
-					href: '/bdr/admin/requests?role=office-admin'
+					href: '/bdr/admin/requests'
 				}
 			: {
 					label: 'Review request queue',
 					detail: `${data.requestInbox.length} requests`,
-					href: '/bdr/admin/requests?role=office-admin'
+					href: '/bdr/admin/requests'
 				},
 		{
 			label: 'Price pending estimates',
 			detail: `${data.snapshot.summary.estimateCount} estimates - ${formatCurrency(data.snapshot.summary.estimateValue)}`,
-			href: '/bdr/admin/estimates?role=office-admin'
+			href: '/bdr/admin/estimates'
 		},
 		{
 			label: 'Confirm schedule gaps',
 			detail: `${activeMetrics.upcomingJobs} active jobs`,
-			href: '/bdr/admin/calendar?role=office-admin'
+			href: '/bdr/admin/calendar'
 		},
 		{
 			label: 'Collect open invoices',
 			detail: `${data.snapshot.summary.invoiceCount} invoices`,
-			href: '/bdr/admin/invoices?role=office-admin'
+			href: '/bdr/admin/invoices'
 		}
 	]);
 
@@ -157,7 +157,7 @@
 			item: 'Concrete',
 			quantity: `${concreteYardsToday} yd`,
 			detail: "Today's pours",
-			href: '/bdr/admin/calendar?role=office-admin'
+			href: '/bdr/admin/calendar'
 		},
 		{
 			id: 'forms-rebar',
@@ -165,7 +165,7 @@
 			item: 'Forms and rebar',
 			quantity: '6 kits',
 			detail: 'Patio prep',
-			href: '/bdr/admin/requests?role=office-admin'
+			href: '/bdr/admin/requests'
 		},
 		{
 			id: 'pump-truck',
@@ -173,7 +173,7 @@
 			item: 'Pump truck',
 			quantity: '1 slot',
 			detail: 'Access window',
-			href: '/bdr/admin/calendar?role=office-admin'
+			href: '/bdr/admin/calendar'
 		},
 		{
 			id: 'finish-kit',
@@ -181,7 +181,7 @@
 			item: 'Finish kit',
 			quantity: '4 sets',
 			detail: 'Cure compound',
-			href: '/bdr/admin/estimates?role=office-admin'
+			href: '/bdr/admin/estimates'
 		}
 	]);
 </script>
@@ -196,7 +196,7 @@
 			<h1 class="text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">Dashboard</h1>
 		</div>
 		<a
-			href="/bdr/admin/estimates?role=office-admin"
+			href="/bdr/admin/estimates"
 			class="inline-flex items-center justify-center rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold leading-5 text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:ring-offset-2 sm:w-auto"
 		>
 			+ New Estimate

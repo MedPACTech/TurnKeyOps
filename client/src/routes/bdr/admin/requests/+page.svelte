@@ -1,9 +1,7 @@
 <script lang="ts">
-	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import {
 		buildQuoteRequestQualification,
 		quoteRequestSiteVisitCancellationReasonOptions,
-		buildQuoteRequestWorkflowModel,
 		getQuoteRequestWorkflowLane,
 		getQuoteRequestWorkflowPhase,
 		isQuoteRequestUnassigned,
@@ -140,7 +138,6 @@
 		)
 	);
 	const selectedQualification = $derived(selectedRequest ? buildQuoteRequestQualification(selectedRequest) : null);
-	const selectedWorkflow = $derived(selectedRequest ? buildQuoteRequestWorkflowModel(selectedRequest.status) : []);
 	const selectedWorkflowPhase = $derived(selectedRequest ? getQuoteRequestWorkflowPhase(selectedRequest.status) : null);
 	const selectedRequestScheduleSectionId = $derived(
 		selectedRequest ? `schedule-site-visit-${selectedRequest.id}` : 'schedule-site-visit'
@@ -213,10 +210,19 @@
 		cancellationNotes = '';
 	});
 
-	const metrics = $derived([
-		{ label: 'Total requests', value: String(data.metrics.total), detail: 'Public-site and office-entered requests in one queue' },
-		{ label: 'Needs response', value: String(data.metrics.newCount), detail: 'Fresh messages waiting on first office action' },
-		{ label: 'Active work', value: String(data.metrics.activeCount), detail: 'Requests still moving through qualification or site-visit handling' }
+	const quoteSummaryCards = $derived([
+		{ label: 'New quotes', value: String(data.metrics.newCount), icon: '📥' },
+		{ label: 'Active', value: String(data.metrics.activeCount), icon: '🔎' },
+		{
+			label: 'Ready to book',
+			value: String(requests.filter((request) => buildQuoteRequestQualification(request).isQualified && !request.siteVisitSchedule).length),
+			icon: '📅'
+		},
+		{
+			label: 'Blocked',
+			value: String(requests.filter((request) => buildQuoteRequestQualification(request).blockerLabels.length).length),
+			icon: '⚠️'
+		}
 	]);
 
 	const formatSubmittedAt = (value: string) =>
@@ -254,7 +260,7 @@
 				{
 					label: 'Review queue',
 					detail: `${filteredRequests.length} request${filteredRequests.length === 1 ? '' : 's'} in view`,
-					href: '/bdr/admin/requests?role=office-admin'
+					href: '/bdr/admin/requests'
 				}
 			] satisfies BobMove[];
 		}
@@ -279,7 +285,7 @@
 			moves.push({
 				label: 'Hand off to estimate',
 				detail: `${selectedRequest.siteVisitSchedule.visitDate} · ${selectedRequest.siteVisitSchedule.assignedFieldResource}`,
-				href: '/bdr/admin/estimates?role=office-admin'
+				href: '/bdr/admin/estimates'
 			});
 		} else {
 			moves.push({
@@ -303,13 +309,10 @@
 		return moves;
 	});
 
-	const quoteCardStateClass = (request: QuoteRequest, isSelected: boolean) => {
-		const stateClass = request.status === 'new' ? 'border-t-4 border-t-emerald-400' : 'border-t border-t-[var(--shell-border)]';
-		const selectionClass = isSelected
-			? 'border-x-[var(--accent-border)] border-b-[var(--accent-border)] bg-[var(--accent-soft)]'
-			: 'border-x-[var(--shell-border)] border-b-[var(--shell-border)] bg-[var(--shell-panel)] hover:border-x-[var(--accent-border)] hover:border-b-[var(--accent-border)] hover:bg-[var(--shell-panel-strong)]';
-		return `${stateClass} ${selectionClass}`;
-	};
+	const quoteCardStateClass = (_request: QuoteRequest, isSelected: boolean) =>
+		isSelected
+			? 'bg-[#fff4ea] shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_rgba(249,115,22,0.14)] ring-1 ring-[rgba(249,115,22,0.32)]'
+			: 'bg-white/88 shadow-[var(--shell-shadow)] hover:bg-white hover:shadow-md';
 
 	const parseAddress = (value: string) => {
 		const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
@@ -329,13 +332,21 @@
 
 	const selectedAddress = $derived(parseAddress(selectedRequest?.serviceAddress ?? ''));
 	const selectedWorkflowLane = $derived(selectedRequest ? getQuoteRequestWorkflowLane(selectedRequest.status) : null);
-	const selectedOpsSnapshot = $derived.by(() => {
+	const selectedQuickFacts = $derived.by(() => {
 		if (!selectedRequest) return [] as { label: string; value: string; detail: string }[];
 		return [
-			{ label: 'Workflow lane', value: selectedWorkflowPhase?.label ?? 'Workflow', detail: selectedWorkflowLane ? quoteRequestWorkflowLaneMeta.find((lane) => lane.key === selectedWorkflowLane)?.label ?? 'Lane' : 'Lane' },
-			{ label: 'Source', value: selectedRequest.source === 'public-site' ? 'Public site' : selectedRequest.source === 'office' ? 'Office entered' : 'Referral', detail: selectedRequest.priority === 'emergency' ? 'Emergency priority' : `${selectedRequest.attachments.length} attachment${selectedRequest.attachments.length === 1 ? '' : 's'}` },
+			{
+				label: 'Lane',
+				value: selectedWorkflowPhase?.label ?? quoteRequestStatusMeta[selectedRequest.status].label,
+				detail: selectedWorkflowLane ? quoteRequestWorkflowLaneMeta.find((lane) => lane.key === selectedWorkflowLane)?.label ?? 'Queue' : 'Queue'
+			},
+			{
+				label: 'Source',
+				value: selectedRequest.source === 'public-site' ? 'Public site' : selectedRequest.source === 'office' ? 'Office' : 'Referral',
+				detail: selectedRequest.priority === 'emergency' ? 'Emergency' : `${selectedRequest.attachments.length} file${selectedRequest.attachments.length === 1 ? '' : 's'}`
+			},
 			{ label: 'Property', value: selectedRequest.propertyType, detail: selectedRequest.projectType },
-			{ label: 'Requested timeline', value: selectedRequest.requestedTimeline, detail: selectedRequest.preferredTimeline }
+			{ label: 'Timeline', value: selectedRequest.requestedTimeline, detail: selectedRequest.preferredTimeline }
 		];
 	});
 
@@ -381,257 +392,438 @@
 	<title>BDR Admin · Quotes</title>
 </svelte:head>
 
-<AdminWorkspace
-	kicker="External Admin / Requests"
-	title="Simple intake desk for quote requests"
-	description="Work the request queue, clear blockers, schedule site visits, and hand off estimate-ready jobs without leaving the record."
-	{metrics}
-	contextLabel="Queue lanes"
-	focusLabel="Request list"
->
-	{#snippet context()}
-		<div class="space-y-3">
-			{#each laneOptions as lane}
-				<button
-					type="button"
-					class={`w-full rounded-md border px-3 py-3 text-left transition ${laneFilter === lane.key ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel)] hover:bg-[var(--shell-panel-strong)]'}`}
-					onclick={() => (laneFilter = lane.key)}
-				>
-					<div class="flex items-center justify-between gap-3">
-						<p class="text-sm font-semibold text-[var(--text-strong)]">{lane.label}</p>
-						<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
-							{lane.count}
-						</span>
-					</div>
-				</button>
-			{/each}
+<div class="space-y-5">
+	<section class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+		<h1 class="text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">Quotes</h1>
+		<a
+			href="/bdr/admin/estimates"
+			class="inline-flex items-center justify-center rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold leading-5 text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:ring-offset-2"
+		>
+			+ New Estimate
+		</a>
+	</section>
 
-			<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-3">
-				<div class="flex items-start justify-between gap-3">
-					<div>
-						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Bob intake assist</p>
-						<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-							{selectedRequest ? selectedRequest.companyName : 'Select a request'}
-						</p>
-					</div>
-					<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm">
-						✨
-					</span>
+	<section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+		{#each quoteSummaryCards as card}
+			<div class="flex h-32 flex-col justify-between rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+				<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/85 text-xl" aria-hidden="true">
+					{card.icon}
 				</div>
-				<div class="mt-3 space-y-2">
-					{#each bobMoves as move}
-						<a
-							href={move.href}
-							class="block rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2.5 transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
-						>
-							<p class="text-sm font-semibold text-[var(--text-strong)]">{move.label}</p>
-							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{move.detail}</p>
-						</a>
-					{/each}
+				<div>
+					<p class="text-3xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{card.value}</p>
+					<p class="mt-2 text-sm font-medium leading-5 text-[var(--text-muted)]">{card.label}</p>
 				</div>
 			</div>
-		</div>
-	{/snippet}
+		{/each}
+	</section>
 
-	{#snippet focus()}
-		<div class="space-y-4">
-			<label class="grid gap-1">
-				<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Search queue</span>
+	<section class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+		<aside class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+			<div class="flex items-center justify-between gap-3">
+				<h2 class="text-base font-semibold leading-6 text-[var(--text-strong)]">Quote queue</h2>
+				<span class="rounded-full bg-[var(--shell-panel-strong)] px-3 py-1 text-xs font-semibold text-[var(--text-muted)]">
+					{filteredRequests.length}
+				</span>
+			</div>
+
+			<div class="mt-4 flex flex-wrap gap-2">
+				{#each laneOptions as lane}
+					<button
+						type="button"
+						class={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+							laneFilter === lane.key
+								? 'bg-[var(--accent-solid)] text-white shadow-sm'
+								: 'bg-white/80 text-[var(--text-muted)] shadow-sm hover:bg-white hover:text-[var(--text-strong)]'
+						}`}
+						onclick={() => (laneFilter = lane.key)}
+					>
+						{lane.label} · {lane.count}
+					</button>
+				{/each}
+			</div>
+
+			<label class="mt-4 block">
+				<span class="sr-only">Search quotes</span>
 				<input
 					bind:value={search}
-					placeholder="Name, scope, address, owner"
-					class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none placeholder:text-[var(--muted)]"
+					placeholder="Search quotes"
+					class="w-full rounded-md border border-transparent bg-white px-3 py-2.5 text-sm text-[var(--text-base)] shadow-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent-border)] focus:ring-2 focus:ring-[var(--focus-ring)]"
 				/>
 			</label>
 
-			<div class="space-y-2">
-				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-					{filteredRequests.length} requests
-				</p>
+			<div class="mt-4 space-y-2">
 				{#if filteredRequests.length}
 					{#each filteredRequests as request}
 						{@const qualification = buildQuoteRequestQualification(request)}
 						<button
 							type="button"
-							class={`w-full rounded-md border px-3 py-3 text-left transition ${quoteCardStateClass(request, selectedRequest?.id === request.id)}`}
+							class={`w-full rounded-lg p-3 text-left transition ${quoteCardStateClass(request, selectedRequest?.id === request.id)}`}
 							onclick={() => (selectedRequestId = request.id)}
 						>
-							<div class="flex items-start justify-between gap-3">
-								<div class="min-w-0">
-									<p class="truncate text-sm font-semibold text-[var(--text-strong)]">{request.customerName}</p>
-									<p class="mt-1 line-clamp-1 text-xs text-[var(--text-muted)]">{request.siteName} · {request.serviceType}</p>
-								</div>
-								<p class="shrink-0 text-[0.68rem] text-[var(--muted)]">{formatSubmittedAt(request.submittedAtUtc)}</p>
-							</div>
-							<div class="mt-3 flex flex-wrap items-center gap-2">
-								<span class={`rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${selectedRequest?.id === request.id ? 'border-[var(--accent-border)] bg-[var(--shell-panel)] text-[var(--accent-text)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel-strong)] text-[var(--text-muted)]'}`}>
-									{quoteRequestStatusMeta[request.status].label}
+							<div class="flex items-start gap-3">
+								<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/85 text-xl" aria-hidden="true">
+									📥
 								</span>
-								{#if qualification.blockerLabels.length}
-									<span class="inline-flex min-w-0 items-center gap-1 rounded-md border border-amber-400/35 bg-amber-400/10 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-amber-700">
-										<AlertTriangle size={12} />
-										<span class="truncate">{qualification.blockerLabels.slice(0, 2).join(' · ')}</span>
-									</span>
-								{:else}
-									<span class="inline-flex items-center gap-1 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-emerald-300">
-										<CheckCircle2 size={12} />
-										Qualified inputs
-									</span>
-								{/if}
+								<div class="min-w-0 flex-1">
+									<div class="flex items-start justify-between gap-2">
+										<p class="truncate text-sm font-semibold leading-5 text-[var(--text-strong)]">{request.customerName}</p>
+										<p class="shrink-0 text-xs leading-5 text-[var(--text-muted)]">{formatSubmittedAt(request.submittedAtUtc)}</p>
+									</div>
+									<p class="mt-1 truncate text-xs leading-5 text-[var(--text-muted)]">{request.siteName}</p>
+									<p class="truncate text-xs leading-5 text-[var(--text-muted)]">{request.serviceType}</p>
+									<div class="mt-3 flex flex-wrap gap-2">
+										<span class="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-text)]">
+											{quoteRequestStatusMeta[request.status].label}
+										</span>
+										{#if qualification.blockerLabels.length}
+											<span class="inline-flex min-w-0 items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+												<AlertTriangle size={12} />
+												<span class="truncate">{qualification.blockerLabels[0]}</span>
+											</span>
+										{:else}
+											<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+												<CheckCircle2 size={12} />
+												Ready
+											</span>
+										{/if}
+									</div>
+								</div>
 							</div>
 						</button>
 					{/each}
 				{:else}
-					<div class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-4 text-center text-sm text-[var(--text-muted)]">
-						No requests match this lane. Clear search or switch queues.
+					<div class="rounded-lg bg-white/70 p-6 text-center text-sm text-[var(--text-muted)] shadow-sm">
+						No quotes match this view.
 					</div>
 				{/if}
 			</div>
-		</div>
-	{/snippet}
+		</aside>
 
-	{#snippet work()}
-		<div class="space-y-4">
+		<div class="min-w-0 space-y-4">
 			{#if selectedRequest}
-				<form id={`request-triage-${selectedRequest.id}`} method="POST" action="?/updateRequest" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-					<input type="hidden" name="id" value={selectedRequest.id} />
-					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-						<div>
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Intake desk</p>
-							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedRequest.companyName}</h4>
-							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">{selectedRequest.contactName} · {selectedRequest.serviceType} · {selectedRequest.siteName}</p>
+				<article id={`request-triage-${selectedRequest.id}`} class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+					<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+						<div class="flex min-w-0 items-start gap-3">
+							<span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/85 text-2xl" aria-hidden="true">
+								📝
+							</span>
+							<div class="min-w-0">
+								<h2 class="truncate text-2xl font-semibold leading-8 text-[var(--text-strong)]">{selectedRequest.companyName}</h2>
+								<p class="mt-1 text-sm leading-5 text-[var(--text-muted)]">{selectedRequest.serviceType} · {selectedRequest.siteName}</p>
+							</div>
 						</div>
-						<div class="text-left lg:text-right">
-							<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Submitted</p>
-							<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{formatSubmittedAt(selectedRequest.submittedAtUtc)}</p>
+						<div class="flex flex-wrap items-center gap-2 lg:justify-end">
+							<span class="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-semibold text-[var(--accent-text)]">
+								{quoteRequestStatusMeta[selectedRequest.status].label}
+							</span>
+							<span class="rounded-full bg-white/80 px-3 py-1.5 text-sm font-medium text-[var(--text-muted)] shadow-sm">
+								{formatSubmittedAt(selectedRequest.submittedAtUtc)}
+							</span>
 						</div>
 					</div>
 
 					{#if form?.success && form.updatedRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Saved</p>
+						<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Saved</p>
 					{:else if form?.message && form.updatedRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{form.message}</p>
+						<p class="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{form.message}</p>
 					{/if}
 
-					<div class="mt-5 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-						<div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-							<div>
-								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Workflow</p>
-								<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{selectedWorkflowPhase?.label ?? 'Workflow'}</p>
-								<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{selectedWorkflowPhase?.detail ?? 'Track intake through estimate handoff.'}</p>
+					<div class="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_340px]">
+						<form method="POST" action="?/updateRequest" class="rounded-lg bg-[var(--shell-panel-strong)] p-4">
+							<input type="hidden" name="id" value={selectedRequest.id} />
+							<input type="hidden" name="contactName" value={selectedRequest.contactName} />
+							<input type="hidden" name="email" value={selectedRequest.email} />
+							<input type="hidden" name="phone" value={selectedRequest.phone} />
+							<input type="hidden" name="siteName" value={selectedRequest.siteName} />
+							<input type="hidden" name="address1" value={selectedAddress.address1} />
+							<input type="hidden" name="address2" value={selectedAddress.address2} />
+							<input type="hidden" name="city" value={selectedAddress.city} />
+							<input type="hidden" name="state" value={selectedAddress.state} />
+							<input type="hidden" name="postalCode" value={selectedAddress.postalCode} />
+							<input type="hidden" name="requestedTimeline" value={selectedRequest.requestedTimeline} />
+
+							<div class="grid gap-4 lg:grid-cols-[180px_220px_minmax(0,1fr)]">
+								<label class="grid gap-2">
+									<span class="text-sm font-medium text-[var(--text-muted)]">Stage</span>
+									<select id="status" name="status" bind:value={triageStatus} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none">
+										{#each quoteRequestStatusOptions as option}
+											<option value={option.value}>{option.label}</option>
+										{/each}
+									</select>
+								</label>
+								<label class="grid gap-2">
+									<span class="text-sm font-medium text-[var(--text-muted)]">Owner</span>
+									<input id="assignedTo" name="assignedTo" value={selectedRequest.assignedTo} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-2">
+									<span class="text-sm font-medium text-[var(--text-muted)]">Next action</span>
+									<textarea id="nextAction" name="nextAction" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none">{selectedRequest.nextAction}</textarea>
+								</label>
 							</div>
-							<span class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
-								{quoteRequestStatusMeta[selectedRequest.status].label}
-							</span>
-						</div>
-						<div class="mt-4 grid gap-3 lg:grid-cols-5">
-							{#each selectedWorkflow as phase}
-								<div class={`rounded-md border px-3 py-3 ${phase.isCurrent ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : phase.isComplete ? 'border-emerald-400/25 bg-emerald-400/10' : 'border-[var(--shell-border)] bg-[var(--shell-panel)]'}`}>
-									<div class="flex flex-wrap items-center justify-between gap-2">
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{phase.label}</p>
-										<span class="rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-base)]">
-											{phase.entity}
-										</span>
+
+							{#if triageStatus === 'needs-info'}
+								<div class="mt-4 rounded-lg bg-amber-50 p-3">
+									<p class="text-sm font-semibold text-amber-900">Needed from customer</p>
+									<div class="mt-3 grid gap-2 md:grid-cols-2">
+										{#each quoteRequestMissingInfoReasonOptions as reason}
+											<label class="flex gap-3 rounded-md bg-white/70 p-3 text-left">
+												<input
+													type="checkbox"
+													name="missingInfoReasonCodes"
+													value={reason.value}
+													checked={isMissingInfoReasonChecked(reason.value)}
+													class="mt-1 h-4 w-4 rounded border-amber-200 bg-white text-[var(--accent-solid)]"
+												/>
+												<span>
+													<span class="block text-sm font-semibold text-amber-900">{reason.label}</span>
+													<span class="mt-1 block text-xs leading-5 text-amber-800">{reason.detail}</span>
+												</span>
+											</label>
+										{/each}
 									</div>
-									<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{phase.statuses.map((status) => quoteRequestStatusMeta[status].label).join(' · ')}</p>
-									{#if phase.isCurrent}
-										<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{phase.detail}</p>
-									{/if}
+								</div>
+							{:else if selectedQualification?.blockerLabels.length}
+								<div class="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
+									<span class="font-semibold">Blocked:</span> {selectedQualification.blockerLabels.join(' · ')}
+								</div>
+							{/if}
+
+							<div class="mt-4 flex flex-wrap gap-3">
+								<button type="submit" class="rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">Save</button>
+								{#if selectedRequestCanOpenScheduler}
+									<a href={`#${selectedRequestScheduleSectionId}`} class="inline-flex items-center gap-2 rounded-md bg-[var(--accent-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-white">
+										<CalendarCheck size={16} />
+										{selectedRequest.siteVisitSchedule ? 'Site visit' : 'Book visit'}
+									</a>
+								{:else}
+									<span class="inline-flex items-center gap-2 rounded-md bg-white/70 px-4 py-2.5 text-sm font-semibold text-[var(--text-muted)]">
+										<Lock size={16} />
+										Qualify first
+									</span>
+								{/if}
+								<a href="/bdr/admin/estimates" class="rounded-md bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-white">Estimate lane</a>
+							</div>
+						</form>
+
+						<aside class="rounded-lg bg-white/75 p-4 shadow-sm">
+							<div class="flex items-start justify-between gap-3">
+								<div class="flex items-start gap-3">
+									<span class="flex h-10 w-10 shrink-0 items-center justify-center text-2xl" aria-hidden="true">👷‍♂️</span>
+									<div>
+										<h3 class="text-base font-semibold leading-6 text-[var(--text-strong)]">Bob</h3>
+										<p class="text-sm leading-5 text-[var(--text-muted)]">Next moves</p>
+									</div>
+								</div>
+								<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg shadow-sm" title="AI-driven">✨</span>
+							</div>
+							<div class="mt-4 space-y-2">
+								{#each bobMoves as move}
+									<a href={move.href} class="block rounded-lg bg-[var(--shell-panel-strong)] px-3 py-3 shadow-sm transition hover:bg-white">
+										<p class="text-sm font-semibold leading-5 text-[var(--text-strong)]">{move.label}</p>
+										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{move.detail}</p>
+									</a>
+								{/each}
+							</div>
+						</aside>
+					</div>
+				</article>
+
+				<section id={`request-details-${selectedRequest.id}`} class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+					<article class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="flex items-center justify-between gap-3">
+							<h3 class="text-base font-semibold leading-6 text-[var(--text-strong)]">Quote details</h3>
+							<button
+								type="button"
+								class={`inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/80 text-[var(--accent-text)] shadow-sm transition hover:bg-white ${detailInlineEditing ? 'ring-2 ring-[var(--accent-border)]' : ''}`}
+								onclick={() => {
+									if (detailInlineEditing) {
+										resetDetailDraft(selectedRequest);
+										return;
+									}
+									detailInlineEditing = true;
+								}}
+								aria-label="Edit quote details"
+								title="Edit quote details"
+							>
+								<Pencil size={16} />
+							</button>
+						</div>
+
+						<div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+							{#each selectedQuickFacts as item}
+								<div class="rounded-lg bg-[var(--shell-panel-strong)] px-3 py-3">
+									<p class="text-xs font-medium text-[var(--text-muted)]">{item.label}</p>
+									<p class="mt-2 truncate text-sm font-semibold text-[var(--text-strong)]">{item.value}</p>
+									<p class="mt-1 truncate text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
 								</div>
 							{/each}
 						</div>
-					</div>
 
-					<div class="mt-5 grid gap-4 lg:grid-cols-[180px_220px_minmax(0,1fr)]">
-						<div class="grid gap-2">
-							<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="status">Stage</label>
-							<select id="status" name="status" bind:value={triageStatus} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">
-								{#each quoteRequestStatusOptions as option}
-									<option value={option.value}>{option.label}</option>
+						<div class="mt-4 rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3">
+							<p class="text-sm font-semibold text-[var(--text-strong)]">Scope</p>
+							<p class="mt-2 text-sm leading-6 text-[var(--text-base)]">{selectedRequest.need}</p>
+						</div>
+
+						{#if detailInlineEditing}
+							<form method="POST" action="?/updateRequest" class="mt-4 rounded-lg bg-[var(--accent-soft)] p-4">
+								<input type="hidden" name="id" value={selectedRequest.id} />
+								<input type="hidden" name="status" value={selectedRequest.status} />
+								<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
+								<input type="hidden" name="contactName" value={selectedRequest.contactName} />
+								<input type="hidden" name="email" value={selectedRequest.email} />
+								<input type="hidden" name="phone" value={selectedRequest.phone} />
+								<input type="hidden" name="siteName" value={selectedRequest.siteName} />
+								<input type="hidden" name="address1" value={selectedAddress.address1} />
+								<input type="hidden" name="address2" value={selectedAddress.address2} />
+								<input type="hidden" name="city" value={selectedAddress.city} />
+								<input type="hidden" name="state" value={selectedAddress.state} />
+								<input type="hidden" name="postalCode" value={selectedAddress.postalCode} />
+								{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
+									<input type="hidden" name="missingInfoReasonCodes" value={code} />
 								{/each}
-							</select>
-						</div>
-						<div class="grid gap-2">
-							<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="assignedTo">Owner</label>
-							<input id="assignedTo" name="assignedTo" value={selectedRequest.assignedTo} class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
-						</div>
-						<div class="grid gap-2">
-							<label class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]" for="nextAction">Next action</label>
-							<textarea id="nextAction" name="nextAction" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none">{selectedRequest.nextAction}</textarea>
-						</div>
-					</div>
-
-					{#if triageStatus === 'needs-info'}
-						<div class="mt-5 rounded-md border border-amber-400/30 bg-amber-400/10 p-4">
-							<div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-								<div>
-									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-amber-700">Needs Info reason codes</p>
-									<p class="mt-1 text-sm leading-6 text-amber-800">Select the structured blockers the customer must resolve before qualification can finish.</p>
-								</div>
-								<span class="rounded-md border border-amber-300/30 bg-white/60 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-amber-800">Required</span>
-							</div>
-							<div class="mt-4 grid gap-2 lg:grid-cols-2">
-								{#each quoteRequestMissingInfoReasonOptions as reason}
-									<label class="flex gap-3 rounded-md border border-amber-300/20 bg-white/60 p-3 text-left">
-										<input
-											type="checkbox"
-											name="missingInfoReasonCodes"
-											value={reason.value}
-											checked={isMissingInfoReasonChecked(reason.value)}
-											class="mt-1 h-4 w-4 rounded border-amber-200 bg-[var(--shell-panel)] text-[var(--accent-solid)]"
-										/>
-										<span>
-											<span class="block text-sm font-semibold text-amber-800">{reason.label}</span>
-											<span class="mt-1 block text-xs leading-5 text-amber-800">{reason.detail}</span>
-										</span>
+								<div class="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+									<label class="grid gap-2">
+										<span class="text-sm font-medium text-[var(--text-muted)]">Timeline</span>
+										<input bind:value={detailRequestedTimeline} name="requestedTimeline" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
 									</label>
+									<label class="grid gap-2">
+										<span class="text-sm font-medium text-[var(--text-muted)]">Next action</span>
+										<textarea bind:value={detailNextAction} name="nextAction" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none"></textarea>
+									</label>
+								</div>
+								<div class="mt-4 flex flex-wrap gap-3">
+									<button type="submit" class="rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">Save details</button>
+									<button type="button" class="rounded-md bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-white" onclick={() => resetDetailDraft(selectedRequest)}>Cancel</button>
+								</div>
+							</form>
+						{/if}
+
+						<div class="mt-4 rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3">
+							<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+								<p class="text-sm font-semibold text-[var(--text-strong)]">Qualification</p>
+								<span class={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${selectedQualification?.isQualified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+									{#if selectedQualification?.isQualified}
+										<CheckCircle2 size={13} />
+										Ready
+									{:else}
+										<AlertTriangle size={13} />
+										Blocked
+									{/if}
+								</span>
+							</div>
+							<div class="mt-3 grid gap-2 md:grid-cols-2">
+								{#each selectedQualification?.checks ?? [] as check}
+									<div class="rounded-md bg-white/75 px-3 py-2.5">
+										<div class="flex items-start justify-between gap-3">
+											<p class="text-sm font-semibold text-[var(--text-base)]">{check.label}</p>
+											<span class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${check.complete ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>{check.complete ? 'Ready' : 'Need'}</span>
+										</div>
+										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{check.detail}</p>
+									</div>
 								{/each}
 							</div>
 						</div>
-					{:else if selectedQualification?.blockerLabels.length}
-						<div class="mt-5 rounded-md border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-800">
-							<span class="font-semibold">Blocking inputs:</span> {selectedQualification.blockerLabels.join(' · ')}. Move the request to Needs Info to store customer-facing reason codes.
-						</div>
-					{/if}
+					</article>
 
-					<div class="mt-5 flex flex-wrap gap-3">
-						<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save changes</button>
-						{#if selectedRequestCanOpenScheduler}
-							<a href={`#${selectedRequestScheduleSectionId}`} class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)] transition hover:bg-[var(--shell-panel)]">
-								<CalendarCheck size={15} />
-								{selectedRequest.siteVisitSchedule ? 'Review site visit' : 'Open site visit workspace'}
-							</a>
+					<article id={`contact-site-${selectedRequest.id}`} class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="flex items-center justify-between gap-3">
+							<h3 class="text-base font-semibold leading-6 text-[var(--text-strong)]">Contact</h3>
+							<button
+								type="button"
+								class={`inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/80 text-[var(--accent-text)] shadow-sm transition hover:bg-white ${contactInlineEditing ? 'ring-2 ring-[var(--accent-border)]' : ''}`}
+								onclick={() => {
+									if (contactInlineEditing) {
+										resetContactDraft(selectedRequest);
+										return;
+									}
+									contactInlineEditing = true;
+								}}
+								aria-label="Edit contact information"
+								title="Edit contact information"
+							>
+								<Pencil size={16} />
+							</button>
+						</div>
+
+						{#if contactInlineEditing}
+							<form method="POST" action="?/updateRequest" class="mt-4 space-y-3 rounded-lg bg-[var(--accent-soft)] p-4">
+								<input type="hidden" name="id" value={selectedRequest.id} />
+								<input type="hidden" name="status" value={selectedRequest.status} />
+								<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
+								<input type="hidden" name="nextAction" value={selectedRequest.nextAction} />
+								<input type="hidden" name="requestedTimeline" value={selectedRequest.requestedTimeline} />
+								{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
+									<input type="hidden" name="missingInfoReasonCodes" value={code} />
+								{/each}
+								<label class="grid gap-1">
+									<span class="text-sm font-medium text-[var(--text-muted)]">Name</span>
+									<input bind:value={contactNameDraft} name="contactName" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-1">
+									<span class="text-sm font-medium text-[var(--text-muted)]">Email</span>
+									<input bind:value={contactEmailDraft} type="email" name="email" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-1">
+									<span class="text-sm font-medium text-[var(--text-muted)]">Phone</span>
+									<input bind:value={contactPhoneDraft} name="phone" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-1">
+									<span class="text-sm font-medium text-[var(--text-muted)]">Site</span>
+									<input bind:value={contactSiteNameDraft} name="siteName" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<label class="grid gap-1">
+									<span class="text-sm font-medium text-[var(--text-muted)]">Address</span>
+									<input bind:value={contactAddress1Draft} name="address1" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+								</label>
+								<input type="hidden" name="address2" value={contactAddress2Draft} />
+								<div class="grid grid-cols-[minmax(0,1fr)_78px_96px] gap-2">
+									<input bind:value={contactCityDraft} name="city" placeholder="City" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+									<input bind:value={contactStateDraft} name="state" placeholder="State" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+									<input bind:value={contactPostalCodeDraft} name="postalCode" placeholder="Zip" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
+								</div>
+								<div class="flex flex-wrap gap-3">
+									<button type="submit" class="rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">Save contact</button>
+									<button type="button" class="rounded-md bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-white" onclick={() => resetContactDraft(selectedRequest)}>Cancel</button>
+								</div>
+							</form>
 						{:else}
-							<span class="inline-flex items-center gap-2 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]" title="Mark the request Qualified after clearing qualification blockers to schedule a site visit.">
-								<Lock size={15} />
-								Qualify before scheduling
-							</span>
+							<div class="mt-4 space-y-3">
+								<div class="rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3">
+									<p class="text-base font-semibold text-[var(--text-strong)]">{selectedRequest.contactName}</p>
+									<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.email}</p>
+									<p class="text-sm text-[var(--text-muted)]">{selectedRequest.phone}</p>
+								</div>
+								<div class="rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3">
+									<p class="text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.siteName}</p>
+									<div class="mt-2 space-y-0.5 text-sm leading-5 text-[var(--text-muted)]">
+										{#if selectedAddress.address1}<p>{selectedAddress.address1}</p>{/if}
+										{#if selectedAddress.address2}<p>{selectedAddress.address2}</p>{/if}
+										{#if selectedAddress.city}<p>{selectedAddress.city}</p>{/if}
+										{#if selectedAddress.state || selectedAddress.postalCode}
+											<p>{[selectedAddress.state, selectedAddress.postalCode].filter(Boolean).join(' ')}</p>
+										{/if}
+									</div>
+								</div>
+							</div>
 						{/if}
-						<a href="/bdr/admin/estimates?role=office-admin" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">Open estimate lane</a>
-					</div>
-				</form>
+					</article>
+				</section>
 
-				<section id={selectedRequestScheduleSectionId} class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-						<div class="max-w-3xl">
-							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Site visit</p>
-							<h5 class="mt-1 text-xl font-semibold text-[var(--text-strong)]">Book the field handoff</h5>
-							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-								Set the date, window, contact, and field owner from the intake desk.
-							</p>
-						</div>
+				<section id={selectedRequestScheduleSectionId} class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+					<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+						<h3 class="text-base font-semibold leading-6 text-[var(--text-strong)]">Site visit</h3>
 						{#if selectedRequest.siteVisitSchedule}
-							<span class="inline-flex items-center gap-2 rounded-md border border-emerald-400/35 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300">
+							<span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700">
 								<CheckCircle2 size={14} />
 								Scheduled
 							</span>
 						{:else if selectedRequestCanOpenScheduler}
-							<span class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
+							<span class="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-semibold text-[var(--accent-text)]">
 								<CalendarCheck size={14} />
-								Ready to book
+								Ready
 							</span>
 						{:else}
-							<span class="inline-flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+							<span class="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800">
 								<AlertTriangle size={14} />
 								Blocked
 							</span>
@@ -639,71 +831,35 @@
 					</div>
 
 					{#if form?.scheduleSuccess && form.scheduledRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Site visit scheduled</p>
+						<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Site visit scheduled</p>
 					{:else if form?.scheduleMessage && form.scheduledRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{form.scheduleMessage}</p>
+						<p class="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{form.scheduleMessage}</p>
 					{/if}
 
 					{#if form?.cancelSuccess && form.cancelledRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">Site visit cancelled</p>
+						<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Site visit cancelled</p>
 					{:else if form?.cancelMessage && form.cancelledRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{form.cancelMessage}</p>
+						<p class="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{form.cancelMessage}</p>
 					{/if}
 
 					{#if selectedRequest.siteVisitSchedule}
 						<div class="mt-4 grid gap-3 lg:grid-cols-3">
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Current visit window</p>
+							<div class="rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3">
+								<p class="text-xs font-medium text-[var(--text-muted)]">Window</p>
 								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatScheduleDate(selectedRequest.siteVisitSchedule.visitDate)}</p>
 								<p class="mt-1 text-sm text-[var(--text-muted)]">{formatScheduleWindow(selectedRequest.siteVisitSchedule.windowStart, selectedRequest.siteVisitSchedule.windowEnd)}</p>
 							</div>
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site contact</p>
+							<div class="rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3">
+								<p class="text-xs font-medium text-[var(--text-muted)]">Contact</p>
 								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.siteVisitSchedule.siteContact}</p>
 								<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.siteVisitSchedule.siteContactPhone || 'Phone not captured'}</p>
 							</div>
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Assigned field resource</p>
+							<div class="rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3">
+								<p class="text-xs font-medium text-[var(--text-muted)]">Field owner</p>
 								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.siteVisitSchedule.assignedFieldResource}</p>
-								<p class="mt-1 text-sm text-[var(--text-muted)]">Scheduled by {selectedRequest.siteVisitSchedule.scheduledBy}</p>
+								<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.siteVisitSchedule.scheduledBy}</p>
 							</div>
 						</div>
-
-						<form method="POST" action="?/cancelSiteVisit" class="mt-4 rounded-md border border-rose-400/25 bg-rose-400/10 p-4">
-							<input type="hidden" name="id" value={selectedRequest.id} />
-							<div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-								<div class="max-w-2xl">
-									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-rose-700">Cancellation handling</p>
-									<p class="mt-1 text-sm leading-6 text-rose-900">
-										Cancel from this workspace when the current visit slot is no longer valid. A reason code is required and the request moves back into the qualified queue with a new next action.
-									</p>
-								</div>
-								<span class="rounded-md border border-rose-300/30 bg-white/70 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-rose-800">Reason code required</span>
-							</div>
-							<div class="mt-4 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-								<label class="grid gap-2">
-									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-rose-800">Cancellation reason code</span>
-									<select bind:value={cancellationReasonCode} name="cancellationReasonCode" required class="rounded-md border border-rose-300/30 bg-white/80 px-3 py-3 text-sm text-[var(--text-base)] outline-none">
-										<option value="">Select a reason</option>
-										{#each quoteRequestSiteVisitCancellationReasonOptions as reason}
-											<option value={reason.value}>{reason.label}</option>
-										{/each}
-									</select>
-								</label>
-								<label class="grid gap-2">
-									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-rose-800">Cancellation notes</span>
-									<textarea bind:value={cancellationNotes} name="cancellationNotes" rows="3" class="rounded-md border border-rose-300/30 bg-white/80 px-3 py-3 text-sm text-[var(--text-base)] outline-none" placeholder="Customer availability, weather issue, access problem, or other operator follow-up notes"></textarea>
-								</label>
-							</div>
-							<div class="mt-4 flex flex-wrap gap-3">
-								<button type="submit" class="rounded-md border border-rose-500/40 bg-rose-600 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:opacity-90">
-									Cancel site visit
-								</button>
-								<p class="text-xs leading-5 text-rose-900">
-									The timeline will record the cancellation reason and the request will return to the qualified queue for follow-up.
-								</p>
-							</div>
-						</form>
 					{/if}
 
 					{#if selectedRequestCanOpenScheduler}
@@ -711,35 +867,35 @@
 							<input type="hidden" name="id" value={selectedRequest.id} />
 							<div class="grid gap-4 lg:grid-cols-[160px_150px_150px_minmax(0,1fr)]">
 								<label class="grid gap-2">
-									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Visit date</span>
+									<span class="text-sm font-medium text-[var(--text-muted)]">Visit date</span>
 									<input bind:value={scheduleVisitDate} type="date" name="visitDate" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 								<label class="grid gap-2">
-									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Window start</span>
+									<span class="text-sm font-medium text-[var(--text-muted)]">Start</span>
 									<input bind:value={scheduleWindowStart} type="time" name="windowStart" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 								<label class="grid gap-2">
-									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Window end</span>
+									<span class="text-sm font-medium text-[var(--text-muted)]">End</span>
 									<input bind:value={scheduleWindowEnd} type="time" name="windowEnd" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 								<label class="grid gap-2">
-									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Assigned field resource</span>
+									<span class="text-sm font-medium text-[var(--text-muted)]">Field owner</span>
 									<input bind:value={scheduleAssignedFieldResource} list="field-resource-options" name="assignedFieldResource" placeholder="Estimator or crew" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 							</div>
 							<div class="grid gap-4 lg:grid-cols-2">
 								<label class="grid gap-2">
-									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site contact</span>
+									<span class="text-sm font-medium text-[var(--text-muted)]">Site contact</span>
 									<input bind:value={scheduleSiteContact} name="siteContact" required class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 								<label class="grid gap-2">
-									<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site contact phone</span>
+									<span class="text-sm font-medium text-[var(--text-muted)]">Phone</span>
 									<input bind:value={scheduleSiteContactPhone} name="siteContactPhone" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
 								</label>
 							</div>
 							<label class="grid gap-2">
-								<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Field notes</span>
-								<textarea bind:value={scheduleNotes} name="notes" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" placeholder="Access instructions, expected scope, ladder notes, parking details"></textarea>
+								<span class="text-sm font-medium text-[var(--text-muted)]">Notes</span>
+								<textarea bind:value={scheduleNotes} name="notes" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3 text-sm text-[var(--text-base)] outline-none" placeholder="Access, scope, parking"></textarea>
 							</label>
 							<datalist id="field-resource-options">
 								{#each fieldResourceSuggestions as resource}
@@ -747,372 +903,152 @@
 								{/each}
 							</datalist>
 							<div class="flex flex-wrap gap-3">
-								<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">
-									{selectedRequest.siteVisitSchedule ? 'Update site visit' : 'Schedule site visit'}
+								<button type="submit" class="rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">
+									{selectedRequest.siteVisitSchedule ? 'Update visit' : 'Schedule visit'}
 								</button>
-								<a href={selectedRequestScheduleHref} class="inline-flex items-center gap-2 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]">
+								<a href={selectedRequestScheduleHref} class="inline-flex items-center gap-2 rounded-md bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-white">
 									<ExternalLink size={14} />
-									Open calendar view
+									Calendar
 								</a>
 							</div>
 						</form>
 					{:else}
-						<div class="mt-4 rounded-md border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-800">
-							<span class="font-semibold">Scheduling is blocked:</span>
+						<div class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
 							{#if selectedQualification?.blockerLabels.length}
-								{selectedQualification.blockerLabels.join(' · ')}. Clear the blockers and move the request to Qualified before booking.
+								{selectedQualification.blockerLabels.join(' · ')}
 							{:else}
-								Move the request to Qualified before booking.
+								Move this quote to Qualified before booking.
 							{/if}
 						</div>
 					{/if}
-				</section>
 
-				<section id={`request-details-${selectedRequest.id}`} class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-					<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-						<div class="space-y-5">
-							<div class="flex items-start justify-between gap-3">
-								<div>
-									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Request details</p>
-								</div>
-								<button
-									type="button"
-									class={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em] transition ${detailInlineEditing ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-text)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel-strong)] text-[var(--text-strong)] hover:bg-[var(--shell-panel)]'}`}
-									onclick={() => {
-										if (detailInlineEditing) {
-											resetDetailDraft(selectedRequest);
-											return;
-										}
-										detailInlineEditing = true;
-									}}
-								>
-									<Pencil size={14} />
-									{detailInlineEditing ? 'Cancel edit' : 'Edit inline'}
-								</button>
-							</div>
-
-							<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-								{#each selectedOpsSnapshot as item}
-									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{item.label}</p>
-										<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{item.value}</p>
-										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
-									</div>
-								{/each}
-							</div>
-
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-								<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Scope summary</p>
-								<p class="mt-3 text-sm leading-7 text-[var(--text-base)]">{selectedRequest.need}</p>
-							</div>
-
-							{#if detailInlineEditing}
-								<form method="POST" action="?/updateRequest" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4">
-									<input type="hidden" name="id" value={selectedRequest.id} />
-									<input type="hidden" name="status" value={selectedRequest.status} />
-									<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
-									<input type="hidden" name="contactName" value={selectedRequest.contactName} />
-									<input type="hidden" name="email" value={selectedRequest.email} />
-									<input type="hidden" name="phone" value={selectedRequest.phone} />
-									<input type="hidden" name="siteName" value={selectedRequest.siteName} />
-									<input type="hidden" name="address1" value={selectedAddress.address1} />
-									<input type="hidden" name="address2" value={selectedAddress.address2} />
-									<input type="hidden" name="city" value={selectedAddress.city} />
-									<input type="hidden" name="state" value={selectedAddress.state} />
-									<input type="hidden" name="postalCode" value={selectedAddress.postalCode} />
-									{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
-										<input type="hidden" name="missingInfoReasonCodes" value={code} />
-									{/each}
-									<div class="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-										<label class="grid gap-2">
-											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Requested timeline</span>
-											<input bind:value={detailRequestedTimeline} name="requestedTimeline" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-										</label>
-										<label class="grid gap-2">
-											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Next action</span>
-											<textarea bind:value={detailNextAction} name="nextAction" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none"></textarea>
-										</label>
-									</div>
-									<div class="mt-4 flex flex-wrap gap-3">
-										<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save details</button>
-										<button type="button" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]" onclick={() => resetDetailDraft(selectedRequest)}>Cancel</button>
-									</div>
-								</form>
-							{:else}
-								<div class="grid gap-3 md:grid-cols-2">
-									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Timeline</p>
-										<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.requestedTimeline}</p>
-									</div>
-									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Next action</p>
-										<p class="mt-2 text-sm leading-6 text-[var(--text-base)]">{selectedRequest.nextAction}</p>
-									</div>
-								</div>
-							{/if}
-
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-								<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-									<div>
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Qualification checklist</p>
-									</div>
-									<span class={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${selectedQualification?.isQualified ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-700'}`}>
-										{#if selectedQualification?.isQualified}
-											<CheckCircle2 size={13} />
-											Qualified
-										{:else}
-											<AlertTriangle size={13} />
-											Blocked
-										{/if}
-									</span>
-								</div>
-								<div class="mt-3 space-y-2">
-									{#each selectedQualification?.checks ?? [] as check}
-										<div class="flex items-start justify-between gap-3 rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm">
-											<div class="min-w-0">
-												<p class="font-semibold text-[var(--text-base)]">{check.label}</p>
-												<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{check.detail}</p>
-											</div>
-											<span class={`shrink-0 rounded-md border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${check.complete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/40 bg-amber-400/10 text-amber-700'}`}>{check.complete ? 'Ready' : 'Needs info'}</span>
-										</div>
-									{/each}
-								</div>
-								{#if selectedQualification?.blockerLabels.length}
-									<div class="mt-3 rounded-md border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-800">
-										<span class="font-semibold">Blocking reasons:</span> {selectedQualification.blockerLabels.join(' · ')}
-									</div>
-								{/if}
-							</div>
-						</div>
-						<div id={`contact-site-${selectedRequest.id}`} class="space-y-4 border-t border-[var(--shell-border)] pt-5 text-sm xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
-							<div class="flex items-center justify-between gap-3">
-								<div>
-									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Contact and site</p>
-								</div>
-								<button
-									type="button"
-									class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] text-[var(--accent-text)] transition hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]"
-									onclick={() => {
-										if (contactInlineEditing) {
-											resetContactDraft(selectedRequest);
-											return;
-										}
-										contactInlineEditing = true;
-									}}
-									aria-label="Edit contact information"
-									title="Edit contact information"
-								>
-									<Pencil size={16} />
-								</button>
-							</div>
-							{#if contactInlineEditing}
-								<form method="POST" action="?/updateRequest" class="space-y-4 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4">
-									<input type="hidden" name="id" value={selectedRequest.id} />
-									<input type="hidden" name="status" value={selectedRequest.status} />
-									<input type="hidden" name="assignedTo" value={selectedRequest.assignedTo} />
-									<input type="hidden" name="nextAction" value={selectedRequest.nextAction} />
-									<input type="hidden" name="requestedTimeline" value={selectedRequest.requestedTimeline} />
-									{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
-										<input type="hidden" name="missingInfoReasonCodes" value={code} />
-									{/each}
-									<div class="grid gap-3">
-										<label class="grid gap-1">
-											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Contact name</span>
-											<input bind:value={contactNameDraft} name="contactName" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-										</label>
-										<label class="grid gap-1">
-											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Email</span>
-											<input bind:value={contactEmailDraft} type="email" name="email" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-										</label>
-										<label class="grid gap-1">
-											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Phone</span>
-											<input bind:value={contactPhoneDraft} name="phone" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-										</label>
-										<label class="grid gap-1">
-											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</span>
-											<input bind:value={contactSiteNameDraft} name="siteName" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-										</label>
-										<label class="grid gap-1">
-											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Address 1</span>
-											<input bind:value={contactAddress1Draft} name="address1" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-										</label>
-										<label class="grid gap-1">
-											<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Address 2</span>
-											<input bind:value={contactAddress2Draft} name="address2" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-										</label>
-										<div class="grid grid-cols-[minmax(0,1fr)_88px_112px] gap-2">
-											<label class="grid gap-1">
-												<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">City</span>
-												<input bind:value={contactCityDraft} name="city" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-											</label>
-											<label class="grid gap-1">
-												<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">State</span>
-												<input bind:value={contactStateDraft} name="state" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-											</label>
-											<label class="grid gap-1">
-												<span class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Zip</span>
-												<input bind:value={contactPostalCodeDraft} name="postalCode" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2.5 text-sm text-[var(--text-base)] outline-none" />
-											</label>
-										</div>
-									</div>
-									<div class="flex flex-wrap gap-3">
-										<button type="submit" class="rounded-md border border-[var(--accent-border)] bg-[var(--accent-solid)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-solid-text)] transition hover:opacity-90">Save contact</button>
-										<button type="button" class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]" onclick={() => resetContactDraft(selectedRequest)}>Cancel</button>
-									</div>
-								</form>
-							{:else}
-								<div class="space-y-4">
-									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-										<p class="text-base font-semibold text-[var(--text-strong)]">{selectedRequest.contactName}</p>
-										<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.email}</p>
-										<p class="text-sm text-[var(--text-muted)]">{selectedRequest.phone}</p>
-									</div>
-									<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-3">
-										<p class="text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Site</p>
-										<p class="mt-1 font-semibold text-[var(--text-strong)]">{selectedRequest.siteName}</p>
-										<div class="mt-2 space-y-0.5 text-sm leading-5 text-[var(--text-muted)]">
-											{#if selectedAddress.address1}
-												<p>{selectedAddress.address1}</p>
-											{/if}
-											{#if selectedAddress.address2}
-												<p>{selectedAddress.address2}</p>
-											{/if}
-											{#if selectedAddress.city}
-												<p>{selectedAddress.city}</p>
-											{/if}
-											{#if selectedAddress.state || selectedAddress.postalCode}
-												<p>{[selectedAddress.state, selectedAddress.postalCode].filter(Boolean).join(' ')}</p>
-											{/if}
-										</div>
-									</div>
-								</div>
-							{/if}
-						</div>
-					</div>
-				</section>
-
-				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Attachments</p>
-							<div class="mt-4">
-								{#if selectedRequest.attachments.length}
-									<div class="flex flex-wrap gap-3">
-										{#each selectedRequest.attachments as attachment}
-											<button
-												type="button"
-												class={`w-[88px] rounded-md border p-2 text-center transition ${selectedAttachment?.id === attachment.id ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]' : 'border-[var(--shell-border)] bg-[var(--shell-panel-strong)] hover:border-[var(--accent-border)] hover:bg-[var(--shell-panel)]'}`}
-												onclick={() => viewAttachment(attachment)}
-												title={attachment.fileName}
-											>
-												<span class="mx-auto flex h-[75px] w-[75px] items-center justify-center overflow-hidden rounded-md border border-[var(--shell-border)] bg-black/20 text-[var(--accent-text)]">
-													{#if isImageAttachment(attachment)}
-														<img
-															src={`/bdr/admin/requests/attachments/${encodeURIComponent(selectedRequest.id)}/${encodeURIComponent(attachment.id)}`}
-															alt={attachment.fileName}
-															class="h-full w-full object-cover"
-														/>
-													{:else}
-														<FileText size={24} />
-													{/if}
-												</span>
-												<span class="mt-2 block truncate text-[0.68rem] font-semibold leading-4 text-[var(--text-strong)]">{formatAttachmentName(attachment.fileName)}</span>
-											</button>
+					{#if selectedRequest.siteVisitSchedule}
+						<form method="POST" action="?/cancelSiteVisit" class="mt-4 rounded-lg bg-rose-50 p-4">
+							<input type="hidden" name="id" value={selectedRequest.id} />
+							<div class="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+								<label class="grid gap-2">
+									<span class="text-sm font-medium text-rose-900">Cancel reason</span>
+									<select bind:value={cancellationReasonCode} name="cancellationReasonCode" required class="rounded-md border border-rose-200 bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none">
+										<option value="">Select a reason</option>
+										{#each quoteRequestSiteVisitCancellationReasonOptions as reason}
+											<option value={reason.value}>{reason.label}</option>
 										{/each}
-									</div>
-
-									{#if selectedAttachment}
-										<div class="mt-5 border-t border-[var(--shell-border)] pt-5">
-											<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-												<div>
-													<h5 class="break-all text-lg font-semibold text-[var(--text-strong)]">{selectedAttachment.fileName}</h5>
-													<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedAttachment.contentType} · {formatAttachmentSize(selectedAttachment.sizeBytes)}</p>
-												</div>
-												<div class="flex flex-wrap gap-2">
-													<a
-														href={selectedAttachmentUrl}
-														target="_blank"
-														rel="noreferrer"
-														class="inline-flex items-center gap-2 rounded-md border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]"
-													>
-														<ExternalLink size={15} />
-														Enlarge
-													</a>
-													<button
-														type="button"
-														class="inline-flex items-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-strong)] transition hover:bg-[var(--shell-panel)]"
-														onclick={closeAttachmentPreview}
-													>
-														Close
-													</button>
-												</div>
-											</div>
-
-											<div class="mt-4 overflow-hidden rounded-md border border-[var(--shell-border)] bg-black/20">
-												{#if selectedAttachment.contentType.startsWith('image/')}
-													<img src={selectedAttachmentUrl} alt={selectedAttachment.fileName} class="max-h-[640px] w-full object-contain" />
-												{:else if selectedAttachmentCanPreview}
-													<iframe src={selectedAttachmentUrl} title={selectedAttachment.fileName} class="h-[640px] w-full bg-white"></iframe>
-												{:else}
-													<div class="p-5 text-sm leading-6 text-[var(--text-muted)]">
-														This file type cannot be previewed inline. Enlarge it in a new tab to review the document.
-													</div>
-												{/if}
-											</div>
-										</div>
-									{:else}
-										<p class="mt-4 rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 text-sm text-[var(--text-muted)]">Select a file to preview it here.</p>
-									{/if}
-								{:else}
-									<p class="rounded-md border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3 text-sm text-[var(--text-muted)]">No files attached.</p>
-								{/if}
+									</select>
+								</label>
+								<label class="grid gap-2">
+									<span class="text-sm font-medium text-rose-900">Notes</span>
+									<textarea bind:value={cancellationNotes} name="cancellationNotes" rows="3" class="rounded-md border border-rose-200 bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none"></textarea>
+								</label>
 							</div>
+							<button type="submit" class="mt-4 rounded-md bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700">
+								Cancel visit
+							</button>
+						</form>
+					{/if}
 				</section>
 
-				<section class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
-					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Activity history</p>
-					<div class="mt-4 space-y-3">
-						{#each selectedRequest.timeline as event}
-							<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-4">
-								<div class="flex items-start justify-between gap-3">
-									<div>
-										<p class="text-sm font-semibold text-[var(--text-strong)]">{event.label}</p>
-										<p class="mt-1 text-xs text-[var(--text-muted)]">{event.actor}</p>
-									</div>
-									<p class="shrink-0 text-xs text-[var(--muted)]">{formatSubmittedAt(event.occurredAtUtc)}</p>
+				<section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+					<article class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<h3 class="text-base font-semibold leading-6 text-[var(--text-strong)]">Files</h3>
+						<div class="mt-4">
+							{#if selectedRequest.attachments.length}
+								<div class="flex flex-wrap gap-3">
+									{#each selectedRequest.attachments as attachment}
+										<button
+											type="button"
+											class={`w-[88px] rounded-lg p-2 text-center shadow-sm transition ${selectedAttachment?.id === attachment.id ? 'bg-[var(--accent-soft)] ring-2 ring-[var(--accent-border)]' : 'bg-[var(--shell-panel-strong)] hover:bg-white'}`}
+											onclick={() => viewAttachment(attachment)}
+											title={attachment.fileName}
+										>
+											<span class="mx-auto flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-md bg-white text-[var(--accent-text)] shadow-sm">
+												{#if isImageAttachment(attachment)}
+													<img
+														src={`/bdr/admin/requests/attachments/${encodeURIComponent(selectedRequest.id)}/${encodeURIComponent(attachment.id)}`}
+														alt={attachment.fileName}
+														class="h-full w-full object-cover"
+													/>
+												{:else}
+													<FileText size={24} />
+												{/if}
+											</span>
+											<span class="mt-2 block truncate text-xs font-semibold leading-4 text-[var(--text-strong)]">{formatAttachmentName(attachment.fileName)}</span>
+										</button>
+									{/each}
 								</div>
-								{#if event.siteVisitSchedule}
-									<div class="mt-3 grid gap-3 lg:grid-cols-3">
-										<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3">
-											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Visit window</p>
-											<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatScheduleDate(event.siteVisitSchedule.visitDate)}</p>
-											<p class="mt-1 text-xs text-[var(--text-muted)]">{formatScheduleWindow(event.siteVisitSchedule.windowStart, event.siteVisitSchedule.windowEnd)}</p>
+
+								{#if selectedAttachment}
+									<div class="mt-5 border-t border-[var(--shell-border)] pt-5">
+										<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+											<div>
+												<h4 class="break-all text-base font-semibold text-[var(--text-strong)]">{selectedAttachment.fileName}</h4>
+												<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedAttachment.contentType} · {formatAttachmentSize(selectedAttachment.sizeBytes)}</p>
+											</div>
+											<div class="flex flex-wrap gap-2">
+												<a
+													href={selectedAttachmentUrl}
+													target="_blank"
+													rel="noreferrer"
+													class="inline-flex items-center gap-2 rounded-md bg-[var(--accent-soft)] px-3 py-2 text-sm font-semibold text-[var(--accent-text)]"
+												>
+													<ExternalLink size={15} />
+													Open
+												</a>
+												<button
+													type="button"
+													class="inline-flex items-center rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-white"
+													onclick={closeAttachmentPreview}
+												>
+													Close
+												</button>
+											</div>
 										</div>
-										<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3">
-											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Site contact</p>
-											<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{event.siteVisitSchedule.siteContact}</p>
-											<p class="mt-1 text-xs text-[var(--text-muted)]">{event.siteVisitSchedule.siteContactPhone || 'Phone not captured'}</p>
-										</div>
-										<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3">
-											<p class="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Field resource</p>
-											<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{event.siteVisitSchedule.assignedFieldResource}</p>
-											<p class="mt-1 text-xs text-[var(--text-muted)]">Scheduled by {event.siteVisitSchedule.scheduledBy}</p>
+
+										<div class="mt-4 overflow-hidden rounded-md bg-[var(--shell-panel-strong)]">
+											{#if selectedAttachment.contentType.startsWith('image/')}
+												<img src={selectedAttachmentUrl} alt={selectedAttachment.fileName} class="max-h-[560px] w-full object-contain" />
+											{:else if selectedAttachmentCanPreview}
+												<iframe src={selectedAttachmentUrl} title={selectedAttachment.fileName} class="h-[560px] w-full bg-white"></iframe>
+											{:else}
+												<div class="p-5 text-sm leading-6 text-[var(--text-muted)]">
+													Open this file in a new tab to review it.
+												</div>
+											{/if}
 										</div>
 									</div>
-								{:else if event.payload}
-									<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">{event.payload.companyName} submitted {event.payload.serviceType} for {event.payload.siteName} with timeline "{event.payload.requestedTimeline}".</p>
 								{/if}
-								{#if event.note}
-									<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">{event.note}</p>
-								{/if}
-							</div>
-						{/each}
-					</div>
+							{:else}
+								<p class="rounded-lg bg-[var(--shell-panel-strong)] px-4 py-3 text-sm text-[var(--text-muted)]">No files attached.</p>
+							{/if}
+						</div>
+					</article>
+
+					<article class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<h3 class="text-base font-semibold leading-6 text-[var(--text-strong)]">Activity</h3>
+						<div class="mt-4 space-y-3">
+							{#each selectedRequest.timeline as event}
+								<div class="rounded-lg bg-[var(--shell-panel-strong)] p-3">
+									<div class="flex items-start justify-between gap-3">
+										<div>
+											<p class="text-sm font-semibold text-[var(--text-strong)]">{event.label}</p>
+											<p class="mt-1 text-xs text-[var(--text-muted)]">{event.actor}</p>
+										</div>
+										<p class="shrink-0 text-xs text-[var(--text-muted)]">{formatSubmittedAt(event.occurredAtUtc)}</p>
+									</div>
+									{#if event.note}
+										<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{event.note}</p>
+									{:else if event.payload}
+										<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{event.payload.serviceType} · {event.payload.siteName}</p>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</article>
 				</section>
 			{:else}
-				<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-[var(--shell-panel)] p-8 text-center text-sm text-[var(--text-muted)]">
-					Select a request to work intake, schedule a visit, or prep estimate handoff.
+				<div class="rounded-lg bg-white/90 p-8 text-center text-sm text-[var(--text-muted)] shadow-[var(--shell-shadow)]">
+					Select a quote to work.
 				</div>
 			{/if}
 		</div>
-	{/snippet}
-
-</AdminWorkspace>
+	</section>
+</div>

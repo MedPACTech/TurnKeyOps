@@ -18,7 +18,7 @@ import {
 } from '$lib/server/quote-requests';
 
 const buildScheduleSiteVisitHref = (requestId: string) =>
-	`/bdr/admin/calendar?role=office-admin&scheduleRequest=${encodeURIComponent(requestId)}`;
+	`/bdr/admin/calendar?scheduleRequest=${encodeURIComponent(requestId)}`;
 
 const buildServiceAddress = (formData: FormData) => {
 	const address1 = String(formData.get('address1') ?? '').trim();
@@ -66,7 +66,7 @@ export const load = async ({ fetch }) => {
 		requests: inbox,
 		metrics: getQuoteRequestMetrics(inbox),
 		source,
-		scheduleSiteVisitBaseHref: '/bdr/admin/calendar?role=office-admin',
+		scheduleSiteVisitBaseHref: '/bdr/admin/calendar',
 		scheduleSiteVisitByRequestId: Object.fromEntries(
 			inbox.map((request) => [request.id, buildScheduleSiteVisitHref(request.id)])
 		)

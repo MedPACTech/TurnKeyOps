@@ -248,7 +248,7 @@ export const bdrSiteContent: BdrSiteContent = {
 			key: 'bdr-crest-logo',
 			name: 'Company crest logo',
 			type: 'logo',
-			file: '/clientFiles/BDRLogo.jpeg',
+			file: '/clientFiles/BDRLogo-transparent.png',
 			altText: 'BDR Construction crest logo',
 			contractorCategory: 'concrete',
 			tags: ['brand', 'logo', 'header', 'footer'],
@@ -298,7 +298,7 @@ export const bdrSiteContent: BdrSiteContent = {
 			key: 'hero-driveway-scene',
 			name: 'Modern home driveway hero',
 			type: 'hero-image',
-			file: '/clientFiles/image0.jpeg',
+			file: '/clientFiles/image17.jpeg',
 			altText: 'Modern home with a finished concrete driveway',
 			contractorCategory: 'concrete',
 			tags: ['hero', 'driveway', 'mockup'],
@@ -308,7 +308,7 @@ export const bdrSiteContent: BdrSiteContent = {
 			key: 'cta-finishing-scene',
 			name: 'Concrete finishing CTA banner',
 			type: 'background-image',
-			file: '/clientFiles/image1.jpeg',
+			file: '/clientFiles/image29.jpeg',
 			altText: 'Concrete finishing equipment at work on site',
 			contractorCategory: 'concrete',
 			tags: ['cta', 'banner', 'equipment', 'mockup'],
@@ -334,68 +334,128 @@ export const bdrSiteContent: BdrSiteContent = {
 			tags: ['texture', 'grain', 'overlay'],
 			sortOrder: 6
 		},
-		{
-			key: 'service-driveways-icon',
-			name: 'Driveways service icon',
-			type: 'icon',
-			file: '/clientFiles/assets/driveways-icon.svg',
-			altText: 'Line icon for driveway work',
-			contractorCategory: 'concrete',
-			tags: ['service', 'icon', 'driveways'],
+			{
+				key: 'service-driveways-icon',
+				name: 'Driveways service icon',
+				type: 'icon',
+				file: '/clientFiles/assets/driveways-icon.svg',
+				altText: 'Line icon for driveway work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'driveways'],
 			sortOrder: 7
 		},
 		{
-			key: 'service-patios-icon',
-			name: 'Patios service icon',
-			type: 'icon',
-			file: '/clientFiles/assets/patios-icon.svg',
-			altText: 'Line icon for patio work',
-			contractorCategory: 'concrete',
-			tags: ['service', 'icon', 'patios'],
+				key: 'service-patios-icon',
+				name: 'Patios service icon',
+				type: 'icon',
+				file: '/clientFiles/assets/patios-icon.svg',
+				altText: 'Line icon for patio work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'patios'],
 			sortOrder: 8
 		},
 		{
-			key: 'service-sidewalks-icon',
-			name: 'Sidewalks service icon',
-			type: 'icon',
-			file: '/clientFiles/assets/sidewalks-icon.svg',
-			altText: 'Line icon for sidewalk work',
-			contractorCategory: 'concrete',
-			tags: ['service', 'icon', 'sidewalks'],
+				key: 'service-sidewalks-icon',
+				name: 'Sidewalks service icon',
+				type: 'icon',
+				file: '/clientFiles/assets/sidewalks-icon.svg',
+				altText: 'Line icon for sidewalk work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'sidewalks'],
 			sortOrder: 9
 		},
 		{
-			key: 'service-steps-icon',
-			name: 'Steps and stoops service icon',
-			type: 'icon',
-			file: '/clientFiles/assets/steps-stoops-icon.svg',
-			altText: 'Line icon for steps and stoops work',
-			contractorCategory: 'concrete',
+				key: 'service-steps-icon',
+				name: 'Steps and stoops service icon',
+				type: 'icon',
+				file: '/clientFiles/assets/steps-stoops-icon.svg',
+				altText: 'Line icon for steps and stoops work',
+				contractorCategory: 'concrete',
 			tags: ['service', 'icon', 'steps', 'stoops'],
 			sortOrder: 10
 		},
 		{
-			key: 'service-slabs-icon',
-			name: 'Concrete slabs service icon',
-			type: 'icon',
-			file: '/clientFiles/assets/slabs-icon.svg',
-			altText: 'Line icon for slab work',
-			contractorCategory: 'concrete',
+				key: 'service-slabs-icon',
+				name: 'Concrete slabs service icon',
+				type: 'icon',
+				file: '/clientFiles/assets/slabs-icon.svg',
+				altText: 'Line icon for slab work',
+				contractorCategory: 'concrete',
 			tags: ['service', 'icon', 'slabs'],
 			sortOrder: 11
 		},
 		{
-			key: 'service-decorative-icon',
-			name: 'Decorative concrete service icon',
-			type: 'icon',
-			file: '/clientFiles/assets/decorative-concrete-icon.svg',
-			altText: 'Line icon for decorative concrete work',
-			contractorCategory: 'concrete',
-			tags: ['service', 'icon', 'decorative'],
-			sortOrder: 12
-		},
-		{
-			key: 'footer-facebook-icon',
+				key: 'service-decorative-icon',
+				name: 'Decorative concrete service icon',
+				type: 'icon',
+				file: '/clientFiles/assets/decorative-concrete-icon.svg',
+				altText: 'Line icon for decorative concrete work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'decorative'],
+				sortOrder: 12
+			},
+			{
+				key: 'service-driveways-icon-white',
+				name: 'Driveways service icon white',
+				type: 'icon',
+				file: '/clientFiles/assets/icon_driveways_white.png',
+				altText: 'White line icon for driveway work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'driveways', 'white'],
+				sortOrder: 101
+			},
+			{
+				key: 'service-patios-icon-white',
+				name: 'Patios service icon white',
+				type: 'icon',
+				file: '/clientFiles/assets/icon_patios_white.png',
+				altText: 'White line icon for patio work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'patios', 'white'],
+				sortOrder: 102
+			},
+			{
+				key: 'service-sidewalks-icon-white',
+				name: 'Sidewalks service icon white',
+				type: 'icon',
+				file: '/clientFiles/assets/icon_sidewalks_white.png',
+				altText: 'White line icon for sidewalk work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'sidewalks', 'white'],
+				sortOrder: 103
+			},
+			{
+				key: 'service-steps-icon-white',
+				name: 'Steps and stoops service icon white',
+				type: 'icon',
+				file: '/clientFiles/assets/icon_steps-stoops_white.png',
+				altText: 'White line icon for steps and stoops work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'steps', 'stoops', 'white'],
+				sortOrder: 104
+			},
+			{
+				key: 'service-slabs-icon-white',
+				name: 'Concrete slabs service icon white',
+				type: 'icon',
+				file: '/clientFiles/assets/icon_concrete-slabs_white.png',
+				altText: 'White line icon for slab work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'slabs', 'white'],
+				sortOrder: 105
+			},
+			{
+				key: 'service-decorative-icon-white',
+				name: 'Decorative concrete service icon white',
+				type: 'icon',
+				file: '/clientFiles/assets/icon_decorative-concrete_white.png',
+				altText: 'White line icon for decorative concrete work',
+				contractorCategory: 'concrete',
+				tags: ['service', 'icon', 'decorative', 'white'],
+				sortOrder: 106
+			},
+			{
+				key: 'footer-facebook-icon',
 			name: 'Facebook social icon',
 			type: 'icon',
 			file: '/clientFiles/assets/facebook-icon.svg',
@@ -476,59 +536,59 @@ export const bdrSiteContent: BdrSiteContent = {
 		}
 	],
 	serviceCategories: [
-		{
-			name: 'Driveways',
-			slug: 'driveways',
-			description: 'New pours, replacements, widening, and driveway apron tie-ins.',
-			iconAssetKey: 'service-driveways-icon',
-			imageAssetKey: 'hero-driveway-scene',
-			contractorType: 'concrete',
+			{
+				name: 'Driveways',
+				slug: 'driveways',
+				description: 'Strong, clean, and built to last.',
+				iconAssetKey: 'service-driveways-icon',
+				imageAssetKey: 'hero-driveway-scene',
+				contractorType: 'concrete',
 			featured: true,
 			sortOrder: 1
 		},
-		{
-			name: 'Patios',
-			slug: 'patios',
-			description: 'Backyard entertainment slabs, extensions, and clean broom-finish installs.',
-			iconAssetKey: 'service-patios-icon',
-			contractorType: 'concrete',
-			featured: true,
+			{
+				name: 'Patios',
+				slug: 'patios',
+				description: 'Beautiful outdoor spaces that stand up to every season.',
+				iconAssetKey: 'service-patios-icon',
+				contractorType: 'concrete',
+				featured: true,
 			sortOrder: 2
 		},
-		{
-			name: 'Sidewalks',
-			slug: 'sidewalks',
-			description: 'Walkways, repair sections, and city-style pedestrian flatwork.',
-			iconAssetKey: 'service-sidewalks-icon',
-			contractorType: 'concrete',
-			featured: true,
+			{
+				name: 'Sidewalks',
+				slug: 'sidewalks',
+				description: 'Safe, smooth, and built with precision.',
+				iconAssetKey: 'service-sidewalks-icon',
+				contractorType: 'concrete',
+				featured: true,
 			sortOrder: 3
 		},
-		{
-			name: 'Steps & Stoops',
-			slug: 'steps-stoops',
-			description: 'Safe access upgrades with formed steps, stoops, and landing work.',
-			iconAssetKey: 'service-steps-icon',
-			contractorType: 'concrete',
-			featured: true,
+			{
+				name: 'Steps & Stoops',
+				slug: 'steps-stoops',
+				description: 'Functional steps with a clean, solid finish.',
+				iconAssetKey: 'service-steps-icon',
+				contractorType: 'concrete',
+				featured: true,
 			sortOrder: 4
 		},
-		{
-			name: 'Concrete Slabs',
-			slug: 'concrete-slabs',
-			description: 'Pads, sheds, garages, and work areas that need solid flatwork.',
-			iconAssetKey: 'service-slabs-icon',
-			contractorType: 'concrete',
-			featured: true,
+			{
+				name: 'Concrete Slabs',
+				slug: 'concrete-slabs',
+				description: 'Foundations, pads, and more.',
+				iconAssetKey: 'service-slabs-icon',
+				contractorType: 'concrete',
+				featured: true,
 			sortOrder: 5
 		},
-		{
-			name: 'Decorative Concrete',
-			slug: 'decorative-concrete',
-			description: 'Stamped, colored, and upgraded finishes for higher-visual-impact surfaces.',
-			iconAssetKey: 'service-decorative-icon',
-			contractorType: 'concrete',
-			featured: true,
+			{
+				name: 'Decorative Concrete',
+				slug: 'decorative-concrete',
+				description: 'Stamped, stained, and custom finishes.',
+				iconAssetKey: 'service-decorative-icon',
+				contractorType: 'concrete',
+				featured: true,
 			sortOrder: 6
 		}
 	],
@@ -748,8 +808,8 @@ export const bdrSiteContent: BdrSiteContent = {
 			bodyFont: 'Inter'
 		},
 		sizing: {
-			buttonRadius: '999px',
-			cardRadius: '1.5rem',
+			buttonRadius: '0.18rem',
+			cardRadius: '0.18rem',
 			logoSize: 'Medium'
 		},
 		iconStyle: 'Line',
@@ -759,7 +819,7 @@ export const bdrSiteContent: BdrSiteContent = {
 		}
 	},
 	navigation: {
-		announcement: 'Navigation',
+		announcement: 'Concrete work done right',
 		brandName: 'BDR Construction',
 		logoAssetKey: 'bdr-crest-logo',
 		faviconAssetKey: 'bdr-favicon-mark',
@@ -773,116 +833,117 @@ export const bdrSiteContent: BdrSiteContent = {
 		],
 		primaryCtaLabel: 'Get a Free Quote',
 		primaryCtaHref: '#quote-request',
-		phoneNumber: '(220) 217-7026',
+		phoneNumber: '(704) 555-0100',
 		showPhoneButton: true,
-		showThemeControl: true,
+		showThemeControl: false,
 		stickyHeader: true,
 		layout: 'logo-left'
 	},
 	hero: {
-		eyebrow: 'Hero',
-		headline:
-			'Roofing and exterior work with a clear path from inspection to quote, schedule, and completion.',
+		eyebrow: 'Concrete work done right',
+		headline: 'Built strong. Built to last.',
 		subheadline:
-			'BDR Construction helps homeowners, property managers, and commercial clients move from first contact to scoped work with responsive communication and a dependable project process.',
-		primaryCtaLabel: 'Request a quote',
+			'From driveways to patios and everything in between, BDR Construction delivers high-quality concrete work with unmatched craftsmanship.',
+		primaryCtaLabel: 'Get a free quote',
 		primaryCtaHref: '#quote-request',
 		primaryCtaType: 'anchor',
-		secondaryCtaLabel: 'Explore services',
-		secondaryCtaHref: '#services',
-		secondaryCtaType: 'anchor',
+		secondaryCtaLabel: '(704) 555-0100',
+		secondaryCtaHref: '(704) 555-0100',
+		secondaryCtaType: 'phone',
 		heroImageAssetKey: 'hero-driveway-scene',
-		heroImageAltText: 'Modern home with a finished concrete driveway',
-		backgroundImageAssetKey: '',
-		backgroundTextureAssetKey: 'dark-grid-texture',
-		trustBadgeEyebrow: 'Why customers call BDR',
+		heroImageAltText: 'Fresh concrete driveway work in front of a residential garage',
+		backgroundImageAssetKey: 'hero-driveway-scene',
+		backgroundTextureAssetKey: 'grain-overlay-texture',
+		trustBadgeEyebrow: '',
 		trustBadges: [
 			{
-				iconAssetKey: 'service-driveways-icon',
-				title: 'Fast office follow-up',
-				description: 'Requests move from intake to estimate coordination without disappearing into a spreadsheet.'
+				iconAssetKey: 'service-driveways-icon-white',
+				title: 'Licensed & Insured',
+				description: 'Fully licensed in NC'
 			},
 			{
-				iconAssetKey: 'service-sidewalks-icon',
-				title: 'Residential and commercial scope',
-				description: 'BDR can handle homeowners, property managers, and commercial sites from the same workflow.'
+				iconAssetKey: 'service-sidewalks-icon-white',
+				title: '5-Star Rated',
+				description: '100+ happy customers'
 			},
 			{
-				iconAssetKey: 'service-slabs-icon',
-				title: 'Clear handoff to production',
-				description: 'Estimate, approval, schedule, and billing stay connected once the project moves forward.'
+				iconAssetKey: 'service-slabs-icon-white',
+				title: 'Quality Guaranteed',
+				description: 'Built to last. Every time.'
 			}
 		],
 		mediaByContractorType: []
 	},
 	services: {
-		eyebrow: 'Services',
-		title: 'What BDR handles',
+		eyebrow: 'Our concrete services',
+		title: 'Solid solutions for every project',
 		copy:
-			'BDR handles the exterior work customers need most, from urgent leak response to full replacements and restoration projects.',
+			'Durable. Reliable. Built to handle what life throws at it.',
 		items: [
-			'Residential roof replacement',
-			'Commercial roofing and repair',
-			'Siding, gutters, and exterior restoration',
-			'Insurance and storm-damage coordination'
+			'Driveways',
+			'Patios',
+			'Sidewalks',
+			'Steps and stoops',
+			'Concrete slabs',
+			'Decorative concrete'
 		],
-		ctaLabel: 'Request a quote',
+		ctaLabel: 'View all services ->',
 		ctaHref: '#quote-request'
 	},
 	trust: {
-		eyebrow: 'Trust signals',
-		title: 'Why customers trust the process',
+		eyebrow: 'Why BDR',
+		title: 'Why customers trust the work',
 		copy:
-			'Customers need a contractor they can trust with communication, timing, and follow-through from the first inspection through final billing.',
+			'Concrete projects need clear communication, dependable scheduling, and crews that leave the finish looking right.',
 		points: [
-			'Licensed and insured residential and commercial crews',
-			'Storm-damage and insurance coordination support',
-			'Simple estimate packet backed by a structured office workflow',
-			'Clear handoff from inspection to install to billing'
+			'Licensed and insured',
+			'Free, honest estimates',
+			'Clear schedule communication',
+			'Quality work built to last'
 		]
 	},
 	process: {
-		eyebrow: 'Process',
-		title: 'How the project moves',
+		eyebrow: 'Our process',
+		title: 'Straightforward from start to finish',
 		description:
-			'BDR keeps the handoff from intake to scope, approval, and production visible so customers know what happens next.',
+			'Simple steps, clear communication, and concrete work done right.',
 		steps: [
+				{
+					step: '1',
+					title: 'Request a quote',
+					copy: 'Tell us about your project. We will reach out within 24 hours.',
+					iconAssetKey: 'service-driveways-icon-white',
+					timeframe: 'Day 0'
+				},
 			{
-				step: '1',
-				title: 'Request an estimate',
-				copy: 'Tell BDR about the property, timing, and damage. Urgent storm and leak calls move to the front of the office queue.',
-				iconAssetKey: 'service-driveways-icon',
-				timeframe: 'Day 0'
-			},
+					step: '2',
+					title: 'Scope & estimate',
+					copy: 'We visit the site, discuss your needs, and provide a clear estimate.',
+					iconAssetKey: 'service-sidewalks-icon-white',
+					timeframe: '1 to 3 days'
+				},
 			{
-				step: '2',
-				title: 'Inspection and scope',
-				copy: 'An estimator confirms measurements, photographs conditions, and builds a customer-friendly scope backed by internal costing.',
-				iconAssetKey: 'service-sidewalks-icon',
-				timeframe: '1 to 3 days'
-			},
-			{
-				step: '3',
-				title: 'Approve and schedule',
-				copy: 'Customers approve the contract, sign electronically, handle the deposit if required, and lock the production window.',
-				iconAssetKey: 'service-slabs-icon',
-				timeframe: 'Next available slot'
-			}
+					step: '3',
+					title: 'Schedule & build',
+					copy: 'We schedule the work and build it right the first time.',
+					iconAssetKey: 'service-slabs-icon-white',
+					timeframe: 'Next available slot'
+				}
 		]
 	},
 	ctaBanner: {
-		eyebrow: 'CTA banner',
-		title: 'Need a clear next step before the quote form?',
+		eyebrow: 'Ready to get started?',
+		title: "Let's build something solid.",
 		description:
-			'Use the banner CTA to move urgent prospects straight into the estimate flow or pick up the phone when the job needs faster attention.',
+			'Get a free, no-obligation quote for your concrete project today.',
 		backgroundImageAssetKey: 'cta-finishing-scene',
 		backgroundImageAltText: 'Concrete finishing equipment active on a work site',
 		overlayOpacity: 0.74,
 		primaryCtaLabel: 'Request a quote',
 		primaryCtaHref: '#quote-request',
-		secondaryCtaLabel: 'Call BDR',
+		secondaryCtaLabel: '(704) 555-0100',
 		secondaryCtaType: 'phone',
-		secondaryCtaHref: '(220) 217-7026'
+		secondaryCtaHref: '(704) 555-0100'
 	},
 	quoteForm: {
 		eyebrow: 'Request a quote',
@@ -894,15 +955,15 @@ export const bdrSiteContent: BdrSiteContent = {
 		benefits: [
 			{
 				iconAssetKey: 'service-slabs-icon',
-				text: 'The intake lands in the External Admin queue with the core details needed for first follow-up.'
+				text: 'Takes less than 2 minutes.'
 			},
 			{
-				iconAssetKey: 'preset-exterior-icon',
-				text: 'Scope, inspection scheduling, and estimate drafting stay in one operating workflow instead of scattered notes.'
+				iconAssetKey: 'service-driveways-icon',
+				text: 'No obligation.'
 			},
 			{
-				iconAssetKey: 'preset-roofing-icon',
-				text: 'Photos and supporting files can travel with the request so field and estimate handoff starts with better context.'
+				iconAssetKey: 'service-sidewalks-icon',
+				text: 'Free, honest estimates.'
 			}
 		],
 		fields: [
@@ -932,7 +993,14 @@ export const bdrSiteContent: BdrSiteContent = {
 				label: 'Service Needed',
 				type: 'select',
 				required: true,
-				options: ['Roof replacement', 'Exterior repair', 'Storm restoration', 'Commercial work']
+				options: [
+					'Driveway',
+					'Patio',
+					'Sidewalk',
+					'Steps / stoops',
+					'Concrete slab',
+					'Decorative concrete'
+				]
 			},
 			{
 				key: 'propertyType',
@@ -964,21 +1032,21 @@ export const bdrSiteContent: BdrSiteContent = {
 	},
 	supportingSections: [
 		{
-			eyebrow: 'Project lanes',
-			title: 'Featured work types',
-			copy: 'BDR supports the job types that typically drive the highest urgency, coordination, and homeowner questions.',
+			eyebrow: 'Projects',
+			title: 'Concrete work BDR handles',
+			copy: 'The common residential and commercial flatwork customers need from first call to finished pour.',
 			items: [
 				{
-					title: 'Residential roof replacement',
-					copy: 'Architectural shingles, flashing, venting, cleanup, and homeowner communication in one packet.'
+					title: 'Driveways',
+					copy: 'New pours, replacements, widening, and apron tie-ins built for daily use.'
 				},
 				{
-					title: 'Commercial repair and overlay',
-					copy: 'Flat-roof scopes with staging, tenant-safety notes, and night-work coordination.'
+					title: 'Patios and sidewalks',
+					copy: 'Outdoor slabs, walkways, and repair sections with clean finish work.'
 				},
 				{
-					title: 'Storm restoration',
-					copy: 'Insurance photo sets, supplement support, and material coordination without spreadsheet drift.'
+					title: 'Slabs and decorative concrete',
+					copy: 'Pads, stoops, stamped finishes, and utility flatwork with a clear build plan.'
 				}
 			]
 		},
@@ -1006,18 +1074,18 @@ export const bdrSiteContent: BdrSiteContent = {
 		eyebrow: 'Contact',
 		title: 'Ready to talk about your project?',
 		body:
-			'If you need roofing, repairs, storm restoration, or exterior work, BDR Construction can help you move from estimate to signed agreement with a cleaner process.',
+			'If you need a driveway, patio, sidewalk, slab, or decorative concrete work, BDR Construction can help you move from estimate to finished pour with a cleaner process.',
 		primaryCtaLabel: 'Request a quote',
 		primaryCtaHref: '#quote-request',
 		secondaryCtaLabel: 'Call BDR',
-		secondaryCtaHref: 'tel:2202177026'
+		secondaryCtaHref: 'tel:7045550100'
 	},
 	footer: {
 		eyebrow: 'Footer',
 		logoAssetKey: 'bdr-crest-logo',
 		brandName: 'BDR Construction',
 		body:
-			'Residential and commercial roofing, exterior work, and storm restoration backed by a dependable process from intake to closeout.',
+			'Quality concrete work for homes and businesses across North Carolina.',
 		serviceAreaText: 'Serving Charlotte, Concord, Mooresville, and surrounding communities.',
 		navigationEyebrow: 'Quick links',
 		navigationLinks: [
@@ -1029,13 +1097,15 @@ export const bdrSiteContent: BdrSiteContent = {
 		],
 		servicesEyebrow: 'Services',
 		servicesLinks: [
-			{ href: '#services', label: 'Roof replacement' },
-			{ href: '#services', label: 'Exterior repair' },
-			{ href: '#services', label: 'Storm restoration' },
-			{ href: '#services', label: 'Commercial work' }
+			{ href: '#services', label: 'Driveways' },
+			{ href: '#services', label: 'Patios' },
+			{ href: '#services', label: 'Sidewalks' },
+			{ href: '#services', label: 'Steps & Stoops' },
+			{ href: '#services', label: 'Concrete Slabs' },
+			{ href: '#services', label: 'Decorative Concrete' }
 		],
 		contactEyebrow: 'Contact',
-		phone: '(220) 217-7026',
+		phone: '(704) 555-0100',
 		email: 'office@bdrconstruction.com',
 		address: 'Charlotte, NC',
 		socialLinks: [

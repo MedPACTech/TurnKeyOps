@@ -30,3 +30,5 @@ api/memory/work-status/SCRUM-15.json
 api/memory/work-status/SCRUM-16.json
 api/scripts/codex-card-preflight.sh
 api/scripts/codex-cli-preflight.sh
+/api/memory
+/api/scripts

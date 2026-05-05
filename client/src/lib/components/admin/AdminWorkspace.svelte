@@ -47,40 +47,34 @@
 </script>
 
 <section class="space-y-5">
-	<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-5 shadow-[var(--shell-shadow)]">
-		<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-			<div class="max-w-4xl">
-				{#if kicker}
-					<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">{kicker}</p>
-				{/if}
-				{#if title}
-					<h1 class="mt-2 text-2xl font-bold tracking-tight text-[var(--text-strong)]">{title}</h1>
-				{/if}
-				{#if description}
-					<p class="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{description}</p>
-				{/if}
-			</div>
+	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+		<div>
+			{#if title}
+				<h1 class="text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">{title}</h1>
+			{:else if kicker}
+				<h1 class="text-2xl font-semibold leading-8 tracking-normal text-[var(--text-strong)]">{kicker}</h1>
+			{/if}
+			{#if description}
+				<p class="sr-only">{description}</p>
+			{/if}
 		</div>
-
-		{#if metrics.length}
-			<div class="mt-5 grid gap-3 md:grid-cols-3">
-				{#each metrics as metric}
-					<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] px-4 py-3">
-						<p class="text-xs font-medium text-[var(--text-muted)]">{metric.label}</p>
-						<p class="mt-1 text-2xl font-bold text-[var(--text-strong)]">{metric.value}</p>
-						{#if metric.detail}
-							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{metric.detail}</p>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/if}
 	</div>
+
+	{#if metrics.length}
+		<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+			{#each metrics as metric}
+				<div class="flex h-32 flex-col justify-end rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<p class="text-3xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{metric.value}</p>
+					<p class="mt-2 text-sm font-medium leading-5 text-[var(--text-muted)]">{metric.label}</p>
+				</div>
+			{/each}
+		</div>
+	{/if}
 
 	<div class={`grid gap-4 ${workspaceColumnsClass}`}>
 		{#if context}
-			<aside class="rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
-				<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{contextLabel}</p>
+			<aside class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+				<p class="text-base font-semibold leading-6 text-[var(--text-strong)]">{contextLabel}</p>
 				<div class="mt-4">
 					{@render context()}
 				</div>
@@ -88,15 +82,15 @@
 		{/if}
 
 		{#if focus}
-			<aside class="rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
-				<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{focusLabel}</p>
+			<aside class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+				<p class="text-base font-semibold leading-6 text-[var(--text-strong)]">{focusLabel}</p>
 				<div class="mt-4">
 					{@render focus()}
 				</div>
 			</aside>
 		{/if}
 
-		<div class="min-w-0 rounded-lg border border-[var(--shell-border)] bg-[var(--module-bg)] p-4 shadow-[var(--shell-shadow)]">
+		<div class="min-w-0">
 			{@render work()}
 		</div>
 	</div>
