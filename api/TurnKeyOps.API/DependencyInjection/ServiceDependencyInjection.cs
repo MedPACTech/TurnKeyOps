@@ -3,8 +3,6 @@ using MedInsights.Repositories.Interfaces;
 using MedInsights.Lib;
 using MedInsights.Services.Interfaces;
 using MedInsights.Services.Events;
-using Xabe.FFmpeg;
-using MedInsights.Services.BackgroundServices.Interfaces;
 using MedInsights.Services.BackgroundServices;
 using MedInsights.AzureServices.Interfaces;
 using MedInsights.AzureServices;
@@ -88,15 +86,6 @@ namespace MedInsights.API.DependencyInjection
             // Prompt Templates
             services.AddScoped<IPromptTemplateService, PromptTemplateService>();
 
-            //Queue for transcription jobs
-            services.AddSingleton<IAudioCaptureTranscriptionQueue, AudioCaptureTranscriptionQueue>();
-            services.AddSingleton<IEncounterTranscriptionQueue, EncounterTranscriptionQueue>();
-            //services.AddHostedService<DictationTranscriptionWorker>();
-
-            //services.AddHostedService<EncounterTranscriptionWorker>();
-            //services.AddScoped<IDictationWorkerService, DictationWorkerService>();
-            //services.AddScoped<IEncounterWorkerService, EncounterWorkerService>();
-
             // Auth / Tokens
             //services.AddScoped<ITokenService, MedInisightsTokenService>();
             //services.AddScoped<ITokenRevocationStore, DistributedCacheTokenRevocationStore>();
@@ -153,17 +142,7 @@ namespace MedInsights.API.DependencyInjection
             services.AddHostedService<MonthlyCreditGrantWorker>();
             services.AddHostedService<StartupCacheLoader>();
 
-            // Email (temporary, TODO: move to IBeam scaffolding service)
-            //services.AddScoped<IEmailService, EmailService>();
-
-            var ffmpegPath = Path.Combine(AppContext.BaseDirectory, "Tools", "ffmpeg");
-            if (Directory.Exists(ffmpegPath))
-            {
-                FFmpeg.SetExecutablesPath(ffmpegPath);
-            }
-
             return services;
         }
     }
 }
-

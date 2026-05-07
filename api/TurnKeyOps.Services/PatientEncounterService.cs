@@ -1,10 +1,8 @@
 using OpenAIChatMessage = OpenAI.Chat.ChatMessage;
 using MedInsights.Lib.Dtos;
 using MedInsights.Lib.Entities;
-using MedInsights.Lib.Models;
 using MedInsights.Lib.Utils;
 using MedInsights.Repositories.Interfaces;
-using MedInsights.Services.BackgroundServices.Interfaces;
 using MedInsights.Services.Interfaces;
 using MedInsights.Services.Mappers;
 using MedInsights.AzureServices.Interfaces;
@@ -16,7 +14,6 @@ namespace MedInsights.Services
         private readonly IPatientEncounterRepository _encounterRepository;
         private readonly IUserContext _userContext;
         private readonly IAzureBlobStorageService _azureBlobStorageService;
-        private readonly IEncounterTranscriptionQueue _queue;
         private readonly IAIService<OpenAIChatMessage> _ai;
         private readonly IPatientService _patientService;
         private readonly INoteTypePromptBuilderService _noteTypePromptBuilderService;
@@ -26,7 +23,6 @@ namespace MedInsights.Services
             IPatientEncounterRepository patientEncounterRepository,
             IUserContext userContext,
             IAzureBlobStorageService azureBlobStorageService,
-            IEncounterTranscriptionQueue transcriptionQueue,
             IAIService<OpenAIChatMessage> ai,
             IPatientService patientService,
             INoteTypePromptBuilderService noteTypePromptBuilderService
@@ -34,7 +30,6 @@ namespace MedInsights.Services
         {
             _encounterRepository = patientEncounterRepository;
             _userContext = userContext;
-            _queue = transcriptionQueue;
             _azureBlobStorageService = azureBlobStorageService;
             _ai = ai;
             _patientService = patientService;
@@ -90,15 +85,12 @@ namespace MedInsights.Services
                 NoteType = "AudioCapture",
                 NoteTitle = "Audio Capture",
                 Data = $"{{\"audioFileUrl\":\"{fileName}\"}}",
-                Status = "Pending",
+                Status = "Uploaded",
                 EncounterBody = string.Empty,
                 IsDeleted = false
             };
 
             encounter = await _encounterRepository.SaveAsync(encounter, ct);
-
-            // Queue transcription by reference
-            await _queue.QueueJobAsync(new EncounterTranscriptionJob(partitionKey, encounter.RowKey));
 
             return PatientEncounterMapper.ToDto(encounter);
         }
@@ -321,7 +313,6 @@ namespace MedInsights.Services
     
     
 }
-
 
 
 

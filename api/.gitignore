@@ -89,9 +89,6 @@ MedInsights.API/.data/auth-dev.db
 MedInsights.API/.data/auth-dev.db
 /MedInsights.API/.data
 /__queuestorage__
-/AzureFunctions/TranscriptionFunctions/publish-test
-/AzureFunctions/TranscriptionFunctions/publish-test
-/AzureFunctions/TranscriptionFunctions/publish-test
 /MedInsights.API/.nuget
 /MedInsights.AzureServices/.nuget
 /MedInsights.Lib/.nuget

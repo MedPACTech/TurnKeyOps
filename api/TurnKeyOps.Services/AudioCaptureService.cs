@@ -1,13 +1,10 @@
 using MedInsights.Lib.Dtos;
 using MedInsights.Lib.Entities;
-using MedInsights.Lib.Models;
 using MedInsights.Lib.Utils;
 using MedInsights.Repositories.Interfaces;
-using MedInsights.Services.BackgroundServices.Interfaces;
 using MedInsights.Services.Interfaces;
 using MedInsights.Services.Mappers;
 using MedInsights.AzureServices.Interfaces;
-using Microsoft.Extensions.Options;
 
 namespace MedInsights.Services
 {
@@ -16,18 +13,15 @@ namespace MedInsights.Services
         private readonly IAudioCaptureRepository _audioCaptureRepository;
         private readonly IUserContext _userContext;
         private readonly IAzureBlobStorageService _azureBlobStorageService;
-        private readonly IAudioCaptureTranscriptionQueue _queue;
 
         public AudioCaptureService(
             IAudioCaptureRepository audioCaptureRepository,
             IUserContext userContext,
-            IAzureBlobStorageService azureBlobStorageService,
-            IAudioCaptureTranscriptionQueue transcriptionQueue
+            IAzureBlobStorageService azureBlobStorageService
            )
         {
             _audioCaptureRepository = audioCaptureRepository;
             _userContext = userContext;
-            _queue = transcriptionQueue;
             _azureBlobStorageService = azureBlobStorageService;
         }
 
@@ -152,47 +146,25 @@ namespace MedInsights.Services
 
                 await _azureBlobStorageService.Save("audio-captures", fileName, audioBytes);
 
-                // Reset pipeline fields for a fresh transcription
+                // Reset audio fields for the new upload.
                 audioCapture.AudioFileUrl     = fileName;
-                audioCapture.Status           = "Pending";
+                audioCapture.Status           = "Uploaded";
                 audioCapture.ProcessingStage  = "Uploaded";
                 audioCapture.RetryCount       = 0;
                 audioCapture.SpeechTokenCount = null;
                 audioCapture.EstimatedCostUsd = null;
                 audioCapture.TranscribedText  = string.Empty;
+                audioCapture.JobToken         = null;
                 audioCapture.DateUpdated      = DateTimeOffset.UtcNow;
             }
 
-            // Generate a JobToken for this transcription run
-            var jobToken = Guid.NewGuid().ToString("N");
-
-            // Move to "Transcribing" state before saving
-            audioCapture.Status          = "Transcribing";
-            audioCapture.ProcessingStage = "Transcribing";
-            audioCapture.JobToken        = jobToken;
+            audioCapture.Status          = "Uploaded";
+            audioCapture.ProcessingStage = "Uploaded";
+            audioCapture.JobToken        = null;
             audioCapture.DateUpdated     = DateTimeOffset.UtcNow;
 
             // Persist once (no Add+Update ping-pong, so no empty ETag on Update)
             audioCapture = await _audioCaptureRepository.SaveAsync(audioCapture, ct);
-
-            // Build the queue job for the worker
-            var job = new AudioCaptureTranscriptionJob
-            {
-                PartitionKey       = partitionKey,
-                RowKey             = audioCapture.RowKey,
-
-                AudioBlobContainer = "audio-captures",
-                AudioBlobName      = fileName,
-
-                // TODO: this is an absolute URL right now – fine for local testing,
-                // but later consider making this a relative path and using HttpClient.BaseAddress.
-                CallbackPath       = $"http://localhost:5178/api/audiocaptures/transcription/{Uri.EscapeDataString(audioCapture.RowKey)}",
-
-                JobToken           = jobToken,
-                Scenario           = "audio-capture"
-            };
-
-            await _queue.QueueJobAsync(job);
 
             return AudioCaptureMapper.ToDto(audioCapture);
         }
@@ -337,4 +309,3 @@ namespace MedInsights.Services
         }
     }
 }
-
