@@ -21,6 +21,7 @@ export type StartOtpResponse = {
 	availableChannels?: string[];
 	devCode?: string | null;
 	challengeId?: string | null;
+	expiresAt?: string | null;
 };
 
 export type AuthResult = {
@@ -69,6 +70,15 @@ const roleClaimKeys = [
 
 export const getAuthApiBaseUrl = () =>
 	(env.PUBLIC_TKO_API_BASE_URL || env.TKO_API_BASE_URL || env.VITE_API_URL || defaultApiBaseUrl).replace(/\/$/, '');
+
+const isLocalAuthApi = (baseUrl: string) => {
+	try {
+		const { hostname } = new URL(baseUrl);
+		return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+	} catch {
+		return false;
+	}
+};
 
 export const isExternalAdminPath = (pathname: string) => pathname === '/bdr/admin' || pathname.startsWith('/bdr/admin/');
 export const isInternalAdminPath = (pathname: string) =>
@@ -136,11 +146,19 @@ export const postAuthApi = async <T>(
 	return unwrapApiPayload<T>(payload);
 };
 
-export const startOtp = (fetch: typeof globalThis.fetch, identifier: string, preferredChannel: OtpChannel) =>
-	postAuthApi<StartOtpResponse>(fetch, '/auth/startotp', {
+export const startOtp = async (fetch: typeof globalThis.fetch, identifier: string, preferredChannel: OtpChannel) => {
+	const apiBaseUrl = getAuthApiBaseUrl();
+	const result = await postAuthApi<StartOtpResponse>(fetch, '/auth/startotp', {
 		destination: identifier.trim(),
 		preferredChannel
 	});
+
+	return {
+		...result,
+		channel: result.channel ?? preferredChannel,
+		devCode: result.devCode ?? (isLocalAuthApi(apiBaseUrl) ? '123456' : null)
+	};
+};
 
 export const completeOtp = (
 	fetch: typeof globalThis.fetch,

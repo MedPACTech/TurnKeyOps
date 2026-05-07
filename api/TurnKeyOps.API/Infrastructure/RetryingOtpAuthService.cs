@@ -125,7 +125,7 @@ public sealed class RetryingOtpAuthService : IIdentityOtpAuthService
     private static string NormalizeDestination(string destination)
     {
         if (destination.Contains('@', StringComparison.Ordinal))
-            return destination.Trim().ToLowerInvariant();
+            return destination.Trim().ToUpperInvariant();
 
         var digits = new string(destination.Where(char.IsDigit).ToArray());
         if (digits.Length == 10)
