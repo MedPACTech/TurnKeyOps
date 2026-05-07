@@ -1,53 +1,51 @@
 import { error, redirect, type Handle } from '@sveltejs/kit';
-import { isBdrAdminViewRole } from '$lib/config/platform';
+import {
+	authTokenCookie,
+	bdrAdminContactCookie,
+	bdrAdminSessionCookie,
+	buildLoginRedirect,
+	getAdminSessionFromToken,
+	isAdminPath,
+	isExternalAdminPath
+} from '$lib/server/auth-session';
 import { getPersistedBdrAdminRole } from '$lib/server/bdr-contact-access';
 
-const isBdrAdminPath = (pathname: string) => pathname === '/bdr/admin' || pathname.startsWith('/bdr/admin/');
-const bdrAdminSessionCookie = 'tko_bdr_admin_role';
-const bdrAdminContactCookie = 'tko_bdr_admin_contact_id';
-
-const buildLoginRedirect = (url: URL) => {
-	const returnTo = `${url.pathname}${url.search}`;
-	return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
-};
-
 export const handle: Handle = async ({ event, resolve }) => {
-	if (!isBdrAdminPath(event.url.pathname)) {
+	if (!isAdminPath(event.url.pathname)) {
 		return resolve(event);
 	}
 
-	const devBootstrapRole = event.url.searchParams.get('role');
-	const sessionRole = event.cookies.get(bdrAdminSessionCookie);
-	const persistedRole = await getPersistedBdrAdminRole(event.cookies.get(bdrAdminContactCookie));
+	const authSession = getAdminSessionFromToken(
+		event.cookies.get(authTokenCookie),
+		event.url.pathname,
+		event.cookies.get(bdrAdminSessionCookie)
+	);
+	if (authSession) {
+		event.locals.adminSession = authSession;
+		if (authSession.surface === 'external-admin' && authSession.role) {
+			event.locals.bdrAdminSession = {
+				role: authSession.role,
+				source: 'auth-token'
+			};
+		}
 
+		return resolve(event);
+	}
+
+	const persistedRole = isExternalAdminPath(event.url.pathname)
+		? await getPersistedBdrAdminRole(event.cookies.get(bdrAdminContactCookie))
+		: null;
 	if (persistedRole) {
+		event.locals.adminSession = {
+			surface: 'external-admin',
+			role: persistedRole,
+			email: '',
+			tenantId: '',
+			source: 'contact-access'
+		};
 		event.locals.bdrAdminSession = {
 			role: persistedRole,
-			source: 'session'
-		};
-		return resolve(event);
-	}
-
-	if (isBdrAdminViewRole(sessionRole)) {
-		event.locals.bdrAdminSession = {
-			role: sessionRole,
-			source: 'session'
-		};
-		return resolve(event);
-	}
-
-	if (isBdrAdminViewRole(devBootstrapRole)) {
-		event.cookies.set(bdrAdminSessionCookie, devBootstrapRole, {
-			path: '/bdr/admin',
-			httpOnly: true,
-			sameSite: 'lax',
-			secure: event.url.protocol === 'https:',
-			maxAge: 60 * 60 * 8
-		});
-
-		event.locals.bdrAdminSession = {
-			role: devBootstrapRole,
-			source: 'dev-bootstrap'
+			source: 'contact-access'
 		};
 		return resolve(event);
 	}
