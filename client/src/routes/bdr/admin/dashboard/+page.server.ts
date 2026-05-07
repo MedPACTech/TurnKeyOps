@@ -2,10 +2,20 @@ import { resolveMvpScaffold } from '$lib/server/mvp';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
 import { buildQuoteRequestInbox, getQuoteRequestMetrics } from '$lib/quote-requests';
 import { formatCurrency } from '$lib/utils/format';
+import { loadBdrBillingSettings } from '$lib/server/bdr-billing-settings';
+import { loadBdrInvoices } from '$lib/server/bdr-invoices';
+import {
+	buildBdrScheduleReadyJobs,
+	loadBdrScheduledJobs
+} from '$lib/server/bdr-job-scheduling';
 
 export const load = async ({ fetch }) => {
 	const { snapshot, source } = await resolveMvpScaffold(fetch);
 	const { requests, source: requestSource } = await loadQuoteRequests(fetch);
+	const billingSettings = await loadBdrBillingSettings();
+	const lifecycleInvoices = await loadBdrInvoices();
+	const scheduledJobs = await loadBdrScheduledJobs();
+	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, scheduledJobs);
 	const requestInbox = buildQuoteRequestInbox(requests);
 
 	return {
@@ -13,6 +23,9 @@ export const load = async ({ fetch }) => {
 		requestSource,
 		snapshot,
 		requestInbox,
+		billingSettings,
+		scheduledJobs,
+		scheduleReadyJobs,
 		requestMetrics: getQuoteRequestMetrics(requestInbox),
 		metrics: [
 			{

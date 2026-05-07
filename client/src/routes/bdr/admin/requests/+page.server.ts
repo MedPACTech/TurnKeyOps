@@ -1,14 +1,22 @@
 import { fail } from '@sveltejs/kit';
 import {
+	bdrEmployeeContacts,
+	getRecommendedBdrEmployeeForTask
+} from '$lib/bdr-team';
+import {
+	buildQuoteRequestWorkflowGuidance,
 	buildQuoteRequestQualification,
 	buildQuoteRequestInbox,
 	getQuoteRequestMetrics,
+	isQuoteRequestWorkflowActionKey,
 	isQuoteRequestSiteVisitCancellationReasonCode,
 	isQuoteRequestClosedStatus,
 	isQuoteRequestMissingInfoReasonCode,
 	quoteRequestStatuses,
+	type QuoteRequest,
 	type QuoteRequestMissingInfoReasonCode,
-	type QuoteRequestStatus
+	type QuoteRequestStatus,
+	type QuoteRequestWorkflowActionKey
 } from '$lib/quote-requests';
 import {
 	cancelQuoteRequestSiteVisit,
@@ -58,6 +66,73 @@ const formatDateLabel = (value: string) =>
 
 const rangesOverlap = (startA: number, endA: number, startB: number, endB: number) => startA < endB && startB < endA;
 
+const buildWorkflowActionUpdate = (
+	selectedRequest: QuoteRequest,
+	workflowAction: QuoteRequestWorkflowActionKey
+): {
+	status: QuoteRequestStatus;
+	nextAction: string;
+	missingInfoReasonCodes: QuoteRequestMissingInfoReasonCode[];
+} => {
+	const qualification = buildQuoteRequestQualification(selectedRequest);
+	const blockers = qualification.missingInfoReasonCodes;
+
+	switch (workflowAction) {
+		case 'start-review':
+			return {
+				status: qualification.isQualified ? 'qualified' : 'in-review',
+				nextAction: qualification.isQualified
+					? 'Book the site visit or prepare direct estimate follow-up.'
+					: 'Review scope, contact details, and detected qualification blockers.',
+				missingInfoReasonCodes: []
+			};
+		case 'request-missing-info':
+			if (!blockers.length) {
+				throw new Error('No missing-information blockers were detected for this quote.');
+			}
+			return {
+				status: 'needs-info',
+				nextAction: `Ask the customer for: ${qualification.blockerLabels.join(' · ')}.`,
+				missingInfoReasonCodes: blockers
+			};
+		case 'mark-visit-complete':
+			if (!selectedRequest.siteVisitSchedule && selectedRequest.status !== 'inspection-scheduled') {
+				throw new Error('A scheduled site visit is required before moving into estimate prep.');
+			}
+			return {
+				status: 'estimate-drafted',
+				nextAction: 'Draft the estimate from site visit findings and scope notes.',
+				missingInfoReasonCodes: []
+			};
+		case 'send-estimate':
+			return {
+				status: 'estimate-sent',
+				nextAction: 'Follow up with the customer on the sent estimate.',
+				missingInfoReasonCodes: []
+			};
+		case 'mark-won':
+			return {
+				status: 'won',
+				nextAction: 'Hand off won work to scheduling and production.',
+				missingInfoReasonCodes: []
+			};
+		case 'close-quote':
+			return {
+				status: 'closed',
+				nextAction: 'Quote closed; no active follow-up is needed.',
+				missingInfoReasonCodes: []
+			};
+	}
+};
+
+const getWorkflowAssignee = (request: QuoteRequest, override: string) => {
+	const trimmedOverride = override.trim();
+	if (trimmedOverride) return trimmedOverride;
+
+	const guidance = buildQuoteRequestWorkflowGuidance(request);
+	return getRecommendedBdrEmployeeForTask(guidance.taskKey, request)?.displayName || request.assignedTo;
+};
+
 export const load = async ({ fetch }) => {
 	const { requests, source } = await loadQuoteRequests(fetch);
 	const inbox = buildQuoteRequestInbox(requests);
@@ -66,6 +141,7 @@ export const load = async ({ fetch }) => {
 		requests: inbox,
 		metrics: getQuoteRequestMetrics(inbox),
 		source,
+		employeeContacts: bdrEmployeeContacts,
 		scheduleSiteVisitBaseHref: '/bdr/admin/calendar',
 		scheduleSiteVisitByRequestId: Object.fromEntries(
 			inbox.map((request) => [request.id, buildScheduleSiteVisitHref(request.id)])
@@ -119,6 +195,63 @@ export const actions = {
 		}
 
 		return { success: true, updatedRequestId: id };
+	},
+	applyWorkflowAction: async ({ fetch, request }) => {
+		const formData = await request.formData();
+		const id = String(formData.get('id') ?? '').trim();
+		const workflowAction = String(formData.get('workflowAction') ?? '').trim();
+		const assigneeOverride = String(formData.get('assignedTo') ?? '').trim();
+
+		if (!id || !isQuoteRequestWorkflowActionKey(workflowAction)) {
+			return fail(400, {
+				workflowMessage: 'Choose a valid quote workflow action.',
+				workflowRequestId: id
+			});
+		}
+
+		const { requests } = await loadQuoteRequests(fetch);
+		const selectedRequest = requests.find((entry) => entry.id === id);
+
+		if (!selectedRequest) {
+			return fail(404, {
+				workflowMessage: 'Quote request record was not found.',
+				workflowRequestId: id
+			});
+		}
+
+		try {
+			const workflowUpdate = buildWorkflowActionUpdate(selectedRequest, workflowAction);
+			const draftRequest = {
+				...selectedRequest,
+				status: workflowUpdate.status,
+				nextAction: workflowUpdate.nextAction,
+				qualification: {
+					...selectedRequest.qualification,
+					missingInfoReasonCodes: workflowUpdate.missingInfoReasonCodes
+				}
+			};
+			await updateQuoteRequest(fetch, {
+				id,
+				status: workflowUpdate.status,
+				assignedTo: getWorkflowAssignee(draftRequest, assigneeOverride),
+				nextAction: workflowUpdate.nextAction,
+				missingInfoReasonCodes: workflowUpdate.missingInfoReasonCodes,
+				contactName: selectedRequest.contactName,
+				email: selectedRequest.email,
+				phone: selectedRequest.phone,
+				siteName: selectedRequest.siteName,
+				serviceAddress: selectedRequest.serviceAddress,
+				requestedTimeline: selectedRequest.requestedTimeline
+			});
+		} catch (cause) {
+			console.error('Failed to apply quote request workflow action.', cause);
+			return fail(400, {
+				workflowMessage: cause instanceof Error ? cause.message : 'Could not apply the workflow action.',
+				workflowRequestId: id
+			});
+		}
+
+		return { workflowSuccess: true, workflowRequestId: id };
 	},
 	scheduleSiteVisit: async ({ fetch, request }) => {
 		const formData = await request.formData();

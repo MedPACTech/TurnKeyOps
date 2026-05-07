@@ -1,9 +1,19 @@
 import { buildQuoteRequestQualification } from '$lib/quote-requests';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
+import { loadBdrBillingSettings } from '$lib/server/bdr-billing-settings';
+import { loadBdrInvoices } from '$lib/server/bdr-invoices';
+import {
+	buildBdrScheduleReadyJobs,
+	loadBdrScheduledJobs
+} from '$lib/server/bdr-job-scheduling';
 
 export const load = async ({ fetch, url }) => {
 	const scheduleRequestId = url.searchParams.get('scheduleRequest')?.trim() ?? '';
 	const { requests } = await loadQuoteRequests(fetch);
+	const billingSettings = await loadBdrBillingSettings();
+	const lifecycleInvoices = await loadBdrInvoices();
+	const scheduledJobs = await loadBdrScheduledJobs();
+	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, scheduledJobs);
 	const scheduledVisitRequests = requests.filter((request) => request.siteVisitSchedule);
 	const scheduledRequest = scheduleRequestId
 		? requests.find((request) => request.id === scheduleRequestId) ?? null
@@ -14,6 +24,9 @@ export const load = async ({ fetch, url }) => {
 		scheduleRequestId,
 		scheduledVisitRequests,
 		scheduledRequest,
-		scheduledRequestQualification
+		scheduledRequestQualification,
+		billingSettings,
+		scheduledJobs,
+		scheduleReadyJobs
 	};
 };

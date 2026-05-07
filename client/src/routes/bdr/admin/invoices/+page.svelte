@@ -7,6 +7,34 @@
 	type InvoiceView = ReturnType<typeof buildInvoiceViews>[number];
 	type BillingDeskState = 'Overdue' | 'Follow-up' | 'Open' | 'Paid';
 	type InvoiceMode = 'ready' | 'active' | 'paid';
+	type LifecyclePayment = {
+		id: string;
+		amount: number;
+		method: 'ACH' | 'Card' | 'Check' | 'Cash' | 'Other';
+		note?: string;
+		receivedAtUtc: string;
+		receivedBy: string;
+	};
+	type ScheduledJob = {
+		id: string;
+		invoiceId: string;
+		scheduledDate: string;
+		windowStart: string;
+		windowEnd: string;
+		crew: string;
+		notes?: string;
+		scheduledBy: string;
+	};
+	type ScheduleReadyJob = {
+		invoiceId: string;
+		amountPaid: number;
+		balanceDue: number;
+		requiredDepositAmount: number;
+		depositPercentRequired: number;
+		paidPercent: number;
+		isScheduled: boolean;
+		scheduledJob?: ScheduledJob;
+	};
 	type BobSuggestion = {
 		label: string;
 		detail: string;
@@ -46,17 +74,25 @@
 			siteName: string;
 			serviceSummary: string;
 			amount: number;
+			payments: LifecyclePayment[];
 			customerEmail: string;
 			customerPhone: string;
 			reviewUrl: string;
 			approvedBy: string;
 			approvalMethod: 'customer review link';
+			createdAtUtc: string;
+			updatedAtUtc: string;
 			approvedAtUtc?: string;
 			sentAtUtc?: string;
 			paidAtUtc?: string;
 			reminderSentAtUtc?: string;
 			lineItems: string[];
 		}>;
+		billingSettings?: {
+			depositPercentRequired: number;
+		};
+		scheduledJobs?: ScheduledJob[];
+		scheduleReadyJobs?: ScheduleReadyJob[];
 	};
 
 	let { data, form }: PageProps = $props();
@@ -64,6 +100,9 @@
 
 	const allInvoices = $derived(buildInvoiceViews(pageData.invoices, pageData.customers));
 	const lifecycleInvoices = $derived(pageData.lifecycleInvoices ?? []);
+	const billingSettings = $derived(pageData.billingSettings ?? { depositPercentRequired: 50 });
+	const scheduledJobs = $derived(pageData.scheduledJobs ?? []);
+	const scheduleReadyJobs = $derived(pageData.scheduleReadyJobs ?? []);
 	const approvedEstimateDrafts = $derived(
 		lifecycleInvoices
 			.filter((invoice) => invoice.state === 'draft')
@@ -99,8 +138,21 @@
 		allInvoices.reduce((sum, invoice) => sum + invoice.balanceDue, 0) +
 			lifecycleInvoices
 				.filter((invoice) => invoice.state === 'sent')
-				.reduce((sum, invoice) => sum + invoice.amount, 0)
+				.reduce((sum, invoice) => sum + getLifecycleBalanceDue(invoice), 0)
 	);
+	const collectedValue = $derived(
+		allInvoices.filter((invoice) => isPaid(invoice)).reduce((sum, invoice) => sum + invoice.balanceDue, 0) +
+			lifecycleInvoices.reduce((sum, invoice) => sum + getLifecycleAmountPaid(invoice), 0)
+	);
+	const activeInvoiceCount = $derived(
+		allInvoices.filter((invoice) => !isPaid(invoice)).length +
+			lifecycleInvoices.filter((invoice) => invoice.state === 'sent' && !isLifecycleInvoicePaid(invoice)).length
+	);
+	const paidInvoiceCount = $derived(
+		allInvoices.filter((invoice) => isPaid(invoice)).length +
+			lifecycleInvoices.filter((invoice) => isLifecycleInvoicePaid(invoice)).length
+	);
+	const totalInvoiceCount = $derived(allInvoices.length + lifecycleInvoices.length);
 
 	let invoiceMode = $state<InvoiceMode>('ready');
 	let selectedInvoiceId = $state('');
@@ -110,11 +162,23 @@
 	let sendingReadyInvoiceId = $state('');
 	let queuedReadyInvoiceId = $state('');
 	let copiedCustomerLink = $state('');
+	let paymentDraftInvoiceId = $state('');
+	let paymentAmount = $state('');
+	let paymentMethod = $state<'ACH' | 'Card' | 'Check' | 'Cash' | 'Other'>('ACH');
+	let paymentNote = $state('');
+	let scheduleDraftInvoiceId = $state('');
+	let scheduleDate = $state('');
+	let scheduleWindowStart = $state('08:00');
+	let scheduleWindowEnd = $state('12:00');
+	let scheduleCrew = $state('Production crew');
+	let scheduleNotes = $state('');
 	const activeInvoiceMode = $derived(
 		invoiceMode === 'ready' && !approvedEstimateDrafts.length ? 'active' : invoiceMode
 	);
 
-	const isPaid = (invoice: InvoiceView) => invoice.status.toLowerCase().includes('paid');
+	function isPaid(invoice: InvoiceView) {
+		return invoice.status.toLowerCase().includes('paid');
+	}
 	const invoiceDueTime = (invoice: InvoiceView) => new Date(invoice.dueDateUtc ?? '').getTime();
 	const isOverdue = (invoice: InvoiceView) => !isPaid(invoice) && Number.isFinite(invoiceDueTime(invoice)) && invoiceDueTime(invoice) < Date.now();
 	const needsFollowUp = (invoice: InvoiceView) =>
@@ -128,6 +192,63 @@
 		if (needsFollowUp(invoice)) return 'Follow-up';
 		return 'Open';
 	};
+	function getLifecycleAmountPaid(invoice: { amount: number; payments?: LifecyclePayment[]; state: string; paidAtUtc?: string }) {
+		const paymentTotal = (invoice.payments ?? []).reduce((sum, payment) => sum + payment.amount, 0);
+		if (paymentTotal > 0) return Math.min(paymentTotal, invoice.amount);
+		if (invoice.state === 'paid' || invoice.paidAtUtc) return invoice.amount;
+		return 0;
+	}
+	function getLifecycleBalanceDue(invoice: { amount: number; payments?: LifecyclePayment[]; state: string; paidAtUtc?: string }) {
+		return Math.max(invoice.amount - getLifecycleAmountPaid(invoice), 0);
+	}
+	function isLifecycleInvoicePaid(invoice: { amount: number; payments?: LifecyclePayment[]; state: string; paidAtUtc?: string }) {
+		return getLifecycleBalanceDue(invoice) <= 0.01 || invoice.state === 'paid';
+	}
+	function getLifecycleStateLabel(invoice: { amount: number; payments?: LifecyclePayment[]; state: string; paidAtUtc?: string }) {
+		if (isLifecycleInvoicePaid(invoice)) return 'Paid';
+		if (getLifecycleAmountPaid(invoice) > 0) return 'Partial';
+		return invoice.state === 'draft' ? 'Draft' : 'Open';
+	}
+	function getLifecycleRequiredDepositAmount(invoice: { amount: number }) {
+		return Math.min(invoice.amount, invoice.amount * (billingSettings.depositPercentRequired / 100));
+	}
+	function getLifecycleRemainingDepositAmount(invoice: { amount: number; payments?: LifecyclePayment[]; state: string; paidAtUtc?: string }) {
+		return Math.max(getLifecycleRequiredDepositAmount(invoice) - getLifecycleAmountPaid(invoice), 0);
+	}
+	function canScheduleLifecycleInvoice(invoice: { amount: number; payments?: LifecyclePayment[]; state: string; paidAtUtc?: string }) {
+		return getLifecycleRemainingDepositAmount(invoice) <= 0.01;
+	}
+	function getDefaultScheduleDate() {
+		const date = new Date();
+		date.setDate(date.getDate() + 1);
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+	function formatTimeLabel(value: string) {
+		const [hoursText = '', minutesText = ''] = value.split(':');
+		const hours = Number(hoursText);
+		const minutes = Number(minutesText);
+		if (Number.isNaN(hours) || Number.isNaN(minutes)) return value;
+		return new Date(2026, 0, 1, hours, minutes).toLocaleTimeString('en-US', {
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+	}
+	const getInvoiceCardStatusBorder = (status: string) => {
+		const normalized = status.toLowerCase();
+		if (normalized.includes('overdue')) return 'border-t-red-500';
+		if (normalized.includes('partial')) return 'border-t-yellow-400';
+		if (normalized.includes('paid')) return 'border-t-emerald-500';
+		return 'border-t-transparent';
+	};
+	const setPaymentPreset = (amount: number) => {
+		paymentAmount = Math.max(0, amount).toFixed(2);
+	};
+	const setDepositPaymentPreset = (invoice: { amount: number; payments?: LifecyclePayment[]; state: string; paidAtUtc?: string }) => {
+		paymentAmount = Math.max(0, getLifecycleRequiredDepositAmount(invoice) - getLifecycleAmountPaid(invoice)).toFixed(2);
+	};
 
 	const visibleInvoices = $derived.by(() =>
 		activeInvoiceMode === 'ready'
@@ -138,7 +259,9 @@
 		activeInvoiceMode === 'ready'
 			? []
 			: lifecycleInvoices.filter((invoice) =>
-					activeInvoiceMode === 'active' ? invoice.state === 'sent' : invoice.state === 'paid'
+					activeInvoiceMode === 'active'
+						? invoice.state === 'sent' && !isLifecycleInvoicePaid(invoice)
+						: isLifecycleInvoicePaid(invoice)
 				)
 	);
 
@@ -147,6 +270,12 @@
 		const current = visibleLifecycleInvoices.find((invoice) => invoice.id === selectedLifecycleInvoiceId);
 		return current ?? visibleLifecycleInvoices[0] ?? null;
 	});
+	const selectedScheduleReadyJob = $derived(
+		selectedLifecycleInvoice ? scheduleReadyJobs.find((job) => job.invoiceId === selectedLifecycleInvoice.id) ?? null : null
+	);
+	const selectedScheduledJob = $derived(
+		selectedLifecycleInvoice ? scheduledJobs.find((job) => job.invoiceId === selectedLifecycleInvoice.id) ?? selectedScheduleReadyJob?.scheduledJob ?? null : null
+	);
 	const selectedInvoice = $derived.by(() => {
 		if (activeInvoiceMode === 'ready') return null;
 		if (selectedLifecycleInvoice) return null;
@@ -222,13 +351,16 @@
 		}
 
 		if (selectedLifecycleInvoice) {
+			const remainingDeposit = getLifecycleRemainingDepositAmount(selectedLifecycleInvoice);
 			return [
 				{
-					label: selectedLifecycleInvoice.state === 'paid' ? 'Close the loop' : 'Work billing follow-up',
+					label: selectedScheduledJob ? 'Job scheduled' : canScheduleLifecycleInvoice(selectedLifecycleInvoice) ? 'Schedule the job' : 'Collect deposit',
 					detail:
-						selectedLifecycleInvoice.state === 'paid'
-							? `${selectedLifecycleInvoice.invoiceNumber} is paid and ready for closeout.`
-							: `${selectedLifecycleInvoice.invoiceNumber} was sent; keep payment and reminder timing visible.`
+						selectedScheduledJob
+							? `${selectedLifecycleInvoice.invoiceNumber} is on the calendar for ${selectedScheduledJob.scheduledDate}.`
+							: canScheduleLifecycleInvoice(selectedLifecycleInvoice)
+								? `${billingSettings.depositPercentRequired}% deposit is met; production scheduling can start.`
+								: `${formatCurrency(remainingDeposit)} more deposit is needed before scheduling.`
 				},
 				{
 					label: 'Customer context',
@@ -270,12 +402,29 @@
 	});
 
 	const metrics = $derived([
-		{ label: 'Draft invoices', value: String(approvedEstimateDrafts.length), detail: 'Customer-approved estimate invoices waiting on billing review' },
-		{ label: 'Receivables', value: formatCurrency(receivablesValue), detail: 'Outstanding balance visible from the billing desk' },
+		{
+			label: 'Draft invoices',
+			value: String(approvedEstimateDrafts.length),
+			detail: 'Customer-approved estimate invoices waiting on billing review',
+			icon: '🧾'
+		},
+		{
+			label: 'Receivables',
+			value: formatCurrency(receivablesValue),
+			detail: 'Outstanding balance visible from the billing desk',
+			icon: '💰'
+		},
+		{
+			label: 'Collected',
+			value: formatCurrency(collectedValue),
+			detail: 'Payments recorded against invoice balances',
+			icon: '💵'
+		},
 		{
 			label: 'Invoices',
-			value: String(allInvoices.length + lifecycleInvoices.length),
-			detail: getScaffoldBanner(pageData.source)
+			value: String(totalInvoiceCount),
+			detail: getScaffoldBanner(pageData.source),
+			icon: '💸'
 		}
 	]);
 
@@ -308,6 +457,26 @@
 			sendingReadyInvoiceId = '';
 		}
 	});
+
+	$effect(() => {
+		if (selectedLifecycleInvoice && paymentDraftInvoiceId !== selectedLifecycleInvoice.id) {
+			paymentDraftInvoiceId = selectedLifecycleInvoice.id;
+			paymentAmount = getLifecycleBalanceDue(selectedLifecycleInvoice).toFixed(2);
+			paymentMethod = 'ACH';
+			paymentNote = '';
+		}
+	});
+
+	$effect(() => {
+		if (selectedLifecycleInvoice && scheduleDraftInvoiceId !== selectedLifecycleInvoice.id) {
+			scheduleDraftInvoiceId = selectedLifecycleInvoice.id;
+			scheduleDate = selectedScheduledJob?.scheduledDate ?? getDefaultScheduleDate();
+			scheduleWindowStart = selectedScheduledJob?.windowStart ?? '08:00';
+			scheduleWindowEnd = selectedScheduledJob?.windowEnd ?? '12:00';
+			scheduleCrew = selectedScheduledJob?.crew ?? 'Production crew';
+			scheduleNotes = selectedScheduledJob?.notes ?? '';
+		}
+	});
 </script>
 
 <AdminWorkspace
@@ -322,29 +491,29 @@
 		<div class="space-y-3">
 			<button
 				type="button"
-				class={`w-full rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'ready' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'ready' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
 				onclick={() => (invoiceMode = 'ready')}
 			>
-				<p class="text-sm font-semibold text-[var(--text-strong)]">Draft invoices</p>
-				<p class="mt-1 text-xs text-[var(--text-muted)]">{approvedEstimateDrafts.length} customer-approved invoice draft{approvedEstimateDrafts.length === 1 ? '' : 's'} waiting for review</p>
+				<span class="text-sm font-semibold text-[var(--text-strong)]">Draft invoices</span>
+				<span class="min-w-8 text-right text-sm font-semibold text-[var(--text-muted)]">{approvedEstimateDrafts.length}</span>
 			</button>
 
 			<button
 				type="button"
-				class={`w-full rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'active' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'active' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
 				onclick={() => (invoiceMode = 'active')}
 			>
-				<p class="text-sm font-semibold text-[var(--text-strong)]">Active invoices</p>
-				<p class="mt-1 text-xs text-[var(--text-muted)]">{allInvoices.filter((invoice) => !isPaid(invoice)).length} visible for collection or release decisions</p>
+				<span class="text-sm font-semibold text-[var(--text-strong)]">Active invoices</span>
+				<span class="min-w-8 text-right text-sm font-semibold text-[var(--text-muted)]">{activeInvoiceCount}</span>
 			</button>
 
 			<button
 				type="button"
-				class={`w-full rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'paid' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'paid' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
 				onclick={() => (invoiceMode = 'paid')}
 			>
-				<p class="text-sm font-semibold text-[var(--text-strong)]">Paid invoices</p>
-				<p class="mt-1 text-xs text-[var(--text-muted)]">{allInvoices.filter((invoice) => isPaid(invoice)).length} cleared and closed records</p>
+				<span class="text-sm font-semibold text-[var(--text-strong)]">Paid invoices</span>
+				<span class="min-w-8 text-right text-sm font-semibold text-[var(--text-muted)]">{paidInvoiceCount}</span>
 			</button>
 		</div>
 	{/snippet}
@@ -362,15 +531,9 @@
 						onclick={() => (selectedReadyEstimateId = estimate.requestId)}
 					>
 						<p class="text-sm font-semibold text-[var(--text-strong)]">{getDraftInvoiceNumber(estimate)}</p>
-						<p class="mt-1 text-xs text-[var(--text-muted)]">{estimate.customerName} · {estimate.siteName}</p>
-						<div class="mt-3 flex items-start justify-between gap-3">
-							<p class="text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(parseApprovedEstimateTotal(estimate))}</p>
-							<p class="text-right text-[0.7rem] uppercase tracking-[0.14em] text-[var(--muted)]">{getApprovalDateLabel(estimate)}</p>
-						</div>
-						<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{estimate.serviceSummary}</p>
-						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-							Approved by {getApprovalPersonLabel(estimate)} via {getApprovalMethodLabel(estimate)}
-						</p>
+						<p class="mt-1 text-xs text-[var(--text-muted)]">{estimate.siteName} / {estimate.customerName}</p>
+						<p class="mt-3 text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(parseApprovedEstimateTotal(estimate))}</p>
+						<p class="mt-1 text-xs font-semibold text-emerald-700">$0 collected</p>
 					</button>
 				{/each}
 				{#if !approvedEstimateDrafts.length}
@@ -383,44 +546,37 @@
 					{visibleInvoices.length + visibleLifecycleInvoices.length} invoices
 				</p>
 				{#each visibleLifecycleInvoices as invoice}
+					{@const status = getLifecycleStateLabel(invoice)}
 					<button
 						type="button"
-						class={`w-full rounded-lg border px-3 py-3 text-left transition ${selectedLifecycleInvoice?.id === invoice.id ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+						class={`w-full rounded-lg border border-t-4 border-x-transparent border-b-transparent px-3 py-3 text-left transition ${getInvoiceCardStatusBorder(status)} ${selectedLifecycleInvoice?.id === invoice.id ? 'bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-white/80 shadow-sm hover:bg-white'}`}
 						onclick={() => {
 							selectedLifecycleInvoiceId = invoice.id;
 							selectedInvoiceId = '';
 						}}
 					>
 						<p class="text-sm font-semibold text-[var(--text-strong)]">{invoice.invoiceNumber}</p>
-						<p class="mt-1 text-xs text-[var(--text-muted)]">{invoice.customerName} · {invoice.siteName}</p>
-						<div class="mt-3 flex items-start justify-between gap-3">
-							<p class="text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(invoice.amount)}</p>
-							<p class="text-right text-[0.7rem] uppercase tracking-[0.14em] text-[var(--muted)]">{invoice.state}</p>
-						</div>
-						<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{invoice.serviceSummary}</p>
-						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-							Approved by {invoice.approvedBy} via {invoice.approvalMethod}
-						</p>
+						<p class="mt-1 text-xs text-[var(--text-muted)]">{invoice.siteName} / {invoice.customerName}</p>
+						<p class="mt-3 text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(invoice.amount)}</p>
+						<p class="mt-1 text-xs font-semibold text-emerald-700">{formatCurrency(getLifecycleAmountPaid(invoice))} collected</p>
 					</button>
 				{/each}
 				{#each visibleInvoices as invoice}
 					{@const state = getBillingDeskState(invoice)}
 					<button
 						type="button"
-						class={`w-full rounded-lg border px-3 py-3 text-left transition ${selectedInvoice?.id === invoice.id ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+						class={`w-full rounded-lg border border-t-4 border-x-transparent border-b-transparent px-3 py-3 text-left transition ${getInvoiceCardStatusBorder(state)} ${selectedInvoice?.id === invoice.id ? 'bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-white/80 shadow-sm hover:bg-white'}`}
 						onclick={() => {
 							selectedInvoiceId = invoice.id;
 							selectedLifecycleInvoiceId = '';
 						}}
 					>
 						<p class="text-sm font-semibold text-[var(--text-strong)]">{invoice.invoiceNumber}</p>
-						<p class="mt-1 text-xs text-[var(--text-muted)]">{invoice.customer?.displayName ?? 'Unknown customer'}</p>
-						<div class="mt-3 flex items-start justify-between gap-3">
-							<p class="text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(invoice.balanceDue)}</p>
-							<p class="text-right text-[0.7rem] uppercase tracking-[0.14em] text-[var(--muted)]">{state}</p>
-						</div>
-						<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{invoice.nextStep}</p>
-						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{invoice.billingPhase} · Due {formatDate(invoice.dueDateUtc)}</p>
+						<p class="mt-1 text-xs text-[var(--text-muted)]">
+							{invoice.customer?.displayName ?? 'Unknown project'} / {invoice.customer?.primaryContactName ?? invoice.customer?.displayName ?? 'Unknown owner'}
+						</p>
+						<p class="mt-3 text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(invoice.balanceDue)}</p>
+						<p class="mt-1 text-xs font-semibold text-emerald-700">{formatCurrency(isPaid(invoice) ? invoice.balanceDue : 0)} collected</p>
 					</button>
 				{/each}
 			{/if}
@@ -656,8 +812,11 @@
 							<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedLifecycleInvoice.customerName} · {selectedLifecycleInvoice.serviceSummary} · {selectedLifecycleInvoice.siteName}</p>
 						</div>
 						<div class="text-right">
-							<p class="text-xl font-semibold text-[var(--text-strong)]">{formatCurrency(selectedLifecycleInvoice.amount)}</p>
-							<p class="mt-1 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">{selectedLifecycleInvoice.state}</p>
+							<p class="text-xl font-semibold text-[var(--text-strong)]">{formatCurrency(getLifecycleBalanceDue(selectedLifecycleInvoice))}</p>
+							<p class="mt-1 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Balance due</p>
+							{#if getLifecycleAmountPaid(selectedLifecycleInvoice) > 0}
+								<p class="mt-2 text-xs font-semibold text-emerald-700">{formatCurrency(getLifecycleAmountPaid(selectedLifecycleInvoice))} collected</p>
+							{/if}
 						</div>
 					</div>
 
@@ -686,11 +845,16 @@
 					</p>
 				{/if}
 
-				<div class="grid gap-3 md:grid-cols-3">
+				<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
 					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Approved by</p>
 						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedLifecycleInvoice.approvedBy}</p>
 						<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedLifecycleInvoice.approvedAtUtc ? formatDate(selectedLifecycleInvoice.approvedAtUtc) : 'Date not captured'}</p>
+					</div>
+					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Project description</p>
+						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedLifecycleInvoice.serviceSummary}</p>
+						<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedLifecycleInvoice.approvalMethod}</p>
 					</div>
 					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Delivery</p>
@@ -699,9 +863,143 @@
 					</div>
 					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Payment</p>
-						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedLifecycleInvoice.paidAtUtc ? `Paid ${formatDate(selectedLifecycleInvoice.paidAtUtc)}` : 'Payment open'}</p>
-						<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedLifecycleInvoice.reminderSentAtUtc ? `Reminder ${formatDate(selectedLifecycleInvoice.reminderSentAtUtc)}` : 'No reminder recorded'}</p>
+						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+							{isLifecycleInvoicePaid(selectedLifecycleInvoice)
+								? selectedLifecycleInvoice.paidAtUtc
+									? `Paid ${formatDate(selectedLifecycleInvoice.paidAtUtc)}`
+									: 'Paid'
+								: getLifecycleAmountPaid(selectedLifecycleInvoice) > 0
+									? 'Partial payment received'
+									: 'Payment open'}
+						</p>
+						<p class="mt-1 text-xs text-[var(--text-muted)]">
+							Collected {formatCurrency(getLifecycleAmountPaid(selectedLifecycleInvoice))} · Balance {formatCurrency(getLifecycleBalanceDue(selectedLifecycleInvoice))}
+						</p>
+						{#if selectedLifecycleInvoice.reminderSentAtUtc}
+							<p class="mt-1 text-xs text-[var(--text-muted)]">Reminder {formatDate(selectedLifecycleInvoice.reminderSentAtUtc)}</p>
+						{/if}
 					</div>
+				</div>
+
+				{#if selectedLifecycleInvoice.payments.length}
+					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+						<div class="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Payment history</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatCurrency(getLifecycleAmountPaid(selectedLifecycleInvoice))} collected</p>
+							</div>
+							<p class="text-sm font-semibold text-[var(--text-muted)]">{formatCurrency(getLifecycleBalanceDue(selectedLifecycleInvoice))} balance</p>
+						</div>
+						<div class="mt-3 grid gap-2">
+							{#each selectedLifecycleInvoice.payments as payment}
+								<div class="grid gap-2 rounded-lg bg-[var(--shell-panel-strong)] px-3 py-2 text-sm shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+									<div>
+										<p class="font-semibold text-[var(--text-strong)]">{formatCurrency(payment.amount)} · {payment.method}</p>
+										<p class="mt-1 text-xs text-[var(--text-muted)]">{payment.note || 'Payment recorded'} · {formatDate(payment.receivedAtUtc)}</p>
+									</div>
+									<p class="text-xs font-semibold text-[var(--text-muted)]">{payment.receivedBy}</p>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<div class={`rounded-lg p-4 shadow-[var(--shell-shadow)] ${selectedScheduledJob ? 'bg-emerald-50' : canScheduleLifecycleInvoice(selectedLifecycleInvoice) ? 'bg-white/90 ring-1 ring-emerald-200' : 'bg-amber-50'}`}>
+					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+						<div>
+							<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Schedule readiness</p>
+							<h5 class="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+								{selectedScheduledJob
+									? 'Job scheduled'
+									: canScheduleLifecycleInvoice(selectedLifecycleInvoice)
+										? 'Ready to schedule'
+										: 'Deposit needed'}
+							</h5>
+							<p class="mt-2 text-sm leading-6 text-[var(--text-base)]">
+								{formatCurrency(getLifecycleAmountPaid(selectedLifecycleInvoice))} collected toward a {billingSettings.depositPercentRequired}% deposit gate.
+							</p>
+							{#if !canScheduleLifecycleInvoice(selectedLifecycleInvoice)}
+								<p class="mt-1 text-sm font-semibold text-amber-700">
+									Collect {formatCurrency(getLifecycleRemainingDepositAmount(selectedLifecycleInvoice))} more to unlock scheduling.
+								</p>
+							{/if}
+						</div>
+						<div class="rounded-lg bg-white/80 px-3 py-2 text-sm shadow-sm">
+							<p class="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Required deposit</p>
+							<p class="mt-1 font-semibold text-[var(--text-strong)]">{formatCurrency(getLifecycleRequiredDepositAmount(selectedLifecycleInvoice))}</p>
+						</div>
+					</div>
+
+					{#if selectedScheduledJob}
+						<div class="mt-4 grid gap-3 md:grid-cols-3">
+							<div class="rounded-lg bg-white/90 p-3 shadow-sm">
+								<p class="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Production date</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatDate(selectedScheduledJob.scheduledDate)}</p>
+							</div>
+							<div class="rounded-lg bg-white/90 p-3 shadow-sm">
+								<p class="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Window</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatTimeLabel(selectedScheduledJob.windowStart)} - {formatTimeLabel(selectedScheduledJob.windowEnd)}</p>
+							</div>
+							<div class="rounded-lg bg-white/90 p-3 shadow-sm">
+								<p class="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Crew</p>
+								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedScheduledJob.crew}</p>
+							</div>
+						</div>
+						<a href="/bdr/admin/calendar" class="mt-4 inline-flex rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+							Open calendar
+						</a>
+					{:else if canScheduleLifecycleInvoice(selectedLifecycleInvoice)}
+						<form method="POST" action="?/scheduleJob" class="mt-4 grid gap-3 rounded-lg bg-[var(--shell-panel-strong)] p-3 shadow-sm lg:grid-cols-2">
+							<input type="hidden" name="invoiceId" value={selectedLifecycleInvoice.id} />
+							<label class="grid gap-1">
+								<span class="text-xs font-semibold text-[var(--text-muted)]">Production date</span>
+								<input
+									type="date"
+									name="scheduledDate"
+									bind:value={scheduleDate}
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+								/>
+							</label>
+							<label class="grid gap-1">
+								<span class="text-xs font-semibold text-[var(--text-muted)]">Crew</span>
+								<input
+									name="crew"
+									bind:value={scheduleCrew}
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+								/>
+							</label>
+							<label class="grid gap-1">
+								<span class="text-xs font-semibold text-[var(--text-muted)]">Start</span>
+								<input
+									type="time"
+									name="windowStart"
+									bind:value={scheduleWindowStart}
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+								/>
+							</label>
+							<label class="grid gap-1">
+								<span class="text-xs font-semibold text-[var(--text-muted)]">End</span>
+								<input
+									type="time"
+									name="windowEnd"
+									bind:value={scheduleWindowEnd}
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+								/>
+							</label>
+							<label class="grid gap-1 lg:col-span-2">
+								<span class="text-xs font-semibold text-[var(--text-muted)]">Schedule notes</span>
+								<input
+									name="scheduleNotes"
+									bind:value={scheduleNotes}
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+									placeholder="Access notes, prep constraints, production handoff..."
+								/>
+							</label>
+							<button type="submit" class="inline-flex justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)] lg:col-span-2">
+								Schedule job
+							</button>
+						</form>
+					{/if}
 				</div>
 
 				<div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
@@ -718,10 +1016,70 @@
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Invoice actions</p>
 						<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">Complete the billing step from this selected invoice.</p>
 						<div class="mt-4 grid gap-2">
-							{#if selectedLifecycleInvoice.state !== 'paid'}
-								<form method="POST" action="?/recordPayment">
+							{#if !isLifecycleInvoicePaid(selectedLifecycleInvoice)}
+								<form method="POST" action="?/recordPayment" class="rounded-lg bg-[var(--shell-panel-strong)] p-3 shadow-sm">
 									<input type="hidden" name="invoiceId" value={selectedLifecycleInvoice.id} />
-									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">
+									<div class="flex items-start justify-between gap-3">
+										<div>
+											<p class="text-sm font-semibold text-[var(--text-strong)]">Record payment</p>
+											<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Use partial amounts for deposits, draws, or retainers.</p>
+										</div>
+										<span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--accent-text)]">
+											{formatCurrency(getLifecycleBalanceDue(selectedLifecycleInvoice))} due
+										</span>
+									</div>
+									<div class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
+										<label class="grid gap-1">
+											<span class="text-xs font-semibold text-[var(--text-muted)]">Amount</span>
+											<input
+												name="paymentAmount"
+												bind:value={paymentAmount}
+												inputmode="decimal"
+												class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+												placeholder="0.00"
+											/>
+										</label>
+										<label class="grid gap-1">
+											<span class="text-xs font-semibold text-[var(--text-muted)]">Method</span>
+											<select
+												name="paymentMethod"
+												bind:value={paymentMethod}
+												class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+											>
+												<option>ACH</option>
+												<option>Card</option>
+												<option>Check</option>
+												<option>Cash</option>
+												<option>Other</option>
+											</select>
+										</label>
+									</div>
+									<div class="mt-2 flex flex-wrap gap-2">
+										<button
+											type="button"
+											class="rounded-md bg-white px-3 py-2 text-xs font-semibold text-[var(--accent-text)] shadow-sm transition hover:bg-[var(--accent-soft)]"
+											onclick={() => setDepositPaymentPreset(selectedLifecycleInvoice)}
+										>
+											{billingSettings.depositPercentRequired}% deposit
+										</button>
+										<button
+											type="button"
+											class="rounded-md bg-white px-3 py-2 text-xs font-semibold text-[var(--accent-text)] shadow-sm transition hover:bg-[var(--accent-soft)]"
+											onclick={() => setPaymentPreset(getLifecycleBalanceDue(selectedLifecycleInvoice))}
+										>
+											Remaining balance
+										</button>
+									</div>
+									<label class="mt-3 grid gap-1">
+										<span class="text-xs font-semibold text-[var(--text-muted)]">Note</span>
+										<input
+											name="paymentNote"
+											bind:value={paymentNote}
+											class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+											placeholder="Deposit before production, progress draw, final payment..."
+										/>
+									</label>
+									<button type="submit" class="mt-3 inline-flex w-full justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">
 										Record payment
 									</button>
 								</form>

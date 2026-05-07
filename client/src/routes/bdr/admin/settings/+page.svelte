@@ -5,6 +5,7 @@
 	import type { PageProps } from './$types';
 
 	type EstimateDefaults = PageProps['data']['estimateDefaults'];
+	type BillingSettings = PageProps['data']['billingSettings'];
 	type DefaultsField = {
 		key: keyof EstimateDefaults;
 		label: string;
@@ -145,12 +146,16 @@
 
 	let savedDefaults = $state<EstimateDefaults>(untrack(() => structuredClone(data.estimateDefaults)));
 	let defaultsForm = $state<EstimateDefaults>(untrack(() => structuredClone(data.estimateDefaults)));
+	let savedBillingSettings = $state<BillingSettings>(untrack(() => structuredClone(data.billingSettings)));
+	let billingSettingsForm = $state<BillingSettings>(untrack(() => structuredClone(data.billingSettings)));
 
 	const hasChanges = $derived(JSON.stringify(savedDefaults) !== JSON.stringify(defaultsForm));
+	const billingHasChanges = $derived(JSON.stringify(savedBillingSettings) !== JSON.stringify(billingSettingsForm));
 	const metrics = $derived([
 		{ label: 'Sections', value: `${sections.length} groups` },
 		{ label: 'Crew size', value: `${defaultsForm.defaultCrewSize} people` },
 		{ label: 'Concrete cost', value: `$${defaultsForm.concreteCostPerYard} / yard` },
+		{ label: 'Deposit gate', value: `${billingSettingsForm.depositPercentRequired}%` },
 		{ label: 'Status', value: hasChanges ? 'Unsaved changes' : 'All changes saved' }
 	]);
 
@@ -176,10 +181,26 @@
 		savedDefaults = structuredClone(defaultsForm);
 	}
 
+	function updateDepositPercent(raw: string) {
+		const numeric = raw === '' ? 0 : Number(raw);
+		billingSettingsForm = {
+			...billingSettingsForm,
+			depositPercentRequired: Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : 0
+		};
+	}
+
+	function resetBillingSettings() {
+		billingSettingsForm = structuredClone(savedBillingSettings);
+	}
+
 	$effect(() => {
 		if (form?.defaultsSaved && form.estimateDefaults) {
 			savedDefaults = structuredClone(form.estimateDefaults);
 			defaultsForm = structuredClone(form.estimateDefaults);
+		}
+		if (form?.billingSettingsSaved && form.billingSettings) {
+			savedBillingSettings = structuredClone(form.billingSettings);
+			billingSettingsForm = structuredClone(form.billingSettings);
 		}
 	});
 </script>
@@ -195,6 +216,59 @@
 	{/snippet}
 
 	{#snippet work()}
+		<form method="POST" action="?/saveBillingSettings" class="mb-5 space-y-5">
+			<section class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+					<div class="flex items-start gap-4">
+						<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl">💳</div>
+						<div>
+							<p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Billing Workflow</p>
+							<h2 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Deposit gate for scheduling</h2>
+							<p class="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
+								Jobs become schedule-ready when recorded payments meet this percentage of the invoice total.
+							</p>
+						</div>
+					</div>
+					<div class="flex flex-col gap-3 sm:flex-row">
+						<button
+							type="button"
+							class="min-h-11 rounded-lg bg-white px-4 text-sm font-semibold text-[var(--text-strong)] shadow-[var(--shell-shadow)] transition disabled:opacity-50"
+							disabled={!billingHasChanges}
+							onclick={resetBillingSettings}
+						>
+							Reset
+						</button>
+						<button
+							type="submit"
+							class="min-h-11 rounded-lg bg-[var(--accent-text)] px-4 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
+							disabled={!billingHasChanges}
+						>
+							Save billing
+						</button>
+					</div>
+				</div>
+
+				<label class="mt-5 block max-w-sm">
+					<span class="mb-2 block text-sm font-medium text-[var(--text-base)]">Required deposit before scheduling</span>
+					<span class="relative block">
+						<input
+							class="min-h-12 w-full rounded-lg border border-[var(--shell-border)] bg-white px-4 pr-14 text-sm text-[var(--text-base)] shadow-sm outline-none transition focus:border-[var(--accent-border)] focus:ring-2 focus:ring-[var(--accent-border)]/30"
+							type="number"
+							name="depositPercentRequired"
+							min="0"
+							max="100"
+							step="1"
+							value={billingSettingsForm.depositPercentRequired}
+							oninput={(event) => updateDepositPercent(event.currentTarget.value)}
+						/>
+						<span class="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-medium text-[var(--text-muted)]">
+							%
+						</span>
+					</span>
+				</label>
+			</section>
+		</form>
+
 		<form method="POST" action="?/saveDefaults" class="space-y-5">
 			<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 				<div>

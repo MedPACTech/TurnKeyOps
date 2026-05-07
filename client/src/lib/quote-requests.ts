@@ -192,6 +192,71 @@ export const quoteRequestStatusOptions = quoteRequestStatuses.map((status) => ({
 	label: quoteRequestStatusMeta[status].label
 }));
 
+export type QuoteRequestWorkflowActionKey =
+	| 'start-review'
+	| 'request-missing-info'
+	| 'mark-visit-complete'
+	| 'send-estimate'
+	| 'mark-won'
+	| 'close-quote';
+export type QuoteRequestWorkflowTaskKey =
+	| 'intake-review'
+	| 'customer-follow-up'
+	| 'book-site-visit'
+	| 'complete-site-visit'
+	| 'draft-estimate'
+	| 'send-estimate'
+	| 'closeout';
+
+export type QuoteRequestWorkflowActionTone = 'primary' | 'secondary' | 'danger';
+
+export const quoteRequestWorkflowActionMeta: Record<
+	QuoteRequestWorkflowActionKey,
+	{
+		label: string;
+		detail: string;
+		tone: QuoteRequestWorkflowActionTone;
+	}
+> = {
+	'start-review': {
+		label: 'Start review',
+		detail: 'Acknowledge the intake and let qualification signals decide the next lane.',
+		tone: 'secondary'
+	},
+	'request-missing-info': {
+		label: 'Request info',
+		detail: 'Move the quote into customer follow-up for the detected blockers.',
+		tone: 'primary'
+	},
+	'mark-visit-complete': {
+		label: 'Visit complete',
+		detail: 'Move the scheduled visit into estimate prep.',
+		tone: 'primary'
+	},
+	'send-estimate': {
+		label: 'Send estimate',
+		detail: 'Mark the estimate packet as sent and keep follow-up active.',
+		tone: 'primary'
+	},
+	'mark-won': {
+		label: 'Mark won',
+		detail: 'Convert the quote into won work for handoff.',
+		tone: 'primary'
+	},
+	'close-quote': {
+		label: 'Close quote',
+		detail: 'Archive the request as declined, lost, duplicate, or no-fit.',
+		tone: 'danger'
+	}
+};
+
+export const quoteRequestWorkflowActionKeys = Object.keys(
+	quoteRequestWorkflowActionMeta
+) as QuoteRequestWorkflowActionKey[];
+
+export const isQuoteRequestWorkflowActionKey = (value: string): value is QuoteRequestWorkflowActionKey =>
+	quoteRequestWorkflowActionKeys.includes(value as QuoteRequestWorkflowActionKey);
+
 export const quoteRequestSiteVisitCancellationReasonCodes: QuoteRequestSiteVisitCancellationReasonCode[] = [
 	'customer-requested',
 	'site-not-ready',
@@ -565,6 +630,93 @@ export const buildQuoteRequestQualification = (request: QuoteRequest): QuoteRequ
 
 export const isQuoteRequestReadyForScheduling = (request: QuoteRequest) =>
 	buildQuoteRequestQualification(request).scheduleEligible;
+
+export type QuoteRequestWorkflowGuidance = {
+	status: QuoteRequestStatus;
+	label: string;
+	detail: string;
+	phaseLabel: string;
+	laneLabel: string;
+	blockerLabels: string[];
+	canBookVisit: boolean;
+	taskKey: QuoteRequestWorkflowTaskKey | null;
+	actions: QuoteRequestWorkflowActionKey[];
+};
+
+const quoteRequestEstimateStatuses = new Set<QuoteRequestStatus>(['estimate-drafted', 'estimate-sent']);
+const quoteRequestFinalStatuses = new Set<QuoteRequestStatus>(['won', 'closed']);
+
+export const buildQuoteRequestWorkflowGuidance = (request: QuoteRequest): QuoteRequestWorkflowGuidance => {
+	const qualification = buildQuoteRequestQualification(request);
+	const phase = getQuoteRequestWorkflowPhase(request.status);
+	const lane = quoteRequestWorkflowLaneMeta.find((entry) => entry.key === phase.lane);
+	const isFinal = quoteRequestFinalStatuses.has(request.status);
+	const isEstimate = quoteRequestEstimateStatuses.has(request.status);
+	const hasSiteVisit = Boolean(request.siteVisitSchedule);
+	const canBookVisit = qualification.isQualified && !hasSiteVisit && !isFinal && !isEstimate;
+	const actions: QuoteRequestWorkflowActionKey[] = [];
+	const taskKey: QuoteRequestWorkflowTaskKey | null = (() => {
+		if (request.status === 'closed' || request.status === 'won') return null;
+		if (request.status === 'estimate-sent') return 'closeout';
+		if (request.status === 'estimate-drafted') return 'send-estimate';
+		if (request.status === 'inspection-scheduled') return 'complete-site-visit';
+		if (qualification.blockerLabels.length) return 'customer-follow-up';
+		if (canBookVisit) return 'book-site-visit';
+		if (request.status === 'new' || request.status === 'in-review') return 'intake-review';
+		if (request.status === 'qualified' || request.status === 'contacted') return 'book-site-visit';
+		return 'intake-review';
+	})();
+
+	if (!isFinal) {
+		if (request.status === 'new' && !canBookVisit) {
+			actions.push('start-review');
+		}
+
+		if (qualification.blockerLabels.length && !isEstimate) {
+			actions.push('request-missing-info');
+		}
+
+		if (request.status === 'inspection-scheduled') {
+			actions.push('mark-visit-complete');
+		}
+
+		if (request.status === 'estimate-drafted') {
+			actions.push('send-estimate');
+		}
+
+		if (request.status === 'estimate-sent') {
+			actions.push('mark-won');
+		}
+
+		actions.push('close-quote');
+	}
+
+	const uniqueActions = [...new Set(actions)];
+	const label = quoteRequestStatusMeta[request.status].label;
+	const detail = (() => {
+		if (request.status === 'closed') return 'This quote is closed and out of the active workflow.';
+		if (request.status === 'won') return 'This quote is won and ready for downstream handoff.';
+		if (request.status === 'estimate-sent') return 'The estimate is with the customer; follow up for the outcome.';
+		if (request.status === 'estimate-drafted') return 'Draft the estimate packet and send it when ready.';
+		if (hasSiteVisit || request.status === 'inspection-scheduled') return 'A site visit is scheduled; the next workflow move is completing the visit.';
+		if (qualification.blockerLabels.length) return `Detected blockers: ${qualification.blockerLabels.join(' · ')}.`;
+		if (canBookVisit) return 'Qualification is clear; the next workflow move is booking the site visit.';
+		if (request.status === 'new') return 'Fresh intake is waiting for review.';
+		return quoteRequestStatusMeta[request.status].detail;
+	})();
+
+	return {
+		status: request.status,
+		label,
+		detail,
+		phaseLabel: phase.label,
+		laneLabel: lane?.label ?? 'Queue',
+		blockerLabels: qualification.blockerLabels,
+		canBookVisit,
+		taskKey,
+		actions: uniqueActions
+	};
+};
 
 export const seededQuoteRequests: QuoteRequest[] = [
 	{

@@ -3,6 +3,11 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+	const amountPaid = $derived(
+		data.invoice.payments.reduce((sum, payment) => sum + payment.amount, 0) ||
+			(data.invoice.state === 'paid' || data.invoice.paidAtUtc ? data.invoice.amount : 0)
+	);
+	const balanceDue = $derived(Math.max(data.invoice.amount - amountPaid, 0));
 </script>
 
 <svelte:head>
@@ -45,7 +50,10 @@
 				</div>
 				<div class="rounded-lg bg-orange-50 px-4 py-3 text-left sm:text-right">
 					<p class="text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">Amount Due</p>
-					<p class="mt-1 text-3xl font-semibold text-slate-950">{formatCurrency(data.invoice.amount)}</p>
+					<p class="mt-1 text-3xl font-semibold text-slate-950">{formatCurrency(balanceDue)}</p>
+					{#if amountPaid > 0}
+						<p class="mt-1 text-xs font-semibold text-emerald-700">{formatCurrency(amountPaid)} paid</p>
+					{/if}
 				</div>
 			</div>
 		</section>
@@ -63,8 +71,8 @@
 			</div>
 			<div class="rounded-lg bg-white/90 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
 				<p class="text-xs uppercase tracking-[0.18em] text-slate-500">Payment</p>
-				<p class="mt-2 font-semibold">{data.invoice.paidAtUtc ? formatDate(data.invoice.paidAtUtc) : 'Open'}</p>
-				<p class="mt-1 text-sm text-slate-600">{data.invoice.reminderSentAtUtc ? `Reminder ${formatDate(data.invoice.reminderSentAtUtc)}` : 'No reminder recorded'}</p>
+				<p class="mt-2 font-semibold">{balanceDue <= 0 ? (data.invoice.paidAtUtc ? formatDate(data.invoice.paidAtUtc) : 'Paid') : amountPaid > 0 ? 'Partial payment' : 'Open'}</p>
+				<p class="mt-1 text-sm text-slate-600">{formatCurrency(amountPaid)} paid · {formatCurrency(balanceDue)} due</p>
 			</div>
 		</section>
 

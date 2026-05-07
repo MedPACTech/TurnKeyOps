@@ -48,6 +48,7 @@
 		({
 			dashboard: '📊',
 			calendar: '📅',
+			jobs: '🏗️',
 			estimates: '📝',
 			invoices: '💰',
 			customers: '👥',
@@ -60,9 +61,9 @@
 	const isActive = (item: BdrAdminNavItem) => activeNav.slug === item.slug || activePath === item.href;
 </script>
 
-<div class="concept-admin-shell min-h-screen bg-[var(--app-bg)] text-[var(--text-base)]">
-	<div class="flex min-h-screen">
-		<aside class={`hidden shrink-0 flex-col border-r border-[var(--nav-divider)] bg-[var(--nav-bg)] text-white transition-[width] duration-200 lg:flex ${navCollapsed ? 'w-[88px]' : 'w-64'}`}>
+<div class="concept-admin-shell h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--text-base)]">
+	<div class="flex h-full min-h-0">
+		<aside class={`hidden h-screen shrink-0 flex-col overflow-hidden border-r border-[var(--nav-divider)] bg-[var(--nav-bg)] text-white transition-[width] duration-200 lg:flex ${navCollapsed ? 'w-[88px]' : 'w-64'}`}>
 			<div class={`relative border-b border-[var(--nav-divider)] ${navCollapsed ? 'px-3 py-5' : 'px-4 py-5'}`}>
 				<div class={`flex w-full flex-col gap-4 bg-white shadow-sm ${navCollapsed ? 'p-1.5' : 'px-4 py-3'}`}>
 					<img
@@ -201,8 +202,8 @@
 			</div>
 		{/if}
 
-		<div class="flex min-w-0 flex-1 flex-col">
-			<main class="admin-workarea min-w-0 flex-1 overflow-auto px-4 py-5 lg:px-6 lg:py-7">
+		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+			<main class="admin-workarea min-h-0 min-w-0 flex-1 overflow-auto px-4 py-5 lg:px-6 lg:py-7">
 				<button
 					type="button"
 					class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md bg-white/85 text-xl text-[var(--text-base)] shadow-sm lg:hidden"

@@ -51,12 +51,13 @@
 	} as const;
 
 	const activeMetrics = $derived(dashboardRanges[activeRange]);
+	const scheduleReadyJobs = $derived((data.scheduleReadyJobs ?? []).filter((job) => !job.isScheduled));
 
 	const summaryCards = $derived([
 		{
 			label: 'Active jobs',
 			value: String(activeMetrics.upcomingJobs),
-			href: '/bdr/admin/calendar',
+			href: '/bdr/admin/jobs',
 			icon: '🏗️'
 		},
 		{
@@ -70,6 +71,12 @@
 			value: String(data.requestInbox.length),
 			href: '/bdr/admin/requests',
 			icon: '📥'
+		},
+		{
+			label: 'Ready to schedule',
+			value: String(scheduleReadyJobs.length),
+			href: '/bdr/admin/calendar',
+			icon: '📅'
 		},
 		{
 			label: 'Overdue',
@@ -122,6 +129,13 @@
 	};
 
 	const bobMoves = $derived([
+		scheduleReadyJobs[0]
+			? {
+					label: `Schedule ${scheduleReadyJobs[0].siteName}`,
+					detail: `${formatCurrency(scheduleReadyJobs[0].amountPaid)} collected · ${scheduleReadyJobs[0].depositPercentRequired}% deposit met`,
+					href: '/bdr/admin/jobs'
+				}
+			: null,
 		priorityRequest
 			? {
 					label: priorityRequest.contactName ? `Call ${priorityRequest.contactName}` : 'Review newest request',
@@ -141,14 +155,14 @@
 		{
 			label: 'Confirm schedule gaps',
 			detail: `${activeMetrics.upcomingJobs} active jobs`,
-			href: '/bdr/admin/calendar'
+			href: '/bdr/admin/jobs'
 		},
 		{
 			label: 'Collect open invoices',
 			detail: `${data.snapshot.summary.invoiceCount} invoices`,
 			href: '/bdr/admin/invoices'
 		}
-	]);
+	].filter((item): item is { label: string; detail: string; href: string } => Boolean(item)));
 
 	const orderItems = $derived([
 		{
@@ -203,7 +217,7 @@
 		</a>
 	</section>
 
-	<section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+	<section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
 		{#each summaryCards as card}
 			<a
 				href={card.href}
@@ -251,6 +265,35 @@
 					<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.detail}</p>
 				</a>
 			{/each}
+		</div>
+	</article>
+
+	<article class="rounded-lg bg-white/88 p-5 shadow-[var(--shell-shadow)]">
+		<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+			<div>
+				<h2 class="text-base font-semibold leading-6 tracking-normal text-[var(--text-strong)]">Scheduling handoff</h2>
+				<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">
+					Jobs appear here once payments meet the configured {data.billingSettings.depositPercentRequired}% deposit gate.
+				</p>
+			</div>
+			<a href="/bdr/admin/calendar" class="inline-flex w-fit rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+				Open calendar
+			</a>
+		</div>
+		<div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+			{#if scheduleReadyJobs.length}
+				{#each scheduleReadyJobs.slice(0, 3) as job}
+					<a href="/bdr/admin/invoices" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm transition hover:bg-emerald-100">
+						<p class="text-sm font-semibold text-[var(--text-strong)]">{job.invoiceNumber} · {job.siteName}</p>
+						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{job.customerName} / {job.contactName}</p>
+						<p class="mt-3 text-sm font-semibold text-emerald-700">{formatCurrency(job.amountPaid)} collected</p>
+					</a>
+				{/each}
+			{:else}
+				<div class="rounded-lg border border-dashed border-[var(--shell-border)] px-4 py-6 text-sm text-[var(--text-muted)] md:col-span-2 xl:col-span-3">
+					No deposit-cleared jobs are waiting on the schedule.
+				</div>
+			{/if}
 		</div>
 	</article>
 

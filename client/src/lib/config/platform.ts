@@ -150,24 +150,14 @@ export const bdrAdminNavigation: BdrAdminNavItem[] = [
 		section: 'operations'
 	},
 	{
-		slug: 'estimates',
-		label: 'Estimates',
-		href: '/bdr/admin/estimates',
-		summary: 'Quote prep, approval, deposits, and contract status',
-		contextLabel: 'Sales Ops',
-		focusLabel: 'Pipeline lane',
-		canvasLabel: 'Quote canvas',
-		section: 'revenue'
-	},
-	{
-		slug: 'customers',
-		label: 'Contact',
-		href: '/bdr/admin/contact',
-		summary: 'Accounts, properties, files, and communication history',
-		contextLabel: 'Contact Ops',
-		focusLabel: 'Relationship desk',
-		canvasLabel: 'Record canvas',
-		section: 'customers'
+		slug: 'jobs',
+		label: 'Jobs',
+		href: '/bdr/admin/jobs',
+		summary: 'Production jobs, crew status, holds, and completion controls',
+		contextLabel: 'Production Ops',
+		focusLabel: 'Run desk',
+		canvasLabel: 'Job canvas',
+		section: 'operations'
 	},
 	{
 		slug: 'requests',
@@ -180,6 +170,16 @@ export const bdrAdminNavigation: BdrAdminNavItem[] = [
 		section: 'customers'
 	},
 	{
+		slug: 'estimates',
+		label: 'Estimates',
+		href: '/bdr/admin/estimates',
+		summary: 'Quote prep, approval, deposits, and contract status',
+		contextLabel: 'Sales Ops',
+		focusLabel: 'Pipeline lane',
+		canvasLabel: 'Quote canvas',
+		section: 'revenue'
+	},
+	{
 		slug: 'invoices',
 		label: 'Invoices',
 		href: '/bdr/admin/invoices',
@@ -188,6 +188,16 @@ export const bdrAdminNavigation: BdrAdminNavItem[] = [
 		focusLabel: 'Collections lane',
 		canvasLabel: 'Billing canvas',
 		section: 'revenue'
+	},
+	{
+		slug: 'customers',
+		label: 'Contacts',
+		href: '/bdr/admin/contact',
+		summary: 'Accounts, properties, files, and communication history',
+		contextLabel: 'Relationship Ops',
+		focusLabel: 'Relationship desk',
+		canvasLabel: 'Record canvas',
+		section: 'customers'
 	},
 	{
 		slug: 'bob',
@@ -329,7 +339,7 @@ export const bdrAdminNavSections: Array<{
 	{ key: 'overview', label: 'Overview', description: 'Leadership and daily office pulse' },
 	{ key: 'operations', label: 'Operations', description: 'Scheduling, dispatch, and production timing' },
 	{ key: 'revenue', label: 'Revenue', description: 'Estimate approvals, billing, and collections' },
-	{ key: 'customers', label: 'Contact', description: 'People, properties, vendors, and service history' },
+	{ key: 'customers', label: 'Contacts', description: 'People, properties, vendors, and service history' },
 	{ key: 'content', label: 'Website', description: 'Public-site copy, structure, preview, and editable sections' },
 	{ key: 'admin', label: 'Admin', description: 'System rules, estimate defaults, and operator settings' }
 ];
@@ -400,6 +410,40 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			actions: [
 				{ label: 'Open dashboard', href: '/bdr/admin/dashboard', variant: 'secondary' },
 				{ label: 'Check estimate readiness', href: '/bdr/admin/estimates' }
+			]
+		}
+	},
+	'/bdr/admin/jobs': {
+		title: 'Run production jobs from schedule lock through completion',
+		description:
+			'Jobs are the live production layer after approval, deposit, and scheduling. This surface keeps crew state, customer context, billing posture, holds, notes, and completion actions in one place.',
+		context: {
+			label: 'Production context',
+			title: 'What the job desk owns',
+			summary: 'The office needs a place to run actual work after the invoice clears the release gate. Jobs should not be buried inside invoices or calendar events once crews start moving.',
+			metrics: [
+				{ label: 'Lifecycle', value: '5 states', detail: 'Scheduled, running, hold, complete, and cancelled states stay explicit.' },
+				{ label: 'Billing link', value: 'Invoice-tied', detail: 'Deposit and invoice context remains attached after scheduling.' },
+				{ label: 'Crew control', value: 'Live desk', detail: 'Crew assignment, schedule window, notes, and blockers stay editable.' }
+			]
+		},
+		focus: {
+			label: 'Production habits',
+			title: 'What has to stay visible while work is active',
+			summary: 'A job is where promises become field work. The surface should help the office start work, pause it for a real reason, recover the schedule, and close it out cleanly.',
+			notes: [
+				{ title: 'Run state matters', detail: 'Scheduled work needs a clear transition into in-progress before the office can track what is actually happening.' },
+				{ title: 'Holds need reasons', detail: 'Weather, access, materials, paperwork, and customer delays should be captured where the job is managed.' },
+				{ title: 'Closeout starts here', detail: 'Completion is the handoff point for final billing, customer follow-up, and internal wrap-up.' }
+			]
+		},
+		canvas: {
+			label: 'Job canvas',
+			title: 'Production queue, run controls, and closeout posture',
+			summary: 'This canvas turns schedule-ready invoices into manageable production records with status actions and a concise activity trail.',
+			actions: [
+				{ label: 'Open calendar', href: '/bdr/admin/calendar', variant: 'secondary' },
+				{ label: 'Open invoice queue', href: '/bdr/admin/invoices' }
 			]
 		}
 	},

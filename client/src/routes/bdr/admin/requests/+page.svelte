@@ -1,5 +1,14 @@
 <script lang="ts">
 	import {
+		bdrEmployeePermissionMeta,
+		bdrEmployeeSkillMeta,
+		getBdrEmployeeByName,
+		getEligibleBdrEmployeesForTask,
+		getRecommendedBdrEmployeeForTask,
+		quoteWorkflowTaskRequirements
+	} from '$lib/bdr-team';
+	import {
+		buildQuoteRequestWorkflowGuidance,
 		buildQuoteRequestQualification,
 		quoteRequestSiteVisitCancellationReasonOptions,
 		getQuoteRequestWorkflowLane,
@@ -7,11 +16,11 @@
 		isQuoteRequestUnassigned,
 		quoteRequestMissingInfoReasonOptions,
 		quoteRequestStatusMeta,
-		quoteRequestStatusOptions,
+		quoteRequestWorkflowActionMeta,
 		quoteRequestWorkflowLaneMeta,
 		type QuoteRequest,
 		type QuoteRequestMissingInfoReasonCode,
-		type QuoteRequestStatus,
+		type QuoteRequestWorkflowActionKey,
 		type QuoteRequestWorkflowLane
 	} from '$lib/quote-requests';
 	import { AlertTriangle, CalendarCheck, CheckCircle2, ExternalLink, FileText, Lock, Pencil } from 'lucide-svelte';
@@ -22,16 +31,17 @@
 		detail: string;
 		href: string;
 	};
+	type QuoteQueueFilter = 'all' | QuoteRequestWorkflowLane | 'closed';
+	type QuoteTone = 'amber' | 'blue' | 'violet' | 'emerald' | 'slate';
 
 	let { data, form }: { data: PageProps['data']; form: ActionData } = $props();
 
 	const requests = $derived(data.requests);
 	const scheduleSiteVisitByRequestId = $derived(data.scheduleSiteVisitByRequestId);
 	let selectedRequestId = $state('');
-	let laneFilter = $state<'all' | QuoteRequestWorkflowLane>('all');
+	let laneFilter = $state<QuoteQueueFilter>('new');
 	let search = $state('');
 	let selectedAttachmentId = $state('');
-	let triageStatus = $state<QuoteRequestStatus>('new');
 	let scheduleVisitDate = $state('');
 	let scheduleWindowStart = $state('09:00');
 	let scheduleWindowEnd = $state('10:30');
@@ -41,6 +51,7 @@
 	let scheduleNotes = $state('');
 	let cancellationReasonCode = $state('');
 	let cancellationNotes = $state('');
+	let workflowAssignedTo = $state('');
 	let detailInlineEditing = $state(false);
 	let contactInlineEditing = $state(false);
 	let detailRequestedTimeline = $state('');
@@ -55,7 +66,46 @@
 	let contactStateDraft = $state('');
 	let contactPostalCodeDraft = $state('');
 
-	const fieldResourceSuggestions = ['Estimator - Maya', 'Estimator - Chris', 'Estimator - Lane', 'Ella - office admin', 'Estimator - Jordan'];
+	const employeeContacts = $derived(data.employeeContacts);
+	const fieldResourceSuggestions = $derived(
+		employeeContacts
+			.filter((employee) => employee.skills.includes('field-inspection'))
+			.map((employee) => employee.displayName)
+	);
+	const quoteToneStyles: Record<
+		QuoteTone,
+		{
+			cardTop: string;
+			notice: string;
+			pill: string;
+		}
+	> = {
+		amber: {
+			cardTop: 'border-t-amber-400',
+			notice: 'border-amber-400 bg-amber-50 text-amber-900',
+			pill: 'bg-amber-100 text-amber-800'
+		},
+		blue: {
+			cardTop: 'border-t-sky-400',
+			notice: 'border-sky-400 bg-sky-50 text-sky-900',
+			pill: 'bg-sky-100 text-sky-800'
+		},
+		violet: {
+			cardTop: 'border-t-violet-400',
+			notice: 'border-violet-400 bg-violet-50 text-violet-900',
+			pill: 'bg-violet-100 text-violet-800'
+		},
+		emerald: {
+			cardTop: 'border-t-emerald-400',
+			notice: 'border-emerald-400 bg-emerald-50 text-emerald-900',
+			pill: 'bg-emerald-100 text-emerald-800'
+		},
+		slate: {
+			cardTop: 'border-t-slate-400',
+			notice: 'border-slate-400 bg-slate-50 text-slate-900',
+			pill: 'bg-slate-100 text-slate-700'
+		}
+	};
 
 	$effect(() => {
 		if (!selectedRequestId && requests[0]) {
@@ -65,6 +115,8 @@
 
 	const laneMatches = (request: QuoteRequest) => {
 		if (laneFilter === 'all') return true;
+		if (laneFilter === 'closed') return request.status === 'closed';
+		if (laneFilter === 'won') return request.status === 'won';
 		return getQuoteRequestWorkflowLane(request.status) === laneFilter;
 	};
 
@@ -138,15 +190,37 @@
 		)
 	);
 	const selectedQualification = $derived(selectedRequest ? buildQuoteRequestQualification(selectedRequest) : null);
+	const selectedWorkflowGuidance = $derived(selectedRequest ? buildQuoteRequestWorkflowGuidance(selectedRequest) : null);
+	const selectedWorkflowTaskRequirement = $derived(
+		selectedWorkflowGuidance?.taskKey ? quoteWorkflowTaskRequirements[selectedWorkflowGuidance.taskKey] : null
+	);
+	const selectedWorkflowEligibleEmployees = $derived(
+		getEligibleBdrEmployeesForTask(selectedWorkflowGuidance?.taskKey)
+	);
+	const selectedWorkflowOtherEmployees = $derived(
+		employeeContacts.filter(
+			(employee) => !selectedWorkflowEligibleEmployees.some((eligible) => eligible.id === employee.id)
+		)
+	);
+	const selectedWorkflowRecommendedEmployee = $derived(
+		getRecommendedBdrEmployeeForTask(selectedWorkflowGuidance?.taskKey, selectedRequest)
+	);
+	const selectedWorkflowAssignedEmployee = $derived(getBdrEmployeeByName(workflowAssignedTo));
+	const selectedTone = $derived<QuoteTone>(selectedRequest ? quoteRequestStatusMeta[selectedRequest.status].tone : 'slate');
+	const selectedToneStyle = $derived(quoteToneStyles[selectedTone]);
+	const selectedNoticeDetail = $derived.by(() => {
+		if (!selectedRequest) return '';
+		return selectedWorkflowGuidance?.detail ?? quoteRequestStatusMeta[selectedRequest.status].detail;
+	});
 	const selectedWorkflowPhase = $derived(selectedRequest ? getQuoteRequestWorkflowPhase(selectedRequest.status) : null);
 	const selectedRequestScheduleSectionId = $derived(
 		selectedRequest ? `schedule-site-visit-${selectedRequest.id}` : 'schedule-site-visit'
 	);
 	const selectedRequestCanOpenScheduler = $derived(
-		Boolean(
-			selectedRequest &&
-				(selectedQualification?.isQualified || selectedRequest.status === 'inspection-scheduled' || selectedRequest.siteVisitSchedule)
-		)
+		Boolean(selectedRequest && (selectedWorkflowGuidance?.canBookVisit || selectedRequest.status === 'inspection-scheduled'))
+	);
+	const selectedSiteVisitIsComplete = $derived(
+		Boolean(selectedRequest?.siteVisitSchedule && selectedRequest.status !== 'inspection-scheduled')
 	);
 
 	$effect(() => {
@@ -156,9 +230,19 @@
 	});
 
 	$effect(() => {
-		if (selectedRequest) {
-			triageStatus = selectedRequest.status;
+		if (!selectedRequest) {
+			workflowAssignedTo = '';
+			return;
 		}
+
+		const existingEmployee = getBdrEmployeeByName(selectedRequest.assignedTo);
+		const existingIsEligible = Boolean(
+			existingEmployee &&
+				selectedWorkflowEligibleEmployees.some((employee) => employee.id === existingEmployee.id)
+		);
+		workflowAssignedTo = existingIsEligible
+			? (existingEmployee?.displayName ?? selectedRequest.assignedTo)
+			: selectedWorkflowRecommendedEmployee?.displayName || selectedRequest.assignedTo;
 	});
 
 	const laneOptions = $derived([
@@ -166,8 +250,13 @@
 		...quoteRequestWorkflowLaneMeta.map((lane) => ({
 			key: lane.key,
 			label: lane.label,
-			count: requests.filter((request) => getQuoteRequestWorkflowLane(request.status) === lane.key).length
-		}))
+			count: requests.filter((request) =>
+				lane.key === 'won'
+					? request.status === 'won'
+					: getQuoteRequestWorkflowLane(request.status) === lane.key
+			).length
+		})),
+		{ key: 'closed' as const, label: 'Closed', count: requests.filter((request) => request.status === 'closed').length }
 	]);
 
 	const resetDetailDraft = (request: QuoteRequest | null | undefined) => {
@@ -215,7 +304,7 @@
 		{ label: 'Active', value: String(data.metrics.activeCount), icon: '🔎' },
 		{
 			label: 'Ready to book',
-			value: String(requests.filter((request) => buildQuoteRequestQualification(request).isQualified && !request.siteVisitSchedule).length),
+			value: String(requests.filter((request) => buildQuoteRequestWorkflowGuidance(request).canBookVisit).length),
 			icon: '📅'
 		},
 		{
@@ -281,11 +370,23 @@
 				detail: selectedRequest.requestedTimeline || 'Qualified and ready to schedule',
 				href: `#${selectedRequestScheduleSectionId}`
 			});
-		} else if (selectedRequest.siteVisitSchedule) {
+		} else if (selectedRequest.status === 'inspection-scheduled' && selectedRequest.siteVisitSchedule) {
 			moves.push({
-				label: 'Hand off to estimate',
+				label: 'Complete site visit',
 				detail: `${selectedRequest.siteVisitSchedule.visitDate} · ${selectedRequest.siteVisitSchedule.assignedFieldResource}`,
-				href: '/bdr/admin/estimates'
+				href: `#request-triage-${selectedRequest.id}`
+			});
+		} else if (selectedRequest.status === 'estimate-drafted') {
+			moves.push({
+				label: 'Send estimate',
+				detail: selectedRequest.nextAction,
+				href: `#request-triage-${selectedRequest.id}`
+			});
+		} else if (selectedRequest.status === 'estimate-sent') {
+			moves.push({
+				label: 'Close outcome',
+				detail: 'Mark won or close after customer follow-up',
+				href: `#request-triage-${selectedRequest.id}`
 			});
 		} else {
 			moves.push({
@@ -309,10 +410,24 @@
 		return moves;
 	});
 
-	const quoteCardStateClass = (_request: QuoteRequest, isSelected: boolean) =>
-		isSelected
-			? 'bg-[#fff4ea] shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_rgba(249,115,22,0.14)] ring-1 ring-[rgba(249,115,22,0.32)]'
-			: 'bg-white/88 shadow-[var(--shell-shadow)] hover:bg-white hover:shadow-md';
+	const quoteCardStateClass = (request: QuoteRequest, isSelected: boolean) => {
+		const tone = quoteRequestStatusMeta[request.status].tone;
+		const topBorderClass = quoteToneStyles[tone].cardTop;
+		return isSelected
+			? `border-x border-b border-x-transparent border-b-transparent border-t-4 ${topBorderClass} bg-[#fff4ea] shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_rgba(249,115,22,0.14)] ring-1 ring-[rgba(249,115,22,0.32)]`
+			: `border-x border-b border-x-transparent border-b-transparent border-t-4 ${topBorderClass} bg-white/88 shadow-[var(--shell-shadow)] hover:bg-white hover:shadow-md`;
+	};
+	const workflowActionButtonClass = (action: QuoteRequestWorkflowActionKey) => {
+		const tone = quoteRequestWorkflowActionMeta[action].tone;
+		if (tone === 'danger') {
+			return 'bg-rose-50 text-rose-700 shadow-sm transition hover:bg-rose-100';
+		}
+		if (tone === 'primary') {
+			return 'bg-[var(--accent-solid)] text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]';
+		}
+		return 'bg-white/80 text-[var(--text-strong)] shadow-sm transition hover:bg-white';
+	};
+	const qualificationReadyText = 'Ready to book';
 
 	const parseAddress = (value: string) => {
 		const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
@@ -354,11 +469,11 @@
 		resetDetailDraft(selectedRequest);
 		resetContactDraft(selectedRequest);
 	});
-	const isMissingInfoReasonChecked = (code: QuoteRequestMissingInfoReasonCode) =>
-		Boolean(
-			selectedQualification?.suggestedMissingInfoReasonCodes.includes(code) ||
-				selectedRequest?.qualification.missingInfoReasonCodes.includes(code)
-		);
+	const isQualificationCheckBlocked = (code: QuoteRequestMissingInfoReasonCode) =>
+		Boolean(selectedQualification?.missingInfoReasonCodes.includes(code));
+	const getQualificationBlockerDetail = (code: QuoteRequestMissingInfoReasonCode) =>
+		quoteRequestMissingInfoReasonOptions.find((option) => option.value === code)?.detail ??
+		'Review this qualification item before booking the site visit.';
 
 	const formatAttachmentSize = (sizeBytes: number) => {
 		if (sizeBytes >= 1024 * 1024) return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -483,7 +598,7 @@
 										{:else}
 											<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
 												<CheckCircle2 size={12} />
-												Ready
+												{qualificationReadyText}
 											</span>
 										{/if}
 									</div>
@@ -513,7 +628,7 @@
 							</div>
 						</div>
 						<div class="flex flex-wrap items-center gap-2 lg:justify-end">
-							<span class="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-semibold text-[var(--accent-text)]">
+							<span class={`rounded-full px-3 py-1.5 text-sm font-semibold ${selectedToneStyle.pill}`}>
 								{quoteRequestStatusMeta[selectedRequest.status].label}
 							</span>
 							<span class="rounded-full bg-white/80 px-3 py-1.5 text-sm font-medium text-[var(--text-muted)] shadow-sm">
@@ -528,82 +643,144 @@
 						<p class="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{form.message}</p>
 					{/if}
 
-					<div class="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_340px]">
-						<form method="POST" action="?/updateRequest" class="rounded-lg bg-[var(--shell-panel-strong)] p-4">
-							<input type="hidden" name="id" value={selectedRequest.id} />
-							<input type="hidden" name="contactName" value={selectedRequest.contactName} />
-							<input type="hidden" name="email" value={selectedRequest.email} />
-							<input type="hidden" name="phone" value={selectedRequest.phone} />
-							<input type="hidden" name="siteName" value={selectedRequest.siteName} />
-							<input type="hidden" name="address1" value={selectedAddress.address1} />
-							<input type="hidden" name="address2" value={selectedAddress.address2} />
-							<input type="hidden" name="city" value={selectedAddress.city} />
-							<input type="hidden" name="state" value={selectedAddress.state} />
-							<input type="hidden" name="postalCode" value={selectedAddress.postalCode} />
-							<input type="hidden" name="requestedTimeline" value={selectedRequest.requestedTimeline} />
+					{#if form?.workflowSuccess && form.workflowRequestId === selectedRequest.id}
+						<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Workflow updated</p>
+					{:else if form?.workflowMessage && form.workflowRequestId === selectedRequest.id}
+						<p class="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{form.workflowMessage}</p>
+					{/if}
 
-							<div class="grid gap-4 lg:grid-cols-[180px_220px_minmax(0,1fr)]">
+					<div class={`mt-4 rounded-lg border-l-4 px-4 py-3 shadow-sm ${selectedToneStyle.notice}`}>
+						<p class="text-sm font-semibold">{quoteRequestStatusMeta[selectedRequest.status].label}</p>
+						<p class="mt-1 text-sm leading-6 opacity-85">{selectedNoticeDetail}</p>
+					</div>
+
+					<div class="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_340px]">
+						<div class="rounded-lg bg-[var(--shell-panel-strong)] p-4">
+							<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+								<div>
+									<p class="text-base font-semibold leading-6 text-[var(--text-strong)]">Workflow</p>
+									<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{selectedWorkflowGuidance?.detail}</p>
+								</div>
+								<span class={`w-fit rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${selectedToneStyle.pill}`}>
+									{selectedWorkflowGuidance?.phaseLabel}
+								</span>
+							</div>
+
+							<form method="POST" action="?/updateRequest" class="mt-4 space-y-4">
+								<input type="hidden" name="id" value={selectedRequest.id} />
+								<input type="hidden" name="status" value={selectedRequest.status} />
+								<input type="hidden" name="contactName" value={selectedRequest.contactName} />
+								<input type="hidden" name="email" value={selectedRequest.email} />
+								<input type="hidden" name="phone" value={selectedRequest.phone} />
+								<input type="hidden" name="siteName" value={selectedRequest.siteName} />
+								<input type="hidden" name="address1" value={selectedAddress.address1} />
+								<input type="hidden" name="address2" value={selectedAddress.address2} />
+								<input type="hidden" name="city" value={selectedAddress.city} />
+								<input type="hidden" name="state" value={selectedAddress.state} />
+								<input type="hidden" name="postalCode" value={selectedAddress.postalCode} />
+								<input type="hidden" name="requestedTimeline" value={selectedRequest.requestedTimeline} />
+								{#if selectedRequest.status === 'needs-info'}
+									{#each selectedQualification?.missingInfoReasonCodes ?? [] as code}
+										<input type="hidden" name="missingInfoReasonCodes" value={code} />
+									{/each}
+								{/if}
+
 								<label class="grid gap-2">
-									<span class="text-sm font-medium text-[var(--text-muted)]">Stage</span>
-									<select id="status" name="status" bind:value={triageStatus} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none">
-										{#each quoteRequestStatusOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
+									<span class="text-sm font-medium text-[var(--text-muted)]">Task owner</span>
+									<select id="assignedTo" name="assignedTo" bind:value={workflowAssignedTo} class="min-h-12 rounded-md border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none">
+										{#if selectedRequest.assignedTo && !getBdrEmployeeByName(selectedRequest.assignedTo)}
+											<option value={selectedRequest.assignedTo}>{selectedRequest.assignedTo} · current queue</option>
+										{/if}
+										{#if selectedWorkflowEligibleEmployees.length}
+											<optgroup label="Skill match">
+												{#each selectedWorkflowEligibleEmployees as employee}
+													<option value={employee.displayName}>
+														{employee.displayName} · {employee.title}
+													</option>
+												{/each}
+											</optgroup>
+										{/if}
+										{#if selectedWorkflowOtherEmployees.length}
+											<optgroup label="Override">
+												{#each selectedWorkflowOtherEmployees as employee}
+													<option value={employee.displayName}>
+														{employee.displayName} · {employee.title}
+													</option>
+												{/each}
+											</optgroup>
+										{/if}
 									</select>
 								</label>
-								<label class="grid gap-2">
-									<span class="text-sm font-medium text-[var(--text-muted)]">Owner</span>
-									<input id="assignedTo" name="assignedTo" value={selectedRequest.assignedTo} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none" />
-								</label>
+
+								<div class="rounded-lg bg-white/70 px-3 py-3">
+									<div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+										<div>
+											<p class="text-sm font-semibold text-[var(--text-strong)]">
+												{selectedWorkflowTaskRequirement?.label ?? 'Workflow task'}
+											</p>
+											<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+												{#if selectedWorkflowRecommendedEmployee && selectedWorkflowTaskRequirement}
+													Auto-picked {selectedWorkflowRecommendedEmployee.displayName} for {bdrEmployeeSkillMeta[selectedWorkflowTaskRequirement.skill].label.toLowerCase()}.
+												{:else}
+													No skill-matched employee is available for this workflow task.
+												{/if}
+											</p>
+										</div>
+										{#if selectedWorkflowAssignedEmployee}
+											<span class="w-fit rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+												{selectedWorkflowAssignedEmployee.availability}
+											</span>
+										{/if}
+									</div>
+									{#if selectedWorkflowTaskRequirement}
+										<div class="mt-3 flex flex-wrap gap-2">
+											<span class="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-text)]">
+												{bdrEmployeeSkillMeta[selectedWorkflowTaskRequirement.skill].label}
+											</span>
+											<span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--text-muted)] shadow-sm">
+												{bdrEmployeePermissionMeta[selectedWorkflowTaskRequirement.permission].label}
+											</span>
+										</div>
+									{/if}
+								</div>
+
 								<label class="grid gap-2">
 									<span class="text-sm font-medium text-[var(--text-muted)]">Next action</span>
-									<textarea id="nextAction" name="nextAction" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none">{selectedRequest.nextAction}</textarea>
+									<textarea id="nextAction" name="nextAction" rows="5" class="min-h-32 w-full resize-y rounded-md border border-[var(--shell-border)] bg-white px-3 py-3 text-sm leading-6 text-[var(--text-base)] outline-none">{selectedRequest.nextAction}</textarea>
 								</label>
-							</div>
 
-							{#if triageStatus === 'needs-info'}
-								<div class="mt-4 rounded-lg bg-amber-50 p-3">
-									<p class="text-sm font-semibold text-amber-900">Needed from customer</p>
-									<div class="mt-3 grid gap-2 md:grid-cols-2">
-										{#each quoteRequestMissingInfoReasonOptions as reason}
-											<label class="flex gap-3 rounded-md bg-white/70 p-3 text-left">
-												<input
-													type="checkbox"
-													name="missingInfoReasonCodes"
-													value={reason.value}
-													checked={isMissingInfoReasonChecked(reason.value)}
-													class="mt-1 h-4 w-4 rounded border-amber-200 bg-white text-[var(--accent-solid)]"
-												/>
-												<span>
-													<span class="block text-sm font-semibold text-amber-900">{reason.label}</span>
-													<span class="mt-1 block text-xs leading-5 text-amber-800">{reason.detail}</span>
-												</span>
-											</label>
-										{/each}
-									</div>
-								</div>
-							{:else if selectedQualification?.blockerLabels.length}
-								<div class="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
-									<span class="font-semibold">Blocked:</span> {selectedQualification.blockerLabels.join(' · ')}
-								</div>
-							{/if}
+								<button type="submit" class="rounded-md bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-white">Save owner/action</button>
+							</form>
 
 							<div class="mt-4 flex flex-wrap gap-3">
-								<button type="submit" class="rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">Save</button>
-								{#if selectedRequestCanOpenScheduler}
-									<a href={`#${selectedRequestScheduleSectionId}`} class="inline-flex items-center gap-2 rounded-md bg-[var(--accent-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-white">
+								{#if selectedWorkflowGuidance?.canBookVisit}
+									<a href={`#${selectedRequestScheduleSectionId}`} class="inline-flex items-center gap-2 rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">
 										<CalendarCheck size={16} />
-										{selectedRequest.siteVisitSchedule ? 'Site visit' : 'Book visit'}
+										Book visit
 									</a>
-								{:else}
-									<span class="inline-flex items-center gap-2 rounded-md bg-white/70 px-4 py-2.5 text-sm font-semibold text-[var(--text-muted)]">
-										<Lock size={16} />
-										Qualify first
-									</span>
 								{/if}
-								<a href="/bdr/admin/estimates" class="rounded-md bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-white">Estimate lane</a>
+
+								{#each selectedWorkflowGuidance?.actions ?? [] as action}
+									<form method="POST" action="?/applyWorkflowAction">
+										<input type="hidden" name="id" value={selectedRequest.id} />
+										<input type="hidden" name="workflowAction" value={action} />
+										<input type="hidden" name="assignedTo" value={workflowAssignedTo} />
+										<button type="submit" class={`inline-flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold ${workflowActionButtonClass(action)}`}>
+											{#if action === 'request-missing-info'}
+												<AlertTriangle size={16} />
+											{:else if action === 'mark-visit-complete' || action === 'mark-won'}
+												<CheckCircle2 size={16} />
+											{:else if action === 'close-quote'}
+												<Lock size={16} />
+											{:else}
+												<CalendarCheck size={16} />
+											{/if}
+											{quoteRequestWorkflowActionMeta[action].label}
+										</button>
+									</form>
+								{/each}
 							</div>
-						</form>
+						</div>
 
 						<aside class="rounded-lg bg-white/75 p-4 shadow-sm">
 							<div class="flex items-start justify-between gap-3">
@@ -704,7 +881,7 @@
 								<span class={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${selectedQualification?.isQualified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
 									{#if selectedQualification?.isQualified}
 										<CheckCircle2 size={13} />
-										Ready
+										{qualificationReadyText}
 									{:else}
 										<AlertTriangle size={13} />
 										Blocked
@@ -713,12 +890,15 @@
 							</div>
 							<div class="mt-3 grid gap-2 md:grid-cols-2">
 								{#each selectedQualification?.checks ?? [] as check}
+									{@const isBlocked = isQualificationCheckBlocked(check.missingInfoReasonCode)}
 									<div class="rounded-md bg-white/75 px-3 py-2.5">
 										<div class="flex items-start justify-between gap-3">
 											<p class="text-sm font-semibold text-[var(--text-base)]">{check.label}</p>
-											<span class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${check.complete ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>{check.complete ? 'Ready' : 'Need'}</span>
+											<span class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${isBlocked ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>{isBlocked ? 'Need' : 'Ready'}</span>
 										</div>
-										<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{check.detail}</p>
+										{#if isBlocked}
+											<p class="mt-2 text-xs leading-5 text-amber-800">{getQualificationBlockerDetail(check.missingInfoReasonCode)}</p>
+										{/if}
 									</div>
 								{/each}
 							</div>
@@ -812,7 +992,12 @@
 				<section id={selectedRequestScheduleSectionId} class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 						<h3 class="text-base font-semibold leading-6 text-[var(--text-strong)]">Site visit</h3>
-						{#if selectedRequest.siteVisitSchedule}
+						{#if selectedSiteVisitIsComplete}
+							<span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700">
+								<CheckCircle2 size={14} />
+								Completed
+							</span>
+						{:else if selectedRequest.siteVisitSchedule}
 							<span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700">
 								<CheckCircle2 size={14} />
 								Scheduled
@@ -820,7 +1005,7 @@
 						{:else if selectedRequestCanOpenScheduler}
 							<span class="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-semibold text-[var(--accent-text)]">
 								<CalendarCheck size={14} />
-								Ready
+								Ready to schedule
 							</span>
 						{:else}
 							<span class="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800">
@@ -917,12 +1102,12 @@
 							{#if selectedQualification?.blockerLabels.length}
 								{selectedQualification.blockerLabels.join(' · ')}
 							{:else}
-								Move this quote to Qualified before booking.
+								Qualification must clear before booking a site visit.
 							{/if}
 						</div>
 					{/if}
 
-					{#if selectedRequest.siteVisitSchedule}
+					{#if selectedRequest.status === 'inspection-scheduled' && selectedRequest.siteVisitSchedule}
 						<form method="POST" action="?/cancelSiteVisit" class="mt-4 rounded-lg bg-rose-50 p-4">
 							<input type="hidden" name="id" value={selectedRequest.id} />
 							<div class="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">

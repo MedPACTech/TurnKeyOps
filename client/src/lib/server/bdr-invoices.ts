@@ -7,6 +7,7 @@ type FsPromises = {
 };
 
 export type BdrInvoiceState = 'draft' | 'sent' | 'paid';
+export type BdrInvoicePaymentMethod = 'ACH' | 'Card' | 'Check' | 'Cash' | 'Other';
 
 export type ApprovedEstimateInvoiceInput = {
 	requestId: string;
@@ -41,7 +42,17 @@ export type BdrInvoiceRecord = {
 	sentAtUtc?: string;
 	paidAtUtc?: string;
 	reminderSentAtUtc?: string;
+	payments: BdrInvoicePaymentRecord[];
 	lineItems: string[];
+};
+
+export type BdrInvoicePaymentRecord = {
+	id: string;
+	amount: number;
+	method: BdrInvoicePaymentMethod;
+	note?: string;
+	receivedAtUtc: string;
+	receivedBy: string;
 };
 
 const getCwd = () =>
@@ -64,6 +75,37 @@ const parseEstimateTotal = (lineItems: string[]) => {
 	return match ? Number.parseFloat(match[1].replaceAll(',', '')) : 0;
 };
 
+const normalizePaymentMethod = (value: unknown): BdrInvoicePaymentMethod => {
+	if (value === 'Card' || value === 'Check' || value === 'Cash' || value === 'Other') return value;
+	return 'ACH';
+};
+
+const normalizePayment = (value: unknown): BdrInvoicePaymentRecord | null => {
+	if (!value || typeof value !== 'object') return null;
+	const record = value as Partial<BdrInvoicePaymentRecord>;
+	const amount = typeof record.amount === 'number' && Number.isFinite(record.amount) ? record.amount : 0;
+	if (amount <= 0) return null;
+
+	return {
+		id: String(record.id ?? `payment-${Date.now()}`).trim(),
+		amount,
+		method: normalizePaymentMethod(record.method),
+		note: record.note?.trim() || undefined,
+		receivedAtUtc: String(record.receivedAtUtc ?? '').trim() || new Date().toISOString(),
+		receivedBy: String(record.receivedBy ?? 'Office admin').trim()
+	};
+};
+
+export const getBdrInvoiceAmountPaid = (invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'>) => {
+	const paymentTotal = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
+	if (paymentTotal > 0) return Math.min(paymentTotal, invoice.amount);
+	if (invoice.state === 'paid' || invoice.paidAtUtc) return invoice.amount;
+	return 0;
+};
+
+export const getBdrInvoiceBalanceDue = (invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'>) =>
+	Math.max(invoice.amount - getBdrInvoiceAmountPaid(invoice), 0);
+
 const normalizeInvoice = (value: unknown): BdrInvoiceRecord | null => {
 	if (!value || typeof value !== 'object') return null;
 	const record = value as Partial<BdrInvoiceRecord>;
@@ -79,6 +121,23 @@ const normalizeInvoice = (value: unknown): BdrInvoiceRecord | null => {
 			? record.amount
 			: parseEstimateTotal(lineItems);
 	const now = new Date().toISOString();
+	const payments = Array.isArray(record.payments)
+		? record.payments.map(normalizePayment).filter((payment): payment is BdrInvoicePaymentRecord => Boolean(payment))
+		: [];
+	const paidAtUtc = record.paidAtUtc?.trim() || undefined;
+	const normalizedPayments =
+		payments.length || normalizeState(record.state) !== 'paid'
+			? payments
+			: [
+					{
+						id: `payment-${id}-paid`,
+						amount,
+						method: 'ACH' as const,
+						note: 'Legacy paid invoice balance captured as collected.',
+						receivedAtUtc: paidAtUtc ?? now,
+						receivedBy: 'Office admin'
+					}
+				];
 
 	return {
 		id,
@@ -98,8 +157,9 @@ const normalizeInvoice = (value: unknown): BdrInvoiceRecord | null => {
 		createdAtUtc: String(record.createdAtUtc ?? '').trim() || now,
 		updatedAtUtc: String(record.updatedAtUtc ?? '').trim() || now,
 		sentAtUtc: record.sentAtUtc?.trim() || undefined,
-		paidAtUtc: record.paidAtUtc?.trim() || undefined,
+		paidAtUtc,
 		reminderSentAtUtc: record.reminderSentAtUtc?.trim() || undefined,
+		payments: normalizedPayments,
 		lineItems
 	};
 };
@@ -147,6 +207,7 @@ export const syncApprovedEstimateInvoices = async (approvedEstimates: ApprovedEs
 			approvedAtUtc: estimate.approvedAtUtc,
 			createdAtUtc: now,
 			updatedAtUtc: now,
+			payments: [],
 			lineItems: estimate.scopeLineItems
 		};
 		existing.unshift(invoice);
@@ -160,18 +221,53 @@ export const syncApprovedEstimateInvoices = async (approvedEstimates: ApprovedEs
 
 export const updateBdrInvoiceState = async (
 	invoiceId: string,
-	update: { state?: BdrInvoiceState; sent?: boolean; paid?: boolean; reminder?: boolean }
+	update: {
+		state?: BdrInvoiceState;
+		sent?: boolean;
+		paid?: boolean;
+		reminder?: boolean;
+		payment?: {
+			amount?: number;
+			method?: BdrInvoicePaymentMethod;
+			note?: string;
+			receivedBy?: string;
+		};
+	}
 ) => {
 	const invoices = await loadBdrInvoices();
 	const now = new Date().toISOString();
 	const next = invoices.map((invoice) => {
 		if (invoice.id !== invoiceId) return invoice;
+		const balanceDue = getBdrInvoiceBalanceDue(invoice);
+		const paymentAmount =
+			typeof update.payment?.amount === 'number' && Number.isFinite(update.payment.amount)
+				? Math.max(0, Math.min(update.payment.amount, balanceDue))
+				: update.paid
+					? balanceDue
+					: 0;
+		const payments =
+			paymentAmount > 0
+				? [
+						...invoice.payments,
+						{
+							id: `payment-${now}`,
+							amount: paymentAmount,
+							method: update.payment?.method ?? 'ACH',
+							note: update.payment?.note?.trim() || undefined,
+							receivedAtUtc: now,
+							receivedBy: update.payment?.receivedBy?.trim() || 'Office admin'
+						}
+					]
+				: invoice.payments;
+		const nextBalanceDue = Math.max(invoice.amount - payments.reduce((sum, payment) => sum + payment.amount, 0), 0);
+		const isFullyPaid = nextBalanceDue <= 0.01 || update.paid;
 		return {
 			...invoice,
-			state: update.state ?? (update.paid ? 'paid' : update.sent ? 'sent' : invoice.state),
+			state: update.state ?? (isFullyPaid ? 'paid' : update.sent ? 'sent' : invoice.state),
 			sentAtUtc: update.sent ? now : invoice.sentAtUtc,
-			paidAtUtc: update.paid ? now : invoice.paidAtUtc,
+			paidAtUtc: isFullyPaid ? invoice.paidAtUtc ?? now : invoice.paidAtUtc,
 			reminderSentAtUtc: update.reminder ? now : invoice.reminderSentAtUtc,
+			payments,
 			updatedAtUtc: now
 		};
 	});

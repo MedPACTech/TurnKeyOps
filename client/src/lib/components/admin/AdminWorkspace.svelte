@@ -6,6 +6,7 @@
 		label: string;
 		value: string;
 		detail?: string;
+		icon?: string;
 	};
 
 	let {
@@ -44,6 +45,7 @@
 		if (context) return 'xl:grid-cols-[260px_minmax(0,1fr)]';
 		return '';
 	});
+	const metricGridClass = $derived(metrics.length >= 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3');
 </script>
 
 <section class="space-y-5">
@@ -61,11 +63,18 @@
 	</div>
 
 	{#if metrics.length}
-		<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+		<div class={`grid gap-3 sm:grid-cols-2 ${metricGridClass}`}>
 			{#each metrics as metric}
-				<div class="flex h-32 flex-col justify-end rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
-					<p class="text-3xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{metric.value}</p>
-					<p class="mt-2 text-sm font-medium leading-5 text-[var(--text-muted)]">{metric.label}</p>
+				<div class="flex h-32 flex-col justify-between rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="flex items-start justify-between gap-3">
+						{#if metric.icon}
+							<span class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/80 text-xl shadow-sm" aria-hidden="true">{metric.icon}</span>
+						{/if}
+					</div>
+					<div>
+						<p class="text-3xl font-semibold leading-none tracking-normal text-[var(--text-strong)]">{metric.value}</p>
+						<p class="mt-2 text-sm font-medium leading-5 text-[var(--text-muted)]">{metric.label}</p>
+					</div>
 				</div>
 			{/each}
 		</div>

@@ -19,9 +19,10 @@
 		MapPin,
 		X
 	} from 'lucide-svelte';
+	import { formatCurrency } from '$lib/utils/format';
 
 	type CalendarView = 'day' | 'week' | 'month';
-	type EventType = 'Estimate' | 'Install Forms' | 'Pour Concrete' | 'Repair' | 'Site Visit';
+	type EventType = 'Estimate' | 'Install Forms' | 'Pour Concrete' | 'Repair' | 'Site Visit' | 'Job';
 	type WeatherKind = 'sunny' | 'partly-cloudy' | 'rain' | 'snow';
 
 type SiteVisit = {
@@ -30,6 +31,37 @@ type SiteVisit = {
 	customer: string;
 	status: string;
 };
+
+	type ScheduledJob = {
+		id: string;
+		invoiceId: string;
+		invoiceNumber: string;
+		customerName: string;
+		siteName: string;
+		serviceSummary: string;
+		serviceAddress: string;
+		contactName: string;
+		phone: string;
+		amount: number;
+		amountPaidAtScheduling: number;
+		depositPercentRequired: number;
+		scheduledDate: string;
+		windowStart: string;
+		windowEnd: string;
+		crew: string;
+		notes?: string;
+		status: 'scheduled' | 'in-progress' | 'on-hold' | 'completed' | 'cancelled';
+	};
+
+	type ScheduleReadyJob = {
+		invoiceId: string;
+		invoiceNumber: string;
+		customerName: string;
+		siteName: string;
+		amountPaid: number;
+		depositPercentRequired: number;
+		isScheduled: boolean;
+	};
 
 	type CalendarEvent = {
 		id: string;
@@ -59,7 +91,12 @@ type SiteVisit = {
 		low: number;
 	};
 
-	let { data }: { data: PageProps['data'] } = $props();
+	type CalendarPageData = PageProps['data'] & {
+		scheduledJobs?: ScheduledJob[];
+		scheduleReadyJobs?: ScheduleReadyJob[];
+	};
+
+	let { data }: { data: CalendarPageData } = $props();
 
 	const today = new Date();
 	const todayKey = formatDateKey(today);
@@ -96,6 +133,11 @@ type SiteVisit = {
 			colorClass: 'border-slate-300 bg-slate-100 text-slate-700',
 			softClass: 'bg-slate-200/80 text-slate-700',
 			icon: CalendarDays
+		},
+		Job: {
+			colorClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+			softClass: 'bg-emerald-100/80 text-emerald-700',
+			icon: Hammer
 		}
 	};
 
@@ -289,7 +331,8 @@ type SiteVisit = {
 		'Install Forms': true,
 		'Pour Concrete': true,
 		Repair: true,
-		'Site Visit': true
+		'Site Visit': true,
+		Job: true
 	});
 	let selectedEventId = $state<string | null>(null);
 	let focusedScheduleRequestId = $state<string | null>(null);
@@ -308,7 +351,9 @@ type SiteVisit = {
 			: ''
 	);
 	const scheduledVisitEvents = $derived((data.scheduledVisitRequests ?? []).map(toScheduledVisitEvent));
-	const calendarEvents = $derived([...mockedEvents, ...scheduledVisitEvents]);
+	const scheduledProductionEvents = $derived((data.scheduledJobs ?? []).map(toScheduledJobEvent));
+	const scheduleReadyJobs = $derived((data.scheduleReadyJobs ?? []).filter((job) => !job.isScheduled));
+	const calendarEvents = $derived([...mockedEvents, ...scheduledVisitEvents, ...scheduledProductionEvents]);
 	const selectedEvent = $derived(calendarEvents.find((event) => event.id === selectedEventId) ?? null);
 	const filteredEvents = $derived(calendarEvents.filter((event) => enabledTypes[event.type]));
 	const monthLabel = $derived(
@@ -416,6 +461,28 @@ type SiteVisit = {
 			crew: schedule?.assignedFieldResource || request.assignedTo,
 			estimatedValue: 'Pending estimate',
 			notes: schedule?.notes || request.nextAction,
+			source: 'quote-request'
+		};
+	}
+
+	function toScheduledJobEvent(job: ScheduledJob): CalendarEvent {
+		return {
+			id: `scheduled-job-${job.id}`,
+			type: 'Job',
+			name: job.siteName || job.customerName,
+			customerType: job.customerName !== job.siteName ? 'company' : 'customer',
+			date: job.scheduledDate,
+			startTime: formatScheduleTime(job.windowStart),
+			endTime: formatScheduleTime(job.windowEnd),
+			address: job.serviceAddress,
+			zipCode: extractZipCode(job.serviceAddress),
+			customerContact: job.contactName,
+			phone: job.phone,
+			projectSummary: job.serviceSummary,
+			status: `Production ${job.status.replace('-', ' ')}`,
+			crew: job.crew,
+			estimatedValue: formatCurrency(job.amount),
+			notes: job.notes || `${job.invoiceNumber} met the ${job.depositPercentRequired}% deposit gate.`,
 			source: 'quote-request'
 		};
 	}
@@ -592,6 +659,26 @@ type SiteVisit = {
 						Next <ChevronRight size={16} />
 					</button>
 				</div>
+			</section>
+
+			<section class="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+				<div class="flex items-center justify-between gap-3">
+					<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-emerald-700">Ready to schedule</p>
+					<span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700">{scheduleReadyJobs.length}</span>
+				</div>
+				{#if scheduleReadyJobs.length}
+					<div class="space-y-2">
+						{#each scheduleReadyJobs.slice(0, 3) as job}
+							<a href={`/bdr/admin/invoices#invoice-record`} class="block rounded-lg bg-white/90 px-3 py-3 shadow-sm transition hover:bg-white">
+								<p class="text-sm font-semibold text-[var(--text-strong)]">{job.invoiceNumber}</p>
+								<p class="mt-1 text-xs text-[var(--text-muted)]">{job.siteName} / {job.customerName}</p>
+								<p class="mt-2 text-xs font-semibold text-emerald-700">{formatCurrency(job.amountPaid)} collected · {job.depositPercentRequired}% gate met</p>
+							</a>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-sm leading-6 text-emerald-800">No paid-deposit jobs are waiting on production scheduling.</p>
+				{/if}
 			</section>
 
 			<section class="space-y-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">

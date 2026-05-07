@@ -1,6 +1,15 @@
 <script lang="ts">
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
+	import {
+		bdrEmployeeContacts,
+		bdrEmployeePermissionMeta,
+		bdrEmployeeSkillMeta,
+		type BdrEmployeeContact,
+		type BdrEmployeePermissionKey,
+		type BdrEmployeeSkillKey
+	} from '$lib/bdr-team';
 	import { buildCustomerViews, getScaffoldBanner } from '$lib/mvp-display';
+	import { CheckCircle2 } from 'lucide-svelte';
 	import type { PageProps } from './$types';
 
 	type ContactType = 'customer' | 'vendor' | 'employee';
@@ -16,6 +25,7 @@
 		contactType: ContactType;
 		title: string;
 		team: string;
+		employee?: BdrEmployeeContact;
 	};
 	type BobMove = {
 		label: string;
@@ -43,8 +53,13 @@
 	let newTitle = $state('');
 	let newStatus = $state('Active');
 	let newLifecycleStage = $state('Customer');
+	let newEmployeeSkills = $state<BdrEmployeeSkillKey[]>([]);
+	let newEmployeePermissions = $state<BdrEmployeePermissionKey[]>([]);
 
 	const customerViews = $derived(buildCustomerViews(data.customers, data.estimates, data.invoices));
+	const canManageEmployeeCapabilities = $derived(data.role === 'owner' || data.role === 'office-admin');
+	const employeeSkillOptions = Object.keys(bdrEmployeeSkillMeta) as BdrEmployeeSkillKey[];
+	const employeePermissionOptions = Object.keys(bdrEmployeePermissionMeta) as BdrEmployeePermissionKey[];
 	const baseContactRecords = $derived<ContactRecord[]>([
 		...customerViews.map((customer, index) => ({
 			...customer,
@@ -65,17 +80,26 @@
 			title: index === 0 ? 'Material supplier' : 'Trade partner',
 			team: 'Vendor network'
 		})),
-		...customerViews.slice(0, 3).map((customer, index) => ({
-			...customer,
-			id: `${customer.id}-employee`,
-			displayName: ['Jordan Ellis', 'Casey Morgan', 'Riley Stone'][index],
-			primaryContactName: ['Jordan Ellis', 'Casey Morgan', 'Riley Stone'][index],
-			primaryContactEmail: [`team${index + 1}@bdr-demo.local`][0],
-			primaryContactPhone: '704-555-0188',
+		...bdrEmployeeContacts.map((employee) => ({
+			id: employee.id,
+			displayName: employee.displayName,
+			primaryContactName: employee.displayName,
+			primaryContactEmail: employee.email,
+			primaryContactPhone: employee.phone,
+			status: employee.availability,
+			lifecycleStage: 'Employee',
+			property: `${employee.team} · ${employee.employmentType}`,
+			segment: employee.employmentType,
+			lastTouch: 'Capability profile ready for quote workflow assignment',
+			nextStep: `Eligible for ${employee.skills.map((skill) => bdrEmployeeSkillMeta[skill].label).join(', ')}`,
+			files: [],
+			risk: employee.permissions.includes('manage-admin-access') ? 'Access admin privileges enabled' : 'Standard workflow access',
+			openEstimateCount: 0,
+			openInvoiceCount: 0,
 			contactType: 'employee' as const,
-			segment: index === 0 ? 'Full time' : 'Contractor',
-			title: index === 0 ? 'Office admin' : 'Estimator / field lead',
-			team: 'BDR team'
+			title: employee.title,
+			team: employee.team,
+			employee
 		})),
 		...addedContacts
 	]);
@@ -120,6 +144,7 @@
 
 	const defaultAccessRole = (contact: ContactRecord): AdminAccessRole => {
 		if (contact.contactType !== 'employee') return 'none';
+		if (contact.employee) return contact.employee.accessRole;
 		if (contact.title.toLowerCase().includes('office admin')) return 'office-admin';
 		return 'field';
 	};
@@ -161,6 +186,8 @@
 		newTitle = type === 'employee' ? 'Team member' : type === 'vendor' ? 'Vendor contact' : 'Property owner';
 		newStatus = type === 'employee' ? 'Active' : type === 'vendor' ? 'Pending approval' : 'Active';
 		newLifecycleStage = type === 'employee' ? 'Employee' : type === 'vendor' ? 'Vendor' : 'Customer';
+		newEmployeeSkills = type === 'employee' ? ['intake-review'] : [];
+		newEmployeePermissions = type === 'employee' ? ['manage-quotes'] : [];
 	};
 	const setDrawerContactType = (type: ContactType) => {
 		newContactType = type;
@@ -169,6 +196,13 @@
 			newTitle = type === 'employee' ? 'Team member' : type === 'vendor' ? 'Vendor contact' : 'Property owner';
 		}
 		newLifecycleStage = type === 'employee' ? 'Employee' : type === 'vendor' ? 'Vendor' : 'Customer';
+		if (type === 'employee') {
+			newEmployeeSkills = newEmployeeSkills.length ? newEmployeeSkills : ['intake-review'];
+			newEmployeePermissions = newEmployeePermissions.length ? newEmployeePermissions : ['manage-quotes'];
+		} else {
+			newEmployeeSkills = [];
+			newEmployeePermissions = [];
+		}
 	};
 	const openContactDrawer = (type: ContactType = contactType) => {
 		resetContactDrawer(type);
@@ -188,11 +222,25 @@
 		newTitle = contact.title;
 		newStatus = contact.status;
 		newLifecycleStage = contact.lifecycleStage;
+		newEmployeeSkills = contact.employee?.skills ?? [];
+		newEmployeePermissions = contact.employee?.permissions ?? [];
 		contactDrawerOpen = true;
 	};
 	const closeContactDrawer = () => {
 		contactDrawerOpen = false;
 		editingContactId = null;
+	};
+	const toggleEmployeeSkill = (skill: BdrEmployeeSkillKey) => {
+		if (!canManageEmployeeCapabilities) return;
+		newEmployeeSkills = newEmployeeSkills.includes(skill)
+			? newEmployeeSkills.filter((entry) => entry !== skill)
+			: [...newEmployeeSkills, skill];
+	};
+	const toggleEmployeePermission = (permission: BdrEmployeePermissionKey) => {
+		if (!canManageEmployeeCapabilities) return;
+		newEmployeePermissions = newEmployeePermissions.includes(permission)
+			? newEmployeePermissions.filter((entry) => entry !== permission)
+			: [...newEmployeePermissions, permission];
 	};
 	const saveContact = () => {
 		const displayName = newDisplayName.trim();
@@ -201,6 +249,28 @@
 		const primaryContactName = newPrimaryContactName.trim() || displayName;
 		const existingContact = editingContactId ? contactRecords.find((contact) => contact.id === editingContactId) : null;
 		const id = existingContact?.id ?? `manual-${Date.now()}`;
+		const title = newTitle.trim() || (newContactType === 'employee' ? 'Team member' : newContactType === 'vendor' ? 'Vendor contact' : 'Property owner');
+		const team = newContactType === 'employee' ? existingContact?.team ?? 'BDR team' : newContactType === 'vendor' ? 'Vendor network' : 'Client account';
+		const employeeAccessRole =
+			existingContact?.employee?.accessRole ??
+			(title.toLowerCase().includes('owner') ? 'owner' : title.toLowerCase().includes('office admin') ? 'office-admin' : 'field');
+		const employee =
+			newContactType === 'employee'
+				? ({
+						id,
+						displayName,
+						title,
+						team,
+						employmentType: newContactSegment as BdrEmployeeContact['employmentType'],
+						email: newPrimaryContactEmail.trim(),
+						phone: newPrimaryContactPhone.trim(),
+						accessRole: employeeAccessRole,
+						skills: [...new Set(newEmployeeSkills)],
+						permissions: [...new Set(newEmployeePermissions)],
+						availability: newStatus.trim() || 'Available',
+						workload: existingContact?.employee?.workload ?? 2
+					} satisfies BdrEmployeeContact)
+				: undefined;
 		const contact: ContactRecord = {
 			...(existingContact ?? {}),
 			id,
@@ -213,14 +283,25 @@
 			property: newProperty.trim() || (newContactType === 'employee' ? 'BDR team' : 'No address on file'),
 			segment: newContactSegment,
 			lastTouch: existingContact?.lastTouch ?? 'New contact added',
-			nextStep: existingContact?.nextStep ?? (newContactType === 'employee' ? 'Confirm app access and operating role' : 'Complete contact profile and next follow-up'),
+			nextStep:
+				newContactType === 'employee'
+					? employee?.skills.length
+						? `Eligible for ${employee.skills.map((skill) => bdrEmployeeSkillMeta[skill].label).join(', ')}`
+						: 'No workflow skills selected'
+					: existingContact?.nextStep ?? 'Complete contact profile and next follow-up',
 			files: existingContact?.files ?? [],
-			risk: existingContact?.risk ?? 'New contact needs review',
+			risk:
+				newContactType === 'employee'
+					? employee?.permissions.includes('manage-admin-access')
+						? 'Access admin privileges enabled'
+						: 'Standard workflow access'
+					: existingContact?.risk ?? 'New contact needs review',
 			openEstimateCount: existingContact?.openEstimateCount ?? 0,
 			openInvoiceCount: existingContact?.openInvoiceCount ?? 0,
 			contactType: newContactType,
-			title: newTitle.trim() || (newContactType === 'employee' ? 'Team member' : newContactType === 'vendor' ? 'Vendor contact' : 'Property owner'),
-			team: newContactType === 'employee' ? 'BDR team' : newContactType === 'vendor' ? 'Vendor network' : 'Client account'
+			title,
+			team,
+			employee
 		};
 
 		if (existingContact) {
@@ -490,6 +571,34 @@
 						</div>
 					</div>
 					{#if selectedContact.contactType === 'employee'}
+						<div class="grid gap-3 md:grid-cols-2">
+							<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+								<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Workflow skills</p>
+								<div class="mt-3 flex flex-wrap gap-2">
+									{#each selectedContact.employee?.skills ?? [] as skill}
+										<span class="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+											{bdrEmployeeSkillMeta[skill].label}
+										</span>
+									{/each}
+								</div>
+								<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">
+									Skills drive automatic quote task assignment before an admin overrides the owner.
+								</p>
+							</div>
+							<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+								<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Workflow permissions</p>
+								<div class="mt-3 flex flex-wrap gap-2">
+									{#each selectedContact.employee?.permissions ?? [] as permission}
+										<span class="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-text)]">
+											{bdrEmployeePermissionMeta[permission].label}
+										</span>
+									{/each}
+								</div>
+								<p class="mt-3 text-xs leading-5 text-[var(--text-muted)]">
+									Permissions control which workflow buttons can choose this employee automatically.
+								</p>
+							</div>
+						</div>
 						<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
 							<div class="flex flex-wrap items-start justify-between gap-3">
 								<div>
@@ -638,6 +747,63 @@
 					<input bind:value={newLifecycleStage} class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
 				</label>
 			</div>
+
+			{#if newContactType === 'employee'}
+				<div class="space-y-4 rounded-lg bg-white/80 p-4 shadow-sm">
+					<div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+						<div>
+							<p class="text-sm font-semibold text-[var(--text-strong)]">Workflow skills</p>
+							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Skills decide which quote task this employee can be auto-picked for.</p>
+						</div>
+						<span class="w-fit rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-text)]">
+							{canManageEmployeeCapabilities ? 'Editable' : 'Owner/admin only'}
+						</span>
+					</div>
+					<div class="grid gap-2 sm:grid-cols-2">
+						{#each employeeSkillOptions as skill}
+							{@const isSelected = newEmployeeSkills.includes(skill)}
+							<button
+								type="button"
+								class={`min-h-16 rounded-lg px-3 py-3 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200' : 'bg-[var(--shell-panel-strong)] text-[var(--text-base)] hover:bg-white'}`}
+								aria-pressed={isSelected}
+								disabled={!canManageEmployeeCapabilities}
+								onclick={() => toggleEmployeeSkill(skill)}
+							>
+								<span class="flex items-center gap-2 text-sm font-semibold">
+									{#if isSelected}<CheckCircle2 size={15} />{/if}
+									{bdrEmployeeSkillMeta[skill].label}
+								</span>
+								<span class="mt-1 block text-xs leading-5 opacity-80">{bdrEmployeeSkillMeta[skill].detail}</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+
+				<div class="space-y-4 rounded-lg bg-white/80 p-4 shadow-sm">
+					<div>
+						<p class="text-sm font-semibold text-[var(--text-strong)]">Workflow permissions</p>
+						<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Permissions control which workflow actions can assign work to this employee.</p>
+					</div>
+					<div class="grid gap-2 sm:grid-cols-2">
+						{#each employeePermissionOptions as permission}
+							{@const isSelected = newEmployeePermissions.includes(permission)}
+							<button
+								type="button"
+								class={`min-h-16 rounded-lg px-3 py-3 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${isSelected ? 'bg-[#fff4ea] text-[var(--accent-text)] ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-[var(--shell-panel-strong)] text-[var(--text-base)] hover:bg-white'}`}
+								aria-pressed={isSelected}
+								disabled={!canManageEmployeeCapabilities}
+								onclick={() => toggleEmployeePermission(permission)}
+							>
+								<span class="flex items-center gap-2 text-sm font-semibold">
+									{#if isSelected}<CheckCircle2 size={15} />{/if}
+									{bdrEmployeePermissionMeta[permission].label}
+								</span>
+								<span class="mt-1 block text-xs leading-5 opacity-80">{bdrEmployeePermissionMeta[permission].detail}</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 
 			<div class="flex flex-col gap-2 sm:flex-row">
 				<button
