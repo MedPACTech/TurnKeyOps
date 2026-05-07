@@ -945,9 +945,17 @@
 								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedScheduledJob.crew}</p>
 							</div>
 						</div>
-						<a href="/bdr/admin/calendar" class="mt-4 inline-flex rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
-							Open calendar
-						</a>
+						<div class="mt-4 flex flex-wrap gap-2">
+							<a
+								href={`/bdr/admin/jobs?job=${encodeURIComponent(selectedScheduledJob.id)}`}
+								class="inline-flex rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]"
+							>
+								Open job
+							</a>
+							<a href="/bdr/admin/calendar" class="inline-flex rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+								Open calendar
+							</a>
+						</div>
 					{:else if canScheduleLifecycleInvoice(selectedLifecycleInvoice)}
 						<form method="POST" action="?/scheduleJob" class="mt-4 grid gap-3 rounded-lg bg-[var(--shell-panel-strong)] p-3 shadow-sm lg:grid-cols-2">
 							<input type="hidden" name="invoiceId" value={selectedLifecycleInvoice.id} />

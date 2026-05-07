@@ -13,7 +13,7 @@ import {
 	scheduleBdrJobFromInvoice
 } from '$lib/server/bdr-job-scheduling';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 
 const fsModuleName = 'node:fs/promises';
 const getCwd = () =>
@@ -265,9 +265,6 @@ export const actions = {
 			notes,
 			scheduledBy: 'Office admin'
 		});
-		return {
-			invoiceActionMessage: `${invoice.invoiceNumber} was scheduled for ${scheduledJob.scheduledDate}.`,
-			scheduledJob
-		};
+		throw redirect(303, `/bdr/admin/jobs?job=${encodeURIComponent(scheduledJob.id)}`);
 	}
 };
