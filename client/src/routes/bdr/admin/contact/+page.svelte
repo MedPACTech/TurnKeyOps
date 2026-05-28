@@ -174,6 +174,16 @@
 		return '#64748b';
 	};
 	const getContactAccentSoft = (contact: ContactRecord) => `${getContactAccent(contact)}1f`;
+	const violetSelectionCardClass = 'border-transparent bg-violet-50 shadow-sm ring-1 ring-violet-200';
+	const violetSelectionChipClass = 'border-transparent bg-violet-50 text-violet-700 shadow-sm ring-1 ring-violet-200';
+	const violetPrimaryButtonClass =
+		'rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-500';
+	const violetPrimaryButtonLargeClass =
+		'rounded-md bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50';
+	const violetFieldClass =
+		'h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100';
+	const violetTextareaClass =
+		'rounded-lg border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-strong)] outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100';
 	const resetContactDrawer = (type: ContactType = contactType) => {
 		editingContactId = null;
 		newContactType = type;
@@ -343,6 +353,32 @@
 		},
 		{ label: 'Source', value: data.source === 'api' ? 'API scaffold' : 'Fallback scaffold', detail: getScaffoldBanner(data.source) }
 	]);
+	const selectedContactHeaderMetrics = $derived.by(() => {
+		if (!selectedContact) return [];
+
+		return [
+			{
+				label: 'Relationship type',
+				value: getContactTypeLabel(selectedContact),
+				detail: selectedContact.segment
+			},
+			{
+				label: 'Work surface',
+				value: selectedContact.lifecycleStage,
+				detail: selectedContact.team
+			},
+			{
+				label: 'Open estimates',
+				value: String(selectedContact.openEstimateCount),
+				detail: 'Linked quote work'
+			},
+			{
+				label: 'Open invoices',
+				value: String(selectedContact.openInvoiceCount),
+				detail: 'Linked billing work'
+			}
+		];
+	});
 	const bobMoves = $derived.by(() => {
 		if (!selectedContact) {
 			return [
@@ -389,8 +425,8 @@
 	title="Contacts"
 	description="Keep people, property context, and the next follow-up visible without turning the page into a dense CRM screen."
 	{metrics}
-	contextLabel="Contact type"
-	focusLabel="Contact list"
+	contextLabel="Blades"
+	focusLabel="Filtered contacts"
 	drawerOpen={contactDrawerOpen}
 	drawerTitle={editingContactId ? 'Edit Contact' : 'Add Contact'}
 	closeDrawer={closeContactDrawer}
@@ -400,7 +436,7 @@
 			{#each contactTypeOptions as option}
 				<button
 					type="button"
-					class={`w-full rounded-lg border px-3 py-3 text-left transition ${contactType === option.key ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+					class={`w-full rounded-lg border px-3 py-3 text-left transition ${contactType === option.key ? violetSelectionCardClass : 'border-transparent bg-white/80 shadow-sm hover:bg-violet-50/70'}`}
 					onclick={() => {
 						contactType = option.key;
 						selectedContactId = '';
@@ -449,7 +485,7 @@
 				</p>
 				<button
 					type="button"
-					class="rounded-md bg-[var(--accent-solid)] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
+					class={violetPrimaryButtonClass}
 					onclick={() => openContactDrawer(contactType)}
 				>
 					+ Add Contact
@@ -459,7 +495,7 @@
 				<button
 					type="button"
 					style={`--contact-accent: ${getContactAccent(contact)}; --contact-accent-soft: ${getContactAccentSoft(contact)}; border-top-color: var(--contact-accent);`}
-					class={`group w-full overflow-hidden rounded-lg border border-t-[3px] border-x-transparent border-b-transparent p-0 text-left transition ${selectedContact?.id === contact.id ? 'bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-white/85 shadow-sm hover:bg-white'}`}
+					class={`group w-full overflow-hidden rounded-lg border border-t-[3px] border-x-transparent border-b-transparent p-0 text-left transition ${selectedContact?.id === contact.id ? violetSelectionCardClass : 'bg-white/85 shadow-sm hover:bg-violet-50/70'}`}
 					onclick={() => (selectedContactId = contact.id)}
 				>
 					<div class="flex min-h-[7.25rem] items-stretch">
@@ -497,30 +533,37 @@
 	{#snippet work()}
 		{#if selectedContact}
 			<div id="relationship-record" class="space-y-4">
-				<div class="flex flex-wrap items-start justify-between gap-3">
-					<div>
-						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{contactType}</p>
-						<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedContact.displayName}</h4>
-						<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedContact.title} · {selectedContact.team}</p>
+				<div class="rounded-[1.4rem] border border-violet-100 bg-gradient-to-r from-violet-50 via-white to-white p-5 shadow-[var(--shell-shadow)]">
+					<div class="flex flex-wrap items-start justify-between gap-4">
+						<div class="min-w-0">
+							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-violet-700">{contactType} blade</p>
+							<h4 class="mt-2 text-2xl font-semibold text-[var(--text-strong)]">{selectedContact.displayName}</h4>
+							<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedContact.title} · {selectedContact.team}</p>
+						</div>
+						<div
+							class="flex flex-col items-end gap-2"
+							style={`--contact-accent: ${getContactAccent(selectedContact)}; --contact-accent-soft: ${getContactAccentSoft(selectedContact)};`}
+						>
+							<button type="button" class={violetPrimaryButtonClass} onclick={() => openEditContactDrawer(selectedContact)}>
+								Edit Contact
+							</button>
+							<span
+								class="rounded-md border px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.16em]"
+								style="border-color: var(--contact-accent); background: var(--contact-accent-soft); color: var(--contact-accent);"
+							>
+								{selectedContact.status}
+							</span>
+						</div>
 					</div>
-					<div
-						class="flex flex-col items-end gap-2"
-						style={`--contact-accent: ${getContactAccent(selectedContact)}; --contact-accent-soft: ${getContactAccentSoft(selectedContact)};`}
-					>
-						<button
-							type="button"
-							class="rounded-md bg-[var(--accent-solid)] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
-							onclick={() => openEditContactDrawer(selectedContact)}
-						>
-							Edit Contact
-						</button>
-						<span
-							class="rounded-md border px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.16em]"
-							style="border-color: var(--contact-accent); background: var(--contact-accent-soft); color: var(--contact-accent);"
-						>
-							{selectedContact.status}
-						</span>
-						<p class="text-right text-xs uppercase tracking-[0.18em] text-[var(--muted)]">{selectedContact.lifecycleStage}</p>
+
+					<div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+						{#each selectedContactHeaderMetrics as metric}
+							<div class="rounded-2xl border border-violet-100/80 bg-white/90 p-4 shadow-sm">
+								<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">{metric.label}</p>
+								<p class="mt-3 text-xl font-semibold text-[var(--text-strong)]">{metric.value}</p>
+								<p class="mt-1 text-xs text-[var(--text-muted)]">{metric.detail}</p>
+							</div>
+						{/each}
 					</div>
 				</div>
 
@@ -548,7 +591,7 @@
 					] as tab}
 						<button
 							type="button"
-							class={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${activeTab === tab.key ? 'border-transparent bg-[#fff4ea] text-[var(--accent-text)] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 text-[var(--text-base)] shadow-sm hover:bg-white'}`}
+							class={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${activeTab === tab.key ? violetSelectionChipClass : 'border-transparent bg-white/80 text-[var(--text-base)] shadow-sm hover:bg-violet-50/70'}`}
 							onclick={() => (activeTab = tab.key)}
 						>
 							{tab.label}
@@ -618,7 +661,7 @@
 										<input type="hidden" name="role" value={option.key} />
 										<button
 											type="submit"
-											class={`h-full w-full rounded-lg px-3 py-3 text-left shadow-sm transition ${getAccessRole(selectedContact) === option.key ? 'bg-[#fff4ea] ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-[var(--shell-panel-strong)] hover:bg-white'}`}
+											class={`h-full w-full rounded-lg px-3 py-3 text-left shadow-sm transition ${getAccessRole(selectedContact) === option.key ? 'bg-violet-50 ring-1 ring-violet-200' : 'bg-[var(--shell-panel-strong)] hover:bg-violet-50/70'}`}
 											onclick={(event) => {
 												if (isAdminRole(option.key) && getAccessRole(selectedContact) !== option.key) {
 													event.preventDefault();
@@ -683,7 +726,7 @@
 					{#each contactTypeOptions as option}
 						<button
 							type="button"
-							class={`rounded-lg px-3 py-3 text-sm font-semibold shadow-sm transition ${newContactType === option.key ? 'bg-[#fff4ea] text-[var(--accent-text)] ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-white text-[var(--text-base)] hover:bg-[var(--shell-panel-strong)]'}`}
+							class={`rounded-lg px-3 py-3 text-sm font-semibold shadow-sm transition ${newContactType === option.key ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200' : 'bg-white text-[var(--text-base)] hover:bg-violet-50/70'}`}
 							onclick={() => setDrawerContactType(option.key)}
 						>
 							{option.label.replace(/s$/, '')}
@@ -696,7 +739,7 @@
 				<span class="text-sm font-semibold text-[var(--text-base)]">
 					{newContactType === 'customer' ? 'Customer type' : newContactType === 'vendor' ? 'Vendor type' : 'Employee type'}
 				</span>
-				<select bind:value={newContactSegment} class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]">
+				<select bind:value={newContactSegment} class={violetFieldClass}>
 					{#each contactClassificationOptions[newContactType] as option}
 						<option value={option}>{option}</option>
 					{/each}
@@ -707,44 +750,44 @@
 				<span class="text-sm font-semibold text-[var(--text-base)]">
 					{newContactType === 'employee' ? 'Employee name' : newContactType === 'vendor' ? 'Vendor name' : 'Customer / property name'}
 				</span>
-				<input bind:value={newDisplayName} class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" placeholder="Name" />
+				<input bind:value={newDisplayName} class={violetFieldClass} placeholder="Name" />
 			</label>
 
 			<div class="grid gap-4 sm:grid-cols-2">
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Primary contact</span>
-					<input bind:value={newPrimaryContactName} class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" placeholder="Contact name" />
+					<input bind:value={newPrimaryContactName} class={violetFieldClass} placeholder="Contact name" />
 				</label>
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Role / title</span>
-					<input bind:value={newTitle} class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
+					<input bind:value={newTitle} class={violetFieldClass} />
 				</label>
 			</div>
 
 			<div class="grid gap-4 sm:grid-cols-2">
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Email</span>
-					<input bind:value={newPrimaryContactEmail} type="email" class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" placeholder="name@example.com" />
+					<input bind:value={newPrimaryContactEmail} type="email" class={violetFieldClass} placeholder="name@example.com" />
 				</label>
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Phone</span>
-					<input bind:value={newPrimaryContactPhone} type="tel" class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" placeholder="704-555-0100" />
+					<input bind:value={newPrimaryContactPhone} type="tel" class={violetFieldClass} placeholder="704-555-0100" />
 				</label>
 			</div>
 
 			<label class="grid gap-2">
 				<span class="text-sm font-semibold text-[var(--text-base)]">{newContactType === 'employee' ? 'Team / context' : 'Address / context'}</span>
-				<textarea bind:value={newProperty} rows="3" class="rounded-lg border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" placeholder={newContactType === 'employee' ? 'Office, field, dispatch...' : 'Street, city, notes...'}></textarea>
+				<textarea bind:value={newProperty} rows="3" class={violetTextareaClass} placeholder={newContactType === 'employee' ? 'Office, field, dispatch...' : 'Street, city, notes...'}></textarea>
 			</label>
 
 			<div class="grid gap-4 sm:grid-cols-2">
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Status</span>
-					<input bind:value={newStatus} class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
+					<input bind:value={newStatus} class={violetFieldClass} />
 				</label>
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Work surface label</span>
-					<input bind:value={newLifecycleStage} class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
+					<input bind:value={newLifecycleStage} class={violetFieldClass} />
 				</label>
 			</div>
 
@@ -764,7 +807,7 @@
 							{@const isSelected = newEmployeeSkills.includes(skill)}
 							<button
 								type="button"
-								class={`min-h-16 rounded-lg px-3 py-3 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200' : 'bg-[var(--shell-panel-strong)] text-[var(--text-base)] hover:bg-white'}`}
+								class={`min-h-16 rounded-lg px-3 py-3 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${isSelected ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200' : 'bg-[var(--shell-panel-strong)] text-[var(--text-base)] hover:bg-violet-50/70'}`}
 								aria-pressed={isSelected}
 								disabled={!canManageEmployeeCapabilities}
 								onclick={() => toggleEmployeeSkill(skill)}
@@ -789,7 +832,7 @@
 							{@const isSelected = newEmployeePermissions.includes(permission)}
 							<button
 								type="button"
-								class={`min-h-16 rounded-lg px-3 py-3 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${isSelected ? 'bg-[#fff4ea] text-[var(--accent-text)] ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-[var(--shell-panel-strong)] text-[var(--text-base)] hover:bg-white'}`}
+								class={`min-h-16 rounded-lg px-3 py-3 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${isSelected ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200' : 'bg-[var(--shell-panel-strong)] text-[var(--text-base)] hover:bg-violet-50/70'}`}
 								aria-pressed={isSelected}
 								disabled={!canManageEmployeeCapabilities}
 								onclick={() => toggleEmployeePermission(permission)}
@@ -808,7 +851,7 @@
 			<div class="flex flex-col gap-2 sm:flex-row">
 				<button
 					type="button"
-					class="rounded-md bg-[var(--accent-solid)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+					class={violetPrimaryButtonLargeClass}
 					disabled={!newDisplayName.trim()}
 					onclick={saveContact}
 				>
