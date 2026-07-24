@@ -258,7 +258,7 @@ export const bdrSiteContent: BdrSiteContent = {
 			key: 'bdr-favicon-mark',
 			name: 'Favicon mark',
 			type: 'icon',
-			file: '/clientFiles/logo.png',
+			file: '/clientFiles/bdr-favicon.png',
 			altText: 'BDR Construction favicon mark',
 			contractorCategory: 'concrete',
 			tags: ['brand', 'favicon', 'logo-mark'],
@@ -338,57 +338,57 @@ export const bdrSiteContent: BdrSiteContent = {
 				key: 'service-driveways-icon',
 				name: 'Driveways service icon',
 				type: 'icon',
-				file: '/clientFiles/assets/driveways-icon.svg',
+				file: '/clientFiles/assets/bdr-driveways.png',
 				altText: 'Line icon for driveway work',
 				contractorCategory: 'concrete',
 				tags: ['service', 'icon', 'driveways'],
 			sortOrder: 7
 		},
-		{
+			{
 				key: 'service-patios-icon',
 				name: 'Patios service icon',
 				type: 'icon',
-				file: '/clientFiles/assets/patios-icon.svg',
+				file: '/clientFiles/assets/bdr-patios.png',
 				altText: 'Line icon for patio work',
 				contractorCategory: 'concrete',
 				tags: ['service', 'icon', 'patios'],
 			sortOrder: 8
 		},
-		{
+			{
 				key: 'service-sidewalks-icon',
 				name: 'Sidewalks service icon',
 				type: 'icon',
-				file: '/clientFiles/assets/sidewalks-icon.svg',
+				file: '/clientFiles/assets/bdr-sidewalks.png',
 				altText: 'Line icon for sidewalk work',
 				contractorCategory: 'concrete',
 				tags: ['service', 'icon', 'sidewalks'],
 			sortOrder: 9
 		},
-		{
+			{
 				key: 'service-steps-icon',
 				name: 'Steps and stoops service icon',
 				type: 'icon',
-				file: '/clientFiles/assets/steps-stoops-icon.svg',
+				file: '/clientFiles/assets/bdr-steps-stoops.png',
 				altText: 'Line icon for steps and stoops work',
 				contractorCategory: 'concrete',
 			tags: ['service', 'icon', 'steps', 'stoops'],
 			sortOrder: 10
 		},
-		{
+			{
 				key: 'service-slabs-icon',
 				name: 'Concrete slabs service icon',
 				type: 'icon',
-				file: '/clientFiles/assets/slabs-icon.svg',
+				file: '/clientFiles/assets/bdr-concrete-slabs.png',
 				altText: 'Line icon for slab work',
 				contractorCategory: 'concrete',
 			tags: ['service', 'icon', 'slabs'],
 			sortOrder: 11
 		},
-		{
+			{
 				key: 'service-decorative-icon',
 				name: 'Decorative concrete service icon',
 				type: 'icon',
-				file: '/clientFiles/assets/decorative-concrete-icon.svg',
+				file: '/clientFiles/assets/bdr-decorative-concrete.png',
 				altText: 'Line icon for decorative concrete work',
 				contractorCategory: 'concrete',
 				tags: ['service', 'icon', 'decorative'],
@@ -1149,8 +1149,20 @@ export const resolveBdrCopyright = (
 	return template.replace('{{year}}', String(resolvedYear));
 };
 
-export const getBdrAsset = (content: BdrSiteContent, key: string) =>
-	content.assetLibrary.find((asset) => asset.key === key) ?? null;
+const currentBdrServiceIconFiles: Record<string, string> = {
+	'service-driveways-icon': '/clientFiles/assets/bdr-driveways.png',
+	'service-patios-icon': '/clientFiles/assets/bdr-patios.png',
+	'service-sidewalks-icon': '/clientFiles/assets/bdr-sidewalks.png',
+	'service-steps-icon': '/clientFiles/assets/bdr-steps-stoops.png',
+	'service-slabs-icon': '/clientFiles/assets/bdr-concrete-slabs.png',
+	'service-decorative-icon': '/clientFiles/assets/bdr-decorative-concrete.png'
+};
+
+export const getBdrAsset = (content: BdrSiteContent, key: string) => {
+	const asset = content.assetLibrary.find((candidate) => candidate.key === key) ?? null;
+	const currentFile = currentBdrServiceIconFiles[key];
+	return asset && currentFile ? { ...asset, file: currentFile } : asset;
+};
 
 export const getBdrServiceCategories = (content: BdrSiteContent) =>
 	[...content.serviceCategories].sort((left, right) => left.sortOrder - right.sortOrder);

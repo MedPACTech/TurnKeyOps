@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+
+@theme {
+	/* Brand palette — lifted from the Think Pink design file */
+	--color-ink: #1c1418;
+	--color-ink-soft: #251b20;
+	--color-ink-line: #3a2c33;
+	--color-bone: #faf7f8;
+	--color-bone-2: #f3ebef;
+	--color-pink: #d40f80;
+	--color-pink-dark: #a50c64;
+	--color-pink-bright: #ff4fb2;
+	--color-pink-pale: #fbd7ea;
+	--color-body: #4a3e44;
+	--color-muted: #6e5f66;
+	--color-muted-2: #8a7681;
+	--color-faint: #9c8e95;
+	--color-line: #eadde3;
+	--color-line-2: #e3d2db;
+	--color-line-3: #dccbd4;
+	--color-dark-body: #bca9b2;
+	--color-dark-body-2: #e7dae0;
+
+	--font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+	--font-display: 'Big Shoulders Display', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+	html {
+		scroll-behavior: smooth;
+		/* keep sticky header from covering anchor targets */
+		scroll-padding-top: 5rem;
+	}
+
+	body {
+		background: var(--color-bone);
+		color: var(--color-ink);
+		font-family: var(--font-sans);
+		-webkit-font-smoothing: antialiased;
+	}
+
+	::placeholder {
+		color: var(--color-faint);
+	}
+}
+
+@utility eyebrow {
+	font-size: 0.8125rem;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+}
+
+@utility display {
+	font-family: var(--font-display);
+	text-transform: uppercase;
+	line-height: 1;
+}
+

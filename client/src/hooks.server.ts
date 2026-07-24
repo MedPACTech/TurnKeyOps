@@ -9,15 +9,18 @@ import {
 	isExternalAdminPath
 } from '$lib/server/auth-session';
 import { getPersistedBdrAdminRole } from '$lib/server/bdr-contact-access';
+import { resolveProductionPathname } from '$lib/config/domains';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	if (!isAdminPath(event.url.pathname)) {
+	const authPathname = resolveProductionPathname(event.url.hostname, event.url.pathname);
+
+	if (!isAdminPath(authPathname)) {
 		return resolve(event);
 	}
 
 	const authSession = getAdminSessionFromToken(
 		event.cookies.get(authTokenCookie),
-		event.url.pathname,
+		authPathname,
 		event.cookies.get(bdrAdminSessionCookie)
 	);
 	if (authSession) {
@@ -32,7 +35,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
-	const persistedRole = isExternalAdminPath(event.url.pathname)
+	const persistedRole = isExternalAdminPath(authPathname)
 		? await getPersistedBdrAdminRole(event.cookies.get(bdrAdminContactCookie))
 		: null;
 	if (persistedRole) {
@@ -51,7 +54,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (event.request.headers.get('accept')?.includes('text/html')) {
-		throw redirect(303, buildLoginRedirect(event.url));
+		const loginUrl = new URL(event.url);
+		loginUrl.pathname = authPathname;
+		throw redirect(303, buildLoginRedirect(loginUrl));
 	}
 
 	throw error(403, 'Admin access requires owner or office admin privileges.');

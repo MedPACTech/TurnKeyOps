@@ -99,6 +99,7 @@ export type QuoteRequestTimelineEvent = {
 
 export type QuoteRequest = {
 	id: string;
+	tenantId?: string;
 	submittedAtUtc: string;
 	companyName: string;
 	contactName: string;
@@ -129,6 +130,7 @@ export type QuoteRequest = {
 
 export type QuoteRequestFormInput = {
 	id?: string;
+	tenantId?: string;
 	companyName: string;
 	contactName: string;
 	email: string;
@@ -1046,6 +1048,7 @@ export const createQuoteRequestFromForm = (form: QuoteRequestFormInput): QuoteRe
 
 	return {
 		id,
+		tenantId: form.tenantId,
 		submittedAtUtc,
 		companyName: form.companyName,
 		contactName: form.contactName,

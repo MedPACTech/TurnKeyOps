@@ -1,9 +1,5 @@
 <script lang="ts">
-	const tenants = [
-		{ name: 'BDR Construction', vertical: 'Contractor', stage: 'Live', owner: 'Christian + implementation', readiness: '92%', blockers: 'Keep reference learnings from hard-coding the platform shell.', milestone: 'Graduate stable launch checks into shared playbooks.' },
-		{ name: 'Field Services Pilot', vertical: 'Field services', stage: 'Configuration', owner: 'Solutions architect', readiness: '68%', blockers: 'Permissions and billing policies are still too bespoke.', milestone: 'Finalize modular roles + invoice exception rules.' },
-		{ name: 'White-Glove Services', vertical: 'White-glove', stage: 'Discovery', owner: 'Platform PM', readiness: '41%', blockers: 'Workflow assumptions still lean contractor-first.', milestone: 'Define vertical object model before environment setup.' }
-	];
+	import { tenants } from '$lib/config/tenants';
 
 	const portfolioNotes = [
 		'Every tenant should carry owner, stage, confidence, next milestone, and escalation path.',
@@ -24,17 +20,20 @@
 					<div>
 						<div class="flex flex-wrap items-center gap-2">
 							<p class="text-base font-semibold text-[var(--text-strong)]">{tenant.name}</p>
-							<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-2 py-1 text-[0.68rem] uppercase tracking-[0.14em] text-[var(--muted)]">{tenant.vertical}</span>
+							<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-2 py-1 text-[0.68rem] uppercase tracking-[0.14em] text-[var(--muted)]">{tenant.tradeLabel}</span>
 						</div>
-						<p class="mt-1 text-sm text-[var(--text-muted)]">{tenant.stage} · {tenant.owner}</p>
+						<p class="mt-1 text-sm capitalize text-[var(--text-muted)]">{tenant.status} · {tenant.services.length} configured services</p>
 					</div>
 					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3">
-						<p class="text-[0.62rem] uppercase tracking-[0.16em] text-[var(--muted)]">Readiness</p>
-						<p class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{tenant.readiness}</p>
+						<p class="text-[0.62rem] uppercase tracking-[0.16em] text-[var(--muted)]">Trade profile</p>
+						<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{tenant.tradeProfile}</p>
 					</div>
 					<div class="space-y-2 text-sm">
-						<p class="text-[var(--text-muted)]"><span class="font-semibold text-[var(--text-strong)]">Current block:</span> {tenant.blockers}</p>
-						<p class="text-[var(--text-muted)]"><span class="font-semibold text-[var(--text-strong)]">Next milestone:</span> {tenant.milestone}</p>
+						<p class="text-[var(--text-muted)]"><span class="font-semibold text-[var(--text-strong)]">Bob context:</span> {tenant.bobContext}</p>
+						<div class="flex flex-wrap gap-2 pt-1">
+							<a href={tenant.adminPath} class="rounded-md bg-[var(--text-strong)] px-3 py-2 text-xs font-semibold text-white">Open admin</a>
+							<a href={tenant.publicPath} class="rounded-md border border-[var(--shell-border)] px-3 py-2 text-xs font-semibold text-[var(--text-strong)]">View public site</a>
+						</div>
 					</div>
 				</div>
 			{/each}

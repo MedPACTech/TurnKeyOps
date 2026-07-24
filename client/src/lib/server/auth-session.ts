@@ -100,7 +100,11 @@ export const inferOtpChannel = (identifier: string): OtpChannel | null => {
 	return digits.length >= 7 && digits.length <= 15 ? 'sms' : null;
 };
 
-export const isExternalAdminPath = (pathname: string) => pathname === '/bdr/admin' || pathname.startsWith('/bdr/admin/');
+export const isExternalAdminPath = (pathname: string) =>
+	pathname === '/bdr/admin' ||
+	pathname.startsWith('/bdr/admin/') ||
+	pathname === '/thinkpink/admin' ||
+	pathname.startsWith('/thinkpink/admin/');
 export const isInternalAdminPath = (pathname: string) =>
 	pathname === '/turnkeyops/admin' || pathname.startsWith('/turnkeyops/admin/');
 export const isAdminPath = (pathname: string) => isExternalAdminPath(pathname) || isInternalAdminPath(pathname);
@@ -114,6 +118,7 @@ export const getDefaultAdminReturnTo = (surface: AdminSurface) =>
 export const getSafeAdminReturnTo = (value: string | null | undefined) => {
 	if (value?.startsWith('/turnkeyops/admin')) return value;
 	if (value?.startsWith('/bdr/admin')) return value;
+	if (value?.startsWith('/thinkpink/admin')) return value;
 	return '/bdr/admin/bob';
 };
 
