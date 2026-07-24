@@ -28,8 +28,8 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     variables:
-      SOLUTION_FILE: '**/MedInsights.API.sln'
-      API_PROJECT_FILE: 'MedInsights.API/MedInsights.API.csproj'
+      SOLUTION_FILE: 'api/TurnKeyOps.API.sln'
+      API_PROJECT_FILE: 'api/TurnKeyOps.API/TurnKeyOps.API.csproj'
       PUBLISH_DIR: '$(Build.ArtifactStagingDirectory)/publish'
       DEPLOY_ZIP: '$(Build.ArtifactStagingDirectory)/app.zip'
     steps:
@@ -119,8 +119,8 @@ stages:
           exit 1
         fi
 
-        if ! echo "$CONTENTS" | grep -Eq '^(\./)?MedInsights\.API\.dll$'; then
-          echo "ERROR: MedInsights.API.dll not found at package root."
+        if ! echo "$CONTENTS" | grep -Eq '^(\./)?TurnKeyOps\.API\.dll$'; then
+          echo "ERROR: TurnKeyOps.API.dll not found at package root."
           echo "Top package entries:"
           echo "$CONTENTS" | head -n 80
           exit 1
@@ -188,4 +188,3 @@ stages:
             --restart true \
             --track-status true \
             --output json
-

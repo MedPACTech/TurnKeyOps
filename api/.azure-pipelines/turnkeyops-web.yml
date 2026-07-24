@@ -5,7 +5,7 @@ trigger:
   paths:
     include:
     - client/*
-    - api/.azure-pipelines/bdr-client.yml
+    - api/.azure-pipelines/turnkeyops-web.yml
     - api/.azure-pipelines/templates/node-app-service-deploy.yml
 
 pr:
@@ -15,7 +15,7 @@ pr:
   paths:
     include:
     - client/*
-    - api/.azure-pipelines/bdr-client.yml
+    - api/.azure-pipelines/turnkeyops-web.yml
     - api/.azure-pipelines/templates/node-app-service-deploy.yml
 
 extends:
@@ -23,7 +23,9 @@ extends:
   parameters:
     environmentName: 'Production'
     appDirectory: 'client'
-    artifactName: 'bdr-client'
+    artifactName: 'turnkeyops-web'
     azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
-    webAppName: '$(BDR_CLIENT_WEB_APP_NAME)'
+    resourceGroupName: '$(TURNKEYOPS_PRODUCTION_RESOURCE_GROUP)'
+    webAppName: '$(TURNKEYOPS_WEB_APP_NAME)'
+    apiBaseUrl: '$(TURNKEYOPS_API_BASE_URL)'
     deployBranch: 'main'

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
-	import { bdrAdminNavigation, type BdrAdminNavItem, type BdrAdminRole } from '$lib/config/platform';
+	import type { BdrAdminNavItem, BdrAdminRole } from '$lib/config/platform';
+	import type { ExternalAdminTheme } from '$lib/config/external-admin';
 	import {
 		bobVoiceCookie,
 		bobVoiceOptions,
@@ -9,41 +10,33 @@
 		type BobVoiceId
 	} from '$lib/bob-voice';
 
-	type ShellMetric = { label: string; value: string; detail: string };
-	type ShellNote = { title: string; detail: string };
-	type ShellAction = { label: string; href: string; variant?: 'primary' | 'secondary' };
-
 	let {
 		role,
 		activePath,
 		activeNav,
 		initialBobVoice,
+		navItems,
+		tenantName,
+		workspaceLabel,
+		workspaceSummary,
+		homeHref,
+		publicHref,
+		operatorEmail,
+		theme,
 		children
 	} = $props<{
 		role: BdrAdminRole;
 		activePath: string;
 		activeNav: BdrAdminNavItem;
 		initialBobVoice: BobVoiceId;
-		title: string;
-		description: string;
-		context: {
-			label: string;
-			title: string;
-			summary: string;
-			metrics: ShellMetric[];
-		};
-		focus: {
-			label: string;
-			title: string;
-			summary: string;
-			notes: ShellNote[];
-		};
-		canvas: {
-			label: string;
-			title: string;
-			summary: string;
-			actions: ShellAction[];
-		};
+		navItems: BdrAdminNavItem[];
+		tenantName: string;
+		workspaceLabel: string;
+		workspaceSummary: string;
+		homeHref: string;
+		publicHref: string;
+		operatorEmail: string;
+		theme: ExternalAdminTheme;
 		children: Snippet;
 	}>();
 
@@ -52,8 +45,19 @@
 	let profileOpen = $state(false);
 	let bobVoice = $derived(initialBobVoice);
 
-	const navItems = $derived(bdrAdminNavigation);
 	const isBobWorkspace = $derived(activeNav.slug === 'bob');
+	const operatorName = $derived(operatorEmail || 'Workspace operator');
+	const operatorInitials = $derived(
+		operatorEmail
+			? operatorEmail
+					.split('@')[0]
+					.split(/[._-]/)
+					.filter(Boolean)
+					.slice(0, 2)
+					.map((part: string) => part[0]?.toUpperCase())
+					.join('')
+			: 'OP'
+	);
 
 	const navIconFor = (slug: string) =>
 		({
@@ -81,7 +85,10 @@
 	}
 </script>
 
-<div class="concept-admin-shell h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--text-base)]">
+<div
+	class="concept-admin-shell h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--text-base)]"
+	style={`--brand-solid:${theme.accent};--brand-solid-hover:${theme.accentHover};--accent-soft:${theme.accentSoft};--accent-border:${theme.accentBorder};--accent-text:${theme.accentText};--accent-solid:${theme.accent};--accent-solid-hover:${theme.accentHover};`}
+>
 	<div class="flex h-full min-h-0">
 		<aside class={`hidden h-screen shrink-0 flex-col overflow-hidden border-r border-[var(--nav-divider)] bg-[var(--nav-bg)] text-white transition-[width] duration-200 lg:flex ${navCollapsed ? 'w-[88px]' : 'w-64'}`}>
 			<div class={`relative border-b border-[var(--nav-divider)] ${navCollapsed ? 'px-3 py-5' : 'px-4 py-5'}`}>
@@ -91,6 +98,11 @@
 						alt="TurnKeyOps"
 						class={`h-auto w-full object-contain ${navCollapsed ? 'max-w-[3.75rem]' : 'max-w-[14rem]'}`}
 					/>
+					{#if !navCollapsed}
+						<p class="border-t border-slate-200 pt-2 text-center text-[0.65rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+							{tenantName}
+						</p>
+					{/if}
 				</div>
 				<button
 					type="button"
@@ -145,12 +157,12 @@
 						title="Profile"
 						onclick={() => (profileOpen = true)}
 					>
-						ER
+						{operatorInitials}
 					</button>
 					{#if !navCollapsed}
 						<div class="min-w-0 flex-1">
-							<p class="truncate text-sm font-medium">Ella Robinson</p>
-							<p class="truncate text-xs text-white/50">Admin</p>
+							<p class="truncate text-sm font-medium">{operatorName}</p>
+							<p class="truncate text-xs text-white/50">{workspaceLabel}</p>
 						</div>
 						<a
 							href="/"
@@ -227,7 +239,7 @@
 								profileOpen = true;
 							}}
 						>
-							<span class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--brand-solid)] text-xs font-bold text-white">ER</span>
+							<span class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--brand-solid)] text-xs font-bold text-white">{operatorInitials}</span>
 							Profile & Bob voice
 						</button>
 					</div>
@@ -237,7 +249,7 @@
 
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 			<header class="flex h-16 shrink-0 items-center justify-between border-b border-[var(--shell-border)] bg-white px-4 lg:hidden">
-				<a href="/bdr/admin/bob" class="inline-flex min-w-0 items-center" aria-label="TurnKeyOps home">
+				<a href={homeHref} class="inline-flex min-w-0 items-center" aria-label={`${workspaceLabel} home`}>
 					<img
 						src="/turnkeyops-logo.png"
 						alt="TurnKeyOps"
@@ -291,10 +303,10 @@
 		<div class="flex-1 space-y-4 overflow-y-auto px-5 py-5">
 			<section class="rounded-lg border border-[var(--shell-border)] bg-white p-4 shadow-sm">
 				<div class="flex items-center gap-3">
-					<div class="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-solid)] text-sm font-semibold text-white">ER</div>
+					<div class="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-solid)] text-sm font-semibold text-white">{operatorInitials}</div>
 					<div>
-						<p class="text-base font-semibold text-[var(--text-strong)]">Ella Robinson</p>
-						<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">TurnKeyOps admin operator</p>
+						<p class="text-base font-semibold text-[var(--text-strong)]">{operatorName}</p>
+						<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{workspaceLabel}</p>
 					</div>
 				</div>
 			</section>
@@ -323,9 +335,12 @@
 			<section class="rounded-lg border border-[var(--shell-border)] bg-white p-4 shadow-sm">
 				<p class="text-sm font-semibold text-[var(--text-muted)]">Workspace</p>
 				<div class="mt-3 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel-strong)] p-3">
-					<p class="text-base font-semibold text-[var(--text-strong)]">BDR Admin</p>
-					<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">Calm contractor office workspace for daily estimating, scheduling, and follow-through.</p>
+					<p class="text-base font-semibold text-[var(--text-strong)]">{workspaceLabel}</p>
+					<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{workspaceSummary}</p>
 				</div>
+				<a href={publicHref} class="mt-3 inline-flex text-sm font-semibold text-[var(--accent-text)] hover:underline">
+					View public site
+				</a>
 			</section>
 		</div>
 	</aside>
