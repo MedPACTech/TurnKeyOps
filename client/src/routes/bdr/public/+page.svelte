@@ -21,6 +21,11 @@
 	const faviconAsset = $derived(
 		getBdrAsset(content, content.navigation.faviconAssetKey) ?? navigationLogoAsset
 	);
+	const faviconHref = $derived(
+		faviconAsset?.file === '/clientFiles/logo.png'
+			? '/clientFiles/bdr-favicon.png'
+			: (faviconAsset?.file ?? '/clientFiles/bdr-favicon.png')
+	);
 	const footerLogoAsset = $derived(
 		getBdrAsset(content, content.footer.logoAssetKey) ?? navigationLogoAsset
 	);
@@ -109,7 +114,13 @@
 		name="description"
 		content="BDR Construction public site for concrete driveways, patios, sidewalks, slabs, and estimate requests."
 	/>
-	<link rel="icon" href={faviconAsset?.file ?? '/clientFiles/logo.png'} />
+	<link
+		rel="icon"
+		href={`${faviconHref}?v=3`}
+		sizes="any"
+		type="image/png"
+	/>
+	<link rel="apple-touch-icon" href="/clientFiles/bdr-favicon.png?v=3" />
 </svelte:head>
 
 <div

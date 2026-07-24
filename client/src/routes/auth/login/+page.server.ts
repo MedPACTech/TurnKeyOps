@@ -25,7 +25,12 @@ const getSurfaceMeta = (returnTo: string) => {
 	const surface = getAdminSurface(returnTo);
 	return {
 		surface,
-		label: surface === 'internal-admin' ? 'Internal Admin' : 'External Admin',
+		label:
+			surface === 'internal-admin'
+				? 'Internal Admin'
+				: returnTo.startsWith('/thinkpink/admin')
+					? 'Think Pink Admin'
+					: 'BDR Admin',
 		defaultReturnTo: getDefaultAdminReturnTo(surface)
 	};
 };
@@ -150,7 +155,7 @@ export const actions = {
 
 			if (bdrRole) {
 				cookies.set(bdrAdminSessionCookie, bdrRole, {
-					path: '/bdr/admin',
+					path: '/',
 					httpOnly: true,
 					sameSite: 'lax',
 					secure: url.protocol === 'https:',

@@ -1,8 +1,9 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { loadBdrSiteContent } from '$lib/server/bdr-site-content';
 import { uploadQuoteRequestAttachments } from '$lib/server/quote-request-attachments';
-import { getQuoteRequestTenantId, submitQuoteRequest } from '$lib/server/quote-requests';
+import { submitQuoteRequest } from '$lib/server/quote-requests';
 import type { QuoteRequestPriority } from '$lib/quote-requests';
+import { bdrTenant } from '$lib/config/tenants';
 
 const priorities = new Set<QuoteRequestPriority>(['standard', 'priority', 'emergency']);
 
@@ -86,13 +87,14 @@ export const actions = {
 		try {
 			const quoteRequestId = crypto.randomUUID();
 			const attachments = await uploadQuoteRequestAttachments(
-				getQuoteRequestTenantId(),
+				bdrTenant.id,
 				quoteRequestId,
 				attachmentFiles
 			);
 
 			await submitQuoteRequest(fetch, {
 				id: quoteRequestId,
+				tenantId: bdrTenant.id,
 				companyName,
 				contactName,
 				email,

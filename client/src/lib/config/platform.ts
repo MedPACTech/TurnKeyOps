@@ -116,6 +116,28 @@ export const surfaceDefinitions: SurfaceDefinition[] = [
 		theme: 'operations'
 	},
 	{
+		slug: 'thinkpink-public',
+		title: 'Think Pink Land Clearing',
+		path: '/thinkpink/public',
+		audience: 'Landowners, builders, farms, and storm-response customers',
+		status: 'active',
+		description:
+			'Customer-facing land-clearing site with acreage, service, timing, property-photo, and site-visit intake.',
+		highlight: 'Think Pink is the second configured TurnKeyOps tenant and the first land-clearing trade profile.',
+		theme: 'tenant'
+	},
+	{
+		slug: 'thinkpink-admin',
+		title: 'Think Pink Admin',
+		path: '/thinkpink/admin',
+		audience: 'Think Pink owner and office operations',
+		status: 'active',
+		description:
+			'Tenant-isolated request and property-assessment workspace for land clearing, tree removal, mulching, and restoration work.',
+		highlight: 'Public submissions are tenant-tagged and stay out of the BDR operating queue.',
+		theme: 'operations'
+	},
+	{
 		slug: 'turnkeyops-admin',
 		title: 'TurnKeyOps Operator Console',
 		path: '/turnkeyops/admin',

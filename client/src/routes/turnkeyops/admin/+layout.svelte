@@ -19,9 +19,9 @@
 						title: 'Portfolio sequencing',
 						summary: 'Implementation work gets cleaner when tenant status, blockers, and expansion bets are visible in one shared operating rail.',
 						metrics: [
-							{ label: 'Live tenants', value: '1', detail: 'BDR is the active reference tenant shaping the initial vertical pattern.' },
-							{ label: 'Queued launches', value: '2', detail: 'Two follow-on verticals are in scope definition and data mapping.' },
-							{ label: 'Critical blockers', value: '4', detail: 'The same four implementation dependencies are slowing repeatable rollout.' }
+							{ label: 'Configured tenants', value: '2', detail: 'BDR and Think Pink now run from explicit tenant and trade profiles.' },
+							{ label: 'Live tenants', value: '1', detail: 'BDR is live; Think Pink is in configuration and workflow validation.' },
+							{ label: 'Trade profiles', value: '2', detail: 'Concrete construction and land clearing now have separate operating defaults.' }
 						]
 					},
 					focus: {
@@ -31,7 +31,7 @@
 						notes: [
 							{ title: 'Keep tenant variance explicit', detail: 'Separate product capabilities, vertical defaults, and client-specific exceptions before they sprawl.' },
 							{ title: 'Launch reviews need product owners', detail: 'Every blocker logged here should either become a backlog item or a playbook update.' },
-							{ title: 'BDR stays a tenant, not the template', detail: 'Useful patterns can graduate upward, but tenant identity should not bleed into platform navigation or naming.', tone: 'accent' }
+							{ title: 'Tenants stay isolated', detail: 'BDR and Think Pink share platform capabilities without sharing records, branding, or trade defaults.', tone: 'accent' }
 						]
 					},
 					canvas: {
@@ -155,7 +155,7 @@
 						title: 'Portfolio command view',
 						summary: 'This route sets the tone for the whole console: less “tenant office dashboard,” more “platform operating cockpit.”',
 						metrics: [
-							{ label: 'Launches in motion', value: '3', detail: '1 active tenant, 2 near-term implementations in discovery and setup.' },
+							{ label: 'Launches in motion', value: '2', detail: 'BDR is live and Think Pink is moving through configuration and workflow validation.' },
 							{ label: 'Platform commitments', value: '9', detail: 'Shared backlog items tied directly to rollout readiness and product integrity.' },
 							{ label: 'Exec watchlist', value: '5', detail: 'The top risks that could delay expansion or erode operator trust.' }
 						]
@@ -166,7 +166,7 @@
 						summary: 'The admin shell should make platform priorities obvious: repeatability, launch confidence, controls, and a healthy boundary between shared product and tenant-specific workflows.',
 						notes: [
 							{ title: 'Pattern after Wellderly, not copy-paste it', detail: 'Borrow the shell architecture and route discipline, then fill it with TurnKeyOps product-ops content.' },
-							{ title: 'Keep BDR visibly separate', detail: 'Link to BDR as a tenant workspace, but never let the TurnKeyOps admin read like the BDR office.' },
+							{ title: 'Keep every tenant visibly separate', detail: 'Internal Admin can open BDR or Think Pink without blending their branding, records, or operating assumptions.' },
 							{ title: 'Make the dashboard believable', detail: 'Use launch pressure, implementation blockers, shared reliability, and governance as first-class admin concerns.', tone: 'accent' }
 						]
 					},

@@ -24,10 +24,10 @@ import {
 	type QuoteRequestTimelineEvent
 } from '$lib/quote-requests';
 import type { ApiEnvelope } from '$lib/types/mvp';
+import { bdrTenant } from '$lib/config/tenants';
 
 const defaultApiBaseUrl = 'http://localhost:5178';
 const quoteMarker = 'TKO_BDR_QUOTE_REQUEST::';
-const demoTenantId = '7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b';
 const internalAdminActor = 'Internal Admin';
 const officeQueueOwner = 'Office intake';
 const fsModuleName = 'node:fs/promises';
@@ -169,7 +169,7 @@ const serializeLeadMetadata = (metadata: QuoteLeadMetadata) => `${quoteMarker}${
 const getApiBaseUrl = () =>
 	(env.PUBLIC_TKO_API_BASE_URL || env.TKO_API_BASE_URL || defaultApiBaseUrl).replace(/\/$/, '');
 
-export const getQuoteRequestTenantId = () => env.TKO_API_TENANT_ID ?? demoTenantId;
+export const getQuoteRequestTenantId = () => env.TKO_API_TENANT_ID ?? bdrTenant.id;
 
 const getApiHeaders = () => {
 	const headers: Record<string, string> = {
@@ -417,6 +417,7 @@ const toQuoteRequest = (record: QuoteRequestDto | LegacyLeadDto): QuoteRequest |
 	if (isQuoteRequestDto(record)) {
 		return normalizeQuoteRequest({
 			id: record.id,
+			tenantId: record.tenantId,
 			submittedAtUtc: record.submittedAtUtc,
 			companyName: record.companyName ?? record.customerName,
 			contactName: record.contactName ?? record.customerName,
@@ -451,6 +452,7 @@ const toQuoteRequest = (record: QuoteRequestDto | LegacyLeadDto): QuoteRequest |
 
 	return normalizeQuoteRequest({
 		id: record.id,
+		tenantId: record.tenantId,
 		submittedAtUtc: metadata.submittedAtUtc,
 		companyName: metadata.companyName ?? record.companyName,
 		contactName: metadata.contactName ?? record.contactName ?? record.companyName,
@@ -496,7 +498,7 @@ const parseCityState = (serviceAddress: string) => {
 
 const toQuoteRequestDto = (request: QuoteRequest, existing?: QuoteRequestDto): QuoteRequestDto => ({
 	id: existing?.id ?? request.id,
-	tenantId: existing?.tenantId ?? getQuoteRequestTenantId(),
+	tenantId: existing?.tenantId ?? request.tenantId ?? getQuoteRequestTenantId(),
 	submittedAtUtc: existing?.submittedAtUtc ?? request.submittedAtUtc,
 	companyName: request.companyName,
 	contactName: request.contactName,
@@ -554,7 +556,7 @@ const toLegacyLeadDto = (request: QuoteRequest, existing?: LegacyLeadDto): Legac
 
 	return {
 		id: existing?.id ?? request.id,
-		tenantId: existing?.tenantId ?? getQuoteRequestTenantId(),
+		tenantId: existing?.tenantId ?? request.tenantId ?? getQuoteRequestTenantId(),
 		leadNumber: existing?.leadNumber ?? `BDR-LEAD-${Date.now()}`,
 		companyName: existing?.companyName?.trim() || request.companyName,
 		contactName: request.contactName,
@@ -579,22 +581,30 @@ const toLegacyLeadDto = (request: QuoteRequest, existing?: LegacyLeadDto): Legac
 };
 
 export const loadQuoteRequests = async (
-	fetch: typeof globalThis.fetch
+	fetch: typeof globalThis.fetch,
+	tenantId = getQuoteRequestTenantId()
 ): Promise<{ requests: QuoteRequest[]; source: 'api' | 'fallback' }> => {
-	const localRequests = await readLocalQuoteRequests();
+	const localRequests = (await readLocalQuoteRequests()).filter(
+		(request) => (request.tenantId ?? getQuoteRequestTenantId()) === tenantId
+	);
 	const hasLocalStore = await localQuoteRequestStoreExists();
 	try {
 		const response = await fetch(`${getApiBaseUrl()}/api/quote-requests`, {
 			headers: getApiHeaders()
 		});
-		const records = await unwrapEnvelope<Array<QuoteRequestDto | LegacyLeadDto>>(response);
+		const records = (await unwrapEnvelope<Array<QuoteRequestDto | LegacyLeadDto>>(response)).filter(
+			(record) => record.tenantId === tenantId
+		);
 		const apiRequests = records.map(toQuoteRequest).filter((request): request is QuoteRequest => Boolean(request));
 		const requests = mergeQuoteRequests(localRequests, apiRequests);
 		return { requests, source: 'api' };
 	} catch (cause) {
 		console.warn('Falling back to local quote requests.', cause);
 		return {
-			requests: hasLocalStore ? buildQuoteRequestInbox(localRequests) : mergeQuoteRequests(localRequests, seededQuoteRequests),
+			requests:
+				hasLocalStore || tenantId !== getQuoteRequestTenantId()
+					? buildQuoteRequestInbox(localRequests)
+					: mergeQuoteRequests(localRequests, seededQuoteRequests),
 			source: 'fallback'
 		};
 	}
