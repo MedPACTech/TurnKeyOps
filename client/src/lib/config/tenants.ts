@@ -44,7 +44,7 @@ export const tenants: TenantDefinition[] = [
 		tradeLabel: 'Land clearing and tree removal',
 		status: 'configuration',
 		publicPath: '/thinkpink/public',
-		adminPath: '/thinkpink/admin',
+		adminPath: '/thinkpink/admin/bob',
 		accent: '#d40f80',
 		services: ['Land clearing', 'Forestry mulching', 'Stump grinding', 'Right-of-way and trails', 'Storm cleanup'],
 		estimateInputs: ['Acreage', 'Vegetation density', 'Tree count and diameter', 'Terrain', 'Access', 'Disposal method', 'Restoration'],

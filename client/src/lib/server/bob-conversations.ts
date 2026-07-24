@@ -2,7 +2,8 @@ const fsModuleName = 'node:fs/promises';
 const getCwd = () =>
 	(globalThis as typeof globalThis & { process?: { cwd: () => string } }).process?.cwd() ?? '.';
 const storeDir = `${getCwd()}/.svelte-kit`;
-const storePath = `${storeDir}/local-bob-conversations.json`;
+const storePath = (tenantSlug: string) =>
+	`${storeDir}/local-bob-conversations${tenantSlug === 'bdr' ? '' : `-${tenantSlug}`}.json`;
 
 type FsPromises = {
 	mkdir: (path: string, options: { recursive: boolean }) => Promise<unknown>;
@@ -114,6 +115,42 @@ const estimateQuestions: Array<{
 		suggestedReplies: ['None']
 	}
 ];
+const landClearingEstimateQuestions: typeof estimateQuestions = [
+	{ key: 'contactName', prompt: 'Who is the customer or primary contact?' },
+	{
+		key: 'companyName',
+		prompt: 'Is this for a company or property name? Say “residential” if not.',
+		suggestedReplies: ['Residential']
+	},
+	{ key: 'email', prompt: 'What email should the estimate be tied to?' },
+	{ key: 'phone', prompt: 'What is the best phone number for the customer?' },
+	{ key: 'serviceAddress', prompt: 'What is the full property address?' },
+	{ key: 'projectType', prompt: 'What service are we estimating?', suggestedReplies: ['Land clearing', 'Tree removal', 'Forestry mulching'] },
+	{
+		key: 'scope',
+		prompt: 'Describe the requested work, including what must be cleared or removed and the desired finished condition.'
+	},
+	{
+		key: 'dimensions',
+		prompt: 'What site quantities do we know? Include acreage, vegetation density, tree count and diameter, or trail length.'
+	},
+	{
+		key: 'depth',
+		prompt: 'What should we know about terrain, equipment access, hauling or disposal, grading, and restoration?'
+	},
+	{
+		key: 'timeline',
+		prompt: 'When does the customer want the work completed?',
+		suggestedReplies: ['No firm deadline']
+	},
+	{
+		key: 'notes',
+		prompt: 'Any final assumptions, exclusions, hazards, permits, utilities, or internal notes? Say “none” if not.',
+		suggestedReplies: ['None']
+	}
+];
+const questionsForTenant = (tenantSlug: string) =>
+	tenantSlug === 'thinkpink' ? landClearingEstimateQuestions : estimateQuestions;
 
 const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -140,9 +177,9 @@ const defaultConversation = (): BobConversation => {
 	};
 };
 
-const normalizeEstimateConversation = (conversation: BobConversation): BobConversation => {
+const normalizeEstimateConversation = (conversation: BobConversation, tenantSlug = 'bdr'): BobConversation => {
 	if (conversation.mode !== 'estimate-builder') return conversation;
-	const firstQuestion = estimateQuestions[0].prompt;
+	const firstQuestion = questionsForTenant(tenantSlug)[0].prompt;
 	let messages = [...conversation.messages];
 	if (
 		messages[0]?.role === 'bob' &&
@@ -179,10 +216,10 @@ const normalizeEstimateConversation = (conversation: BobConversation): BobConver
 	return { ...conversation, messages };
 };
 
-export const loadBobConversations = async (): Promise<BobConversation[]> => {
+export const loadBobConversations = async (tenantSlug = 'bdr'): Promise<BobConversation[]> => {
 	try {
 		const fs = await getFs();
-		const parsed = JSON.parse(await fs.readFile(storePath, 'utf-8')) as Array<
+		const parsed = JSON.parse(await fs.readFile(storePath(tenantSlug), 'utf-8')) as Array<
 			| BobConversation
 			| (Omit<BobConversation, 'mode' | 'estimateDraft'> & {
 					mode: 'quote-builder';
@@ -192,7 +229,7 @@ export const loadBobConversations = async (): Promise<BobConversation[]> => {
 		if (!Array.isArray(parsed)) return [];
 		return parsed.map((conversation) => {
 			if (conversation.mode !== 'quote-builder') {
-				return normalizeEstimateConversation(conversation as BobConversation);
+				return normalizeEstimateConversation(conversation as BobConversation, tenantSlug);
 			}
 			const { quoteDraft, ...legacyConversation } = conversation;
 			return normalizeEstimateConversation({
@@ -200,32 +237,33 @@ export const loadBobConversations = async (): Promise<BobConversation[]> => {
 				mode: 'estimate-builder',
 				title: conversation.title === 'New quote' ? 'New estimate' : conversation.title,
 				estimateDraft: { ...emptyEstimateDraft(), ...(quoteDraft ?? {}) }
-			});
+			}, tenantSlug);
 		});
 	} catch {
 		return [];
 	}
 };
 
-const saveBobConversations = async (conversations: BobConversation[]) => {
+const saveBobConversations = async (conversations: BobConversation[], tenantSlug = 'bdr') => {
 	const fs = await getFs();
 	await fs.mkdir(storeDir, { recursive: true });
-	await fs.writeFile(storePath, JSON.stringify(conversations, null, 2));
+	await fs.writeFile(storePath(tenantSlug), JSON.stringify(conversations, null, 2));
 };
 
-export const ensureBobConversations = async () => {
-	const conversations = await loadBobConversations();
+export const ensureBobConversations = async (tenantSlug = 'bdr') => {
+	const conversations = await loadBobConversations(tenantSlug);
 	if (conversations.some((conversation) => conversation.id === bobHomeConversationId)) {
 		return conversations;
 	}
 	const initial = defaultConversation();
 	const next = [initial, ...conversations];
-	await saveBobConversations(next);
+	await saveBobConversations(next, tenantSlug);
 	return next;
 };
 
-export const createBobConversation = async (mode: BobConversationMode) => {
-	const conversations = await ensureBobConversations();
+export const createBobConversation = async (mode: BobConversationMode, tenantSlug = 'bdr') => {
+	const conversations = await ensureBobConversations(tenantSlug);
+	const questions = questionsForTenant(tenantSlug);
 	const now = new Date().toISOString();
 	const title =
 		mode === 'estimate-builder'
@@ -235,7 +273,7 @@ export const createBobConversation = async (mode: BobConversationMode) => {
 				: 'New conversation';
 	const introduction =
 		mode === 'estimate-builder'
-			? `Let’s build the internal estimate. Tell me what you already know; I’ll capture every useful detail and ask only for what is still missing.\n\n${estimateQuestions[0].prompt}`
+			? `Let’s build the internal estimate. Tell me what you already know; I’ll capture every useful detail and ask only for what is still missing.\n\n${questions[0].prompt}`
 			: mode === 'estimate-followup'
 				? 'I reviewed the live estimate pipeline and surfaced the records that need a next action.'
 				: 'What would you like to work on? Tell me in your own words, or choose a starting point below.';
@@ -250,18 +288,18 @@ export const createBobConversation = async (mode: BobConversationMode) => {
 		],
 		estimateDraft: mode === 'estimate-builder' ? emptyEstimateDraft() : undefined
 	};
-	await saveBobConversations([conversation, ...conversations]);
+	await saveBobConversations([conversation, ...conversations], tenantSlug);
 	return conversation;
 };
 
-export const getBobConversation = async (id: string | null | undefined) => {
-	const conversations = await ensureBobConversations();
+export const getBobConversation = async (id: string | null | undefined, tenantSlug = 'bdr') => {
+	const conversations = await ensureBobConversations(tenantSlug);
 	return conversations.find((conversation) => conversation.id === id) ?? conversations[0];
 };
 
-export const setBobConversationArchived = async (conversationId: string, archived: boolean) => {
+export const setBobConversationArchived = async (conversationId: string, archived: boolean, tenantSlug = 'bdr') => {
 	if (conversationId === bobHomeConversationId) return;
-	const conversations = await ensureBobConversations();
+	const conversations = await ensureBobConversations(tenantSlug);
 	const next = conversations.map((conversation) =>
 		conversation.id === conversationId
 			? {
@@ -271,14 +309,15 @@ export const setBobConversationArchived = async (conversationId: string, archive
 				}
 			: conversation
 	);
-	await saveBobConversations(next);
+	await saveBobConversations(next, tenantSlug);
 };
 
-export const deleteBobConversation = async (conversationId: string) => {
+export const deleteBobConversation = async (conversationId: string, tenantSlug = 'bdr') => {
 	if (conversationId === bobHomeConversationId) return;
-	const conversations = await ensureBobConversations();
+	const conversations = await ensureBobConversations(tenantSlug);
 	await saveBobConversations(
-		conversations.filter((conversation) => conversation.id !== conversationId)
+		conversations.filter((conversation) => conversation.id !== conversationId),
+		tenantSlug
 	);
 };
 
@@ -308,9 +347,11 @@ export const appendGeneralConversationExchange = async (
 	conversationId: string,
 	question: string,
 	answer: string,
-	suggestedReplies?: string[]
+	suggestedReplies?: string[],
+	tenantSlug = 'bdr'
 ) => {
-	const conversations = await ensureBobConversations();
+	const conversations = await ensureBobConversations(tenantSlug);
+	const questions = questionsForTenant(tenantSlug);
 	const next = conversations.map((conversation) => {
 		if (conversation.id !== conversationId) return conversation;
 		let updated = addMessage(conversation, 'user', question);
@@ -320,7 +361,7 @@ export const appendGeneralConversationExchange = async (
 			title: conversation.title === 'New conversation' ? question.slice(0, 54) : conversation.title
 		};
 	});
-	await saveBobConversations(next);
+	await saveBobConversations(next, tenantSlug);
 	return next.find((conversation) => conversation.id === conversationId)!;
 };
 
@@ -329,15 +370,16 @@ export const appendBobMessage = async (
 	role: BobMessage['role'],
 	content: string,
 	suggestedReplies?: string[],
-	actions?: BobMessageAction[]
+	actions?: BobMessageAction[],
+	tenantSlug = 'bdr'
 ) => {
-	const conversations = await ensureBobConversations();
+	const conversations = await ensureBobConversations(tenantSlug);
 	const next = conversations.map((conversation) =>
 		conversation.id === conversationId
 			? addMessage(conversation, role, content, suggestedReplies, actions)
 			: conversation
 	);
-	await saveBobConversations(next);
+	await saveBobConversations(next, tenantSlug);
 	return next.find((conversation) => conversation.id === conversationId);
 };
 
@@ -345,14 +387,16 @@ export const advanceEstimateConversation = async (
 	conversationId: string,
 	answer: string,
 	extractedFields: Record<string, string>,
-	acknowledgement?: string
+	acknowledgement?: string,
+	tenantSlug = 'bdr'
 ) => {
-	const conversations = await ensureBobConversations();
+	const conversations = await ensureBobConversations(tenantSlug);
+	const questions = questionsForTenant(tenantSlug);
 	let updatedConversation: BobConversation | undefined;
 	const next = conversations.map((conversation) => {
 		if (conversation.id !== conversationId || conversation.mode !== 'estimate-builder') return conversation;
 		const draft = { ...(conversation.estimateDraft ?? emptyEstimateDraft()) };
-		for (const question of estimateQuestions) {
+		for (const question of questions) {
 			const value = Object.entries(extractedFields).find(
 				([key]) => key.toLowerCase() === String(question.key).toLowerCase()
 			)?.[1];
@@ -360,7 +404,7 @@ export const advanceEstimateConversation = async (
 		}
 
 		let updated = addMessage(conversation, 'user', answer);
-		const nextQuestion = estimateQuestions.find(
+		const nextQuestion = questions.find(
 			(question) => !String(draft[question.key] ?? '').trim()
 		);
 		const captured = Object.keys(extractedFields).length
@@ -384,15 +428,16 @@ export const advanceEstimateConversation = async (
 		};
 		return updatedConversation;
 	});
-	await saveBobConversations(next);
+	await saveBobConversations(next, tenantSlug);
 	return updatedConversation;
 };
 
 export const markEstimateConversationCreated = async (
 	conversationId: string,
-	requestId: string
+	requestId: string,
+	tenantSlug = 'bdr'
 ) => {
-	const conversations = await ensureBobConversations();
+	const conversations = await ensureBobConversations(tenantSlug);
 	const next = conversations.map((conversation) =>
 		conversation.id === conversationId && conversation.estimateDraft
 			? {
@@ -405,18 +450,19 @@ export const markEstimateConversationCreated = async (
 				}
 			: conversation
 	);
-	await saveBobConversations(next);
+	await saveBobConversations(next, tenantSlug);
 	return next.find((conversation) => conversation.id === conversationId);
 };
 
-export const getEstimateBuilderProgress = (draft: BobEstimateDraft | undefined) => {
+export const getEstimateBuilderProgress = (draft: BobEstimateDraft | undefined, tenantSlug = 'bdr') => {
 	const value = draft ?? emptyEstimateDraft();
-	const complete = estimateQuestions.filter((question) =>
+	const questions = questionsForTenant(tenantSlug);
+	const complete = questions.filter((question) =>
 		String(value[question.key] ?? '').trim()
 	).length;
 	return {
 		complete,
-		total: estimateQuestions.length,
-		isComplete: complete === estimateQuestions.length
+		total: questions.length,
+		isComplete: complete === questions.length
 	};
 };

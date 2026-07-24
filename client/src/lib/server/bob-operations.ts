@@ -4,6 +4,7 @@ import { loadQuoteRequests, recordQuoteRequestActivity } from '$lib/server/quote
 import { updateBdrInvoiceState } from '$lib/server/bdr-invoices';
 import { addBdrScheduledJobNote } from '$lib/server/bdr-job-scheduling';
 import { resolveMvpScaffold } from '$lib/server/mvp';
+import { bdrTenant, type TenantDefinition } from '$lib/config/tenants';
 
 export type BobActionKind = 'invoice-reminder' | 'quote-follow-up' | 'job-note' | 'open-record';
 
@@ -55,9 +56,10 @@ const ageInDays = (value: string | null | undefined) => {
 };
 
 export const buildEstimateFollowups = async (
-	fetch: typeof globalThis.fetch
+	fetch: typeof globalThis.fetch,
+	tenant: TenantDefinition = bdrTenant
 ): Promise<BobEstimateFollowup[]> => {
-	const { requests } = await loadQuoteRequests(fetch);
+	const { requests } = await loadQuoteRequests(fetch, tenant.id);
 	return requests
 		.filter((request) =>
 			['qualified', 'inspection-scheduled', 'estimate-drafted', 'estimate-sent'].includes(request.status)
@@ -95,7 +97,7 @@ export const buildEstimateFollowups = async (
 				reason: state.reason,
 				nextAction: state.nextAction,
 				ageDays,
-				href: `/bdr/admin/estimates?request=${encodeURIComponent(request.id)}`,
+				href: `${tenant.adminPath.replace(/\/bob$/, '')}/estimates?request=${encodeURIComponent(request.id)}`,
 				priority:
 					(request.status === 'estimate-sent' && ageDays >= 3) ||
 					(request.status !== 'estimate-sent' && ageDays >= 5)
@@ -111,7 +113,79 @@ export const buildEstimateFollowups = async (
 		});
 };
 
-export const buildBobBriefing = async (fetch: typeof globalThis.fetch): Promise<BobBriefing> => {
+export const buildBobBriefing = async (
+	fetch: typeof globalThis.fetch,
+	tenant: TenantDefinition = bdrTenant
+): Promise<BobBriefing> => {
+	if (tenant.slug !== 'bdr') {
+		const { requests } = await loadQuoteRequests(fetch, tenant.id);
+		const activeRequests = requests.filter((request) => !['won', 'closed'].includes(request.status));
+		const newRequests = requests.filter((request) => request.status === 'new');
+		const blockedRequests = requests.filter(
+			(request) =>
+				request.status === 'needs-info' ||
+				Boolean(request.qualification?.missingInfoReasonCodes?.length)
+		);
+		const base = tenant.adminPath.replace(/\/bob$/, '');
+		const attention: BobBriefing['attention'] = [];
+		if (newRequests.length) {
+			attention.push({
+				title: `${newRequests.length} new request${newRequests.length === 1 ? '' : 's'} need first response`,
+				detail: 'Confirm the property, clearing scope, access, disposal plan, and assessment timing.',
+				href: `${base}/requests`,
+				severity: 'high'
+			});
+		}
+		if (blockedRequests.length) {
+			attention.push({
+				title: `${blockedRequests.length} request${blockedRequests.length === 1 ? '' : 's'} are blocked`,
+				detail: 'Acreage, vegetation, access, disposal, or customer details are still missing.',
+				href: `${base}/requests`,
+				severity: 'medium'
+			});
+		}
+		const recommendations: BobRecommendation[] = newRequests.slice(0, 3).map((request) => ({
+			id: `quote-${request.id}`,
+			kind: 'quote-follow-up',
+			title: `Prepare first response for ${request.contactName || request.customerName}`,
+			reason: request.need || request.message || 'A new land-clearing request is waiting for review.',
+			impact: 'Moves the request toward a property assessment and estimate.',
+			href: `${base}/requests?request=${encodeURIComponent(request.id)}`,
+			targetId: request.id,
+			draft: `Hi ${request.contactName || request.customerName}, thanks for contacting ${tenant.name}. We received your request for ${request.serviceType || request.projectType || 'land-clearing work'} and will follow up with the next step shortly.`,
+			approvalRequired: true
+		}));
+		return {
+			generatedAtUtc: new Date().toISOString(),
+			headline: attention.length
+				? `${attention.length} operating priorities need a decision`
+				: 'The land-clearing pipeline is clear',
+			summary: `Bob reviewed ${requests.length} ${tenant.shortName} requests and the active estimate pipeline.`,
+			metrics: [
+				{ label: 'Needs attention', value: String(attention.length), detail: 'Exceptions Bob surfaced', tone: attention.length ? 'warning' : 'positive' },
+				{ label: 'Open requests', value: String(activeRequests.length), detail: `${newRequests.length} waiting on first response`, tone: newRequests.length ? 'warning' : 'neutral' },
+				{ label: 'Blocked', value: String(blockedRequests.length), detail: 'Waiting on job-site or scope details', tone: blockedRequests.length ? 'warning' : 'positive' }
+			],
+			attention,
+			recommendations,
+			context: {
+				quoteRequests: requests.slice(0, 20).map((request) => ({
+					id: request.id,
+					customer: request.contactName || request.customerName,
+					address: request.serviceAddress,
+					status: request.status,
+					service: request.serviceType || request.projectType,
+					scope: request.need || request.message,
+					timeline: request.requestedTimeline || request.preferredTimeline,
+					nextAction: request.nextAction,
+					missingInfo: request.qualification?.missingInfoReasonCodes ?? []
+				})),
+				invoices: [],
+				jobs: [],
+				estimates: { count: requests.filter((request) => request.status.includes('estimate')).length }
+			}
+		};
+	}
 	const [{ requests }, invoices, jobs, { snapshot }] = await Promise.all([
 		loadQuoteRequests(fetch),
 		loadBdrInvoices(),
