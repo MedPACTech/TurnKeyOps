@@ -144,7 +144,6 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IEstimateWorkflowPayloadStore, EstimateWorkflowPayloadStore>();
-        services.AddScoped<IMobileAppointmentContextService, MobileAppointmentContextService>();
         services.AddScoped<IEstimateService, EstimateService>();
         services.AddScoped<IEstimateDefaultsService, EstimateDefaultsService>();
         services.AddScoped<IInvoiceService, InvoiceService>();

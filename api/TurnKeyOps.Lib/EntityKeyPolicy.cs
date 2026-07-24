@@ -10,8 +10,5 @@ public static class EntityKeyPolicy
     public static string TenantUserPartition(Guid? tenantId, Guid userId)
         => tenantId.HasValue ? RepositoryKeyHelper.ToTenantUserPartitionKey(tenantId.Value, userId) : string.Empty;
 
-    public static string TenantPatientPartition(Guid? tenantId, Guid patientId)
-        => tenantId.HasValue ? RepositoryKeyHelper.ToTenantPatientPartitionKey(tenantId.Value, patientId) : string.Empty;
-
     public static string Row(Guid id) => RepositoryKeyHelper.ToRowKey(id);
 }

@@ -6,7 +6,6 @@ using MedInsights.Services.Events;
 using MedInsights.Services.BackgroundServices;
 using MedInsights.AzureServices.Interfaces;
 using MedInsights.AzureServices;
-using MedInsights.API.Infrastructure;
 
 namespace MedInsights.API.DependencyInjection
 {
@@ -23,68 +22,14 @@ namespace MedInsights.API.DependencyInjection
             // Auth Services
            //services.AddScoped<IAuthService, AuthService>();
 
-            // Capture Services
-            services.AddScoped<ICaptureDraftNoteService, CaptureDraftNoteService>();
-
             // OpenAI / Azure Speech
             services.AddScoped<IAIService<OpenAI.Chat.ChatMessage>, OpenAIService>();
             services.AddSingleton<IAzureSpeechService, AzureSpeechService>();
             //services.AddScoped<IOpenAIRealtimeService, OpenAIRealtimeService>();
             
-            //Chats
-            services.AddScoped<IChatService, ChatService>();
-            services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
-            //services.AddScoped<IChatSummarizerService, ChatSummarizerService>();
-            services.AddScoped<IChatTitleService, ChatTitleService>();
-            services.AddScoped<IChatSummaryService, ChatSummaryService>();
-            //services.AddScoped<IChatPostProcessor, ChatPostProcessor>();
-
-            // Audio Capture Services
-            services.AddScoped<IAudioCaptureService, AudioCaptureService>();
-    
-            //services.AddScoped<IDictationService, DictationService>();
-            services.AddScoped<IPatientEncounterService, PatientEncounterService>();
             services.AddScoped<IAzureBlobStorageService, AzureBlobStorageService>();
 
-            // Document Services
-            services.AddScoped<IDocumentService, DocumentService>();
-            services.AddScoped<IFileTextExtractorService, FileTextExtractorService>();
-
-            // Patient Services            
-            services.AddScoped<IPatientService, PatientService>();
-            services.AddScoped<IPatientAppointmentService, PatientAppointmentService>();
-            services.AddScoped<IAppointmentTypeService, AppointmentTypeService>();
-            services.AddScoped<IAppointmentTypeProvisioningService, AppointmentTypeProvisioningService>();
-            services.AddScoped<IStartupSeedContributor, AppointmentTypeStartupSeedContributor>();
-            services.AddScoped<IFacilityService, FacilityService>();
             services.AddScoped<IStartupSeeder, StartupSeeder>();
-            services.AddScoped<IStartupSeedContributor, SystemDefaultsSeedContributor>();
-            services.AddScoped<INoteTypeService, NoteTypeService>();
-            services.AddScoped<INoteTypeProfileService, NoteTypeProfileService>();
-            services.AddScoped<INoteTypePromptBuilderService, NoteTypePromptBuilderService>();
-            services.AddScoped<IPatientContactService, PatientContactService>();
-            services.AddScoped<IPatientOrderService, PatientOrderService>();
-            services.AddScoped<IPatientMedicationService, PatientMedicationService>();
-            services.AddScoped<IPatientDiagnosisService, PatientDiagnosisService>();
-            services.AddScoped<IDiagnosisCodeService, DiagnosisCodeService>();
-            services.AddScoped<IPatientInsuranceService, PatientInsuranceService>();
-            services.AddScoped<IPatientAllergyService, PatientAllergyService>();
-            services.AddScoped<IPatientLabsService, PatientLabsService>();
-            services.AddScoped<IPatientEnvironmentalHistoryService, PatientEnvironmentalHistoryService>();
-            services.AddScoped<IPatientMaritalHistoryService, PatientMaritalHistoryService>();
-            services.AddScoped<IPatientMilitaryFirstResponderService, PatientMilitaryFirstResponderService>();
-            services.AddScoped<IPatientFamilyMedicalHistoryService, PatientFamilyMedicalHistoryService>();
-            services.AddScoped<IPatientContextService, PatientContextService>();
-            services.AddScoped<IPatientBillingNoteService, PatientBillingNoteService>();
-            services.AddScoped<IPatientNoteService, PatientNoteService>();
-            services.AddScoped<IPatientVitalsService, PatientVitalsService>();
-            services.AddScoped<IPatientReferralService, PatientReferralService>();
-            services.AddScoped<IPatientReferralActivityService, PatientReferralActivityService>();
-            services.AddScoped<IReferralWorkItemService, ReferralWorkItemService>();
-            services.AddScoped<IPatientClinicalSummaryService, PatientClinicalSummaryService>();
-
-            // Prompt Templates
-            services.AddScoped<IPromptTemplateService, PromptTemplateService>();
 
             // Auth / Tokens
             //services.AddScoped<ITokenService, MedInisightsTokenService>();
@@ -140,8 +85,6 @@ namespace MedInsights.API.DependencyInjection
             }
             services.AddHostedService<BillingRenewalWorker>();
             services.AddHostedService<MonthlyCreditGrantWorker>();
-            services.AddHostedService<StartupCacheLoader>();
-
             return services;
         }
     }

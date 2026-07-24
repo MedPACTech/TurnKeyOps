@@ -12,6 +12,9 @@ namespace MedInsights.Authorization.Tests;
 
 public sealed class RolePersistenceTests
 {
+    private const string EstimateReadPermission = "estimates.read";
+    private const string EstimateSavePermission = "estimates.save";
+
     [Fact]
     public async Task TenantRoleDefinitionsAndMappingsPersistAcrossServiceInstances()
     {
@@ -24,8 +27,8 @@ public sealed class RolePersistenceTests
         var mappingRepository = CreateMappingRepository(mappingStore);
         var catalog = new TestRolePermissionCatalog(
         [
-            new PermissionDefinitionOption { Key = PatientAllergyAuthorizationKeys.Read, Name = "Read" },
-            new PermissionDefinitionOption { Key = PatientAllergyAuthorizationKeys.Save, Name = "Save" }
+            new PermissionDefinitionOption { Key = EstimateReadPermission, Name = "Read estimates" },
+            new PermissionDefinitionOption { Key = EstimateSavePermission, Name = "Save estimates" }
         ]);
 
         var membershipAuthorization = new Mock<ITenantMembershipAuthorizationService>();
@@ -41,11 +44,11 @@ public sealed class RolePersistenceTests
 
         var created = await serviceA.CreateAsync(new UpsertTenantRoleRequestDto
         {
-            Key = "clinical_reviewer",
-            Name = "Clinical Reviewer",
-            Description = "Reviews allergy changes",
+            Key = "estimate_reviewer",
+            Name = "Estimate Reviewer",
+            Description = "Reviews estimate changes",
             IsAssignable = true,
-            PermissionKeys = [PatientAllergyAuthorizationKeys.Read, PatientAllergyAuthorizationKeys.Save]
+            PermissionKeys = [EstimateReadPermission, EstimateSavePermission]
         });
 
         var serviceB = new TenantRoleDefinitionService(
@@ -58,10 +61,10 @@ public sealed class RolePersistenceTests
         var roles = await serviceB.GetAllAsync();
         var reloaded = Assert.Single(roles, x => x.Id == created.Id);
 
-        Assert.Equal("clinical_reviewer", reloaded.Key);
+        Assert.Equal("estimate_reviewer", reloaded.Key);
         Assert.Equal(2, reloaded.Permissions.Count);
-        Assert.Contains(reloaded.Permissions, x => x.Key == PatientAllergyAuthorizationKeys.Read);
-        Assert.Contains(reloaded.Permissions, x => x.Key == PatientAllergyAuthorizationKeys.Save);
+        Assert.Contains(reloaded.Permissions, x => x.Key == EstimateReadPermission);
+        Assert.Contains(reloaded.Permissions, x => x.Key == EstimateSavePermission);
     }
 
     private static Mock<ITenantRoleDefinitionRepository> CreateRoleRepository(IDictionary<string, TenantRoleDefinition> store)

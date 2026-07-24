@@ -59,7 +59,6 @@ public class TurnKeyChatService : ITurnKeyChatService
             Title = "New Chat",
             CustomTitle = string.Empty,
             TokensUsed = 0,
-            PatientId = null,
             DateChatCreated = now,
             DateChatUpdated = now,
             ChatSummary = string.Empty,

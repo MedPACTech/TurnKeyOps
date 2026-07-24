@@ -8,22 +8,15 @@ namespace MedInsights.Services.Events;
 public sealed class UserProfileHook : IAuthLifecycleHook
 {
     private readonly IUserProfileService _profiles;
-    private readonly IAppointmentTypeProvisioningService _appointmentTypeProvisioningService;
 
-    public UserProfileHook(
-        IUserProfileService profiles,
-        IAppointmentTypeProvisioningService appointmentTypeProvisioningService)
+    public UserProfileHook(IUserProfileService profiles)
     {
         _profiles = profiles;
-        _appointmentTypeProvisioningService = appointmentTypeProvisioningService;
     }
 
     public Task OnAuthUserCreatedAsync(AuthUserCreatedEvent evt, CancellationToken ct = default) => Task.CompletedTask;
 
-    public async Task OnTenantCreatedAsync(TenantCreatedEvent evt, CancellationToken ct = default)
-    {
-        await _appointmentTypeProvisioningService.EnsureTenantHasActiveAppointmentTypesAsync(evt.TenantId, ct);
-    }
+    public Task OnTenantCreatedAsync(TenantCreatedEvent evt, CancellationToken ct = default) => Task.CompletedTask;
 
     public async Task OnTenantUserLinkedAsync(TenantUserLinkedEvent evt, CancellationToken ct = default)
     {

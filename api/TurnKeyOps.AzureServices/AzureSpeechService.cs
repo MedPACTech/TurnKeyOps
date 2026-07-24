@@ -56,7 +56,7 @@ namespace MedInsights.Services
                     var json = e.Result.Properties.GetProperty(PropertyId.SpeechServiceResponse_JsonResult);
                     var words = ExtractWordTiming(json);
 
-                    // Dictation has no diarized speaker; use "Speaker" neutral label.
+                    // Single-speaker transcription has no diarized speaker; use a neutral label.
                     var redacted = RedactText(rawText, _lastAudit, "Speaker", words);
                     sb.AppendLine(redacted);
                 }
@@ -127,13 +127,13 @@ namespace MedInsights.Services
 
             transcriber.Canceled += (s, e) =>
             {
-                Console.WriteLine($"Encounter transcription canceled: {e.Reason} — {e.ErrorDetails}");
+                Console.WriteLine($"Transcription canceled: {e.Reason} — {e.ErrorDetails}");
                 tcs.TrySetResult(true);
             };
 
             transcriber.SessionStopped += (s, e) =>
             {
-                Console.WriteLine("Encounter transcription session stopped.");
+                Console.WriteLine("Transcription session stopped.");
                 tcs.TrySetResult(true);
             };
 

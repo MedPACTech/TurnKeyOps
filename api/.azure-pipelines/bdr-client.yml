@@ -1,0 +1,29 @@
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - client/*
+    - api/.azure-pipelines/bdr-client.yml
+    - api/.azure-pipelines/templates/node-app-service-deploy.yml
+
+pr:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - client/*
+    - api/.azure-pipelines/bdr-client.yml
+    - api/.azure-pipelines/templates/node-app-service-deploy.yml
+
+extends:
+  template: templates/node-app-service-deploy.yml
+  parameters:
+    environmentName: 'Production'
+    appDirectory: 'client'
+    artifactName: 'bdr-client'
+    azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+    webAppName: '$(BDR_CLIENT_WEB_APP_NAME)'
+    deployBranch: 'main'

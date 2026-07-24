@@ -44,11 +44,6 @@ namespace MedInsights.Lib.Utils
         /// Builds a PartitionKey by combining TenantId and UserId.
         /// Format: TENANT={tenantId}|USER={userId}
         /// </summary>
-        public static string ToTenantPatientPartitionKey(Guid tenantId, Guid patientId)
-        {
-            return $"TENANT={FormatGuid(tenantId)}|PATIENT={FormatGuid(patientId)}";
-        }
-
         /// <summary>
         /// Converts a Guid to a String RowKey.
         /// </summary>

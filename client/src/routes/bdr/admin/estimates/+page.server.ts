@@ -290,12 +290,13 @@ const parseDraftRecord = (formData: FormData, overrides?: Partial<EstimateDraftR
 	};
 };
 
-export const load = async ({ fetch }) => {
+export const load = async ({ fetch, url }) => {
 	const { requests } = await loadQuoteRequests(fetch);
 	return {
 		quoteRequests: requests,
 		estimateDrafts: await readEstimateDrafts(),
-		estimateDefaults: await loadBdrEstimateDefaults()
+		estimateDefaults: await loadBdrEstimateDefaults(),
+		requestedRequestId: url.searchParams.get('request')?.trim() ?? ''
 	};
 };
 

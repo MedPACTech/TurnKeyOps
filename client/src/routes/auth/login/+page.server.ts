@@ -10,16 +10,14 @@ import {
 	getAdminSurface,
 	getDefaultAdminReturnTo,
 	getSafeAdminReturnTo,
+	inferOtpChannel,
 	internalAdminSessionCookie,
 	resolveBdrAdminRole,
-	startOtp,
-	type OtpChannel
+	startOtp
 } from '$lib/server/auth-session';
 
 const authRefreshTokenCookie = 'tko_refresh_token';
 const adminSessionMaxAge = 60 * 60 * 8;
-
-const isOtpChannel = (value: string): value is OtpChannel => value === 'email' || value === 'sms';
 
 const getFormString = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
 
@@ -32,9 +30,9 @@ const getSurfaceMeta = (returnTo: string) => {
 	};
 };
 
-const getReturnedOtpState = (challengeId: string, preferredChannel: OtpChannel) => ({
+const getReturnedOtpState = (challengeId: string, identifier: string) => ({
 	challengeId,
-	channel: preferredChannel,
+	channel: inferOtpChannel(identifier),
 	destinationMasked: '',
 	devCode: null
 });
@@ -58,28 +56,25 @@ export const actions = {
 	request: async ({ request, fetch }) => {
 		const formData = await request.formData();
 		const identifier = getFormString(formData, 'identifier');
-		const preferredChannelValue = getFormString(formData, 'preferredChannel');
-		const preferredChannel = isOtpChannel(preferredChannelValue) ? preferredChannelValue : 'email';
 		const returnTo = getSafeAdminReturnTo(getFormString(formData, 'returnTo'));
 		const surfaceMeta = getSurfaceMeta(returnTo);
+		const channel = inferOtpChannel(identifier);
 
-		if (!identifier) {
+		if (!channel) {
 			return fail(400, {
 				step: 'request',
-				message: 'Enter your email or mobile number.',
+				message: 'Enter a valid email address or mobile number.',
 				identifier,
-				preferredChannel,
 				returnTo,
 				...surfaceMeta
 			});
 		}
 
 		try {
-			const otpState = await startOtp(fetch, identifier, preferredChannel);
+			const otpState = await startOtp(fetch, identifier);
 			return {
 				step: 'verify',
 				identifier,
-				preferredChannel,
 				otpState,
 				returnTo,
 				...surfaceMeta
@@ -89,7 +84,6 @@ export const actions = {
 				step: 'request',
 				message: cause instanceof Error ? cause.message : 'Unable to send verification code.',
 				identifier,
-				preferredChannel,
 				returnTo,
 				...surfaceMeta
 			});
@@ -100,8 +94,6 @@ export const actions = {
 		const identifier = getFormString(formData, 'identifier');
 		const code = getFormString(formData, 'code');
 		const challengeId = getFormString(formData, 'challengeId');
-		const preferredChannelValue = getFormString(formData, 'preferredChannel');
-		const preferredChannel = isOtpChannel(preferredChannelValue) ? preferredChannelValue : 'email';
 		const returnTo = getSafeAdminReturnTo(getFormString(formData, 'returnTo'));
 		const surfaceMeta = getSurfaceMeta(returnTo);
 
@@ -110,8 +102,7 @@ export const actions = {
 				step: 'verify',
 				message: 'Enter the verification code.',
 				identifier,
-				preferredChannel,
-				otpState: getReturnedOtpState(challengeId, preferredChannel),
+				otpState: getReturnedOtpState(challengeId, identifier),
 				returnTo,
 				...surfaceMeta
 			});
@@ -132,8 +123,7 @@ export const actions = {
 					step: 'verify',
 					message: 'Your account does not have External Admin access.',
 					identifier,
-					preferredChannel,
-					otpState: getReturnedOtpState(challengeId, preferredChannel),
+					otpState: getReturnedOtpState(challengeId, identifier),
 					returnTo,
 					...surfaceMeta
 				});
@@ -182,8 +172,7 @@ export const actions = {
 				step: 'verify',
 				message: cause instanceof Error ? cause.message : 'Verification failed.',
 				identifier,
-				preferredChannel,
-				otpState: getReturnedOtpState(challengeId, preferredChannel),
+				otpState: getReturnedOtpState(challengeId, identifier),
 				returnTo,
 				...surfaceMeta
 			});

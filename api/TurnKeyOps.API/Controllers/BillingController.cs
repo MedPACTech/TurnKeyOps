@@ -82,8 +82,8 @@ public class BillingController : ControllerBase
     //             var subs = new SubscriptionService();
     //             var sub = await subs.GetAsync(session.SubscriptionId);
 
-    //             // 2) Upsert Tenant & Owner in Qurvia DB
-    //             //    - Avoid PHI. Store Stripe IDs: CustomerId, SubscriptionId, PriceId, Status
+    //             // 2) Upsert tenant and owner billing records
+    //             //    - Store Stripe IDs: CustomerId, SubscriptionId, PriceId, Status
     //             // 3) Send magic-link email to session.CustomerDetails.Email (or Customer.Email)
     //             break;
     //         }

@@ -9,7 +9,7 @@ namespace MedInsights.AzureServices.Interfaces
 
         /// <summary>
         /// The most recent audit records produced during the last transcription call.
-        /// Persist this externally if needed for legal/clinical auditing.
+        /// Persist this externally if needed for legal or operational auditing.
         /// </summary>
         IReadOnlyList<RedactionHit> LastAudit { get; }
     }

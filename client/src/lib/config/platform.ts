@@ -130,6 +130,16 @@ export const surfaceDefinitions: SurfaceDefinition[] = [
 
 export const bdrAdminNavigation: BdrAdminNavItem[] = [
 	{
+		slug: 'bob',
+		label: 'Ask Bob',
+		href: '/bdr/admin/bob',
+		summary: 'AI operating partner for priorities, decisions, and approved actions',
+		contextLabel: 'AI Ops',
+		focusLabel: 'Daily briefing',
+		canvasLabel: 'Decision canvas',
+		section: 'overview'
+	},
+	{
 		slug: 'dashboard',
 		label: 'Dashboard',
 		href: '/bdr/admin/dashboard',
@@ -198,16 +208,6 @@ export const bdrAdminNavigation: BdrAdminNavItem[] = [
 		focusLabel: 'Relationship desk',
 		canvasLabel: 'Record canvas',
 		section: 'customers'
-	},
-	{
-		slug: 'bob',
-		label: 'Ask Bob',
-		href: '/bdr/admin/bob',
-		summary: 'AI backoffice assistant for business questions and next moves',
-		contextLabel: 'AI Ops',
-		focusLabel: 'Conversation',
-		canvasLabel: 'Answer canvas',
-		section: 'admin'
 	},
 	{
 		slug: 'settings',
@@ -688,7 +688,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 };
 
 const bdrAdminPathAliases: Record<string, string> = {
-	'/bdr/admin': '/bdr/admin/dashboard',
+	'/bdr/admin': '/bdr/admin/bob',
 	'/bdr/admin/customers': '/bdr/admin/contact',
 	'/bdr/admin/content': '/bdr/admin/website',
 	'/bdr/admin/website': '/bdr/admin/settings'
@@ -722,7 +722,7 @@ export const getBdrAdminNav = (pathname: string): BdrAdminNavItem => {
 
 export const getBdrAdminShellState = (pathname: string): BdrAdminShellState => {
 	const normalizedPath = normalizeBdrAdminPath(pathname);
-	return bdrAdminShellStates[normalizedPath] ?? bdrAdminShellStates['/bdr/admin/dashboard'];
+	return bdrAdminShellStates[normalizedPath] ?? bdrAdminShellStates['/bdr/admin/bob'];
 };
 
 export const getTurnkeyOpsAdminNav = (pathname: string) => {

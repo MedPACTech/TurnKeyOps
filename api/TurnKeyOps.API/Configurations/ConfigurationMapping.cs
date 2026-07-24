@@ -29,14 +29,7 @@ public static class ConfigurationMapping
 
         services.Configure<OpenAISettings>(configuration.GetSection("OpenAISettings"));
 
-        services.Configure<SummarizerSettings>(configuration.GetSection("SummarizerSettings"));
-        services.Configure<PatientClinicalSummarySettings>(configuration.GetSection("PatientClinicalSummarySettings"));
-        services.Configure<AppointmentDataCompletenessSettings>(configuration.GetSection("AppointmentDataCompleteness"));
-
-        services.Configure<SummarizerPromptTemplates>(configuration.GetSection("SummarizerPromptTemplates"));
-
         services.Configure<ApiErrorHandlingOptions>(configuration.GetSection("ApiErrorHandling"));
-        services.Configure<DiagnosisCodeCacheSettings>(configuration.GetSection("DiagnosisCodeCache"));
 
         return services;
     }

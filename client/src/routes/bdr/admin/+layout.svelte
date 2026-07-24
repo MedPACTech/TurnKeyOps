@@ -7,8 +7,15 @@
 		normalizeBdrAdminPath
 	} from '$lib/config/platform';
 	import type { Snippet } from 'svelte';
+	import type { BobVoiceId } from '$lib/bob-voice';
 
-	let { children, data }: { children: Snippet; data: { role: 'owner' | 'office-admin' } } = $props();
+	let {
+		children,
+		data
+	}: {
+		children: Snippet;
+		data: { role: 'owner' | 'office-admin'; bobVoice: BobVoiceId };
+	} = $props();
 
 	const currentRole = $derived(data.role);
 	const activePath = $derived(normalizeBdrAdminPath(page.url.pathname));
@@ -20,6 +27,7 @@
 	role={currentRole}
 	{activePath}
 	{activeNav}
+	initialBobVoice={data.bobVoice}
 	title={shellState.title}
 	description={shellState.description}
 	context={shellState.context}

@@ -64,6 +64,7 @@
 		quoteRequests?: QuoteRequest[];
 		estimateDrafts?: Record<string, EstimateDraftRecord>;
 		estimateDefaults?: EstimateDefaults;
+		requestedRequestId?: string;
 	};
 
 	type DraftStatus = EstimateDraftRecord['status'];
@@ -90,6 +91,7 @@
 	const sentDraftCount = $derived(Object.values(estimateDrafts).filter((draft) => draft.status === 'sent').length);
 
 	let selectedRequestId = $state('');
+	let appliedRequestedRequestId = $state('');
 	let quoteSearch = $state('');
 	let quoteQueueFilter = $state<QuoteQueueFilter>('all');
 	let draftStatus = $state<DraftStatus>('draft');
@@ -332,6 +334,16 @@
 		const visibleRequests = filterRequestQueue(requestQueue, quoteQueueFilter, quoteSearch);
 		if (visibleRequests.length === 0) {
 			selectedRequestId = '';
+			return;
+		}
+		const requestedRequestId = pageData.requestedRequestId ?? '';
+		if (
+			requestedRequestId &&
+			appliedRequestedRequestId !== requestedRequestId &&
+			visibleRequests.some((request) => request.id === requestedRequestId)
+		) {
+			selectedRequestId = requestedRequestId;
+			appliedRequestedRequestId = requestedRequestId;
 			return;
 		}
 		if (!visibleRequests.some((request) => request.id === selectedRequestId)) {

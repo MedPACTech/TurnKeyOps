@@ -14,7 +14,7 @@ namespace MedInsights.Lib.Dtos
         public string UserLastName { get; set; } = default!;
         public DateTime EntryDate { get; set; }
         public string Type { get; set; } = default!; // e.g. "encounters", "admin_tasks"
-        public string Key { get; set; } = default!;  // e.g. "training_room", "clinical"
+        public string Key { get; set; } = default!;  // e.g. "estimating", "production"
         public double Value { get; set; }
         public string? Unit { get; set; }
     }

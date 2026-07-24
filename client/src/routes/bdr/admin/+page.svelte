@@ -2,6 +2,6 @@
 	import { goto } from '$app/navigation';
 
 	$effect(() => {
-		goto('/bdr/admin/dashboard', { replaceState: true });
+		goto('/bdr/admin/bob', { replaceState: true });
 	});
 </script>

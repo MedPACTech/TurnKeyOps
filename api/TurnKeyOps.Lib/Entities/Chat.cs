@@ -15,7 +15,6 @@ namespace MedInsights.Lib.Entities
         public string Title { get; set; } = "";
         public string CustomTitle { get; set; } = "";
         public int TokensUsed { get; set; }
-        public Guid? PatientId { get; set; } = default!;
         public DateTime DateChatCreated { get; set; }
         public DateTime DateChatUpdated { get; set; }
         public string ChatSummary { get; set; } = "";

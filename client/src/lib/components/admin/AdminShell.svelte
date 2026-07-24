@@ -1,6 +1,13 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { bdrAdminNavigation, type BdrAdminNavItem, type BdrAdminRole } from '$lib/config/platform';
+	import {
+		bobVoiceCookie,
+		bobVoiceOptions,
+		normalizeBobVoice,
+		type BobVoiceId
+	} from '$lib/bob-voice';
 
 	type ShellMetric = { label: string; value: string; detail: string };
 	type ShellNote = { title: string; detail: string };
@@ -10,11 +17,13 @@
 		role,
 		activePath,
 		activeNav,
+		initialBobVoice,
 		children
 	} = $props<{
 		role: BdrAdminRole;
 		activePath: string;
 		activeNav: BdrAdminNavItem;
+		initialBobVoice: BobVoiceId;
 		title: string;
 		description: string;
 		context: {
@@ -41,8 +50,10 @@
 	let sidebarOpen = $state(false);
 	let navCollapsed = $state(false);
 	let profileOpen = $state(false);
+	let bobVoice = $derived(initialBobVoice);
 
 	const navItems = $derived(bdrAdminNavigation);
+	const isBobWorkspace = $derived(activeNav.slug === 'bob');
 
 	const navIconFor = (slug: string) =>
 		({
@@ -59,6 +70,15 @@
 		})[slug] ?? '⚙️';
 
 	const isActive = (item: BdrAdminNavItem) => activeNav.slug === item.slug || activePath === item.href;
+	const selectedBobVoice = $derived(
+		bobVoiceOptions.find((option) => option.id === bobVoice) ?? bobVoiceOptions[0]
+	);
+
+	async function updateBobVoice(event: Event) {
+		bobVoice = normalizeBobVoice((event.currentTarget as HTMLSelectElement).value);
+		document.cookie = `${bobVoiceCookie}=${encodeURIComponent(bobVoice)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+		await invalidateAll();
+	}
 </script>
 
 <div class="concept-admin-shell h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--text-base)]">
@@ -198,20 +218,48 @@
 						{/each}
 						</div>
 					</nav>
+					<div class="border-t border-[var(--nav-divider)] p-3">
+						<button
+							type="button"
+							class="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-white/75 hover:bg-white/10 hover:text-white"
+							onclick={() => {
+								sidebarOpen = false;
+								profileOpen = true;
+							}}
+						>
+							<span class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--brand-solid)] text-xs font-bold text-white">ER</span>
+							Profile & Bob voice
+						</button>
+					</div>
 				</aside>
 			</div>
 		{/if}
 
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-			<main class="admin-workarea min-h-0 min-w-0 flex-1 overflow-auto px-4 py-5 lg:px-6 lg:py-7">
+			<header class="flex h-16 shrink-0 items-center justify-between border-b border-[var(--shell-border)] bg-white px-4 lg:hidden">
+				<a href="/bdr/admin/bob" class="inline-flex min-w-0 items-center" aria-label="TurnKeyOps home">
+					<img
+						src="/turnkeyops-logo.png"
+						alt="TurnKeyOps"
+						class="h-10 w-auto max-w-[12rem] object-contain object-left"
+					/>
+				</a>
 				<button
 					type="button"
-					class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md bg-white/85 text-xl text-[var(--text-base)] shadow-sm lg:hidden"
+					class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-2xl leading-none text-[var(--text-base)] transition hover:bg-[var(--shell-panel-strong)]"
 					aria-label="Open navigation"
 					onclick={() => (sidebarOpen = true)}
 				>
 					<span aria-hidden="true">☰</span>
 				</button>
+			</header>
+			<main
+				class={`admin-workarea min-h-0 min-w-0 flex-1 ${
+					isBobWorkspace
+						? 'overflow-hidden p-0'
+						: 'overflow-auto px-4 py-5 lg:px-6 lg:py-7'
+				}`}
+			>
 				{@render children()}
 			</main>
 		</div>
@@ -249,6 +297,27 @@
 						<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">TurnKeyOps admin operator</p>
 					</div>
 				</div>
+			</section>
+
+			<section class="border-y border-[var(--shell-border)] py-4">
+				<label for="bob-voice" class="text-sm font-semibold text-[var(--text-strong)]">Bob voice</label>
+				<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">
+					Changes how Bob talks to you, not what he can do.
+				</p>
+				<select
+					id="bob-voice"
+					value={bobVoice}
+					onchange={updateBobVoice}
+					class="mt-3 min-h-11 w-full rounded-md border border-[var(--shell-border-strong)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-solid)] focus:ring-2 focus:ring-[var(--focus-ring)]"
+				>
+					{#each bobVoiceOptions as option}
+						<option value={option.id}>{option.label}</option>
+					{/each}
+				</select>
+				<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">{selectedBobVoice.description}</p>
+				<blockquote class="mt-3 border-l-2 border-[var(--accent-border)] pl-3 text-sm italic leading-6 text-[var(--text-muted)]">
+					“{selectedBobVoice.preview}”
+				</blockquote>
 			</section>
 
 			<section class="rounded-lg border border-[var(--shell-border)] bg-white p-4 shadow-sm">

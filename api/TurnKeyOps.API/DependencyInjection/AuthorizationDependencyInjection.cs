@@ -17,26 +17,7 @@ namespace MedInsights.API.DependencyInjection
             Action<PermissionRegistrationBuilder>? configure = null)
         {
             services.Configure<AuthorizationOptions>(configuration.GetSection("Authorization"));
-            var builder = new PermissionRegistrationBuilder()
-                .AddPermission(PatientAllergyAuthorizationKeys.Read, name: "Read allergies")
-                .AddPermission(PatientAllergyAuthorizationKeys.Save, name: "Save allergies")
-                .AddPermission(PatientAllergyAuthorizationKeys.Delete, name: "Delete allergies")
-                .AddPermission(PatientAllergyAuthorizationKeys.CascadeSevere, name: "Cascade severe allergy changes")
-                .MapRole(TenantRoleCatalog.Owner,
-                    PatientAllergyAuthorizationKeys.Read,
-                    PatientAllergyAuthorizationKeys.Save,
-                    PatientAllergyAuthorizationKeys.Delete,
-                    PatientAllergyAuthorizationKeys.CascadeSevere)
-                .MapRole(TenantRoleCatalog.Admin,
-                    PatientAllergyAuthorizationKeys.Read,
-                    PatientAllergyAuthorizationKeys.Save,
-                    PatientAllergyAuthorizationKeys.Delete,
-                    PatientAllergyAuthorizationKeys.CascadeSevere)
-                .MapRole(TenantRoleCatalog.BillingAdmin,
-                    PatientAllergyAuthorizationKeys.Read,
-                    PatientAllergyAuthorizationKeys.Save)
-                .MapRole(TenantRoleCatalog.Member,
-                    PatientAllergyAuthorizationKeys.Read);
+            var builder = new PermissionRegistrationBuilder();
 
             configure?.Invoke(builder);
 

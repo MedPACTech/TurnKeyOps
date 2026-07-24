@@ -80,6 +80,26 @@ const isLocalAuthApi = (baseUrl: string) => {
 	}
 };
 
+const normalizeOtpDestination = (identifier: string, channel?: OtpChannel) => {
+	const value = identifier.trim();
+	if (channel === 'email' || value.includes('@')) return value;
+
+	const digits = value.replace(/\D/g, '');
+	if (digits.length === 10) return `+1${digits}`;
+	if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+
+	return value;
+};
+
+export const inferOtpChannel = (identifier: string): OtpChannel | null => {
+	const value = identifier.trim();
+	if (!value) return null;
+	if (value.includes('@')) return 'email';
+
+	const digits = value.replace(/\D/g, '');
+	return digits.length >= 7 && digits.length <= 15 ? 'sms' : null;
+};
+
 export const isExternalAdminPath = (pathname: string) => pathname === '/bdr/admin' || pathname.startsWith('/bdr/admin/');
 export const isInternalAdminPath = (pathname: string) =>
 	pathname === '/turnkeyops/admin' || pathname.startsWith('/turnkeyops/admin/');
@@ -89,12 +109,12 @@ export const getAdminSurface = (pathname: string): AdminSurface =>
 	isInternalAdminPath(pathname) ? 'internal-admin' : 'external-admin';
 
 export const getDefaultAdminReturnTo = (surface: AdminSurface) =>
-	surface === 'internal-admin' ? '/turnkeyops/admin/dashboard' : '/bdr/admin/dashboard';
+	surface === 'internal-admin' ? '/turnkeyops/admin/dashboard' : '/bdr/admin/bob';
 
 export const getSafeAdminReturnTo = (value: string | null | undefined) => {
 	if (value?.startsWith('/turnkeyops/admin')) return value;
 	if (value?.startsWith('/bdr/admin')) return value;
-	return '/bdr/admin/dashboard';
+	return '/bdr/admin/bob';
 };
 
 export const buildLoginRedirect = (url: URL) => {
@@ -146,16 +166,21 @@ export const postAuthApi = async <T>(
 	return unwrapApiPayload<T>(payload);
 };
 
-export const startOtp = async (fetch: typeof globalThis.fetch, identifier: string, preferredChannel: OtpChannel) => {
+export const startOtp = async (fetch: typeof globalThis.fetch, identifier: string) => {
+	const channel = inferOtpChannel(identifier);
+	if (!channel) {
+		throw new Error('Enter a valid email address or mobile number.');
+	}
+
 	const apiBaseUrl = getAuthApiBaseUrl();
 	const result = await postAuthApi<StartOtpResponse>(fetch, '/auth/startotp', {
-		destination: identifier.trim(),
-		preferredChannel
+		destination: normalizeOtpDestination(identifier, channel),
+		preferredChannel: channel
 	});
 
 	return {
 		...result,
-		channel: result.channel ?? preferredChannel,
+		channel: result.channel ?? channel,
 		devCode: result.devCode ?? (isLocalAuthApi(apiBaseUrl) ? '123456' : null)
 	};
 };
@@ -171,7 +196,7 @@ export const completeOtp = (
 	}
 
 	return postAuthApi<AuthResult>(fetch, '/auth/completeotp', {
-		destination: identifier.trim(),
+		destination: normalizeOtpDestination(identifier),
 		code: code.trim(),
 		challengeId
 	});

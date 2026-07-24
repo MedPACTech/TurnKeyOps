@@ -56,36 +56,6 @@ namespace MedInsights.Repositories
             return results.OrderByDescending(c => c.DateChatUpdated).ToList();
         }
 
-        public async Task<List<Chat>> GetChatsByUserAndPatientIdAsync(string partitionKey, Guid patientId, CancellationToken ct)
-        {
-            var results = new List<Chat>();
-            await foreach (var chat in _azureStore.QueryAsync(
-                x => x.PartitionKey == partitionKey && x.PatientId == patientId && !x.IsDeleted,
-                ct,
-                "IsDeleted"))
-            {
-                SyncEntityIdentityFromKeys(chat);
-                results.Add(chat);
-            }
-
-            return results.OrderByDescending(c => c.DateChatUpdated).ToList();
-        }
-
-        public async Task<List<Chat>> GetChatsByTenantAndPatientIdAsync(string tenantPartitionPrefix, Guid patientId, CancellationToken ct)
-        {
-            var results = new List<Chat>();
-            await foreach (var chat in _azureStore.QueryAsync(x => x.PatientId == patientId && !x.IsDeleted, ct, "IsDeleted"))
-            {
-                if (!string.IsNullOrWhiteSpace(chat.PartitionKey) && chat.PartitionKey.StartsWith($"TENANT={tenantPartitionPrefix}", StringComparison.Ordinal))
-                {
-                    SyncEntityIdentityFromKeys(chat);
-                    results.Add(chat);
-                }
-            }
-
-            return results.OrderByDescending(c => c.DateChatUpdated).ToList();
-        }
-
         private static void SyncEntityIdentityFromKeys(Chat entity)
         {
             if (entity.Id == Guid.Empty && !string.IsNullOrWhiteSpace(entity.RowKey) && Guid.TryParse(entity.RowKey, out var id))

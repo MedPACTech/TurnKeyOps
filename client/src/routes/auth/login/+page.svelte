@@ -6,11 +6,10 @@
 	const step = $derived(form?.step ?? 'request');
 	const returnTo = $derived(form?.returnTo ?? data.returnTo);
 	const identifier = $derived(form?.identifier ?? '');
-	const preferredChannel = $derived(form?.preferredChannel ?? 'email');
 	const surfaceLabel = $derived(form?.label ?? data.label);
 	const otpState = $derived(form?.otpState ?? null);
 	const destinationLabel = $derived(otpState?.destinationMasked ? ` at ${otpState.destinationMasked}` : '');
-	const resolvedChannel = $derived(otpState?.channel && otpState.channel !== 'choose' ? otpState.channel : preferredChannel);
+	const resolvedChannel = $derived(otpState?.channel === 'sms' ? 'text message' : 'email');
 </script>
 
 <svelte:head>
@@ -34,7 +33,7 @@
 				<form method="POST" action="?/request" class="space-y-4">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<div>
-						<label class="label" for="identifier">Email or mobile number</label>
+						<label class="label" for="identifier">Work email or mobile number</label>
 						<input
 							id="identifier"
 							class="input"
@@ -44,13 +43,7 @@
 							autocomplete="username"
 							required
 						/>
-					</div>
-					<div>
-						<label class="label" for="preferredChannel">Delivery method</label>
-						<select id="preferredChannel" class="input" name="preferredChannel">
-							<option value="email" selected={preferredChannel === 'email'}>Email</option>
-							<option value="sms" selected={preferredChannel === 'sms'}>Text message</option>
-						</select>
+						<p class="mt-2 text-xs text-slate-500">We’ll email an address or text a mobile number automatically.</p>
 					</div>
 					<button type="submit" class="btn-primary w-full">Send code</button>
 				</form>
@@ -58,10 +51,9 @@
 				<form method="POST" action="?/verify" class="space-y-4">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<input type="hidden" name="identifier" value={identifier} />
-					<input type="hidden" name="preferredChannel" value={preferredChannel} />
 					<input type="hidden" name="challengeId" value={otpState?.challengeId ?? ''} />
 					<div class="rounded-2xl border border-orange-100 bg-orange-50/80 px-4 py-3 text-sm text-orange-950">
-						<p>Enter the code sent via {resolvedChannel}{destinationLabel}.</p>
+						<p>Enter the code sent by {resolvedChannel}{destinationLabel}.</p>
 						{#if otpState?.devCode}
 							<p class="mt-2 font-medium">Dev code: {otpState.devCode}</p>
 						{/if}
@@ -84,7 +76,6 @@
 				<form method="POST" action="?/request" class="mt-3">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<input type="hidden" name="identifier" value={identifier} />
-					<input type="hidden" name="preferredChannel" value={preferredChannel} />
 					<button type="submit" class="btn-secondary w-full">Resend code</button>
 				</form>
 
