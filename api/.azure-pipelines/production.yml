@@ -6,7 +6,7 @@ extends:
   parameters:
     environmentName: 'Production'
     buildConfiguration: 'Release'
-    webAppName: 'prod-medinsights-api'
-    azureSubscription: 'Qurvia / MedInsights Production'
-    resourceGroupName: 'production'
+    webAppName: '$(TURNKEYOPS_API_WEB_APP_NAME)'
+    azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+    resourceGroupName: '$(TURNKEYOPS_PRODUCTION_RESOURCE_GROUP)'
     deployBranchPrimary: 'main'

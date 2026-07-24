@@ -15,10 +15,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TurnKeyOps.AzureServices", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TurnKeyOps.Authorization.Tests", "TurnKeyOps.Authorization.Tests\TurnKeyOps.Authorization.Tests.csproj", "{9ADDAF56-8A8A-48F9-8488-E78D338A9E9F}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tools", "Tools", "{07C2787E-EAC7-C090-1BA3-A61EC2A24D84}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReferenceDataLoader", "Tools\ReferenceDataLoader\ReferenceDataLoader.csproj", "{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -101,24 +97,9 @@ Global
 		{9ADDAF56-8A8A-48F9-8488-E78D338A9E9F}.Release|x64.Build.0 = Release|Any CPU
 		{9ADDAF56-8A8A-48F9-8488-E78D338A9E9F}.Release|x86.ActiveCfg = Release|Any CPU
 		{9ADDAF56-8A8A-48F9-8488-E78D338A9E9F}.Release|x86.Build.0 = Release|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Debug|x64.Build.0 = Debug|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Debug|x86.Build.0 = Debug|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Release|x64.ActiveCfg = Release|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Release|x64.Build.0 = Release|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Release|x86.ActiveCfg = Release|Any CPU
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{C4E42B52-447B-494C-833D-6EDA6BE7D4D1} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F6BBD544-4363-42FF-AD0A-273FD7FFBF92}

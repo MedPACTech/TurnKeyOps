@@ -71,6 +71,38 @@ const roleClaimKeys = [
 export const getAuthApiBaseUrl = () =>
 	(env.PUBLIC_TKO_API_BASE_URL || env.TKO_API_BASE_URL || env.VITE_API_URL || defaultApiBaseUrl).replace(/\/$/, '');
 
+const tokenValidationCache = new Map<string, number>();
+const tokenValidationTtlMs = 30_000;
+
+export const validateAdminAccessToken = async (
+	fetch: typeof globalThis.fetch,
+	token: string | null | undefined
+) => {
+	if (!token) return false;
+
+	const cachedUntil = tokenValidationCache.get(token) ?? 0;
+	if (cachedUntil > Date.now()) return true;
+
+	try {
+		const response = await fetch(`${getAuthApiBaseUrl()}/api/auth/session`, {
+			headers: {
+				Authorization: `Bearer ${token}`,
+				Accept: 'application/json'
+			}
+		});
+		if (!response.ok) {
+			tokenValidationCache.delete(token);
+			return false;
+		}
+
+		tokenValidationCache.set(token, Date.now() + tokenValidationTtlMs);
+		return true;
+	} catch {
+		tokenValidationCache.delete(token);
+		return false;
+	}
+};
+
 const isLocalAuthApi = (baseUrl: string) => {
 	try {
 		const { hostname } = new URL(baseUrl);

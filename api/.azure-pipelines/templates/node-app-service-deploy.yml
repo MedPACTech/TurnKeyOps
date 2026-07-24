@@ -9,13 +9,17 @@ parameters:
   type: string
 - name: webAppName
   type: string
+- name: resourceGroupName
+  type: string
+- name: apiBaseUrl
+  type: string
 - name: deployBranch
   type: string
   default: 'main'
 
 stages:
 - stage: Build_Test_Publish
-  displayName: 'Build, Check, Publish BDR Client'
+  displayName: 'Build, Check, Publish TurnKeyOps Web'
   jobs:
   - job: BuildClient
     displayName: 'Build SvelteKit Node application'
@@ -54,7 +58,7 @@ stages:
       displayName: 'Assemble deployable Node package'
 
     - task: ArchiveFiles@2
-      displayName: 'Archive BDR client'
+      displayName: 'Archive TurnKeyOps web'
       inputs:
         rootFolderOrFile: '$(PACKAGE_ROOT)'
         includeRootFolder: false
@@ -69,7 +73,7 @@ stages:
         artifact: '${{ parameters.artifactName }}'
 
 - stage: Deploy
-  displayName: 'Deploy BDR Client'
+  displayName: 'Deploy TurnKeyOps Web'
   dependsOn: Build_Test_Publish
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranch }}'))
   jobs:
@@ -89,7 +93,7 @@ stages:
               path: '$(Pipeline.Workspace)/${{ parameters.artifactName }}'
 
           - task: AzureWebApp@1
-            displayName: 'Deploy BDR client package'
+            displayName: 'Deploy TurnKeyOps web package'
             inputs:
               azureSubscription: '${{ parameters.azureSubscription }}'
               appType: 'webAppLinux'
@@ -97,3 +101,26 @@ stages:
               package: '$(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.artifactName }}.zip'
               runtimeStack: 'NODE|22-lts'
               startUpCommand: 'node build'
+
+          - task: AzureCLI@2
+            displayName: 'Configure TurnKeyOps web runtime'
+            inputs:
+              azureSubscription: '${{ parameters.azureSubscription }}'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -euo pipefail
+                az webapp config appsettings set \
+                  --resource-group '${{ parameters.resourceGroupName }}' \
+                  --name '${{ parameters.webAppName }}' \
+                  --settings \
+                    NODE_ENV='production' \
+                    PUBLIC_TKO_API_BASE_URL='${{ parameters.apiBaseUrl }}' \
+                    TKO_API_BASE_URL='${{ parameters.apiBaseUrl }}' \
+                    PROTOCOL_HEADER='x-forwarded-proto' \
+                    HOST_HEADER='x-forwarded-host' \
+                  --output table
+
+                az webapp restart \
+                  --resource-group '${{ parameters.resourceGroupName }}' \
+                  --name '${{ parameters.webAppName }}'

@@ -6,10 +6,13 @@ import {
 	buildLoginRedirect,
 	getAdminSessionFromToken,
 	isAdminPath,
-	isExternalAdminPath
+	isExternalAdminPath,
+	validateAdminAccessToken
 } from '$lib/server/auth-session';
 import { getPersistedBdrAdminRole } from '$lib/server/bdr-contact-access';
 import { resolveProductionPathname } from '$lib/config/domains';
+import { getExternalAdminTenantForPath } from '$lib/config/external-admin';
+import { getTenantById } from '$lib/config/tenants';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const authPathname = resolveProductionPathname(event.url.hostname, event.url.pathname);
@@ -18,12 +21,22 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
-	const authSession = getAdminSessionFromToken(
-		event.cookies.get(authTokenCookie),
-		authPathname,
-		event.cookies.get(bdrAdminSessionCookie)
-	);
+	const authToken = event.cookies.get(authTokenCookie);
+	const tokenIsValid = await validateAdminAccessToken(event.fetch, authToken);
+	const authSession = tokenIsValid
+		? getAdminSessionFromToken(
+				authToken,
+				authPathname,
+				event.cookies.get(bdrAdminSessionCookie)
+			)
+		: null;
 	if (authSession) {
+		const routeTenant = getExternalAdminTenantForPath(authPathname);
+		const claimedTenant = authSession.tenantId ? getTenantById(authSession.tenantId) : null;
+		if (routeTenant && claimedTenant && routeTenant.id !== claimedTenant.id) {
+			throw error(403, `This account does not have access to ${routeTenant.name}.`);
+		}
+
 		event.locals.adminSession = authSession;
 		if (authSession.surface === 'external-admin' && authSession.role) {
 			event.locals.bdrAdminSession = {

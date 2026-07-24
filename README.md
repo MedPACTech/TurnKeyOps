@@ -2,13 +2,17 @@
 
 Unified TurnKeyOps monorepo for the API, admin, and client applications.
 
+Production deployment and custom-domain setup are documented in
+[`docs/production-deployment.md`](docs/production-deployment.md).
+
 ## Structure
 
 ```
 TurnKeyOps/
 ├── api/    # ASP.NET Core backend
-├── admin/  # Internal admin app
-└── client/ # Public-facing client site
+├── admin/  # Legacy standalone internal-admin client
+├── client/ # Multi-tenant public, External Admin, and platform-admin Node app
+└── docs/   # Production and architecture documentation
 ```
 
 ## Quick Start
