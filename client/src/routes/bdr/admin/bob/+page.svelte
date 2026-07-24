@@ -64,12 +64,12 @@
 		data.conversations.filter((item) => Boolean(item.archivedAtUtc))
 	);
 
-	const generalPrompts = [
+	const generalPrompts = $derived([
 		'Review today’s priorities',
 		'Show estimates needing follow-up',
 		'Start a new estimate',
-		'Review unpaid invoices'
-	];
+		...(data.tenant.slug === 'bdr' ? ['Review unpaid invoices'] : ['Review new land-clearing requests'])
+	]);
 
 	const formatConversationTime = (value: string) =>
 		new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -155,7 +155,7 @@
 </script>
 
 <svelte:head>
-	<title>Ask Bob · BDR Admin</title>
+	<title>Ask Bob · {data.tenant.shortName} Admin</title>
 </svelte:head>
 
 <section class="flex h-full min-h-0 overflow-hidden bg-white">
@@ -163,7 +163,7 @@
 		<div class="border-b border-[var(--shell-border)] px-4 py-4">
 			<h1 class="text-lg font-semibold text-[var(--text-strong)]">Conversations</h1>
 			<a
-				href="/bdr/admin/bob"
+				href={data.bobHref}
 				class={`mt-3 flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-semibold transition ${
 					conversation.id === 'bob-home'
 						? 'bg-white text-[var(--accent-text)] shadow-sm ring-1 ring-[var(--shell-border)]'
@@ -185,7 +185,7 @@
 					}`}
 				>
 					<a
-						href={`/bdr/admin/bob?conversation=${encodeURIComponent(item.id)}`}
+						href={`${data.bobHref}?conversation=${encodeURIComponent(item.id)}`}
 						class="flex min-w-0 flex-1 items-start gap-2 px-3 py-3"
 					>
 						{#if item.mode === 'estimate-builder' || item.mode === 'estimate-followup'}
@@ -346,8 +346,8 @@
 									['Job site', estimateDraft?.serviceAddress],
 									['Project', estimateDraft?.projectType],
 									['Scope', estimateDraft?.scope],
-									['Measurements', estimateDraft?.dimensions],
-									['Depth', estimateDraft?.depth],
+									[data.estimateLabels.dimensions, estimateDraft?.dimensions],
+									[data.estimateLabels.depth, estimateDraft?.depth],
 									['Timeline', estimateDraft?.timeline]
 								] as field}
 									<div class="py-2">
@@ -577,8 +577,8 @@
 					['Job site', estimateDraft?.serviceAddress],
 					['Project', estimateDraft?.projectType],
 					['Scope', estimateDraft?.scope],
-					['Measurements', estimateDraft?.dimensions],
-					['Depth', estimateDraft?.depth],
+					[data.estimateLabels.dimensions, estimateDraft?.dimensions],
+					[data.estimateLabels.depth, estimateDraft?.depth],
 					['Timeline', estimateDraft?.timeline],
 					['Notes', estimateDraft?.notes]
 				] as field}
@@ -593,7 +593,7 @@
 
 			{#if estimateDraft?.createdRequestId}
 				<a
-					href={`/bdr/admin/estimates?request=${encodeURIComponent(estimateDraft.createdRequestId)}`}
+					href={`${data.estimatesHref}?request=${encodeURIComponent(estimateDraft.createdRequestId)}`}
 					class="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-4 text-sm font-semibold text-white"
 				>
 					Open in Estimates

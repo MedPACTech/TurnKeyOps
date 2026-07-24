@@ -12,6 +12,8 @@ import {
 	executeBobRecommendation
 } from '$lib/server/bob-operations';
 import { bdrEmployeeContacts } from '$lib/bdr-team';
+import { getExternalAdminTenantForPath } from '$lib/config/external-admin';
+import { bdrTenant, type TenantDefinition } from '$lib/config/tenants';
 import {
 	advanceEstimateConversation,
 	appendBobMessage,
@@ -50,6 +52,9 @@ type BobAnalyzeEnvelope = {
 };
 
 const formString = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
+const tenantForUrl = (url: URL) => getExternalAdminTenantForPath(url.pathname) ?? bdrTenant;
+const adminBase = (tenant: TenantDefinition) => tenant.adminPath.replace(/\/bob$/, '');
+const bobHref = (tenant: TenantDefinition) => `${adminBase(tenant)}/bob`;
 
 const analyzeWithBob = async ({
 	fetch,
@@ -59,7 +64,8 @@ const analyzeWithBob = async ({
 	voice,
 	estimate,
 	context,
-	conversation
+	conversation,
+	tenant
 }: {
 	fetch: typeof globalThis.fetch;
 	token: string;
@@ -69,6 +75,7 @@ const analyzeWithBob = async ({
 	estimate?: BobEstimateDraft;
 	context: unknown;
 	conversation: BobConversation['messages'];
+	tenant: TenantDefinition;
 }) => {
 	const response = await fetch(`${getAuthApiBaseUrl()}/api/bob/analyze`, {
 		method: 'POST',
@@ -81,7 +88,18 @@ const analyzeWithBob = async ({
 			mode,
 			voice,
 			estimate,
-			context,
+			context: {
+				tenant: {
+					id: tenant.id,
+					name: tenant.name,
+					trade: tenant.tradeLabel,
+					services: tenant.services,
+					estimateInputs: tenant.estimateInputs,
+					jobStages: tenant.jobStages,
+					instructions: tenant.bobContext
+				},
+				operatingData: context
+			},
 			conversation: conversation.slice(-12)
 		})
 	});
@@ -169,10 +187,11 @@ const buildInspectionOffer = async (
 	fetch: typeof globalThis.fetch,
 	conversation: BobConversation,
 	question: string,
-	voice: BobVoiceId
+	voice: BobVoiceId,
+	tenant: TenantDefinition
 ) => {
 	if (!inspectionIntent.test(question)) return null;
-	const { requests } = await loadQuoteRequests(fetch);
+	const { requests } = await loadQuoteRequests(fetch, tenant.id);
 	const conversationText = [...conversation.messages.slice(-6).map((message) => message.content), question]
 		.join(' ')
 		.toLowerCase();
@@ -200,7 +219,7 @@ const buildInspectionOffer = async (
 	if (!target) return null;
 
 	const fieldResource =
-		bdrEmployeeContacts
+		(tenant.slug === 'bdr' ? bdrEmployeeContacts : [])
 			.filter((employee) => employee.skills.includes('field-inspection'))
 			.sort((left, right) => left.workload - right.workload)[0]?.displayName ??
 		target.assignedTo ??
@@ -250,7 +269,7 @@ const buildInspectionOffer = async (
 	actions.push({
 		kind: 'open-calendar',
 		label: 'Review calendar',
-		href: `/bdr/admin/calendar?scheduleRequest=${encodeURIComponent(target.id)}`
+		href: `${adminBase(tenant)}/${tenant.slug === 'bdr' ? 'calendar' : 'requests'}?scheduleRequest=${encodeURIComponent(target.id)}`
 	});
 	const firstSlot = actions.find((action) => action.kind === 'schedule-inspection');
 	const customer = target.siteName || target.companyName || target.contactName || target.customerName;
@@ -262,10 +281,11 @@ const buildInspectionOffer = async (
 };
 
 export const load = async ({ fetch, url, cookies }) => {
+	const tenant = tenantForUrl(url);
 	const [briefing, conversations, estimateFollowups] = await Promise.all([
-		buildBobBriefing(fetch),
-		ensureBobConversations(),
-		buildEstimateFollowups(fetch)
+		buildBobBriefing(fetch, tenant),
+		ensureBobConversations(tenant.slug),
+		buildEstimateFollowups(fetch, tenant)
 	]);
 	const storedConversation =
 		conversations.find((conversation) => conversation.id === url.searchParams.get('conversation')) ??
@@ -292,35 +312,46 @@ export const load = async ({ fetch, url, cookies }) => {
 		conversations,
 		selectedConversation,
 		bobVoice,
-		estimateProgress: getEstimateBuilderProgress(selectedConversation.estimateDraft),
-		estimateFollowups
+		estimateProgress: getEstimateBuilderProgress(selectedConversation.estimateDraft, tenant.slug),
+		estimateFollowups,
+		tenant,
+		bobHref: bobHref(tenant),
+		estimatesHref: `${adminBase(tenant)}/estimates`,
+		estimateLabels:
+			tenant.slug === 'thinkpink'
+				? { dimensions: 'Site quantities', depth: 'Terrain, access & disposal' }
+				: { dimensions: 'Measurements', depth: 'Depth' }
 	};
 };
 
 export const actions = {
-	archiveConversation: async ({ request }) => {
+	archiveConversation: async ({ request, url }) => {
+		const tenant = tenantForUrl(url);
 		const formData = await request.formData();
-		await setBobConversationArchived(formString(formData, 'conversationId'), true);
-		throw redirect(303, '/bdr/admin/bob');
+		await setBobConversationArchived(formString(formData, 'conversationId'), true, tenant.slug);
+		throw redirect(303, bobHref(tenant));
 	},
-	restoreConversation: async ({ request }) => {
+	restoreConversation: async ({ request, url }) => {
+		const tenant = tenantForUrl(url);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
-		await setBobConversationArchived(conversationId, false);
-		throw redirect(303, `/bdr/admin/bob?conversation=${encodeURIComponent(conversationId)}`);
+		await setBobConversationArchived(conversationId, false, tenant.slug);
+		throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`);
 	},
-	deleteConversation: async ({ request }) => {
+	deleteConversation: async ({ request, url }) => {
+		const tenant = tenantForUrl(url);
 		const formData = await request.formData();
-		await deleteBobConversation(formString(formData, 'conversationId'));
-		throw redirect(303, '/bdr/admin/bob');
+		await deleteBobConversation(formString(formData, 'conversationId'), tenant.slug);
+		throw redirect(303, bobHref(tenant));
 	},
-	ask: async ({ request, fetch, cookies }) => {
+	ask: async ({ request, fetch, cookies, url }) => {
+		const tenant = tenantForUrl(url);
 		const formData = await request.formData();
 		const question = formString(formData, 'question');
 		const conversationId = formString(formData, 'conversationId');
 		if (!question) return fail(400, { action: 'ask', message: 'Ask Bob a question.', conversationId });
 
-		const conversation = await getBobConversation(conversationId);
+		const conversation = await getBobConversation(conversationId, tenant.slug);
 		const token = cookies.get(authTokenCookie);
 		if (!token) {
 			return fail(401, { action: 'ask', message: 'Sign in again before asking Bob.', conversationId });
@@ -329,23 +360,24 @@ export const actions = {
 		try {
 			const bobVoice = normalizeBobVoice(cookies.get(bobVoiceCookie));
 			if (conversation.mode === 'estimate-followup') {
-				const inspectionOffer = await buildInspectionOffer(fetch, conversation, question, bobVoice);
+				const inspectionOffer = await buildInspectionOffer(fetch, conversation, question, bobVoice, tenant);
 				if (inspectionOffer) {
-					await appendBobMessage(conversation.id, 'user', question);
+					await appendBobMessage(conversation.id, 'user', question, undefined, undefined, tenant.slug);
 					await appendBobMessage(
 						conversation.id,
 						'bob',
 						inspectionOffer.content,
 						undefined,
-						inspectionOffer.actions
+						inspectionOffer.actions,
+						tenant.slug
 					);
 					throw redirect(
 						303,
-						`/bdr/admin/bob?conversation=${encodeURIComponent(conversation.id)}`
+						`${bobHref(tenant)}?conversation=${encodeURIComponent(conversation.id)}`
 					);
 				}
 			}
-			const briefing = await buildBobBriefing(fetch);
+			const briefing = await buildBobBriefing(fetch, tenant);
 			const analysis = await analyzeWithBob({
 				fetch,
 				token,
@@ -354,7 +386,8 @@ export const actions = {
 				voice: bobVoice,
 				estimate: conversation.estimateDraft,
 				context: briefing.context,
-				conversation: conversation.messages
+				conversation: conversation.messages,
+				tenant
 			});
 
 			if (conversation.mode === 'estimate-builder') {
@@ -362,67 +395,73 @@ export const actions = {
 					conversation.id,
 					question,
 					analysis.fields,
-					analysis.answer
+					analysis.answer,
+					tenant.slug
 				);
-				throw redirect(303, `/bdr/admin/bob?conversation=${encodeURIComponent(conversation.id)}`);
+				throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversation.id)}`);
 			}
 
 			if (conversation.mode === 'estimate-followup') {
-				const followups = await buildEstimateFollowups(fetch);
+				const followups = await buildEstimateFollowups(fetch, tenant);
 				await appendGeneralConversationExchange(
 					conversation.id,
 					question,
 					analysis.answer || summarizeEstimateFollowups(followups),
-					analysis.suggestedReplies
+					analysis.suggestedReplies,
+					tenant.slug
 				);
-				throw redirect(303, `/bdr/admin/bob?conversation=${encodeURIComponent(conversation.id)}`);
+				throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversation.id)}`);
 			}
 
 			if (analysis.intent === 'start_estimate') {
-				const estimateConversation = await createBobConversation('estimate-builder');
+				const estimateConversation = await createBobConversation('estimate-builder', tenant.slug);
 				if (Object.keys(analysis.fields).length) {
 					await advanceEstimateConversation(
 						estimateConversation.id,
 						question,
 						analysis.fields,
-						analysis.answer
+						analysis.answer,
+						tenant.slug
 					);
 				}
 				throw redirect(
 					303,
-					`/bdr/admin/bob?conversation=${encodeURIComponent(estimateConversation.id)}`
+					`${bobHref(tenant)}?conversation=${encodeURIComponent(estimateConversation.id)}`
 				);
 			}
 
 			if (analysis.intent === 'estimate_followup') {
-				const followupConversation = await createBobConversation('estimate-followup');
-				const followups = await buildEstimateFollowups(fetch);
-				await appendBobMessage(followupConversation.id, 'user', question);
+				const followupConversation = await createBobConversation('estimate-followup', tenant.slug);
+				const followups = await buildEstimateFollowups(fetch, tenant);
+				await appendBobMessage(followupConversation.id, 'user', question, undefined, undefined, tenant.slug);
 				await appendBobMessage(
 					followupConversation.id,
 					'bob',
 					analysis.answer || summarizeEstimateFollowups(followups),
-					analysis.suggestedReplies
+					analysis.suggestedReplies,
+					undefined,
+					tenant.slug
 				);
 				throw redirect(
 					303,
-					`/bdr/admin/bob?conversation=${encodeURIComponent(followupConversation.id)}`
+					`${bobHref(tenant)}?conversation=${encodeURIComponent(followupConversation.id)}`
 				);
 			}
 
 			const targetConversation =
 				conversation.id === bobHomeConversationId
-					? await createBobConversation('general')
+					? await createBobConversation('general', tenant.slug)
 					: conversation;
 			await appendGeneralConversationExchange(
 				targetConversation.id,
 				question,
 				analysis.answer || 'I need a little more detail to help with that.',
-				analysis.suggestedReplies
+				analysis.suggestedReplies,
+				tenant.slug
 			);
 			throw redirect(
 				303,
-				`/bdr/admin/bob?conversation=${encodeURIComponent(targetConversation.id)}`
+				`${bobHref(tenant)}?conversation=${encodeURIComponent(targetConversation.id)}`
 			);
 		} catch (cause) {
 			if (cause && typeof cause === 'object' && 'status' in cause && cause.status === 303) throw cause;
@@ -433,7 +472,8 @@ export const actions = {
 			});
 		}
 	},
-	scheduleInspection: async ({ request, fetch, cookies }) => {
+	scheduleInspection: async ({ request, fetch, cookies, url }) => {
+		const tenant = tenantForUrl(url);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		const requestId = formString(formData, 'requestId');
@@ -441,7 +481,7 @@ export const actions = {
 		const windowStart = formString(formData, 'windowStart');
 		const windowEnd = formString(formData, 'windowEnd');
 		const assignedFieldResource = formString(formData, 'assignedFieldResource');
-		const { requests } = await loadQuoteRequests(fetch);
+		const { requests } = await loadQuoteRequests(fetch, tenant.id);
 		const target = requests.find((entry) => entry.id === requestId);
 		if (!target) {
 			return fail(404, {
@@ -490,12 +530,12 @@ export const actions = {
 				{
 					kind: 'open-calendar',
 					label: 'Open calendar',
-					href: `/bdr/admin/calendar?scheduleRequest=${encodeURIComponent(requestId)}`
+					href: `${adminBase(tenant)}/${tenant.slug === 'bdr' ? 'calendar' : 'requests'}?scheduleRequest=${encodeURIComponent(requestId)}`
 				}
-			]);
+			], tenant.slug);
 			throw redirect(
 				303,
-				`/bdr/admin/bob?conversation=${encodeURIComponent(conversationId)}`
+				`${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`
 			);
 		} catch (cause) {
 			if (cause && typeof cause === 'object' && 'status' in cause && cause.status === 303) throw cause;
@@ -506,11 +546,12 @@ export const actions = {
 			});
 		}
 	},
-	approve: async ({ request, fetch }) => {
+	approve: async ({ request, fetch, url }) => {
+		const tenant = tenantForUrl(url);
 		const formData = await request.formData();
 		const recommendationId = formString(formData, 'recommendationId');
 		const conversationId = formString(formData, 'conversationId');
-		const briefing = await buildBobBriefing(fetch);
+		const briefing = await buildBobBriefing(fetch, tenant);
 		const recommendation = briefing.recommendations.find((item) => item.id === recommendationId);
 		if (!recommendation) {
 			return fail(404, {
@@ -522,7 +563,7 @@ export const actions = {
 
 		try {
 			await executeBobRecommendation(fetch, recommendation);
-			throw redirect(303, `/bdr/admin/bob?conversation=${encodeURIComponent(conversationId)}`);
+			throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`);
 		} catch (cause) {
 			if (cause && typeof cause === 'object' && 'status' in cause && cause.status === 303) throw cause;
 			return fail(500, {
@@ -532,12 +573,13 @@ export const actions = {
 			});
 		}
 	},
-	createEstimate: async ({ request, fetch }) => {
+	createEstimate: async ({ request, fetch, url }) => {
+		const tenant = tenantForUrl(url);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
-		const conversation = await getBobConversation(conversationId);
+		const conversation = await getBobConversation(conversationId, tenant.slug);
 		const draft = conversation.estimateDraft;
-		const progress = getEstimateBuilderProgress(draft);
+		const progress = getEstimateBuilderProgress(draft, tenant.slug);
 		if (conversation.mode !== 'estimate-builder' || !draft || !progress.isComplete) {
 			return fail(400, {
 				action: 'createEstimate',
@@ -547,10 +589,11 @@ export const actions = {
 		}
 
 		if (draft.createdRequestId) {
-			throw redirect(303, `/bdr/admin/estimates?request=${encodeURIComponent(draft.createdRequestId)}`);
+			throw redirect(303, `${adminBase(tenant)}/estimates?request=${encodeURIComponent(draft.createdRequestId)}`);
 		}
 
 		const estimateRequest = await submitQuoteRequest(fetch, {
+			tenantId: tenant.id,
 			companyName: /^residential$/i.test(draft.companyName) ? '' : draft.companyName,
 			contactName: draft.contactName,
 			email: draft.email,
@@ -561,7 +604,7 @@ export const actions = {
 			propertyType: /^residential$/i.test(draft.companyName) ? 'Residential' : 'Commercial',
 			requestedTimeline: draft.timeline,
 			priority: 'standard',
-			need: `${draft.scope}\n\nMeasurements: ${draft.dimensions}\n\nDepth: ${draft.depth}\n\nNotes: ${draft.notes}`,
+			need: `${draft.scope}\n\n${tenant.estimateInputs.join(', ')}: ${draft.dimensions}\n\nSite considerations: ${draft.depth}\n\nNotes: ${draft.notes}`,
 			attachments: [],
 			assignedTo: 'Bob · office review',
 			nextAction: 'Review quantities, pricing, margin, assumptions, and customer-ready terms.',
@@ -581,7 +624,7 @@ export const actions = {
 			serviceAddress: draft.serviceAddress,
 			requestedTimeline: draft.timeline
 		});
-		await markEstimateConversationCreated(conversation.id, estimateRequest.id);
-		throw redirect(303, `/bdr/admin/estimates?request=${encodeURIComponent(estimateRequest.id)}`);
+		await markEstimateConversationCreated(conversation.id, estimateRequest.id, tenant.slug);
+		throw redirect(303, `${adminBase(tenant)}/estimates?request=${encodeURIComponent(estimateRequest.id)}`);
 	}
 };

@@ -28,8 +28,13 @@ public sealed class BobController : ApiControllerBase
         """;
 
     private const string AnalyzeSystemPrompt = """
-        You are Bob, the AI operating layer for a construction back office.
+        You are Bob, the AI operating layer for a field-service back office.
         Return ONLY valid JSON. Do not use markdown fences.
+
+        The payload's operatingContext contains a tenant preset with the company name, trade,
+        services, estimate inputs, workflow stages, and trade-specific instructions. Treat that
+        preset as authoritative. Use its vocabulary and never substitute assumptions from a
+        different trade or tenant.
 
         Identify the operator's intent as exactly one of:
         - general
