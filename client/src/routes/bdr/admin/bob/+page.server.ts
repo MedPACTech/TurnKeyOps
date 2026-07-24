@@ -14,6 +14,7 @@ import {
 import { bdrEmployeeContacts } from '$lib/bdr-team';
 import { getExternalAdminTenantForPath } from '$lib/config/external-admin';
 import { bdrTenant, type TenantDefinition } from '$lib/config/tenants';
+import { loadThinkPinkSettings } from '$lib/server/thinkpink-settings';
 import {
 	advanceEstimateConversation,
 	appendBobMessage,
@@ -52,7 +53,19 @@ type BobAnalyzeEnvelope = {
 };
 
 const formString = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
-const tenantForUrl = (url: URL) => getExternalAdminTenantForPath(url.pathname) ?? bdrTenant;
+type BobTenantPreset = TenantDefinition & { operatingDefaults?: unknown };
+const tenantForUrl = async (url: URL): Promise<BobTenantPreset> => {
+	const tenant = getExternalAdminTenantForPath(url.pathname) ?? bdrTenant;
+	if (tenant.slug !== 'thinkpink') return tenant;
+	const settings = await loadThinkPinkSettings();
+	return {
+		...tenant,
+		services: settings.services,
+		estimateInputs: settings.estimateInputs,
+		jobStages: settings.jobStages,
+		operatingDefaults: settings
+	};
+};
 const adminBase = (tenant: TenantDefinition) => tenant.adminPath.replace(/\/bob$/, '');
 const bobHref = (tenant: TenantDefinition) => `${adminBase(tenant)}/bob`;
 
@@ -75,7 +88,7 @@ const analyzeWithBob = async ({
 	estimate?: BobEstimateDraft;
 	context: unknown;
 	conversation: BobConversation['messages'];
-	tenant: TenantDefinition;
+	tenant: BobTenantPreset;
 }) => {
 	const response = await fetch(`${getAuthApiBaseUrl()}/api/bob/analyze`, {
 		method: 'POST',
@@ -96,7 +109,8 @@ const analyzeWithBob = async ({
 					services: tenant.services,
 					estimateInputs: tenant.estimateInputs,
 					jobStages: tenant.jobStages,
-					instructions: tenant.bobContext
+					instructions: tenant.bobContext,
+					operatingDefaults: tenant.operatingDefaults
 				},
 				operatingData: context
 			},
@@ -281,7 +295,7 @@ const buildInspectionOffer = async (
 };
 
 export const load = async ({ fetch, url, cookies }) => {
-	const tenant = tenantForUrl(url);
+	const tenant = await tenantForUrl(url);
 	const [briefing, conversations, estimateFollowups] = await Promise.all([
 		buildBobBriefing(fetch, tenant),
 		ensureBobConversations(tenant.slug),
@@ -326,26 +340,26 @@ export const load = async ({ fetch, url, cookies }) => {
 
 export const actions = {
 	archiveConversation: async ({ request, url }) => {
-		const tenant = tenantForUrl(url);
+		const tenant = await tenantForUrl(url);
 		const formData = await request.formData();
 		await setBobConversationArchived(formString(formData, 'conversationId'), true, tenant.slug);
 		throw redirect(303, bobHref(tenant));
 	},
 	restoreConversation: async ({ request, url }) => {
-		const tenant = tenantForUrl(url);
+		const tenant = await tenantForUrl(url);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		await setBobConversationArchived(conversationId, false, tenant.slug);
 		throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`);
 	},
 	deleteConversation: async ({ request, url }) => {
-		const tenant = tenantForUrl(url);
+		const tenant = await tenantForUrl(url);
 		const formData = await request.formData();
 		await deleteBobConversation(formString(formData, 'conversationId'), tenant.slug);
 		throw redirect(303, bobHref(tenant));
 	},
 	ask: async ({ request, fetch, cookies, url }) => {
-		const tenant = tenantForUrl(url);
+		const tenant = await tenantForUrl(url);
 		const formData = await request.formData();
 		const question = formString(formData, 'question');
 		const conversationId = formString(formData, 'conversationId');
@@ -473,7 +487,7 @@ export const actions = {
 		}
 	},
 	scheduleInspection: async ({ request, fetch, cookies, url }) => {
-		const tenant = tenantForUrl(url);
+		const tenant = await tenantForUrl(url);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		const requestId = formString(formData, 'requestId');
@@ -547,7 +561,7 @@ export const actions = {
 		}
 	},
 	approve: async ({ request, fetch, url }) => {
-		const tenant = tenantForUrl(url);
+		const tenant = await tenantForUrl(url);
 		const formData = await request.formData();
 		const recommendationId = formString(formData, 'recommendationId');
 		const conversationId = formString(formData, 'conversationId');
@@ -574,7 +588,7 @@ export const actions = {
 		}
 	},
 	createEstimate: async ({ request, fetch, url }) => {
-		const tenant = tenantForUrl(url);
+		const tenant = await tenantForUrl(url);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		const conversation = await getBobConversation(conversationId, tenant.slug);
