@@ -28,6 +28,8 @@ public class EstimateDefaultsService : IEstimateDefaultsService
 
     public async Task<EstimateDefaultsDto> UpsertAsync(EstimateDefaultsDto dto, CancellationToken ct = default)
     {
+        Validate(dto);
+
         var existing = await _repository.GetAsync(PartitionKey(), DefaultsRowKey, ct) ?? new EstimateDefaultsProfile
         {
             Id = _userContext.TenantId,
@@ -46,6 +48,34 @@ public class EstimateDefaultsService : IEstimateDefaultsService
     }
 
     private string PartitionKey() => RepositoryKeyHelper.ToTenantPartitionKey(_userContext.TenantId);
+
+    private static void Validate(EstimateDefaultsDto dto)
+    {
+        if (dto.DefaultCrewSize < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(dto.DefaultCrewSize),
+                dto.DefaultCrewSize,
+                "Default crew size must be at least one.");
+        }
+
+        foreach (var property in typeof(EstimateDefaultsDto).GetProperties())
+        {
+            if (property.PropertyType != typeof(decimal))
+            {
+                continue;
+            }
+
+            var value = (decimal)(property.GetValue(dto) ?? 0m);
+            if (value < 0m)
+            {
+                throw new ArgumentOutOfRangeException(
+                    property.Name,
+                    value,
+                    $"{property.Name} cannot be negative.");
+            }
+        }
+    }
 
     private static EstimateDefaultsDto CreateBaselineDefaults() => new()
     {

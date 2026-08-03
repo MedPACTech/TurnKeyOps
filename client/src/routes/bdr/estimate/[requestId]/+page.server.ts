@@ -1,5 +1,4 @@
 import { error, fail } from '@sveltejs/kit';
-import { loadBdrEstimateDefaults } from '$lib/server/bdr-estimate-defaults';
 import {
 	loadQuoteRequests,
 	recordQuoteRequestActivity,
@@ -167,7 +166,7 @@ export const load = async ({ fetch, params, url }) => {
 	const { draft, quoteRequest } = await loadEstimatePacket(fetch, requestId);
 	const returnTo = url.searchParams.get('returnTo') ?? '';
 	const safeReturnTo = returnTo.startsWith('/bdr/admin/') ? returnTo : '';
-	return { draft, quoteRequest, returnTo: safeReturnTo, estimateDefaults: await loadBdrEstimateDefaults() };
+	return { draft, quoteRequest, returnTo: safeReturnTo };
 };
 
 export const actions = {

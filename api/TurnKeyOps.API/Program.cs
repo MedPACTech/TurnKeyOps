@@ -85,20 +85,14 @@ public partial class Program
 
             builder.Services.AddJwtDebugging();
             
-            // CORS (dev)
+            var allowedClientOrigins = builder.Configuration
+                .GetSection("Cors:AllowedOrigins")
+                .Get<string[]>() ?? Array.Empty<string>();
+
             builder.Services.AddCors(options =>
             {
-
-                options.AddPolicy("development",
-                    p => p.WithOrigins(
-                        "http://localhost:5173",
-                        "capacitor://localhost",
-                        "http://localhost:5178",
-                        "http://127.0.0.1:5178",
-                        "http://localhost:5174",
-                        "http://localhost:5180"
-
-                )
+                options.AddPolicy("TurnKeyOpsClients",
+                    p => p.WithOrigins(allowedClientOrigins)
                           .AllowAnyHeader()
                           .AllowAnyMethod());
             });
@@ -269,7 +263,7 @@ public partial class Program
                 app.UseSwaggerUI();
             }
 
-            app.UseCors("development");
+            app.UseCors("TurnKeyOpsClients");
             // app.UseHttpsRedirection();
             app.UseAuthentication();
             app.UseAuthorization();

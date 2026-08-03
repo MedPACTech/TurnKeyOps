@@ -1,5 +1,4 @@
 import { fail } from '@sveltejs/kit';
-import { loadBdrEstimateDefaults } from '$lib/server/bdr-estimate-defaults';
 import { loadQuoteRequests, recordQuoteRequestActivity, updateQuoteRequest } from '$lib/server/quote-requests';
 
 const fsModuleName = 'node:fs/promises';
@@ -295,7 +294,6 @@ export const load = async ({ fetch, url }) => {
 	return {
 		quoteRequests: requests,
 		estimateDrafts: await readEstimateDrafts(),
-		estimateDefaults: await loadBdrEstimateDefaults(),
 		requestedRequestId: url.searchParams.get('request')?.trim() ?? ''
 	};
 };
