@@ -16,9 +16,14 @@ public sealed class JobReleaseServiceTests
     {
         var jobs = new Mock<IJobRepository>();
         var payloads = new Mock<IEstimateWorkflowPayloadStore>();
+        var jobPayloads = new Mock<IJobWorkflowPayloadStore>();
         var invoices = new Mock<IInvoiceService>();
         var invoiceId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
-        var service = new JobService(jobs.Object, payloads.Object, invoices.Object, new User());
+        jobs.Setup(item => item.GetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Job?)null);
+        jobs.Setup(item => item.ListAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<Job>());
+        var service = new JobService(jobs.Object, payloads.Object, jobPayloads.Object, invoices.Object, new User());
         var job = new JobDto { Id = Guid.NewGuid(), Name = "North lot", Status = JobStatus.Scheduled, InvoiceId = invoiceId };
         invoices.Setup(item => item.GetJobReleaseAsync(invoiceId, It.IsAny<CancellationToken>())).ReturnsAsync(new InvoiceJobReleaseDto
         {

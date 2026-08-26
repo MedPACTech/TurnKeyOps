@@ -188,8 +188,8 @@ export const buildBobBriefing = async (
 	}
 	const [{ requests }, invoices, jobs, { snapshot }] = await Promise.all([
 		loadQuoteRequests(fetch),
-		loadBdrInvoices(),
-		loadBdrScheduledJobs(),
+		loadBdrInvoices(fetch),
+		loadBdrScheduledJobs(fetch),
 		resolveMvpScaffold(fetch)
 	]);
 

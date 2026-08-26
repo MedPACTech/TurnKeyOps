@@ -174,6 +174,7 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IInvoiceWorkflowPayloadStore, InvoiceWorkflowPayloadStore>();
         services.AddScoped<IInvoiceService, InvoiceService>();
         services.AddScoped<IInvoiceWebhookService, InvoiceWebhookService>();
+        services.AddScoped<IJobWorkflowPayloadStore, JobWorkflowPayloadStore>();
         services.AddScoped<IJobService, JobService>();
         services.AddScoped<IJobSiteService, JobSiteService>();
         services.AddScoped<IWeatherService, WeatherService>();

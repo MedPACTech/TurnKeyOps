@@ -14,7 +14,7 @@ export const load = async ({ fetch }) => {
 	const { requests, source: requestSource } = await loadQuoteRequests(fetch);
 	const billingSettings = await loadBdrBillingSettings();
 	const lifecycleInvoices = await loadBdrInvoices(fetch);
-	const scheduledJobs = await loadBdrScheduledJobs();
+	const scheduledJobs = await loadBdrScheduledJobs(fetch);
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, scheduledJobs);
 	const requestInbox = buildQuoteRequestInbox(requests);
 

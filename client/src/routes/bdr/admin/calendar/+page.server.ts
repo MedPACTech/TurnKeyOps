@@ -12,7 +12,7 @@ export const load = async ({ fetch, url }) => {
 	const { requests } = await loadQuoteRequests(fetch);
 	const billingSettings = await loadBdrBillingSettings();
 	const lifecycleInvoices = await loadBdrInvoices(fetch);
-	const scheduledJobs = await loadBdrScheduledJobs();
+	const scheduledJobs = await loadBdrScheduledJobs(fetch);
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, scheduledJobs);
 	const scheduledVisitRequests = requests.filter((request) => request.siteVisitSchedule);
 	const scheduledRequest = scheduleRequestId

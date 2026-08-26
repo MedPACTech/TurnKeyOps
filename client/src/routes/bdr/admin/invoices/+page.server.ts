@@ -20,7 +20,7 @@ export const load = async ({ fetch }) => {
 	const billingSettings = await loadBdrBillingSettings();
 	const { requests } = await loadQuoteRequests(fetch);
 	const lifecycleInvoices = await syncApprovedEstimateInvoices(fetch);
-	const scheduledJobs = await loadBdrScheduledJobs();
+	const scheduledJobs = await loadBdrScheduledJobs(fetch);
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, scheduledJobs);
 
 	return {
@@ -126,7 +126,7 @@ export const actions = {
 			crew,
 			notes,
 			scheduledBy: 'Office admin'
-		});
+		}, fetch);
 		throw redirect(303, `/bdr/admin/jobs?job=${encodeURIComponent(scheduledJob.id)}`);
 	}
 };
