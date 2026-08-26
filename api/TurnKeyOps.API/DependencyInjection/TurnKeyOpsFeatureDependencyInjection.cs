@@ -18,6 +18,7 @@ public static class TurnKeyOpsFeatureDependencyInjection
     public static IServiceCollection AddTurnKeyOpsFeatureConfigurations(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<WeatherSettings>(configuration.GetSection("WeatherSettings"));
+        services.Configure<QuoteRequestTenantOptions>(configuration.GetSection(QuoteRequestTenantOptions.SectionName));
         return services;
     }
 
@@ -33,6 +34,13 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddAzureEntityMapping<Customer>(o =>
         {
             o.TableName = "Customers";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = true;
+        });
+
+        services.AddAzureEntityMapping<QuoteRequest>(o =>
+        {
+            o.TableName = "QuoteRequests";
             o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
             o.EnableIdLocator = true;
         });
@@ -111,6 +119,9 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IBaseRepositoryAsync<Customer>>(sp => sp.GetRequiredService<ICustomerRepository>());
 
+        services.AddScoped<IQuoteRequestRepository, QuoteRequestRepository>();
+        services.AddScoped<IBaseRepositoryAsync<QuoteRequest>>(sp => sp.GetRequiredService<IQuoteRequestRepository>());
+
         services.AddScoped<IEstimateRepository, EstimateRepository>();
         services.AddScoped<IBaseRepositoryAsync<Estimate>>(sp => sp.GetRequiredService<IEstimateRepository>());
 
@@ -142,6 +153,7 @@ public static class TurnKeyOpsFeatureDependencyInjection
     {
         services.AddScoped<ICalendarEventService, CalendarEventService>();
         services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<IQuoteRequestService, QuoteRequestService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IEstimateWorkflowPayloadStore, EstimateWorkflowPayloadStore>();
         services.AddScoped<IEstimateService, EstimateService>();

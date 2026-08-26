@@ -10,7 +10,6 @@ import {
 	quoteRequestMissingInfoReasonMeta,
 	quoteRequestSiteVisitCancellationReasonMeta,
 	quoteRequestStatusMeta,
-	seededQuoteRequests,
 	type QuoteRequest,
 	type QuoteRequestAttachment,
 	type QuoteRequestFormInput,
@@ -24,26 +23,12 @@ import {
 	type QuoteRequestTimelineEvent
 } from '$lib/quote-requests';
 import type { ApiEnvelope } from '$lib/types/mvp';
-import { bdrTenant } from '$lib/config/tenants';
+import { bdrTenant, getTenantById } from '$lib/config/tenants';
 
 const defaultApiBaseUrl = 'http://localhost:5178';
 const quoteMarker = 'TKO_BDR_QUOTE_REQUEST::';
 const internalAdminActor = 'Internal Admin';
 const officeQueueOwner = 'Office intake';
-const fsModuleName = 'node:fs/promises';
-const getCwd = () =>
-	(globalThis as typeof globalThis & { process?: { cwd: () => string } }).process?.cwd() ?? '.';
-const localStoreDir = `${getCwd()}/.svelte-kit`;
-const localStorePath = `${localStoreDir}/local-quote-requests.json`;
-
-type FsPromises = {
-	mkdir: (path: string, options: { recursive: boolean }) => Promise<unknown>;
-	readFile: (path: string, encoding: 'utf-8') => Promise<string>;
-	stat: (path: string) => Promise<unknown>;
-	writeFile: (path: string, data: string) => Promise<unknown>;
-};
-
-const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
 
 type QuoteRequestDto = {
 	id: string;
@@ -351,63 +336,6 @@ const createActivityEvent = ({
 const formatMissingInfoReasonSummary = (codes: QuoteRequestMissingInfoReasonCode[]) =>
 	codes.map((code) => quoteRequestMissingInfoReasonMeta[code].label).join(' · ');
 
-const readLocalQuoteRequests = async (): Promise<QuoteRequest[]> => {
-	try {
-		const { readFile } = await getFs();
-		const contents = await readFile(localStorePath, 'utf-8');
-		const parsed = JSON.parse(contents) as unknown;
-		if (!Array.isArray(parsed)) return [];
-		return parsed.map((item) => normalizeQuoteRequest(item as QuoteRequest));
-	} catch (cause) {
-		if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ENOENT') {
-			return [];
-		}
-		console.warn('Unable to read local quote request store.', cause);
-		return [];
-	}
-};
-
-const localQuoteRequestStoreExists = async () => {
-	try {
-		const { stat } = await getFs();
-		await stat(localStorePath);
-		return true;
-	} catch {
-		return false;
-	}
-};
-
-const writeLocalQuoteRequests = async (requests: QuoteRequest[]) => {
-	const { mkdir, writeFile } = await getFs();
-	await mkdir(localStoreDir, { recursive: true });
-	await writeFile(localStorePath, JSON.stringify(requests.map(normalizeQuoteRequest), null, 2));
-};
-
-const mergeQuoteRequests = (...groups: QuoteRequest[][]) => {
-	const byId = new Map<string, QuoteRequest>();
-	for (const request of groups.flat()) {
-		const normalized = normalizeQuoteRequest(request);
-		if (!byId.has(normalized.id)) {
-			byId.set(normalized.id, normalized);
-		}
-	}
-	return buildQuoteRequestInbox([...byId.values()]);
-};
-
-const saveLocalQuoteRequest = async (request: QuoteRequest) => {
-	const localRequests = await readLocalQuoteRequests();
-	await writeLocalQuoteRequests(mergeQuoteRequests([request], localRequests));
-};
-
-const updateLocalQuoteRequest = async (updatedRequest: QuoteRequest) => {
-	const localRequests = await readLocalQuoteRequests();
-	const index = localRequests.findIndex((request) => request.id === updatedRequest.id);
-	if (index === -1) return false;
-	localRequests[index] = normalizeQuoteRequest(updatedRequest);
-	await writeLocalQuoteRequests(localRequests);
-	return true;
-};
-
 const isQuoteRequestDto = (value: unknown): value is QuoteRequestDto => {
 	if (!value || typeof value !== 'object') return false;
 	return 'submittedAtUtc' in value && 'serviceAddress' in value && 'preferredTimeline' in value;
@@ -584,48 +512,47 @@ export const loadQuoteRequests = async (
 	fetch: typeof globalThis.fetch,
 	tenantId = getQuoteRequestTenantId()
 ): Promise<{ requests: QuoteRequest[]; source: 'api' | 'fallback' }> => {
-	const localRequests = (await readLocalQuoteRequests()).filter(
-		(request) => (request.tenantId ?? getQuoteRequestTenantId()) === tenantId
+	const response = await fetch(`${getApiBaseUrl()}/api/quote-requests`, {
+		headers: getApiHeaders()
+	});
+	const records = (await unwrapEnvelope<Array<QuoteRequestDto | LegacyLeadDto>>(response)).filter(
+		(record) => record.tenantId === tenantId
 	);
-	const hasLocalStore = await localQuoteRequestStoreExists();
-	try {
-		const response = await fetch(`${getApiBaseUrl()}/api/quote-requests`, {
-			headers: getApiHeaders()
-		});
-		const records = (await unwrapEnvelope<Array<QuoteRequestDto | LegacyLeadDto>>(response)).filter(
-			(record) => record.tenantId === tenantId
-		);
-		const apiRequests = records.map(toQuoteRequest).filter((request): request is QuoteRequest => Boolean(request));
-		const requests = mergeQuoteRequests(localRequests, apiRequests);
-		return { requests, source: 'api' };
-	} catch (cause) {
-		console.warn('Falling back to local quote requests.', cause);
-		return {
-			requests:
-				hasLocalStore || tenantId !== getQuoteRequestTenantId()
-					? buildQuoteRequestInbox(localRequests)
-					: mergeQuoteRequests(localRequests, seededQuoteRequests),
-			source: 'fallback'
-		};
-	}
+	const requests = records
+		.map(toQuoteRequest)
+		.filter((request): request is QuoteRequest => Boolean(request));
+	return { requests: buildQuoteRequestInbox(requests), source: 'api' };
 };
 
 export const submitQuoteRequest = async (fetch: typeof globalThis.fetch, input: QuoteRequestFormInput) => {
 	const request = createQuoteRequestFromForm(input);
-	try {
-		const response = await fetch(`${getApiBaseUrl()}/api/quote-requests`, {
-			method: 'POST',
-			headers: getApiHeaders(),
-			body: JSON.stringify(toQuoteRequestDto(request))
-		});
-
-		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
-		await saveLocalQuoteRequest(request);
-	} catch (cause) {
-		console.warn('Quote request API unavailable; saving request locally for operator triage.', cause);
-		await saveLocalQuoteRequest(request);
+	const tenantId = input.tenantId ?? getQuoteRequestTenantId();
+	const tenantSlug = getTenantById(tenantId)?.slug;
+	if (!tenantSlug) {
+		throw error(400, 'Quote request tenant is not configured.');
 	}
-	return request;
+
+	const response = await fetch(`${getApiBaseUrl()}/api/public/quote-requests/${tenantSlug}`, {
+		method: 'POST',
+		headers: getApiHeaders(),
+		body: JSON.stringify({
+			id: request.id,
+			companyName: request.companyName,
+			contactName: request.contactName,
+			email: request.email,
+			phone: request.phone,
+			siteName: request.siteName,
+			serviceAddress: request.serviceAddress,
+			serviceType: request.serviceType,
+			propertyType: request.propertyType,
+			requestedTimeline: request.requestedTimeline,
+			priority: request.priority,
+			need: request.need,
+			attachments: request.attachments
+		})
+	});
+	const saved = await unwrapEnvelope<QuoteRequestDto>(response);
+	return toQuoteRequest(saved) ?? request;
 };
 
 export const updateQuoteRequest = async (
@@ -795,20 +722,11 @@ export const updateQuoteRequest = async (
 			body: JSON.stringify(body)
 		});
 
-		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
-		await saveLocalQuoteRequest(updatedRequest);
-		return updatedRequest;
+		const saved = await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		return toQuoteRequest(saved) ?? updatedRequest;
 	} catch (cause) {
-		console.warn('Quote request API unavailable; trying local quote request update.', cause);
-		const localRequests = await readLocalQuoteRequests();
-		const existingRequest = localRequests.find((request) => request.id === params.id);
-		if (!existingRequest) {
-			throw error(404, 'Quote request record was not found locally');
-		}
-
-		const updatedRequest = buildUpdatedRequest(existingRequest);
-		await updateLocalQuoteRequest(updatedRequest);
-		return updatedRequest;
+		console.error('Quote request update failed.', cause);
+		throw cause;
 	}
 };
 
@@ -860,20 +778,11 @@ export const recordQuoteRequestActivity = async (
 			body: JSON.stringify(body)
 		});
 
-		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
-		await updateLocalQuoteRequest(updatedRequest);
-		return updatedRequest;
+		const saved = await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		return toQuoteRequest(saved) ?? updatedRequest;
 	} catch (cause) {
-		console.warn('Quote request API unavailable; trying local activity append.', cause);
-		const localRequests = await readLocalQuoteRequests();
-		const existingRequest = localRequests.find((request) => request.id === params.id);
-		if (!existingRequest) {
-			throw error(404, 'Quote request record was not found locally');
-		}
-
-		const updatedRequest = buildUpdatedRequest(existingRequest);
-		await updateLocalQuoteRequest(updatedRequest);
-		return updatedRequest;
+		console.error('Quote request activity update failed.', cause);
+		throw cause;
 	}
 };
 
@@ -1003,20 +912,11 @@ export const scheduleQuoteRequestSiteVisit = async (
 			body: JSON.stringify(body)
 		});
 
-		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
-		await saveLocalQuoteRequest(updatedRequest);
-		return updatedRequest;
+		const saved = await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		return toQuoteRequest(saved) ?? updatedRequest;
 	} catch (cause) {
-		console.warn('Quote request API unavailable; trying local site visit scheduling.', cause);
-		const localRequests = await readLocalQuoteRequests();
-		const existingRequest = localRequests.find((request) => request.id === params.id);
-		if (!existingRequest) {
-			throw error(404, 'Quote request record was not found locally');
-		}
-
-		const updatedRequest = buildUpdatedRequest(existingRequest);
-		await updateLocalQuoteRequest(updatedRequest);
-		return updatedRequest;
+		console.error('Quote request site visit scheduling failed.', cause);
+		throw cause;
 	}
 };
 
@@ -1116,19 +1016,10 @@ export const cancelQuoteRequestSiteVisit = async (
 			body: JSON.stringify(body)
 		});
 
-		await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
-		await saveLocalQuoteRequest(updatedRequest);
-		return updatedRequest;
+		const saved = await unwrapEnvelope<QuoteRequestDto | LegacyLeadDto>(response);
+		return toQuoteRequest(saved) ?? updatedRequest;
 	} catch (cause) {
-		console.warn('Quote request API unavailable; trying local site visit cancellation.', cause);
-		const localRequests = await readLocalQuoteRequests();
-		const existingRequest = localRequests.find((request) => request.id === params.id);
-		if (!existingRequest) {
-			throw error(404, 'Quote request record was not found locally');
-		}
-
-		const updatedRequest = buildUpdatedRequest(existingRequest);
-		await updateLocalQuoteRequest(updatedRequest);
-		return updatedRequest;
+		console.error('Quote request site visit cancellation failed.', cause);
+		throw cause;
 	}
 };
