@@ -2,6 +2,7 @@ namespace MedInsights.Lib.Authorization;
 
 public static class TurnKeyAuthorizationPolicies
 {
+    public const string AuthenticatedSession = "TurnKey.AuthenticatedSession";
     public const string TenantAccess = "TurnKey.TenantAccess";
     public const string TenantStaff = "TurnKey.TenantStaff";
     public const string TenantAdmin = "TurnKey.TenantAdmin";

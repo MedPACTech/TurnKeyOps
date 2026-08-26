@@ -164,14 +164,16 @@
 							<p class="truncate text-sm font-medium">{operatorName}</p>
 							<p class="truncate text-xs text-white/50">{workspaceLabel}</p>
 						</div>
-						<a
-							href="/"
-							class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white"
-							title="Sign out"
-							aria-label="Sign out"
-						>
-							<span aria-hidden="true">🚪</span>
-						</a>
+						<form method="POST" action="/auth/logout">
+							<button
+								type="submit"
+								class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white"
+								title="Sign out"
+								aria-label="Sign out"
+							>
+								<span aria-hidden="true">🚪</span>
+							</button>
+						</form>
 					{/if}
 				</div>
 			</div>

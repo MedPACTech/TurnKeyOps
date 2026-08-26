@@ -33,6 +33,9 @@ public partial class Program
         try
         {
             var builder = WebApplication.CreateBuilder(args);
+            ProductionIdentityConfiguration.Validate(
+                builder.Configuration,
+                builder.Environment.EnvironmentName);
 
             if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Local"))
             {
@@ -263,8 +266,19 @@ public partial class Program
                 app.UseSwaggerUI();
             }
 
+            if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Local"))
+                app.UseHsts();
+
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                context.Response.Headers["X-Frame-Options"] = "DENY";
+                context.Response.Headers["Referrer-Policy"] = "no-referrer";
+                context.Response.Headers.Append("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
+                await next();
+            });
+            app.UseHttpsRedirection();
             app.UseCors("TurnKeyOpsClients");
-            // app.UseHttpsRedirection();
             app.UseAuthentication();
             app.UseAuthorization();
 

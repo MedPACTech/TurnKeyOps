@@ -9,11 +9,11 @@ declare global {
 				role: 'owner' | 'office-admin' | null;
 				email: string;
 				tenantId: string;
-				source: 'auth-token' | 'contact-access';
+				source: 'auth-token';
 			};
 			bdrAdminSession?: {
 				role: 'owner' | 'office-admin';
-				source: 'auth-token' | 'contact-access';
+				source: 'auth-token';
 			};
 		}
 		// interface PageData {}

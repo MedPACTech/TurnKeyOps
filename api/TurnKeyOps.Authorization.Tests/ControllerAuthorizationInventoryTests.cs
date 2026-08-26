@@ -45,6 +45,7 @@ public sealed class ControllerAuthorizationInventoryTests
     }
 
     [Theory]
+    [InlineData(typeof(AuthSessionController), TurnKeyAuthorizationPolicies.AuthenticatedSession)]
     [InlineData(typeof(RolesController), TurnKeyAuthorizationPolicies.TenantAdmin)]
     [InlineData(typeof(TenantMembershipController), TurnKeyAuthorizationPolicies.TenantAdmin)]
     [InlineData(typeof(BillingAdminController), TurnKeyAuthorizationPolicies.BillingAdmin)]

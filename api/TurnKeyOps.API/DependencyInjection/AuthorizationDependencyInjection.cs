@@ -38,6 +38,9 @@ namespace MedInsights.API.DependencyInjection
                     .RequireAuthenticatedUser()
                     .Build();
 
+                options.AddPolicy(TurnKeyAuthorizationPolicies.AuthenticatedSession, policy =>
+                    policy.RequireAuthenticatedUser());
+
                 options.AddPolicy(TurnKeyAuthorizationPolicies.TenantAccess, policy =>
                     policy.RequireAuthenticatedUser().RequireRole(
                         TurnKeyAuthorizationRoles.Owner,

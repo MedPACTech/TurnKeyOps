@@ -1,7 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import {
 	authTokenCookie,
-	bdrAdminSessionCookie,
+	authRefreshTokenCookie,
 	completeOtp,
 	extractAccessToken,
 	extractAuthRoles,
@@ -10,13 +11,14 @@ import {
 	getAdminSurface,
 	getDefaultAdminReturnTo,
 	getSafeAdminReturnTo,
+	hasInternalAdminRole,
 	inferOtpChannel,
-	internalAdminSessionCookie,
+	legacyAdminCookieNames,
 	resolveBdrAdminRole,
-	startOtp
+	startOtp,
+	validateAdminAccessToken
 } from '$lib/server/auth-session';
 
-const authRefreshTokenCookie = 'tko_refresh_token';
 const adminSessionMaxAge = 60 * 60 * 8;
 
 const getFormString = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
@@ -42,10 +44,13 @@ const getReturnedOtpState = (challengeId: string, identifier: string) => ({
 	devCode: null
 });
 
-export const load = async ({ cookies, url }) => {
+export const load = async ({ cookies, url, fetch }) => {
 	const returnTo = getSafeAdminReturnTo(url.searchParams.get('returnTo'));
 	const surfaceMeta = getSurfaceMeta(returnTo);
-	const session = getAdminSessionFromToken(cookies.get(authTokenCookie), returnTo, cookies.get(bdrAdminSessionCookie));
+	const token = cookies.get(authTokenCookie);
+	const session = (await validateAdminAccessToken(fetch, token))
+		? getAdminSessionFromToken(token, returnTo)
+		: null;
 
 	if (session && (surfaceMeta.surface === 'internal-admin' || session.role)) {
 		throw redirect(303, returnTo);
@@ -133,12 +138,24 @@ export const actions = {
 					...surfaceMeta
 				});
 			}
+			if (surfaceMeta.surface === 'internal-admin' && !hasInternalAdminRole(roles)) {
+				return fail(403, {
+					step: 'verify',
+					message: 'Your account does not have Internal Admin access.',
+					identifier,
+					otpState: getReturnedOtpState(challengeId, identifier),
+					returnTo,
+					...surfaceMeta
+				});
+			}
+
+			const secureCookie = env.NODE_ENV === 'production' || url.protocol === 'https:';
 
 			cookies.set(authTokenCookie, accessToken, {
 				path: '/',
 				httpOnly: true,
-				sameSite: 'lax',
-				secure: url.protocol === 'https:',
+				sameSite: 'strict',
+				secure: secureCookie,
 				maxAge: adminSessionMaxAge
 			});
 
@@ -147,29 +164,18 @@ export const actions = {
 				cookies.set(authRefreshTokenCookie, refreshToken, {
 					path: '/',
 					httpOnly: true,
-					sameSite: 'lax',
-					secure: url.protocol === 'https:',
+					sameSite: 'strict',
+					secure: secureCookie,
 					maxAge: 60 * 60 * 24 * 30
 				});
 			}
 
-			if (bdrRole) {
-				cookies.set(bdrAdminSessionCookie, bdrRole, {
+			for (const cookieName of legacyAdminCookieNames) {
+				cookies.delete(cookieName, {
 					path: '/',
 					httpOnly: true,
-					sameSite: 'lax',
-					secure: url.protocol === 'https:',
-					maxAge: adminSessionMaxAge
-				});
-			}
-
-			if (surfaceMeta.surface === 'internal-admin') {
-				cookies.set(internalAdminSessionCookie, '1', {
-					path: '/turnkeyops/admin',
-					httpOnly: true,
-					sameSite: 'lax',
-					secure: url.protocol === 'https:',
-					maxAge: adminSessionMaxAge
+					sameSite: 'strict',
+					secure: secureCookie
 				});
 			}
 		} catch (cause) {
