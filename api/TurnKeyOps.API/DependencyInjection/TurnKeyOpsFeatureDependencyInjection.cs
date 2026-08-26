@@ -45,6 +45,13 @@ public static class TurnKeyOpsFeatureDependencyInjection
             o.EnableIdLocator = true;
         });
 
+        services.AddAzureEntityMapping<QuoteEstimate>(o =>
+        {
+            o.TableName = "QuoteEstimates";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = true;
+        });
+
         services.AddAzureEntityMapping<JobSite>(o =>
         {
             o.TableName = "JobSites";
@@ -122,6 +129,9 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IQuoteRequestRepository, QuoteRequestRepository>();
         services.AddScoped<IBaseRepositoryAsync<QuoteRequest>>(sp => sp.GetRequiredService<IQuoteRequestRepository>());
 
+        services.AddScoped<IQuoteEstimateRepository, QuoteEstimateRepository>();
+        services.AddScoped<IBaseRepositoryAsync<QuoteEstimate>>(sp => sp.GetRequiredService<IQuoteEstimateRepository>());
+
         services.AddScoped<IEstimateRepository, EstimateRepository>();
         services.AddScoped<IBaseRepositoryAsync<Estimate>>(sp => sp.GetRequiredService<IEstimateRepository>());
 
@@ -156,6 +166,7 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IQuoteRequestTenantResolver, QuoteRequestTenantResolver>();
         services.AddScoped<IQuoteRequestService, QuoteRequestService>();
         services.AddScoped<IQuoteRequestAttachmentService, QuoteRequestAttachmentService>();
+        services.AddScoped<IQuoteEstimateService, QuoteEstimateService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IEstimateWorkflowPayloadStore, EstimateWorkflowPayloadStore>();
         services.AddScoped<IEstimateService, EstimateService>();

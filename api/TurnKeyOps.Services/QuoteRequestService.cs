@@ -22,7 +22,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
             ["contacted"] = new(["needs-info", "qualified", "inspection-scheduled", "estimate-drafted", "closed"], StringComparer.OrdinalIgnoreCase),
             ["inspection-scheduled"] = new(["qualified", "estimate-drafted", "closed"], StringComparer.OrdinalIgnoreCase),
             ["estimate-drafted"] = new(["estimate-sent", "closed"], StringComparer.OrdinalIgnoreCase),
-            ["estimate-sent"] = new(["won", "closed"], StringComparer.OrdinalIgnoreCase),
+            ["estimate-sent"] = new(["estimate-drafted", "won", "closed"], StringComparer.OrdinalIgnoreCase),
             ["won"] = new(StringComparer.OrdinalIgnoreCase),
             ["closed"] = new(["in-review"], StringComparer.OrdinalIgnoreCase)
         };

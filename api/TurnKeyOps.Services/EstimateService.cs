@@ -40,7 +40,7 @@ public class EstimateService : IEstimateService
 
     public async Task<EstimateDto?> GetAsync(Guid id)
     {
-        var entity = await _repo.GetByIdAsync(id);
+        var entity = await GetEstimateEntityAsync(id);
         if (entity is null || entity.IsDeleted) return null;
 
         var liPk = RepositoryKeyHelper.ToTenantEstimatePartitionKey(_userContext.TenantId, id);
@@ -88,7 +88,7 @@ public class EstimateService : IEstimateService
 
     public async Task<EstimateDto> UpdateAsync(EstimateDto dto)
     {
-        var existing = await _repo.GetByIdAsync(dto.Id)
+        var existing = await GetEstimateEntityAsync(dto.Id)
             ?? throw new ArgumentException("Estimate not found", nameof(dto.Id));
 
         ApplyFinancials(dto);
@@ -140,7 +140,7 @@ public class EstimateService : IEstimateService
 
     public async Task<EstimateDto> UpdateStructuredAsync(Guid id, UpdateEstimateStructuredRequestDto dto)
     {
-        var existing = await _repo.GetByIdAsync(id)
+        var existing = await GetEstimateEntityAsync(id)
             ?? throw new ArgumentException("Estimate not found", nameof(id));
 
         var structured = NormalizeStructuredInput(dto.StructuredInput);
@@ -400,7 +400,7 @@ public class EstimateService : IEstimateService
 
     public async Task DeleteAsync(Guid id)
     {
-        var entity = await _repo.GetByIdAsync(id);
+        var entity = await GetEstimateEntityAsync(id);
         if (entity is null) return;
         entity.IsDeleted = true;
         entity.DateUpdated = DateTime.UtcNow;
@@ -460,7 +460,7 @@ public class EstimateService : IEstimateService
 
     public async Task<EstimateDto> SignAsync(Guid estimateId, string signatureDataUrl, string signedByName)
     {
-        var entity = await _repo.GetByIdAsync(estimateId)
+        var entity = await GetEstimateEntityAsync(estimateId)
             ?? throw new ArgumentException("Estimate not found", nameof(estimateId));
 
         entity.SignatureDataUrl = signatureDataUrl;
@@ -545,7 +545,7 @@ public class EstimateService : IEstimateService
 
     private async Task<(Estimate Entity, EstimateDto Dto)> LoadEstimateForWorkflow(Guid id)
     {
-        var existing = await _repo.GetByIdAsync(id)
+        var existing = await GetEstimateEntityAsync(id)
             ?? throw new ArgumentException("Estimate not found", nameof(id));
         var dto = EstimateMapper.ToDto(existing);
         await HydrateEstimateArtifactsAsync(existing, dto);
@@ -607,4 +607,7 @@ public class EstimateService : IEstimateService
         dto.TaxAmount = dto.CalculationSnapshot.TaxAmount;
         dto.Total = dto.CalculationSnapshot.FinalEstimatedPrice;
     }
+
+    private Task<Estimate?> GetEstimateEntityAsync(Guid id) =>
+        _repo.GetAsync(PartitionKeyForTenant(), RepositoryKeyHelper.ToRowKey(id));
 }
