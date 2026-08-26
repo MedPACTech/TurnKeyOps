@@ -86,12 +86,6 @@ export const actions = {
 
 		try {
 			const quoteRequestId = crypto.randomUUID();
-			const attachments = await uploadQuoteRequestAttachments(
-				bdrTenant.id,
-				quoteRequestId,
-				attachmentFiles
-			);
-
 			await submitQuoteRequest(fetch, {
 				id: quoteRequestId,
 				tenantId: bdrTenant.id,
@@ -106,13 +100,14 @@ export const actions = {
 				requestedTimeline,
 				priority: normalizedPriority,
 				need,
-				attachments,
+				attachments: [],
 				assignedTo: content.quoteForm.queueDestination || 'Office intake',
 				nextAction: content.quoteForm.notificationRecipients.length
 					? `Notify ${content.quoteForm.notificationRecipients.join(', ')} and review submission.`
 					: undefined,
 				routingNote: routingNoteParts.join('. ') || undefined
 			});
+			await uploadQuoteRequestAttachments(fetch, bdrTenant.id, quoteRequestId, attachmentFiles);
 		} catch (cause) {
 			console.error('Failed to submit quote request through API.', cause);
 			return fail(502, {

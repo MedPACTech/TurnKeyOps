@@ -153,7 +153,9 @@ public static class TurnKeyOpsFeatureDependencyInjection
     {
         services.AddScoped<ICalendarEventService, CalendarEventService>();
         services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<IQuoteRequestTenantResolver, QuoteRequestTenantResolver>();
         services.AddScoped<IQuoteRequestService, QuoteRequestService>();
+        services.AddScoped<IQuoteRequestAttachmentService, QuoteRequestAttachmentService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IEstimateWorkflowPayloadStore, EstimateWorkflowPayloadStore>();
         services.AddScoped<IEstimateService, EstimateService>();

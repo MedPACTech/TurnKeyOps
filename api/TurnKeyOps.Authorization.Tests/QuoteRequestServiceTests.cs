@@ -1,11 +1,11 @@
 using MedInsights.Lib.Utils;
-using Microsoft.Extensions.Options;
 using Moq;
 using TurnKeyOps.Lib.Configurations;
 using TurnKeyOps.Lib.Dtos;
 using TurnKeyOps.Lib.Entities;
 using TurnKeyOps.Repositories.Interfaces;
 using TurnKeyOps.Services;
+using TurnKeyOps.Services.Interfaces;
 using TurnKeyOps.Services.Mappers;
 
 namespace MedInsights.Authorization.Tests;
@@ -94,6 +94,25 @@ public sealed class QuoteRequestServiceTests
     }
 
     [Fact]
+    public async Task PublicCreateRejectsCallerSuppliedAttachmentMetadata()
+    {
+        var repository = new Mock<IQuoteRequestRepository>();
+        var service = CreateService(repository.Object);
+        var input = ValidCreate();
+        input.Attachments.Add(new QuoteRequestAttachmentDto
+        {
+            Id = Guid.NewGuid(),
+            FileName = "untrusted.pdf",
+            BlobContainer = "caller-container",
+            BlobName = "caller-blob"
+        });
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreatePublicAsync("bdr", input));
+
+        repository.Verify(x => x.SaveAsync(It.IsAny<QuoteRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task GetUsesCurrentTenantPartitionInsteadOfGlobalIdLookup()
     {
         var id = Guid.NewGuid();
@@ -172,17 +191,11 @@ public sealed class QuoteRequestServiceTests
     }
 
     private static QuoteRequestService CreateService(IQuoteRequestRepository repository) =>
-        new(repository, new TestUserContext(), Options.Create(new QuoteRequestTenantOptions
+        new(repository, new TestUserContext(), new StubTenantResolver(new QuoteRequestTenantDefinition
         {
-            Tenants = new Dictionary<string, QuoteRequestTenantDefinition>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["bdr"] = new()
-                {
-                    TenantId = TenantId,
-                    DefaultAssignedTo = "Office intake",
-                    DefaultNextAction = "Review submission"
-                }
-            }
+            TenantId = TenantId,
+            DefaultAssignedTo = "Office intake",
+            DefaultNextAction = "Review submission"
         }));
 
     private static Mock<IQuoteRequestRepository> RepositoryThatSaves()
@@ -260,5 +273,10 @@ public sealed class QuoteRequestServiceTests
         public AppTimeZone Timezone => AppTimeZone.Utc;
         public string FirstName => "Test";
         public string LastName => "User";
+    }
+
+    private sealed class StubTenantResolver(QuoteRequestTenantDefinition tenant) : IQuoteRequestTenantResolver
+    {
+        public QuoteRequestTenantDefinition Resolve(string tenantSlug) => tenant;
     }
 }

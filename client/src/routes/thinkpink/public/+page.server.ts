@@ -52,7 +52,6 @@ export const actions: Actions = {
 
 		try {
 			const id = crypto.randomUUID();
-			const attachments = await uploadQuoteRequestAttachments(thinkPinkTenant.id, id, photos);
 			await submitQuoteRequest(fetch, {
 				id,
 				tenantId: thinkPinkTenant.id,
@@ -73,11 +72,12 @@ export const actions: Actions = {
 				]
 					.filter(Boolean)
 					.join('. '),
-				attachments,
+				attachments: [],
 				assignedTo: 'Think Pink intake',
 				nextAction: 'Call the property owner and schedule an on-site assessment.',
 				routingNote: 'Submitted from the Think Pink public website.'
 			});
+			await uploadQuoteRequestAttachments(fetch, thinkPinkTenant.id, id, photos);
 		} catch (cause) {
 			console.error('Think Pink quote request submission failed.', cause);
 			return fail(502, {

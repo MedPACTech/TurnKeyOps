@@ -1,6 +1,4 @@
 using System.Net.Mail;
-using Microsoft.Extensions.Options;
-using TurnKeyOps.Lib.Configurations;
 using TurnKeyOps.Lib.Dtos;
 using TurnKeyOps.Lib.Utils;
 using TurnKeyOps.Repositories.Interfaces;
@@ -31,16 +29,16 @@ public sealed class QuoteRequestService : IQuoteRequestService
 
     private readonly IQuoteRequestRepository _repository;
     private readonly IUserContext _userContext;
-    private readonly QuoteRequestTenantOptions _tenantOptions;
+    private readonly IQuoteRequestTenantResolver _tenantResolver;
 
     public QuoteRequestService(
         IQuoteRequestRepository repository,
         IUserContext userContext,
-        IOptions<QuoteRequestTenantOptions> tenantOptions)
+        IQuoteRequestTenantResolver tenantResolver)
     {
         _repository = repository;
         _userContext = userContext;
-        _tenantOptions = tenantOptions.Value;
+        _tenantResolver = tenantResolver;
     }
 
     public async Task<IReadOnlyCollection<QuoteRequestDto>> ListAsync(CancellationToken ct = default)
@@ -61,7 +59,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
         CreateQuoteRequestDto dto,
         CancellationToken ct = default)
     {
-        var tenant = ResolveTenant(tenantSlug);
+        var tenant = _tenantResolver.Resolve(tenantSlug);
         ValidateCreate(dto);
 
         var id = dto.Id.GetValueOrDefault();
@@ -75,7 +73,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
         }
 
         var now = DateTime.UtcNow;
-        var attachments = NormalizeAttachments(dto.Attachments, tenant.TenantId, now);
+        var attachments = new List<QuoteRequestAttachmentDto>();
         var submittedPayload = new QuoteRequestSubmittedPayloadDto
         {
             CompanyName = Clean(dto.CompanyName),
@@ -219,14 +217,6 @@ public sealed class QuoteRequestService : IQuoteRequestService
         return QuoteRequestMapper.ToDto(saved);
     }
 
-    private QuoteRequestTenantDefinition ResolveTenant(string tenantSlug)
-    {
-        var slug = Clean(tenantSlug);
-        if (!_tenantOptions.Tenants.TryGetValue(slug, out var tenant) || tenant.TenantId == Guid.Empty)
-            throw new ArgumentException("The quote request tenant is not configured.", nameof(tenantSlug));
-        return tenant;
-    }
-
     private static void ValidateCreate(CreateQuoteRequestDto dto)
     {
         Required(dto.CompanyName, nameof(dto.CompanyName), 200);
@@ -239,8 +229,8 @@ public sealed class QuoteRequestService : IQuoteRequestService
         ValidateEmail(dto.Email);
         if (!Priorities.Contains(Clean(dto.Priority)))
             throw new ArgumentException("Priority must be standard, priority, or emergency.", nameof(dto.Priority));
-        if (dto.Attachments.Count > 25)
-            throw new ArgumentException("A quote request cannot contain more than 25 attachments.", nameof(dto.Attachments));
+        if (dto.Attachments.Count > 0)
+            throw new ArgumentException("Attachments must be uploaded through the attachment endpoint.", nameof(dto.Attachments));
     }
 
     private static void ValidateUpdate(QuoteRequestDto current, QuoteRequestDto dto)
@@ -261,22 +251,6 @@ public sealed class QuoteRequestService : IQuoteRequestService
         if (nextStatus == "inspection-scheduled" && dto.SiteVisitSchedule is null)
             throw new ArgumentException("A site visit schedule is required for this status.", nameof(dto.SiteVisitSchedule));
     }
-
-    private static List<QuoteRequestAttachmentDto> NormalizeAttachments(
-        IEnumerable<QuoteRequestAttachmentDto> attachments,
-        Guid tenantId,
-        DateTime now) => attachments.Select(item => new QuoteRequestAttachmentDto
-        {
-            Id = item.Id == Guid.Empty ? Guid.NewGuid() : item.Id,
-            FileName = Clean(item.FileName),
-            ContentType = CleanOrCurrent(item.ContentType, "application/octet-stream"),
-            SizeBytes = Math.Max(0, item.SizeBytes),
-            UploadedAtUtc = item.UploadedAtUtc == default ? now : item.UploadedAtUtc.ToUniversalTime(),
-            TenantId = tenantId,
-            BlobContainer = item.BlobContainer,
-            BlobName = item.BlobName,
-            BlobUrl = item.BlobUrl
-        }).ToList();
 
     private static QuoteRequestSiteVisitScheduleDto? NormalizeSchedule(
         QuoteRequestSiteVisitScheduleDto? schedule,

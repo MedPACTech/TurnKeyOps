@@ -22,10 +22,13 @@ import {
 	type QuoteRequestSubmittedPayload,
 	type QuoteRequestTimelineEvent
 } from '$lib/quote-requests';
-import type { ApiEnvelope } from '$lib/types/mvp';
 import { bdrTenant, getTenantById } from '$lib/config/tenants';
+import {
+	getTurnKeyApiBaseUrl as getApiBaseUrl,
+	getTurnKeyApiHeaders as getApiHeaders,
+	unwrapTurnKeyApiEnvelope as unwrapEnvelope
+} from '$lib/server/turnkey-api';
 
-const defaultApiBaseUrl = 'http://localhost:5178';
 const quoteMarker = 'TKO_BDR_QUOTE_REQUEST::';
 const internalAdminActor = 'Internal Admin';
 const officeQueueOwner = 'Office intake';
@@ -151,41 +154,7 @@ const parseLeadMetadata = (scopeSummary: string | null | undefined): QuoteLeadMe
 
 const serializeLeadMetadata = (metadata: QuoteLeadMetadata) => `${quoteMarker}${JSON.stringify(metadata)}`;
 
-const getApiBaseUrl = () =>
-	(env.PUBLIC_TKO_API_BASE_URL || env.TKO_API_BASE_URL || defaultApiBaseUrl).replace(/\/$/, '');
-
 export const getQuoteRequestTenantId = () => env.TKO_API_TENANT_ID ?? bdrTenant.id;
-
-const getApiHeaders = () => {
-	const headers: Record<string, string> = {
-		Accept: 'application/json',
-		'Content-Type': 'application/json'
-	};
-
-	const bearerToken = env.TKO_API_BEARER_TOKEN || env.TKO_API_TOKEN || env.TKO_API_AUTH_TOKEN;
-	if (bearerToken) {
-		headers.Authorization = `Bearer ${bearerToken}`;
-	}
-
-	return headers;
-};
-
-const unwrapEnvelope = async <T>(response: Response): Promise<T> => {
-	if (!response.ok) {
-		throw error(response.status, `Quote request API call failed with ${response.status}`);
-	}
-
-	const payload = (await response.json()) as ApiEnvelope<T> | T;
-	if (payload && typeof payload === 'object' && 'success' in payload && 'data' in payload) {
-		if (!payload.success) {
-			throw error(502, 'Quote request API response was not successful');
-		}
-
-		return payload.data;
-	}
-
-	return payload as T;
-};
 
 const normalizeAttachments = (value: unknown): QuoteRequestAttachment[] => {
 	if (!Array.isArray(value)) return [];
