@@ -1,6 +1,7 @@
 import { apiRequest } from './client';
 
 export type EstimateDefaults = {
+	version: string;
 	concreteCostPerYard: number;
 	minimumLoadFee: number;
 	shortLoadFee: number;

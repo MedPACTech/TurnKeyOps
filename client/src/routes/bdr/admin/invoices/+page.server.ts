@@ -14,10 +14,11 @@ import {
 } from '$lib/server/bdr-job-scheduling';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
 import { fail, redirect } from '@sveltejs/kit';
+import { authTokenCookie } from '$lib/server/auth-session';
 
-export const load = async ({ fetch }) => {
+export const load = async ({ fetch, cookies }) => {
 	const { snapshot, source } = await resolveMvpScaffold(fetch);
-	const billingSettings = await loadBdrBillingSettings();
+	const billingSettings = await loadBdrBillingSettings(fetch, cookies.get(authTokenCookie));
 	const { requests } = await loadQuoteRequests(fetch);
 	const lifecycleInvoices = await syncApprovedEstimateInvoices(fetch);
 	const scheduledJobs = await loadBdrScheduledJobs(fetch);
@@ -94,7 +95,7 @@ export const actions = {
 		if (!invoice) return fail(404, { invoiceActionMessage: 'Invoice not found.' });
 		return { invoiceActionMessage: `Reminder noted for ${invoice.invoiceNumber}.` };
 	},
-	scheduleJob: async ({ request, fetch }) => {
+	scheduleJob: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const invoiceId = String(formData.get('invoiceId') ?? '').trim();
 		const scheduledDate = normalizeDateInput(formData.get('scheduledDate'));
@@ -106,7 +107,7 @@ export const actions = {
 		if (!scheduledDate) return fail(400, { invoiceActionMessage: 'Choose a production date.' });
 		if (!crew) return fail(400, { invoiceActionMessage: 'Assign a crew or scheduler before saving.' });
 
-		const billingSettings = await loadBdrBillingSettings();
+		const billingSettings = await loadBdrBillingSettings(fetch, cookies.get(authTokenCookie));
 		const invoice = (await loadBdrInvoices(fetch)).find((record) => record.id === invoiceId);
 		if (!invoice) return fail(404, { invoiceActionMessage: 'Invoice not found.' });
 		if (invoice.state === 'draft') return fail(400, { invoiceActionMessage: 'Send the invoice before scheduling the job.' });

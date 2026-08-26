@@ -6,6 +6,7 @@ using TurnKeyOps.Repositories.Interfaces;
 using TurnKeyOps.Services;
 using MedInsights.Services.Interfaces;
 using MedInsights.Lib.Authorization;
+using Azure;
 
 namespace MedInsights.Authorization.Tests;
 
@@ -78,11 +79,43 @@ public sealed class EstimateDefaultsServiceTests
         roleAccess
             .Setup(x => x.RequirePermissionAsync(TurnKeyPermissionKeys.EstimateDefaultsManage, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new MedInsights.Lib.ForbiddenAccessException("denied"));
-        var service = new EstimateDefaultsService(repository.Object, new TestTurnKeyUserContext(), roleAccess.Object);
+        var audit = Audit();
+        var service = new EstimateDefaultsService(
+            repository.Object,
+            new TestTurnKeyUserContext(),
+            roleAccess.Object,
+            audit.Object);
 
         await Assert.ThrowsAsync<MedInsights.Lib.ForbiddenAccessException>(
             () => service.UpsertAsync(new EstimateDefaultsDto { DefaultCrewSize = 4 }));
 
+        repository.Verify(
+            x => x.SaveAsync(It.IsAny<EstimateDefaultsProfile>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpsertRejectsStaleEstimateDefaultsVersion()
+    {
+        var repository = new Mock<IEstimateDefaultsRepository>();
+        repository
+            .Setup(x => x.GetAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
+                false))
+            .ReturnsAsync(new EstimateDefaultsProfile
+            {
+                PartitionKey = TurnKeyOps.Lib.Utils.RepositoryKeyHelper.ToTenantPartitionKey(TenantId),
+                RowKey = "ESTIMATE-DEFAULTS",
+                ETag = new ETag("v2")
+            });
+        var service = CreateService(repository);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() => service.UpsertAsync(
+            new EstimateDefaultsDto { DefaultCrewSize = 4, Version = "v1" }));
+
+        Assert.Contains("changed after", exception.Message, StringComparison.OrdinalIgnoreCase);
         repository.Verify(
             x => x.SaveAsync(It.IsAny<EstimateDefaultsProfile>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -94,7 +127,22 @@ public sealed class EstimateDefaultsServiceTests
         roleAccess
             .Setup(x => x.RequirePermissionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        return new EstimateDefaultsService(repository.Object, new TestTurnKeyUserContext(), roleAccess.Object);
+        return new EstimateDefaultsService(
+            repository.Object,
+            new TestTurnKeyUserContext(),
+            roleAccess.Object,
+            Audit().Object);
+    }
+
+    private static Mock<IAuditService> Audit()
+    {
+        var audit = new Mock<IAuditService>();
+        audit
+            .Setup(x => x.RecordAsync(
+                It.IsAny<MedInsights.Lib.Dtos.RecordAuditEventRequestDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MedInsights.Lib.Dtos.AuditEventDto());
+        return audit;
     }
 
     private sealed class TestTurnKeyUserContext : TurnKeyOps.Lib.Utils.IUserContext

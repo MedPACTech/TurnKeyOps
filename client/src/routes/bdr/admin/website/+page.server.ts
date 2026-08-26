@@ -16,6 +16,12 @@ import type {
 	BdrSocialLink,
 	ContentLink
 } from '$lib/bdr-site-content';
+import { authTokenCookie } from '$lib/server/auth-session';
+
+const settingsContext = (
+	fetcher: typeof globalThis.fetch,
+	cookies: { get(name: string): string | undefined }
+) => ({ fetcher, accessToken: cookies.get(authTokenCookie) ?? null });
 
 const getValue = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
 const getBoolean = (formData: FormData, key: string) => getValue(formData, key) === 'true';
@@ -235,14 +241,14 @@ const parseQuoteFormFields = (value: string): BdrQuoteFormField[] =>
 const parseCtaType = (value: string, fallback: BdrCtaType): BdrCtaType =>
 	value === 'anchor' || value === 'link' || value === 'phone' ? value : fallback;
 
-export const load = async () => {
+export const load = async ({ fetch }) => {
 	return {
-		content: await loadBdrSiteContent()
+		content: await loadBdrSiteContent(fetch)
 	};
 };
 
 export const actions = {
-	updateQuoteForm: async ({ request }) => {
+	updateQuoteForm: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const benefits = parseQuoteFormBenefits(getValue(formData, 'quoteFormBenefits'));
 		const fields = parseQuoteFormFields(getValue(formData, 'quoteFormFields'));
@@ -289,7 +295,7 @@ export const actions = {
 						notificationRecipients,
 						queueDestination: getValue(formData, 'quoteFormQueueDestination')
 					};
-				}),
+				}, settingsContext(fetch, cookies)),
 				savedSectionId: 'quote-form',
 				savedMessage: 'Quote form settings saved.'
 			};
@@ -301,7 +307,7 @@ export const actions = {
 			});
 		}
 	},
-	updateCtaBanner: async ({ request }) => {
+	updateCtaBanner: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const overlayOpacity = Number(getValue(formData, 'ctaBannerOverlayOpacity'));
 
@@ -344,7 +350,7 @@ export const actions = {
 						),
 						secondaryCtaHref: getValue(formData, 'ctaBannerSecondaryCtaHref')
 					};
-				}),
+				}, settingsContext(fetch, cookies)),
 				savedSectionId: 'cta-banner',
 				savedMessage: 'CTA banner settings saved.'
 			};
@@ -356,7 +362,7 @@ export const actions = {
 			});
 		}
 	},
-	updateProcessSection: async ({ request }) => {
+	updateProcessSection: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const steps = parseProcessSteps(getValue(formData, 'processSteps'));
 		if (steps.length < 3 || steps.length > 5) {
@@ -376,7 +382,7 @@ export const actions = {
 							getValue(formData, 'processDescription') || content.process.description,
 						steps
 					};
-				}),
+				}, settingsContext(fetch, cookies)),
 				savedSectionId: 'process',
 				savedMessage: 'Process section saved.'
 			};
@@ -388,7 +394,7 @@ export const actions = {
 			});
 		}
 	},
-	updateServicesSection: async ({ request }) => {
+	updateServicesSection: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const cards = parseServiceCards(getValue(formData, 'serviceCards'));
 		if (cards.length < 3 || cards.length > 8) {
@@ -417,7 +423,7 @@ export const actions = {
 						contractorType: activeContractorType,
 						sortOrder: index + 1
 					}));
-				}),
+				}, settingsContext(fetch, cookies)),
 				savedSectionId: 'services',
 				savedMessage: 'Services section saved.'
 			};
@@ -429,7 +435,7 @@ export const actions = {
 			});
 		}
 	},
-	updateFooter: async ({ request }) => {
+	updateFooter: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const navigationLinks = parseNavigationLinks(getValue(formData, 'footerNavigationLinks'));
 		const servicesLinks = parseNavigationLinks(getValue(formData, 'footerServicesLinks'));
@@ -474,7 +480,7 @@ export const actions = {
 						copyright:
 							getValue(formData, 'footerCopyright') || content.postFooter.copyright
 					};
-				}),
+				}, settingsContext(fetch, cookies)),
 				savedSectionId: 'footer',
 				savedMessage: 'Footer settings saved.'
 			};
@@ -486,7 +492,7 @@ export const actions = {
 			});
 		}
 	},
-	updateHero: async ({ request }) => {
+	updateHero: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const eyebrow = getValue(formData, 'eyebrow');
 		const headline = getValue(formData, 'headline');
@@ -544,7 +550,7 @@ export const actions = {
 						trustBadges: badges,
 						mediaByContractorType
 					};
-				}),
+				}, settingsContext(fetch, cookies)),
 				savedSectionId: 'hero',
 				savedMessage: 'Hero settings saved.'
 			};
@@ -556,7 +562,7 @@ export const actions = {
 			});
 		}
 	},
-	updateNavigation: async ({ request }) => {
+	updateNavigation: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const navigationLinks = parseNavigationLinks(getValue(formData, 'navigationLinks'));
 
@@ -594,7 +600,7 @@ export const actions = {
 								? layoutValue
 								: content.navigation.layout
 					};
-				}),
+				}, settingsContext(fetch, cookies)),
 				savedSectionId: 'navigation',
 				savedMessage: 'Navigation settings saved.'
 			};
@@ -606,7 +612,7 @@ export const actions = {
 			});
 		}
 	},
-	updateServices: async ({ request }) => {
+	updateServices: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const services = formData
 			.getAll('services')
@@ -615,7 +621,7 @@ export const actions = {
 
 		try {
 			return {
-				content: await saveBdrServices(services)
+				content: await saveBdrServices(services, settingsContext(fetch, cookies))
 			};
 		} catch (cause) {
 			console.error('Unable to save BDR services content.', cause);
@@ -624,7 +630,7 @@ export const actions = {
 			});
 		}
 	},
-	applyContractorPreset: async ({ request }) => {
+	applyContractorPreset: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const presetId = String(formData.get('presetId') ?? '').trim();
 
@@ -636,7 +642,10 @@ export const actions = {
 
 		try {
 			return {
-				content: await applyBdrContractorPresetSelection(presetId),
+				content: await applyBdrContractorPresetSelection(
+					presetId,
+					settingsContext(fetch, cookies)
+				),
 				savedSectionId: 'contractor-presets',
 				savedMessage: `Applied contractor preset ${presetId}.`
 			};

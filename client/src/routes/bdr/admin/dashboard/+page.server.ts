@@ -8,11 +8,12 @@ import {
 	buildBdrScheduleReadyJobs,
 	loadBdrScheduledJobs
 } from '$lib/server/bdr-job-scheduling';
+import { authTokenCookie } from '$lib/server/auth-session';
 
-export const load = async ({ fetch }) => {
+export const load = async ({ fetch, cookies }) => {
 	const { snapshot, source } = await resolveMvpScaffold(fetch);
 	const { requests, source: requestSource } = await loadQuoteRequests(fetch);
-	const billingSettings = await loadBdrBillingSettings();
+	const billingSettings = await loadBdrBillingSettings(fetch, cookies.get(authTokenCookie));
 	const lifecycleInvoices = await loadBdrInvoices(fetch);
 	const scheduledJobs = await loadBdrScheduledJobs(fetch);
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, scheduledJobs);

@@ -41,7 +41,10 @@ public static class TurnKeyPermissionKeys
     public const string OperationsManage = "operations.manage";
     public const string EstimateDefaultsRead = "estimate_defaults.read";
     public const string EstimateDefaultsManage = "estimate_defaults.manage";
+    public const string TenantSettingsRead = "tenant_settings.read";
+    public const string TenantSettingsManage = "tenant_settings.manage";
     public const string BillingRead = "billing.read";
     public const string BillingManage = "billing.manage";
     public const string MembershipManage = "membership.manage";
+    public const string MembershipOwnerGrant = "membership.owner_grant";
 }

@@ -15,20 +15,13 @@ import {
 	type BdrSiteContent,
 	type BdrThemeSettings
 } from '$lib/bdr-site-content';
+import { getPublicTenantContent, updateTenantSettings } from '$lib/api/tenant-settings';
+import { bdrTenant } from '$lib/config/tenants';
 
-const fsModuleName = 'node:fs/promises';
-const getCwd = () =>
-	(globalThis as typeof globalThis & { process?: { cwd: () => string } }).process?.cwd() ?? '.';
-const localStoreDir = `${getCwd()}/.svelte-kit`;
-const localStorePath = `${localStoreDir}/local-bdr-site-content.json`;
-
-type FsPromises = {
-	mkdir: (path: string, options: { recursive: boolean }) => Promise<unknown>;
-	readFile: (path: string, encoding: 'utf-8') => Promise<string>;
-	writeFile: (path: string, data: string) => Promise<unknown>;
+export type TenantSettingsApiContext = {
+	fetcher?: typeof globalThis.fetch;
+	accessToken?: string | null;
 };
-
-const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
 
 const cloneDefaultContent = (): BdrSiteContent => structuredClone(bdrSiteContent);
 const legacyPublicHeroHeadline =
@@ -627,20 +620,32 @@ const normalizeContent = (value: unknown): BdrSiteContent => {
 	return content;
 };
 
-const writeBdrSiteContent = async (content: BdrSiteContent): Promise<BdrSiteContent> => {
-	const fs = await getFs();
-	await fs.mkdir(localStoreDir, { recursive: true });
-	await fs.writeFile(localStorePath, JSON.stringify(content, null, 2));
+const loadBdrSiteContentDocument = (fetcher: typeof globalThis.fetch = globalThis.fetch) =>
+	getPublicTenantContent<BdrSiteContent>(bdrTenant.id, fetcher);
 
-	return content;
+const writeBdrSiteContent = async (
+	content: BdrSiteContent,
+	expectedVersion: string | null | undefined,
+	context: TenantSettingsApiContext = {}
+): Promise<BdrSiteContent> => {
+	const saved = await updateTenantSettings(
+		'public-content',
+		normalizeContent(content),
+		expectedVersion,
+		context.fetcher,
+		context.accessToken
+	);
+	return normalizeContent(saved.values);
 };
 
 export const updateBdrSiteContent = async (
-	updater: (content: BdrSiteContent) => void
+	updater: (content: BdrSiteContent) => void,
+	context: TenantSettingsApiContext = {}
 ): Promise<BdrSiteContent> => {
-	const content = await loadBdrSiteContent();
+	const document = await loadBdrSiteContentDocument(context.fetcher);
+	const content = normalizeContent(document.values);
 	updater(content);
-	return writeBdrSiteContent(content);
+	return writeBdrSiteContent(content, document.version, context);
 };
 
 type BdrThemeSettingsPatch = {
@@ -653,31 +658,34 @@ type BdrThemeSettingsPatch = {
 	brandAssets?: Partial<BdrThemeSettings['brandAssets']>;
 };
 
-export const loadBdrSiteContent = async (): Promise<BdrSiteContent> => {
+export const loadBdrSiteContent = async (
+	fetcher: typeof globalThis.fetch = globalThis.fetch
+): Promise<BdrSiteContent> => {
 	try {
-		const fs = await getFs();
-		const contents = await fs.readFile(localStorePath, 'utf-8');
-		return normalizeContent(JSON.parse(contents) as unknown);
+		const document = await loadBdrSiteContentDocument(fetcher);
+		return normalizeContent(document.values);
 	} catch (cause) {
-		if (cause && typeof cause === 'object' && 'code' in cause && cause.code !== 'ENOENT') {
-			console.warn('Unable to read local BDR site content store.', cause);
-		}
-
+		console.warn('Unable to read durable BDR site content; using packaged defaults.', cause);
 		return cloneDefaultContent();
 	}
 };
 
-export const saveBdrServices = async (items: string[]): Promise<BdrSiteContent> => {
+export const saveBdrServices = async (
+	items: string[],
+	context: TenantSettingsApiContext = {}
+): Promise<BdrSiteContent> => {
 	const services = normalizeServices(items) ?? [];
 	return updateBdrSiteContent((content) => {
 		content.services.items = services;
-	});
+	}, context);
 };
 
 export const saveBdrThemeSettings = async (
-	value: BdrThemeSettingsPatch
+	value: BdrThemeSettingsPatch,
+	context: TenantSettingsApiContext = {}
 ): Promise<BdrSiteContent> => {
-	const content = await loadBdrSiteContent();
+	const document = await loadBdrSiteContentDocument(context.fetcher);
+	const content = normalizeContent(document.values);
 	content.themeSettings = normalizeThemeSettings(
 		{
 			...content.themeSettings,
@@ -702,11 +710,12 @@ export const saveBdrThemeSettings = async (
 		content.themeSettings
 	);
 
-	return writeBdrSiteContent(content);
+	return writeBdrSiteContent(content, document.version, context);
 };
 
 export const applyBdrContractorPresetSelection = async (
-	presetId: string
+	presetId: string,
+	context: TenantSettingsApiContext = {}
 ): Promise<BdrSiteContent> => {
 	return updateBdrSiteContent((content) => {
 		const appliedPreset = applyBdrContractorPresetToContent(content, presetId);
@@ -714,5 +723,5 @@ export const applyBdrContractorPresetSelection = async (
 		if (!appliedPreset) {
 			throw new Error(`Unknown contractor preset: ${presetId}`);
 		}
-	});
+	}, context);
 };

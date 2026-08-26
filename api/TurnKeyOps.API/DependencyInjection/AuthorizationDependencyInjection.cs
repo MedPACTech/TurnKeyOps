@@ -87,9 +87,12 @@ namespace MedInsights.API.DependencyInjection
                 .AddPermission(TurnKeyPermissionKeys.OperationsManage, name: "Manage operations")
                 .AddPermission(TurnKeyPermissionKeys.EstimateDefaultsRead, name: "Read estimate defaults")
                 .AddPermission(TurnKeyPermissionKeys.EstimateDefaultsManage, name: "Manage estimate defaults")
+                .AddPermission(TurnKeyPermissionKeys.TenantSettingsRead, name: "Read tenant settings")
+                .AddPermission(TurnKeyPermissionKeys.TenantSettingsManage, name: "Manage tenant settings")
                 .AddPermission(TurnKeyPermissionKeys.BillingRead, name: "Read billing")
                 .AddPermission(TurnKeyPermissionKeys.BillingManage, name: "Manage billing")
-                .AddPermission(TurnKeyPermissionKeys.MembershipManage, name: "Manage membership");
+                .AddPermission(TurnKeyPermissionKeys.MembershipManage, name: "Manage membership")
+                .AddPermission(TurnKeyPermissionKeys.MembershipOwnerGrant, name: "Grant tenant ownership");
 
             builder.MapRole(TenantRoleCatalog.Owner,
                 TurnKeyPermissionKeys.TenantRead,
@@ -98,9 +101,12 @@ namespace MedInsights.API.DependencyInjection
                 TurnKeyPermissionKeys.OperationsManage,
                 TurnKeyPermissionKeys.EstimateDefaultsRead,
                 TurnKeyPermissionKeys.EstimateDefaultsManage,
+                TurnKeyPermissionKeys.TenantSettingsRead,
+                TurnKeyPermissionKeys.TenantSettingsManage,
                 TurnKeyPermissionKeys.BillingRead,
                 TurnKeyPermissionKeys.BillingManage,
-                TurnKeyPermissionKeys.MembershipManage);
+                TurnKeyPermissionKeys.MembershipManage,
+                TurnKeyPermissionKeys.MembershipOwnerGrant);
             builder.MapRole(TenantRoleCatalog.Admin,
                 TurnKeyPermissionKeys.TenantRead,
                 TurnKeyPermissionKeys.TenantManage,
@@ -108,6 +114,8 @@ namespace MedInsights.API.DependencyInjection
                 TurnKeyPermissionKeys.OperationsManage,
                 TurnKeyPermissionKeys.EstimateDefaultsRead,
                 TurnKeyPermissionKeys.EstimateDefaultsManage,
+                TurnKeyPermissionKeys.TenantSettingsRead,
+                TurnKeyPermissionKeys.TenantSettingsManage,
                 TurnKeyPermissionKeys.BillingRead,
                 TurnKeyPermissionKeys.BillingManage,
                 TurnKeyPermissionKeys.MembershipManage);
@@ -119,12 +127,14 @@ namespace MedInsights.API.DependencyInjection
                 TurnKeyPermissionKeys.TenantRead,
                 TurnKeyPermissionKeys.OperationsRead,
                 TurnKeyPermissionKeys.OperationsManage,
-                TurnKeyPermissionKeys.EstimateDefaultsRead);
+                TurnKeyPermissionKeys.EstimateDefaultsRead,
+                TurnKeyPermissionKeys.TenantSettingsRead);
             builder.MapRole(TenantRoleCatalog.Staff,
                 TurnKeyPermissionKeys.TenantRead,
                 TurnKeyPermissionKeys.OperationsRead,
                 TurnKeyPermissionKeys.OperationsManage,
-                TurnKeyPermissionKeys.EstimateDefaultsRead);
+                TurnKeyPermissionKeys.EstimateDefaultsRead,
+                TurnKeyPermissionKeys.TenantSettingsRead);
             builder.MapRole(TenantRoleCatalog.Contact, TurnKeyPermissionKeys.TenantRead);
         }
     }

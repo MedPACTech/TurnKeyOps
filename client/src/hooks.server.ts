@@ -1,15 +1,12 @@
 import { error, redirect, type Handle } from '@sveltejs/kit';
 import {
 	authTokenCookie,
-	bdrAdminContactCookie,
 	bdrAdminSessionCookie,
 	buildLoginRedirect,
 	getAdminSessionFromToken,
 	isAdminPath,
-	isExternalAdminPath,
 	validateAdminAccessToken
 } from '$lib/server/auth-session';
-import { getPersistedBdrAdminRole } from '$lib/server/bdr-contact-access';
 import { resolveProductionPathname } from '$lib/config/domains';
 import { getExternalAdminTenantForPath } from '$lib/config/external-admin';
 import { getTenantById } from '$lib/config/tenants';
@@ -45,24 +42,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 			};
 		}
 
-		return resolve(event);
-	}
-
-	const persistedRole = isExternalAdminPath(authPathname)
-		? await getPersistedBdrAdminRole(event.cookies.get(bdrAdminContactCookie))
-		: null;
-	if (persistedRole) {
-		event.locals.adminSession = {
-			surface: 'external-admin',
-			role: persistedRole,
-			email: '',
-			tenantId: '',
-			source: 'contact-access'
-		};
-		event.locals.bdrAdminSession = {
-			role: persistedRole,
-			source: 'contact-access'
-		};
 		return resolve(event);
 	}
 

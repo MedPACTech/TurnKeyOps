@@ -7,8 +7,9 @@
 
 	type EstimateDefaults = PageProps['data']['estimateDefaults'];
 	type BillingSettings = PageProps['data']['billingSettings'];
+	type DefaultsFieldKey = Exclude<keyof EstimateDefaults, 'version'>;
 	type DefaultsField = {
-		key: keyof EstimateDefaults;
+		key: DefaultsFieldKey;
 		label: string;
 		help?: string;
 		prefix?: string;
@@ -163,12 +164,12 @@
 		{ label: 'Status', value: hasChanges ? 'Unsaved changes' : 'All changes saved' }
 	]);
 
-	const displayValue = (key: keyof EstimateDefaults) => {
+	const displayValue = (key: DefaultsFieldKey) => {
 		const value = defaultsForm[key];
 		return Number.isFinite(value) ? String(value) : '';
 	};
 
-	function updateValue(key: keyof EstimateDefaults, raw: string) {
+	function updateValue(key: DefaultsFieldKey, raw: string) {
 		const numeric = raw === '' ? 0 : Number(raw);
 		const value = Number.isFinite(numeric) ? numeric : 0;
 		defaultsForm = {

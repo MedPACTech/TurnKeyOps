@@ -87,6 +87,20 @@ public static class TurnKeyOpsFeatureDependencyInjection
             o.EnableIdLocator = true;
         });
 
+        services.AddAzureEntityMapping<TenantSettingsDocument>(o =>
+        {
+            o.TableName = "TenantSettings";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = true;
+        });
+
+        services.AddAzureEntityMapping<ContactAccessGrant>(o =>
+        {
+            o.TableName = "ContactAccessGrants";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = true;
+        });
+
         services.AddAzureEntityMapping<EstimateLineItem>(o =>
         {
             o.TableName = "EstimateLineItems";
@@ -138,6 +152,12 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IEstimateDefaultsRepository, EstimateDefaultsRepository>();
         services.AddScoped<IBaseRepositoryAsync<EstimateDefaultsProfile>>(sp => sp.GetRequiredService<IEstimateDefaultsRepository>());
 
+        services.AddScoped<ITenantSettingsRepository, TenantSettingsRepository>();
+        services.AddScoped<IBaseRepositoryAsync<TenantSettingsDocument>>(sp => sp.GetRequiredService<ITenantSettingsRepository>());
+
+        services.AddScoped<IContactAccessGrantRepository, ContactAccessGrantRepository>();
+        services.AddScoped<IBaseRepositoryAsync<ContactAccessGrant>>(sp => sp.GetRequiredService<IContactAccessGrantRepository>());
+
         services.AddScoped<IEstimateLineItemRepository, EstimateLineItemRepository>();
         services.AddScoped<IBaseRepositoryAsync<EstimateLineItem>>(sp => sp.GetRequiredService<IEstimateLineItemRepository>());
 
@@ -171,6 +191,8 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IEstimateWorkflowPayloadStore, EstimateWorkflowPayloadStore>();
         services.AddScoped<IEstimateService, EstimateService>();
         services.AddScoped<IEstimateDefaultsService, EstimateDefaultsService>();
+        services.AddScoped<ITenantSettingsService, TenantSettingsService>();
+        services.AddScoped<IContactAccessGrantService, ContactAccessGrantService>();
         services.AddScoped<IInvoiceWorkflowPayloadStore, InvoiceWorkflowPayloadStore>();
         services.AddScoped<IInvoiceService, InvoiceService>();
         services.AddScoped<IInvoiceWebhookService, InvoiceWebhookService>();

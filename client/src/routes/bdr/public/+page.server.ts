@@ -14,16 +14,16 @@ const getAttachmentFiles = (formData: FormData): File[] =>
 		.getAll('attachments')
 		.filter((value): value is File => value instanceof File && value.size > 0);
 
-export const load = async ({ url }) => {
+export const load = async ({ fetch, url }) => {
 	return {
-		content: await loadBdrSiteContent(),
+		content: await loadBdrSiteContent(fetch),
 		submitted: url.searchParams.get('submitted') === '1'
 	};
 };
 
 export const actions = {
 	submitQuoteRequest: async ({ fetch, request }) => {
-		const content = await loadBdrSiteContent();
+		const content = await loadBdrSiteContent(fetch);
 		const configuredFields = content.quoteForm.fields;
 		const formData = await request.formData();
 		const values: Record<string, string> = {};

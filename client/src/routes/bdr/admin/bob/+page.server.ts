@@ -54,10 +54,14 @@ type BobAnalyzeEnvelope = {
 
 const formString = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
 type BobTenantPreset = TenantDefinition & { operatingDefaults?: unknown };
-const tenantForUrl = async (url: URL): Promise<BobTenantPreset> => {
+const tenantForUrl = async (
+	url: URL,
+	requestFetch: typeof globalThis.fetch,
+	accessToken?: string | null
+): Promise<BobTenantPreset> => {
 	const tenant = getExternalAdminTenantForPath(url.pathname) ?? bdrTenant;
 	if (tenant.slug !== 'thinkpink') return tenant;
-	const settings = await loadThinkPinkSettings();
+	const settings = await loadThinkPinkSettings(requestFetch, accessToken);
 	return {
 		...tenant,
 		services: settings.services,
@@ -295,7 +299,7 @@ const buildInspectionOffer = async (
 };
 
 export const load = async ({ fetch, url, cookies }) => {
-	const tenant = await tenantForUrl(url);
+	const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 	const [briefing, conversations, estimateFollowups] = await Promise.all([
 		buildBobBriefing(fetch, tenant),
 		ensureBobConversations(tenant.slug),
@@ -339,27 +343,27 @@ export const load = async ({ fetch, url, cookies }) => {
 };
 
 export const actions = {
-	archiveConversation: async ({ request, url }) => {
-		const tenant = await tenantForUrl(url);
+	archiveConversation: async ({ request, url, fetch, cookies }) => {
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 		const formData = await request.formData();
 		await setBobConversationArchived(formString(formData, 'conversationId'), true, tenant.slug);
 		throw redirect(303, bobHref(tenant));
 	},
-	restoreConversation: async ({ request, url }) => {
-		const tenant = await tenantForUrl(url);
+	restoreConversation: async ({ request, url, fetch, cookies }) => {
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		await setBobConversationArchived(conversationId, false, tenant.slug);
 		throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`);
 	},
-	deleteConversation: async ({ request, url }) => {
-		const tenant = await tenantForUrl(url);
+	deleteConversation: async ({ request, url, fetch, cookies }) => {
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 		const formData = await request.formData();
 		await deleteBobConversation(formString(formData, 'conversationId'), tenant.slug);
 		throw redirect(303, bobHref(tenant));
 	},
 	ask: async ({ request, fetch, cookies, url }) => {
-		const tenant = await tenantForUrl(url);
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 		const formData = await request.formData();
 		const question = formString(formData, 'question');
 		const conversationId = formString(formData, 'conversationId');
@@ -487,7 +491,7 @@ export const actions = {
 		}
 	},
 	scheduleInspection: async ({ request, fetch, cookies, url }) => {
-		const tenant = await tenantForUrl(url);
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		const requestId = formString(formData, 'requestId');
@@ -560,8 +564,8 @@ export const actions = {
 			});
 		}
 	},
-	approve: async ({ request, fetch, url }) => {
-		const tenant = await tenantForUrl(url);
+	approve: async ({ request, fetch, url, cookies }) => {
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 		const formData = await request.formData();
 		const recommendationId = formString(formData, 'recommendationId');
 		const conversationId = formString(formData, 'conversationId');
@@ -587,8 +591,8 @@ export const actions = {
 			});
 		}
 	},
-	createEstimate: async ({ request, fetch, url }) => {
-		const tenant = await tenantForUrl(url);
+	createEstimate: async ({ request, fetch, url, cookies }) => {
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		const conversation = await getBobConversation(conversationId, tenant.slug);

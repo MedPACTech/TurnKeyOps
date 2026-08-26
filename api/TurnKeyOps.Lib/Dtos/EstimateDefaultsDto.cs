@@ -2,6 +2,8 @@ namespace TurnKeyOps.Lib.Dtos;
 
 public class EstimateDefaultsDto
 {
+    public string Version { get; set; } = string.Empty;
+
     public decimal ConcreteCostPerYard { get; set; }
     public decimal MinimumLoadFee { get; set; }
     public decimal ShortLoadFee { get; set; }

@@ -16,6 +16,7 @@ import {
 	type BdrProductionJobStatus
 } from '$lib/server/bdr-job-scheduling';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
+import { authTokenCookie } from '$lib/server/auth-session';
 
 const productionStatuses = ['scheduled', 'in-progress', 'on-hold', 'completed', 'cancelled'] as const;
 const confirmationStatuses = ['pending', 'confirmed', 'needs-reschedule'] as const;
@@ -77,9 +78,9 @@ const normalizeChecklistInput = (formData: FormData) => {
 
 const getJobId = (formData: FormData) => String(formData.get('jobId') ?? '').trim();
 
-export const load = async ({ fetch, url }) => {
+export const load = async ({ fetch, url, cookies }) => {
 	const { requests } = await loadQuoteRequests(fetch);
-	const billingSettings = await loadBdrBillingSettings();
+	const billingSettings = await loadBdrBillingSettings(fetch, cookies.get(authTokenCookie));
 	const lifecycleInvoices = await loadBdrInvoices(fetch);
 	const jobs = await loadBdrScheduledJobs(fetch);
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, jobs);
@@ -94,7 +95,7 @@ export const load = async ({ fetch, url }) => {
 };
 
 export const actions = {
-	scheduleReadyJob: async ({ request, fetch }) => {
+	scheduleReadyJob: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const invoiceId = String(formData.get('invoiceId') ?? '').trim();
 		const scheduledDate = normalizeDateInput(formData.get('scheduledDate'));
@@ -106,7 +107,7 @@ export const actions = {
 		if (!scheduledDate) return fail(400, { jobActionMessage: 'Choose a target job date.' });
 		if (!crew) return fail(400, { jobActionMessage: 'Assign a crew or scheduler before creating the job.' });
 
-		const billingSettings = await loadBdrBillingSettings();
+		const billingSettings = await loadBdrBillingSettings(fetch, cookies.get(authTokenCookie));
 		const invoice = (await loadBdrInvoices(fetch)).find((record) => record.id === invoiceId);
 		if (!invoice) return fail(404, { jobActionMessage: 'Invoice not found.' });
 		if (invoice.state === 'draft') return fail(400, { jobActionMessage: 'Send the invoice before creating a job.' });
