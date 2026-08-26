@@ -24,6 +24,8 @@ public class Invoice : IEntity, ITableEntity
     public Guid? JobId { get; set; }
     public string? JobName { get; set; }
     public Guid? EstimateId { get; set; }
+    public Guid? QuoteRequestId { get; set; }
+    public int EstimateRevisionNumber { get; set; }
 
     // --- Financials ---
     public decimal Subtotal { get; set; }
@@ -41,6 +43,7 @@ public class Invoice : IEntity, ITableEntity
     // --- Payment ---
     public string? StripePaymentIntentId { get; set; }
     public string? StripePaymentUrl { get; set; }
+    public string? WorkflowPayloadBlobName { get; set; }
 
     public string? Notes { get; set; }
 

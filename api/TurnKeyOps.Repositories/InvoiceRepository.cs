@@ -17,4 +17,16 @@ public class InvoiceRepository : AzureTablesRepositoryBase<Invoice>, IInvoiceRep
         IOptions<RepositoryOptions> repositoryOptions) : base(store, cache, tenantContext, repositoryOptions.Value)
     {
     }
+
+    public Task<Invoice?> GetAsync(string partitionKey, string rowKey, CancellationToken ct = default) =>
+        GetByKeysAsync(partitionKey, rowKey, ct);
+
+    public async Task<IReadOnlyCollection<Invoice>> ListAsync(string partitionKey, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return (await GetAllAsync(false, false))
+            .Where(item => item.PartitionKey == partitionKey && !item.IsDeleted)
+            .OrderByDescending(item => item.DateUpdated)
+            .ToArray();
+    }
 }

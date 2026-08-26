@@ -12,12 +12,18 @@ public class JobService : IJobService
 {
     private readonly IJobRepository _repo;
     private readonly IEstimateWorkflowPayloadStore _payloadStore;
+    private readonly IInvoiceService _invoiceService;
     private readonly IUserContext _userContext;
 
-    public JobService(IJobRepository repo, IEstimateWorkflowPayloadStore payloadStore, IUserContext userContext)
+    public JobService(
+        IJobRepository repo,
+        IEstimateWorkflowPayloadStore payloadStore,
+        IInvoiceService invoiceService,
+        IUserContext userContext)
     {
         _repo = repo;
         _payloadStore = payloadStore;
+        _invoiceService = invoiceService;
         _userContext = userContext;
     }
 
@@ -62,6 +68,7 @@ public class JobService : IJobService
     public async Task<JobDto> AddAsync(JobDto dto)
     {
         dto.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
+        await EnsureReleaseEligibleAsync(dto);
         var entity = JobMapper.ToEntity(dto, PartitionKeyForTenant());
         await PersistJobArtifactsAsync(entity, dto);
         await _repo.SaveAsync(entity);
@@ -72,6 +79,10 @@ public class JobService : IJobService
     {
         var existing = await _repo.GetByIdAsync(dto.Id)
             ?? throw new ArgumentException("Job not found", nameof(dto.Id));
+        if (!IsReleased(existing.Status) && IsReleased(dto.Status))
+        {
+            await EnsureReleaseEligibleAsync(dto);
+        }
         var entity = JobMapper.ToEntity(dto, existing.PartitionKey);
         entity.DateCreated = existing.DateCreated;
         await PersistJobArtifactsAsync(entity, dto);
@@ -98,4 +109,16 @@ public class JobService : IJobService
     {
         dto.EstimateSnapshot = await _payloadStore.LoadJobEstimateSnapshotAsync(entity.EstimateSnapshotBlobName, entity.EstimateSnapshotJson);
     }
+
+    private async Task EnsureReleaseEligibleAsync(JobDto dto)
+    {
+        if (!IsReleased(dto.Status)) return;
+        if (!dto.InvoiceId.HasValue || dto.InvoiceId.Value == Guid.Empty)
+            throw new ArgumentException("A qualifying invoice is required before a job can be released.", nameof(dto.InvoiceId));
+        var release = await _invoiceService.GetJobReleaseAsync(dto.InvoiceId.Value);
+        if (!release.IsEligible)
+            throw new ArgumentException(release.Reason, nameof(dto.InvoiceId));
+    }
+
+    private static bool IsReleased(JobStatus status) => status is JobStatus.Scheduled or JobStatus.InProgress;
 }

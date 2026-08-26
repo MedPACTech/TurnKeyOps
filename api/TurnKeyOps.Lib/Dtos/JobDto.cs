@@ -15,6 +15,7 @@ public class JobDto
     public string? JobSiteName { get; set; }
     public Guid? EstimateId { get; set; }
     public string? EstimateNumber { get; set; }
+    public Guid? InvoiceId { get; set; }
     public string? ProjectAddress { get; set; }
     public string? ProjectName { get; set; }
     public EstimateCalculationSnapshotDto? EstimateSnapshot { get; set; }

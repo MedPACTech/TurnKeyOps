@@ -33,6 +33,50 @@ public class InvoicesController : ApiControllerBase
         return CreatedResponse(nameof(Get), new { id = result.Id }, result);
     }
 
+    [HttpPost("sync-approved-estimates")]
+    public async Task<IActionResult> SyncApprovedEstimates(CancellationToken ct)
+    {
+        var result = await _service.SyncApprovedEstimatesAsync(ct);
+        return OkResponse(result);
+    }
+
+    [HttpPost("{id:guid}/send")]
+    public async Task<IActionResult> Send(Guid id, [FromBody] InvoiceMutationInputDto input, CancellationToken ct)
+    {
+        var result = await _service.SendAsync(id, input.ExpectedVersion, ct);
+        return OkResponse(result);
+    }
+
+    [HttpPost("{id:guid}/payments")]
+    public async Task<IActionResult> RecordPayment(Guid id, [FromBody] InvoicePaymentInputDto input, CancellationToken ct)
+    {
+        input.Kind = "payment";
+        var result = await _service.RecordPaymentAsync(id, input, ct);
+        return OkResponse(result);
+    }
+
+    [HttpPost("{id:guid}/refunds")]
+    public async Task<IActionResult> RecordRefund(Guid id, [FromBody] InvoicePaymentInputDto input, CancellationToken ct)
+    {
+        input.Kind = "refund";
+        var result = await _service.RecordRefundAsync(id, input, ct);
+        return OkResponse(result);
+    }
+
+    [HttpPost("{id:guid}/reminders")]
+    public async Task<IActionResult> RecordReminder(Guid id, [FromBody] InvoiceReminderInputDto input, CancellationToken ct)
+    {
+        var result = await _service.RecordReminderAsync(id, input, ct);
+        return OkResponse(result);
+    }
+
+    [HttpGet("{id:guid}/job-release")]
+    public async Task<IActionResult> GetJobRelease(Guid id, CancellationToken ct)
+    {
+        var result = await _service.GetJobReleaseAsync(id, ct);
+        return OkResponse(result);
+    }
+
     [HttpPut]
     public async Task<IActionResult> Update([FromBody] InvoiceDto dto)
     {
