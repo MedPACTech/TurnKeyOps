@@ -19,6 +19,7 @@ public static class TurnKeyOpsFeatureDependencyInjection
     {
         services.Configure<WeatherSettings>(configuration.GetSection("WeatherSettings"));
         services.Configure<QuoteRequestTenantOptions>(configuration.GetSection(QuoteRequestTenantOptions.SectionName));
+        services.Configure<BobOperationsOptions>(configuration.GetSection(BobOperationsOptions.SectionName));
         return services;
     }
 
@@ -101,6 +102,13 @@ public static class TurnKeyOpsFeatureDependencyInjection
             o.EnableIdLocator = true;
         });
 
+        services.AddAzureEntityMapping<BobActionRecord>(o =>
+        {
+            o.TableName = "BobActions";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = false;
+        });
+
         services.AddAzureEntityMapping<EstimateLineItem>(o =>
         {
             o.TableName = "EstimateLineItems";
@@ -158,6 +166,9 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IContactAccessGrantRepository, ContactAccessGrantRepository>();
         services.AddScoped<IBaseRepositoryAsync<ContactAccessGrant>>(sp => sp.GetRequiredService<IContactAccessGrantRepository>());
 
+        services.AddScoped<IBobActionRepository, BobActionRepository>();
+        services.AddScoped<IBaseRepositoryAsync<BobActionRecord>>(sp => sp.GetRequiredService<IBobActionRepository>());
+
         services.AddScoped<IEstimateLineItemRepository, EstimateLineItemRepository>();
         services.AddScoped<IBaseRepositoryAsync<EstimateLineItem>>(sp => sp.GetRequiredService<IEstimateLineItemRepository>());
 
@@ -201,6 +212,10 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IJobSiteService, JobSiteService>();
         services.AddScoped<IWeatherService, WeatherService>();
         services.AddScoped<ITurnKeyChatService, TurnKeyChatService>();
+        services.AddScoped<IBobContextMinimizer, BobContextMinimizer>();
+        services.AddScoped<IBobOperationsService, BobOperationsService>();
+        services.AddScoped<IBobActionProvider, BobConversationReadProvider>();
+        services.AddScoped<IBobActionProvider, BobConversationArchiveProvider>();
 
         return services;
     }
