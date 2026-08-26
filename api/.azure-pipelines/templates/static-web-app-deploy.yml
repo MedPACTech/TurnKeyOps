@@ -22,6 +22,10 @@ stages:
     variables:
       APP_ROOT: '$(Build.SourcesDirectory)/${{ parameters.appDirectory }}'
     steps:
+    - bash: api/scripts/scan-repository-security.py
+      displayName: 'Scan tracked secrets and PII'
+      workingDirectory: '$(Build.SourcesDirectory)'
+
     - task: NodeTool@0
       displayName: 'Use Node.js 22'
       inputs:
@@ -44,6 +48,10 @@ stages:
         test -f "$(APP_ROOT)/build/index.html"
         test -f "$(APP_ROOT)/build/staticwebapp.config.json"
       displayName: 'Validate static artifact'
+
+    - bash: api/scripts/scan-repository-security.py --path "$(APP_ROOT)/build"
+      displayName: 'Inspect production artifact for secrets and PII'
+      workingDirectory: '$(Build.SourcesDirectory)'
 
     - task: PublishPipelineArtifact@1
       displayName: 'Publish BDR admin artifact'

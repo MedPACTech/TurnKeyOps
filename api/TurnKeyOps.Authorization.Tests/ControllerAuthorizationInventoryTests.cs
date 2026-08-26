@@ -15,7 +15,6 @@ public sealed class ControllerAuthorizationInventoryTests
         var unsecured = new List<string>();
         var controllers = typeof(TenantProfileController).Assembly.GetTypes()
             .Where(type => !type.IsAbstract && typeof(ControllerBase).IsAssignableFrom(type))
-            .Where(type => type.Name != "TestAuthController")
             .ToList();
 
         foreach (var controller in controllers)
@@ -42,6 +41,23 @@ public sealed class ControllerAuthorizationInventoryTests
         }
 
         Assert.True(unsecured.Count == 0, $"Actions without a named policy: {string.Join(", ", unsecured)}");
+    }
+
+    [Fact]
+    public void DiagnosticAuthenticationEndpointsAreAbsentFromProductionAssembly()
+    {
+        var diagnosticControllers = typeof(TenantProfileController).Assembly.GetTypes()
+            .Where(type => typeof(ControllerBase).IsAssignableFrom(type))
+            .Where(type => string.Equals(type.Name, "TestAuthController", StringComparison.Ordinal) ||
+                           type.GetCustomAttributes<RouteAttribute>(inherit: true)
+                               .Any(route => string.Equals(
+                                   route.Template?.Trim('/'),
+                                   "api/test-auth",
+                                   StringComparison.OrdinalIgnoreCase)))
+            .Select(type => type.FullName)
+            .ToList();
+
+        Assert.Empty(diagnosticControllers);
     }
 
     [Theory]

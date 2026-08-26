@@ -33,6 +33,10 @@ stages:
       PUBLISH_DIR: '$(Build.ArtifactStagingDirectory)/publish'
       DEPLOY_ZIP: '$(Build.ArtifactStagingDirectory)/app.zip'
     steps:
+    - bash: api/scripts/scan-repository-security.py
+      displayName: 'Scan tracked secrets and PII'
+      workingDirectory: '$(Build.SourcesDirectory)'
+
     - ${{ if ne(parameters.nugetServiceConnection, '') }}:
       - task: NuGetAuthenticate@1
         displayName: 'Authenticate Private NuGet Feeds'
@@ -77,6 +81,10 @@ stages:
         arguments: '--configuration ${{ parameters.buildConfiguration }} --output $(PUBLISH_DIR)'
         zipAfterPublish: false
         modifyOutputPath: false
+
+    - bash: api/scripts/scan-repository-security.py --path "$(PUBLISH_DIR)"
+      displayName: 'Inspect production artifact for secrets and PII'
+      workingDirectory: '$(Build.SourcesDirectory)'
 
     - script: |
         set -euo pipefail

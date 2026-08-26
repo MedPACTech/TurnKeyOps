@@ -29,6 +29,10 @@ stages:
       APP_ROOT: '$(Build.SourcesDirectory)/${{ parameters.appDirectory }}'
       PACKAGE_ROOT: '$(Build.ArtifactStagingDirectory)/${{ parameters.artifactName }}'
     steps:
+    - bash: api/scripts/scan-repository-security.py
+      displayName: 'Scan tracked secrets and PII'
+      workingDirectory: '$(Build.SourcesDirectory)'
+
     - task: NodeTool@0
       displayName: 'Use Node.js 22'
       inputs:
@@ -56,6 +60,10 @@ stages:
         npm ci --omit=dev
         test -f build/index.js
       displayName: 'Assemble deployable Node package'
+
+    - bash: api/scripts/scan-repository-security.py --path "$(PACKAGE_ROOT)"
+      displayName: 'Inspect production artifact for secrets and PII'
+      workingDirectory: '$(Build.SourcesDirectory)'
 
     - task: ArchiveFiles@2
       displayName: 'Archive TurnKeyOps web'
