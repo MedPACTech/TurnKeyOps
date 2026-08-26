@@ -4,6 +4,7 @@ using MedInsights.Lib.Utils;
 using MedInsights.Repositories.Interfaces;
 using MedInsights.Services.Interfaces;
 using MedInsights.Services.Mappers;
+using MedInsights.Lib.Authorization;
 using System.Text.Json;
 
 namespace MedInsights.Services
@@ -12,11 +13,16 @@ namespace MedInsights.Services
     {
         private readonly ITenantProfileRepository _repository;
         private readonly IUserContext _userContext;
+        private readonly IRoleAccessService _roleAccess;
 
-        public TenantProfileService(ITenantProfileRepository repository, IUserContext userContext)
+        public TenantProfileService(
+            ITenantProfileRepository repository,
+            IUserContext userContext,
+            IRoleAccessService roleAccess)
         {
             _repository = repository;
             _userContext = userContext;
+            _roleAccess = roleAccess;
         }
 
         public async Task<TenantProfileDto?> GetAsync(Guid id, CancellationToken ct = default)
@@ -90,6 +96,7 @@ namespace MedInsights.Services
         public async Task<TenantProfileDto> CreateAsync(TenantProfileDto dto, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.TenantManage, ct);
             ValidateForCreate(dto);
 
             var tenantId = ResolveTenantId(dto.Id);
@@ -116,6 +123,7 @@ namespace MedInsights.Services
         public async Task<TenantProfileDto> UpdateAsync(Guid id, JsonElement payload, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.TenantManage, ct);
             var tenantId = ResolveTenantId(id);
             var partitionKey = PartitionKeyForTenant();
             var rowKey = EntityKeyPolicy.Row(tenantId);
@@ -145,6 +153,7 @@ namespace MedInsights.Services
         public async Task DeleteAsync(Guid id, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.TenantManage, ct);
             if (id != _userContext.TenantId)
                 throw new KeyNotFoundException("Tenant profile not found.");
 

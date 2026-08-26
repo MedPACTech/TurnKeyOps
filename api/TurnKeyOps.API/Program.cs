@@ -22,6 +22,9 @@ using MedInsights.API.DependencyInjection;
 using IBeam.Identity.Interfaces;
 using MedInsights.Services.Events;
 using IBeam.Identity.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 
 public partial class Program
 {
@@ -79,6 +82,8 @@ public partial class Program
 
             // IBeam Identity API: wires auth/JWT + identity services from IBeam:* configuration.
             builder.Services.AddIBeamIdentityApi(builder.Configuration);
+            builder.Services.PostConfigureAll<JwtBearerOptions>(options =>
+                JwtValidationHardening.Apply(options, builder.Configuration));
             builder.Services.AddOtpCompleteRetryDecorator();
             builder.Services.AddScoped<IAuthLifecycleHook, UserProfileHook>();
             builder.Services.AddIBeamIdentityApiControllers();
@@ -102,12 +107,6 @@ public partial class Program
             //Directory.CreateDirectory(dataDir); // create if missing
             //// Optional: expose to connection strings using |DataDirectory|
             //AppDomain.CurrentDomain.SetData("DataDirectory", dataDir);
-
-            builder.Services.AddAuthorization(options =>
-            {
-                options.AddPolicy("RequireAdmin", p => p.RequireRole("Admin"));
-            });
-            
 
             //JSON enum as strings
             builder.Services.AddControllers()
@@ -188,6 +187,7 @@ public partial class Program
 
             // Needed for CurrentUserContext.FromHttp(...)
             builder.Services.AddHttpContextAccessor();
+            builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, TurnKeyAuthorizationResultHandler>();
 
             // IBeam repository tenant context (safe for both HTTP requests and startup validation).
             builder.Services.AddScoped<ITenantContext>(sp =>
@@ -233,7 +233,7 @@ public partial class Program
 
             var app = builder.Build();
 
-            app.MapGet("/", () => "OK");
+            app.MapGet("/", () => "OK").AllowAnonymous();
 
             // ---- Auto-migrate + seed (DEV only) ----
             if (app.Environment.IsDevelopment())

@@ -5,7 +5,7 @@ using MedInsights.Services.Interfaces;
 
 [ApiController]
 [Route("billing")]
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.BillingAdmin)]
 public class BillingController : ControllerBase
 {
     private readonly IBillingService _billingService;

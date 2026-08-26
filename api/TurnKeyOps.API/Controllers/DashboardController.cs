@@ -4,7 +4,7 @@ using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 public class DashboardController : ApiControllerBase
 {
     private readonly IDashboardService _service;

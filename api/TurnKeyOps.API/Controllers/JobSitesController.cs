@@ -5,7 +5,7 @@ using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 public class JobSitesController : ApiControllerBase
 {
     private readonly IJobSiteService _service;

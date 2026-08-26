@@ -9,7 +9,7 @@ using OpenAI.Chat;
 
 namespace TurnKeyOps.API.Controllers;
 
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 [Route("api/bob")]
 public sealed class BobController : ApiControllerBase
 {

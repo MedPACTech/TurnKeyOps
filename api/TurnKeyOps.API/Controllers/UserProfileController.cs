@@ -9,7 +9,7 @@ namespace MedInsights.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAccess)]
     public class UserProfileController : ApiControllerBase
     {
         private readonly IUserProfileService _service;
@@ -23,6 +23,7 @@ namespace MedInsights.Controllers
 
         // GET: api/userprofile
         [HttpGet]
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         public async Task<IActionResult> GetAsync()
         {
             var users = await _service.GetAllAsync();
@@ -31,6 +32,7 @@ namespace MedInsights.Controllers
 
         // GET: api/userprofile/{id}
         [HttpGet("{userId:guid}")]
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         public async Task<IActionResult> GetByIdAsync(Guid userId)
         {
             var user = await _service.GetAsync(userId);

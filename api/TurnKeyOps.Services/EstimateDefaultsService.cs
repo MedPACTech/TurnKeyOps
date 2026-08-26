@@ -4,6 +4,8 @@ using TurnKeyOps.Lib.Utils;
 using TurnKeyOps.Repositories.Interfaces;
 using TurnKeyOps.Services.Interfaces;
 using TurnKeyOps.Services.Mappers;
+using MedInsights.Lib.Authorization;
+using MedInsights.Services.Interfaces;
 
 namespace TurnKeyOps.Services;
 
@@ -13,11 +15,16 @@ public class EstimateDefaultsService : IEstimateDefaultsService
 
     private readonly IEstimateDefaultsRepository _repository;
     private readonly IUserContext _userContext;
+    private readonly IRoleAccessService _roleAccess;
 
-    public EstimateDefaultsService(IEstimateDefaultsRepository repository, IUserContext userContext)
+    public EstimateDefaultsService(
+        IEstimateDefaultsRepository repository,
+        IUserContext userContext,
+        IRoleAccessService roleAccess)
     {
         _repository = repository;
         _userContext = userContext;
+        _roleAccess = roleAccess;
     }
 
     public async Task<EstimateDefaultsDto> GetAsync(CancellationToken ct = default)
@@ -28,6 +35,7 @@ public class EstimateDefaultsService : IEstimateDefaultsService
 
     public async Task<EstimateDefaultsDto> UpsertAsync(EstimateDefaultsDto dto, CancellationToken ct = default)
     {
+        await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.EstimateDefaultsManage, ct);
         Validate(dto);
 
         var existing = await _repository.GetAsync(PartitionKey(), DefaultsRowKey, ct) ?? new EstimateDefaultsProfile

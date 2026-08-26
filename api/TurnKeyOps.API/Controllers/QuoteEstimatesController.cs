@@ -5,7 +5,7 @@ using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 [Route("api/quote-estimates")]
 public sealed class QuoteEstimatesController : ApiControllerBase
 {

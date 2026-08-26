@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("billing/admin")]
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.BillingAdmin)]
 public class BillingAdminController : MedInsights.Controllers.ApiControllerBase
 {
     private readonly IBillingAdminService _service;

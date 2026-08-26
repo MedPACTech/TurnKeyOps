@@ -5,6 +5,7 @@ using MedInsights.Lib.Utils;
 using MedInsights.Repositories.Interfaces;
 using MedInsights.Services.Interfaces;
 using MedInsights.Services.Mappers;
+using MedInsights.Lib.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using System.Security.Cryptography;
@@ -26,6 +27,7 @@ namespace MedInsights.Services
         private readonly IMemoryCache _memoryCache;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IRoleDirectoryService _roleDirectoryService;
+        private readonly IRoleAccessService _roleAccess;
         private const int RedeemAttemptLimit = 5;
         private static readonly TimeSpan RedeemAttemptWindow = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RedeemBlockDuration = TimeSpan.FromMinutes(30);
@@ -41,7 +43,8 @@ namespace MedInsights.Services
             IAuditService auditService,
             IMemoryCache memoryCache,
             IHttpContextAccessor httpContextAccessor,
-            IRoleDirectoryService roleDirectoryService)
+            IRoleDirectoryService roleDirectoryService,
+            IRoleAccessService roleAccess)
         {
             _inviteRepository = inviteRepository;
             _membershipRepository = membershipRepository;
@@ -54,11 +57,13 @@ namespace MedInsights.Services
             _memoryCache = memoryCache;
             _httpContextAccessor = httpContextAccessor;
             _roleDirectoryService = roleDirectoryService;
+            _roleAccess = roleAccess;
         }
 
         public async Task<IEnumerable<InviteDto>> GetAllAsync(CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.MembershipManage, ct);
             var page = await _inviteRepository.GetByPartitionPagedAsync(PartitionKey(), 200, ct: ct);
             return page.Results.Select(InviteMapper.ToDto);
         }
@@ -66,6 +71,7 @@ namespace MedInsights.Services
         public async Task<InviteDto?> GetAsync(Guid id, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.MembershipManage, ct);
             var entity = await _inviteRepository.GetAsync(PartitionKey(), EntityKeyPolicy.Row(id), ct);
             return entity is null ? null : InviteMapper.ToDto(entity);
         }
@@ -159,6 +165,7 @@ namespace MedInsights.Services
         public async Task<InviteDto> CreateAsync(CreateInviteRequestDto dto, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.MembershipManage, ct);
             ValidateInviteContact(dto.InvitedEmail, dto.InvitedPhone);
             var onboardingPolicy = await _tenantOnboardingPolicyService.GetCurrentAsync(ct);
             var role = await _roleDirectoryService.GetRequiredAssignableRoleAsync(_userContext.TenantId, dto.Role, ct);
@@ -234,6 +241,7 @@ namespace MedInsights.Services
         public async Task<InviteDto> ResendAsync(Guid id, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.MembershipManage, ct);
             var invite = await GetInviteOrThrowAsync(id, ct);
             var onboardingPolicy = await _tenantOnboardingPolicyService.GetCurrentAsync(ct);
 
@@ -265,6 +273,7 @@ namespace MedInsights.Services
         public async Task<InviteDto> CancelAsync(Guid id, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.MembershipManage, ct);
             var invite = await GetInviteOrThrowAsync(id, ct);
 
             if (string.Equals(invite.Status, "Redeemed", StringComparison.OrdinalIgnoreCase))

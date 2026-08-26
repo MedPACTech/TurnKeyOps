@@ -5,7 +5,7 @@ namespace MedInsights.Controllers;
 
 [ApiController]
 [Route("api/auth/session")]
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAccess)]
 public sealed class AuthSessionController : ControllerBase
 {
     [HttpGet]

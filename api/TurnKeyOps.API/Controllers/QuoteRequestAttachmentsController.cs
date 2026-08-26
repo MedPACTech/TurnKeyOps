@@ -4,7 +4,7 @@ using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 [Route("api/quote-requests/{quoteRequestId:guid}/attachments")]
 public sealed class QuoteRequestAttachmentsController : ApiControllerBase
 {

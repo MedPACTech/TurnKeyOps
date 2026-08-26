@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 [Route("api/airealtime")]
 public sealed class AIRealtimeController : ControllerBase
 {

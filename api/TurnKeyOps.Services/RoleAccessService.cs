@@ -67,7 +67,10 @@ namespace MedInsights.Services
             EnsureAuthenticated();
 
             var membership = await _membershipRepository.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(_userContext.TenantId), _userContext.UserId, ct);
-            if (membership is null)
+            if (membership is null
+                || membership.IsDeleted
+                || membership.DateRemoved.HasValue
+                || !string.Equals(membership.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             var role = await _roleDirectoryService.GetRoleAsync(_userContext.TenantId, membership.Role, ct);

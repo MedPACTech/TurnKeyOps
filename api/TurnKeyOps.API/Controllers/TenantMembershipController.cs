@@ -7,7 +7,7 @@ namespace MedInsights.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
     public class TenantMembershipController : ApiControllerBase
     {
         private readonly ITenantMembershipService _service;

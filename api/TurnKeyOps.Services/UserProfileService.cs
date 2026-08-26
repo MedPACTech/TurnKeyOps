@@ -76,6 +76,9 @@ namespace MedInsights.Services
         // Update an existing user
         public async Task<UserProfileDto> UpdateAsync(UserProfileDto dto, CancellationToken ct = default)
         {
+            if (dto.Id != _userContext.UserId)
+                throw new ForbiddenAccessException("A user profile can only be updated by its owner.");
+
             var pk = EntityKeyPolicy.TenantPartition(_userContext.TenantId);
             var existingEntity = await _userProfileRepository.GetAsync(pk, EntityKeyPolicy.Row(dto.Id))
                                 ?? throw new KeyNotFoundException("User not found.");
@@ -144,4 +147,3 @@ namespace MedInsights.Services
             => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
-
