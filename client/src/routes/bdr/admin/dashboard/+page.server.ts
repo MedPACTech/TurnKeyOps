@@ -13,7 +13,7 @@ export const load = async ({ fetch }) => {
 	const { snapshot, source } = await resolveMvpScaffold(fetch);
 	const { requests, source: requestSource } = await loadQuoteRequests(fetch);
 	const billingSettings = await loadBdrBillingSettings();
-	const lifecycleInvoices = await loadBdrInvoices();
+	const lifecycleInvoices = await loadBdrInvoices(fetch);
 	const scheduledJobs = await loadBdrScheduledJobs();
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, scheduledJobs);
 	const requestInbox = buildQuoteRequestInbox(requests);

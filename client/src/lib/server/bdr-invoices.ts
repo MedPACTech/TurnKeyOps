@@ -1,25 +1,15 @@
-const fsModuleName = 'node:fs/promises';
-
-type FsPromises = {
-	mkdir: (path: string, options: { recursive: boolean }) => Promise<unknown>;
-	readFile: (path: string, encoding: 'utf-8') => Promise<string>;
-	writeFile: (path: string, data: string) => Promise<unknown>;
-};
+import { getTurnKeyApiBaseUrl, getTurnKeyApiHeaders, unwrapTurnKeyApiEnvelope } from './turnkey-api';
 
 export type BdrInvoiceState = 'draft' | 'sent' | 'paid';
 export type BdrInvoicePaymentMethod = 'ACH' | 'Card' | 'Check' | 'Cash' | 'Other';
 
-export type ApprovedEstimateInvoiceInput = {
-	requestId: string;
-	revisionNumber: number;
-	customerName: string;
-	siteName: string;
-	serviceSummary: string;
-	scopeLineItems: string[];
-	approvedAtUtc?: string;
-	customerEmail: string;
-	customerPhone: string;
-	reviewUrl: string;
+export type BdrInvoicePaymentRecord = {
+	id: string;
+	amount: number;
+	method: BdrInvoicePaymentMethod;
+	note?: string;
+	receivedAtUtc: string;
+	receivedBy: string;
 };
 
 export type BdrInvoiceRecord = {
@@ -31,6 +21,16 @@ export type BdrInvoiceRecord = {
 	siteName: string;
 	serviceSummary: string;
 	amount: number;
+	amountPaid: number;
+	balanceDue: number;
+	requiredDepositPercent: number;
+	jobRelease: {
+		isEligible: boolean;
+		requiredDepositAmount: number;
+		amountPaid: number;
+		remainingDepositAmount: number;
+		reason: string;
+	};
 	customerEmail: string;
 	customerPhone: string;
 	reviewUrl: string;
@@ -44,179 +44,171 @@ export type BdrInvoiceRecord = {
 	reminderSentAtUtc?: string;
 	payments: BdrInvoicePaymentRecord[];
 	lineItems: string[];
+	version: string;
 };
 
-export type BdrInvoicePaymentRecord = {
+type InvoiceApiPayment = {
 	id: string;
+	kind: string;
+	status: string;
 	amount: number;
-	method: BdrInvoicePaymentMethod;
-	note?: string;
-	receivedAtUtc: string;
-	receivedBy: string;
+	method: string;
+	note?: string | null;
+	occurredAtUtc: string;
+	actor: string;
 };
 
-const getCwd = () =>
-	(globalThis as typeof globalThis & { process?: { cwd: () => string } }).process?.cwd() ?? '.';
-
-const getStoreDir = () => `${getCwd()}/.svelte-kit`;
-const getStorePath = () => `${getStoreDir()}/local-bdr-invoices.json`;
-const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
-
-const normalizeState = (value: unknown): BdrInvoiceState => {
-	if (value === 'sent' || value === 'paid') return value;
-	return 'draft';
+type InvoiceApiRecord = {
+	id: string;
+	quoteRequestId?: string | null;
+	estimateId?: string | null;
+	invoiceNumber: string;
+	status: string;
+	customerName?: string | null;
+	siteName?: string | null;
+	serviceSummary?: string | null;
+	total: number;
+	amountPaid: number;
+	balanceDue: number;
+	requiredDepositPercent: number;
+	jobRelease: BdrInvoiceRecord['jobRelease'];
+	customerEmail?: string | null;
+	customerPhone?: string | null;
+	reviewUrl?: string | null;
+	scopeLineItems?: string[];
+	lineItems?: Array<{ description: string; lineTotal: number }>;
+	payments?: InvoiceApiPayment[];
+	reminders?: Array<{ sentAtUtc: string }>;
+	issueDate: string;
+	paidDate?: string | null;
+	sentAtUtc?: string | null;
+	dateCreated?: string | null;
+	dateUpdated?: string | null;
+	version: string;
 };
 
-const parseEstimateTotal = (lineItems: string[]) => {
-	const totalLine = [...lineItems]
-		.reverse()
-		.find((line) => line.toLowerCase().startsWith('estimated total'));
-	const match = totalLine?.match(/\$([0-9,]+(?:\.\d{1,2})?)/);
-	return match ? Number.parseFloat(match[1].replaceAll(',', '')) : 0;
+type InvoicePageEnvelope = {
+	data: InvoiceApiRecord[];
+	success: boolean;
+	continuationToken?: string | null;
 };
 
-const normalizePaymentMethod = (value: unknown): BdrInvoicePaymentMethod => {
+const api = (path: string, init?: RequestInit, fetcher: typeof globalThis.fetch = fetch) =>
+	fetcher(`${getTurnKeyApiBaseUrl()}${path}`, {
+		...init,
+		headers: { ...getTurnKeyApiHeaders(init?.body !== undefined), ...(init?.headers ?? {}) }
+	});
+
+const number = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+
+const stateFromStatus = (status: string): BdrInvoiceState => {
+	const normalized = status.trim().toLowerCase();
+	if (normalized === 'draft') return 'draft';
+	if (normalized === 'paid') return 'paid';
+	return 'sent';
+};
+
+const paymentMethod = (value: string): BdrInvoicePaymentMethod => {
 	if (value === 'Card' || value === 'Check' || value === 'Cash' || value === 'Other') return value;
 	return 'ACH';
 };
 
-const normalizePayment = (value: unknown): BdrInvoicePaymentRecord | null => {
-	if (!value || typeof value !== 'object') return null;
-	const record = value as Partial<BdrInvoicePaymentRecord>;
-	const amount = typeof record.amount === 'number' && Number.isFinite(record.amount) ? record.amount : 0;
-	if (amount <= 0) return null;
+const mapInvoice = (invoice: InvoiceApiRecord): BdrInvoiceRecord => {
+	const sourceRequestId = invoice.quoteRequestId || invoice.estimateId || invoice.id;
+	const successfulPayments = (invoice.payments ?? []).filter(
+		(payment) => payment.kind.toLowerCase() === 'payment' && payment.status.toLowerCase() === 'succeeded'
+	);
+	const latestReminder = [...(invoice.reminders ?? [])]
+		.sort((left, right) => right.sentAtUtc.localeCompare(left.sentAtUtc))[0];
+	const createdAtUtc = invoice.dateCreated || invoice.issueDate;
 
 	return {
-		id: String(record.id ?? `payment-${Date.now()}`).trim(),
-		amount,
-		method: normalizePaymentMethod(record.method),
-		note: record.note?.trim() || undefined,
-		receivedAtUtc: String(record.receivedAtUtc ?? '').trim() || new Date().toISOString(),
-		receivedBy: String(record.receivedBy ?? 'Office admin').trim()
-	};
-};
-
-export const getBdrInvoiceAmountPaid = (invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'>) => {
-	const paymentTotal = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
-	if (paymentTotal > 0) return Math.min(paymentTotal, invoice.amount);
-	if (invoice.state === 'paid' || invoice.paidAtUtc) return invoice.amount;
-	return 0;
-};
-
-export const getBdrInvoiceBalanceDue = (invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'>) =>
-	Math.max(invoice.amount - getBdrInvoiceAmountPaid(invoice), 0);
-
-const normalizeInvoice = (value: unknown): BdrInvoiceRecord | null => {
-	if (!value || typeof value !== 'object') return null;
-	const record = value as Partial<BdrInvoiceRecord>;
-	const id = String(record.id ?? '').trim();
-	const sourceRequestId = String(record.sourceRequestId ?? '').trim();
-	if (!id || !sourceRequestId) return null;
-
-	const lineItems = Array.isArray(record.lineItems)
-		? record.lineItems.map((line) => String(line).trim()).filter(Boolean)
-		: [];
-	const amount =
-		typeof record.amount === 'number' && Number.isFinite(record.amount)
-			? record.amount
-			: parseEstimateTotal(lineItems);
-	const now = new Date().toISOString();
-	const payments = Array.isArray(record.payments)
-		? record.payments.map(normalizePayment).filter((payment): payment is BdrInvoicePaymentRecord => Boolean(payment))
-		: [];
-	const paidAtUtc = record.paidAtUtc?.trim() || undefined;
-	const normalizedPayments =
-		payments.length || normalizeState(record.state) !== 'paid'
-			? payments
-			: [
-					{
-						id: `payment-${id}-paid`,
-						amount,
-						method: 'ACH' as const,
-						note: 'Legacy paid invoice balance captured as collected.',
-						receivedAtUtc: paidAtUtc ?? now,
-						receivedBy: 'Office admin'
-					}
-				];
-
-	return {
-		id,
+		id: invoice.id,
 		sourceRequestId,
-		invoiceNumber: String(record.invoiceNumber ?? `INV-${sourceRequestId.slice(0, 8).toUpperCase()}`).trim(),
-		state: normalizeState(record.state),
-		customerName: String(record.customerName ?? '').trim(),
-		siteName: String(record.siteName ?? '').trim(),
-		serviceSummary: String(record.serviceSummary ?? '').trim(),
-		amount,
-		customerEmail: String(record.customerEmail ?? '').trim(),
-		customerPhone: String(record.customerPhone ?? '').trim(),
-		reviewUrl: String(record.reviewUrl ?? '').trim(),
-		approvedBy: String(record.approvedBy ?? record.customerName ?? '').trim(),
+		invoiceNumber: invoice.invoiceNumber,
+		state: stateFromStatus(invoice.status),
+		customerName: invoice.customerName ?? '',
+		siteName: invoice.siteName ?? '',
+		serviceSummary: invoice.serviceSummary ?? '',
+		amount: number(invoice.total),
+		amountPaid: number(invoice.amountPaid),
+		balanceDue: number(invoice.balanceDue),
+		requiredDepositPercent: number(invoice.requiredDepositPercent),
+		jobRelease: invoice.jobRelease ?? {
+			isEligible: false,
+			requiredDepositAmount: 0,
+			amountPaid: number(invoice.amountPaid),
+			remainingDepositAmount: number(invoice.balanceDue),
+			reason: 'Release eligibility was not returned by the API.'
+		},
+		customerEmail: invoice.customerEmail ?? '',
+		customerPhone: invoice.customerPhone ?? '',
+		reviewUrl: invoice.reviewUrl ?? '',
+		approvedBy: invoice.customerName ?? '',
 		approvalMethod: 'customer review link',
-		approvedAtUtc: record.approvedAtUtc?.trim() || undefined,
-		createdAtUtc: String(record.createdAtUtc ?? '').trim() || now,
-		updatedAtUtc: String(record.updatedAtUtc ?? '').trim() || now,
-		sentAtUtc: record.sentAtUtc?.trim() || undefined,
-		paidAtUtc,
-		reminderSentAtUtc: record.reminderSentAtUtc?.trim() || undefined,
-		payments: normalizedPayments,
-		lineItems
+		createdAtUtc,
+		updatedAtUtc: invoice.dateUpdated || createdAtUtc,
+		sentAtUtc: invoice.sentAtUtc || undefined,
+		paidAtUtc: invoice.paidDate || undefined,
+		reminderSentAtUtc: latestReminder?.sentAtUtc,
+		payments: successfulPayments.map((payment) => ({
+			id: payment.id,
+			amount: number(payment.amount),
+			method: paymentMethod(payment.method),
+			note: payment.note || undefined,
+			receivedAtUtc: payment.occurredAtUtc,
+			receivedBy: payment.actor
+		})),
+		lineItems:
+			invoice.scopeLineItems?.length
+				? invoice.scopeLineItems
+				: (invoice.lineItems ?? []).map((line) => `${line.description} · $${number(line.lineTotal).toFixed(2)}`),
+		version: invoice.version
 	};
 };
 
-export const loadBdrInvoices = async () => {
-	try {
-		const fs = await getFs();
-		const raw = await fs.readFile(getStorePath(), 'utf-8');
-		const parsed = JSON.parse(raw) as unknown[];
-		if (!Array.isArray(parsed)) return [];
-		return parsed.map(normalizeInvoice).filter((record): record is BdrInvoiceRecord => Boolean(record));
-	} catch {
-		return [];
-	}
+export const getBdrInvoiceAmountPaid = (
+	invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'> & { amountPaid?: number }
+) => {
+	const paid = Number.isFinite(invoice.amountPaid)
+		? number(invoice.amountPaid)
+		: invoice.payments.reduce((sum, payment) => sum + number(payment.amount), 0);
+	return Math.max(0, Math.min(paid, number(invoice.amount)));
 };
 
-const saveBdrInvoices = async (invoices: BdrInvoiceRecord[]) => {
-	const fs = await getFs();
-	await fs.mkdir(getStoreDir(), { recursive: true });
-	await fs.writeFile(getStorePath(), JSON.stringify(invoices, null, 2));
+export const getBdrInvoiceBalanceDue = (
+	invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'> & {
+		amountPaid?: number;
+		balanceDue?: number;
+	}
+) =>
+	Number.isFinite(invoice.balanceDue)
+		? Math.max(0, number(invoice.balanceDue))
+		: Math.max(0, number(invoice.amount) - getBdrInvoiceAmountPaid(invoice));
+
+export const loadBdrInvoices = async (fetcher: typeof globalThis.fetch = fetch) => {
+	const invoices: InvoiceApiRecord[] = [];
+	let continuationToken: string | null = null;
+	do {
+		const query = new URLSearchParams({ pageSize: '100' });
+		if (continuationToken) query.set('continuationToken', continuationToken);
+		const response = await api(`/api/invoices/paged?${query}`, undefined, fetcher);
+		if (!response.ok) throw new Error(`Load invoices failed with ${response.status}.`);
+		const page = (await response.json()) as InvoicePageEnvelope;
+		if (!page.success || !Array.isArray(page.data)) throw new Error('Load invoices returned an invalid response.');
+		invoices.push(...page.data);
+		continuationToken = page.continuationToken ?? null;
+	} while (continuationToken);
+
+	return invoices.map(mapInvoice);
 };
 
-export const syncApprovedEstimateInvoices = async (approvedEstimates: ApprovedEstimateInvoiceInput[]) => {
-	const existing = await loadBdrInvoices();
-	const byRequestId = new Map(existing.map((invoice) => [invoice.sourceRequestId, invoice]));
-	let changed = false;
-
-	for (const estimate of approvedEstimates) {
-		if (byRequestId.has(estimate.requestId)) continue;
-		const now = new Date().toISOString();
-		const invoice: BdrInvoiceRecord = {
-			id: `invoice-${estimate.requestId}`,
-			sourceRequestId: estimate.requestId,
-			invoiceNumber: `INV-${estimate.requestId.slice(0, 8).toUpperCase()}`,
-			state: 'draft',
-			customerName: estimate.customerName,
-			siteName: estimate.siteName,
-			serviceSummary: estimate.serviceSummary,
-			amount: parseEstimateTotal(estimate.scopeLineItems),
-			customerEmail: estimate.customerEmail,
-			customerPhone: estimate.customerPhone,
-			reviewUrl: estimate.reviewUrl,
-			approvedBy: estimate.customerName,
-			approvalMethod: 'customer review link',
-			approvedAtUtc: estimate.approvedAtUtc,
-			createdAtUtc: now,
-			updatedAtUtc: now,
-			payments: [],
-			lineItems: estimate.scopeLineItems
-		};
-		existing.unshift(invoice);
-		byRequestId.set(estimate.requestId, invoice);
-		changed = true;
-	}
-
-	if (changed) await saveBdrInvoices(existing);
-	return existing;
+export const syncApprovedEstimateInvoices = async (fetcher: typeof globalThis.fetch = fetch) => {
+	const synced = await unwrapTurnKeyApiEnvelope<InvoiceApiRecord[]>(
+		await api('/api/invoices/sync-approved-estimates', { method: 'POST' }, fetcher),
+		'Sync approved estimates to invoices'
+	);
+	return synced.map(mapInvoice);
 };
 
 export const updateBdrInvoiceState = async (
@@ -232,48 +224,72 @@ export const updateBdrInvoiceState = async (
 			note?: string;
 			receivedBy?: string;
 		};
-	}
+	},
+	fetcher: typeof globalThis.fetch = fetch
 ) => {
-	const invoices = await loadBdrInvoices();
-	const now = new Date().toISOString();
-	const next = invoices.map((invoice) => {
-		if (invoice.id !== invoiceId) return invoice;
-		const balanceDue = getBdrInvoiceBalanceDue(invoice);
-		const paymentAmount =
-			typeof update.payment?.amount === 'number' && Number.isFinite(update.payment.amount)
-				? Math.max(0, Math.min(update.payment.amount, balanceDue))
-				: update.paid
-					? balanceDue
-					: 0;
-		const payments =
-			paymentAmount > 0
-				? [
-						...invoice.payments,
-						{
-							id: `payment-${now}`,
-							amount: paymentAmount,
-							method: update.payment?.method ?? 'ACH',
-							note: update.payment?.note?.trim() || undefined,
-							receivedAtUtc: now,
-							receivedBy: update.payment?.receivedBy?.trim() || 'Office admin'
-						}
-					]
-				: invoice.payments;
-		const nextBalanceDue = Math.max(invoice.amount - payments.reduce((sum, payment) => sum + payment.amount, 0), 0);
-		const isFullyPaid = nextBalanceDue <= 0.01 || update.paid;
-		return {
-			...invoice,
-			state: update.state ?? (isFullyPaid ? 'paid' : update.sent ? 'sent' : invoice.state),
-			sentAtUtc: update.sent ? now : invoice.sentAtUtc,
-			paidAtUtc: isFullyPaid ? invoice.paidAtUtc ?? now : invoice.paidAtUtc,
-			reminderSentAtUtc: update.reminder ? now : invoice.reminderSentAtUtc,
-			payments,
-			updatedAtUtc: now
-		};
-	});
-	await saveBdrInvoices(next);
-	return next.find((invoice) => invoice.id === invoiceId) ?? null;
+	let current = await unwrapTurnKeyApiEnvelope<InvoiceApiRecord>(
+		await api(`/api/invoices/${encodeURIComponent(invoiceId)}`, undefined, fetcher),
+		'Load invoice'
+	);
+
+	if (update.sent || update.state === 'sent') {
+		current = await unwrapTurnKeyApiEnvelope<InvoiceApiRecord>(
+			await api(
+				`/api/invoices/${encodeURIComponent(invoiceId)}/send`,
+				{ method: 'POST', body: JSON.stringify({ expectedVersion: current.version }) },
+				fetcher
+			),
+			'Send invoice'
+		);
+	}
+
+	if (update.payment || update.paid || update.state === 'paid') {
+		const requested = number(update.payment?.amount);
+		const amount = requested > 0 ? requested : number(current.balanceDue);
+		if (amount <= 0) throw new Error('The invoice has no remaining balance to record.');
+		current = await unwrapTurnKeyApiEnvelope<InvoiceApiRecord>(
+			await api(
+				`/api/invoices/${encodeURIComponent(invoiceId)}/payments`,
+				{
+					method: 'POST',
+					body: JSON.stringify({
+						amount,
+						method: update.payment?.method ?? 'ACH',
+						note: update.payment?.note || null,
+						idempotencyKey: `admin:${crypto.randomUUID()}`,
+						expectedVersion: current.version,
+						status: 'succeeded'
+					})
+				},
+				fetcher
+			),
+			'Record invoice payment'
+		);
+	}
+
+	if (update.reminder) {
+		current = await unwrapTurnKeyApiEnvelope<InvoiceApiRecord>(
+			await api(
+				`/api/invoices/${encodeURIComponent(invoiceId)}/reminders`,
+				{
+					method: 'POST',
+					body: JSON.stringify({
+						channel: current.customerEmail ? 'email' : 'sms',
+						idempotencyKey: `admin:${crypto.randomUUID()}`,
+						expectedVersion: current.version
+					})
+				},
+				fetcher
+			),
+			'Record invoice reminder'
+		);
+	}
+
+	return mapInvoice(current);
 };
 
-export const getBdrInvoice = async (invoiceId: string) =>
-	(await loadBdrInvoices()).find((invoice) => invoice.id === invoiceId) ?? null;
+export const getBdrInvoice = async (invoiceId: string, fetcher: typeof globalThis.fetch = fetch) => {
+	const response = await api(`/api/invoices/${encodeURIComponent(invoiceId)}`, undefined, fetcher);
+	if (response.status === 404) return null;
+	return mapInvoice(await unwrapTurnKeyApiEnvelope<InvoiceApiRecord>(response, 'Load invoice'));
+};

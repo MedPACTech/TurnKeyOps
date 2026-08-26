@@ -80,7 +80,7 @@ const getJobId = (formData: FormData) => String(formData.get('jobId') ?? '').tri
 export const load = async ({ fetch, url }) => {
 	const { requests } = await loadQuoteRequests(fetch);
 	const billingSettings = await loadBdrBillingSettings();
-	const lifecycleInvoices = await loadBdrInvoices();
+	const lifecycleInvoices = await loadBdrInvoices(fetch);
 	const jobs = await loadBdrScheduledJobs();
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, jobs);
 	const selectedJobId = url.searchParams.get('job')?.trim() ?? '';
@@ -107,7 +107,7 @@ export const actions = {
 		if (!crew) return fail(400, { jobActionMessage: 'Assign a crew or scheduler before creating the job.' });
 
 		const billingSettings = await loadBdrBillingSettings();
-		const invoice = (await loadBdrInvoices()).find((record) => record.id === invoiceId);
+		const invoice = (await loadBdrInvoices(fetch)).find((record) => record.id === invoiceId);
 		if (!invoice) return fail(404, { jobActionMessage: 'Invoice not found.' });
 		if (invoice.state === 'draft') return fail(400, { jobActionMessage: 'Send the invoice before creating a job.' });
 		const eligibility = getBdrInvoiceSchedulingEligibility(invoice, billingSettings);

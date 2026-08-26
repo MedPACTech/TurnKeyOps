@@ -396,19 +396,22 @@ const findRequest = (requests: QuoteRequest[], invoice: Pick<BdrInvoiceRecord, '
 	requests.find((request) => request.id === invoice.sourceRequestId) ?? null;
 
 export const getBdrInvoiceSchedulingEligibility = (
-	invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'>,
+	invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'> &
+		Partial<Pick<BdrInvoiceRecord, 'amountPaid' | 'balanceDue' | 'jobRelease'>>,
 	settings: BdrBillingSettings
 ) => {
 	const amountPaid = getBdrInvoiceAmountPaid(invoice);
 	const balanceDue = getBdrInvoiceBalanceDue(invoice);
-	const requiredDepositAmount = Math.min(invoice.amount, invoice.amount * (settings.depositPercentRequired / 100));
+	const requiredDepositAmount = invoice.jobRelease
+		? invoice.jobRelease.requiredDepositAmount
+		: Math.min(invoice.amount, invoice.amount * (settings.depositPercentRequired / 100));
 	const paidPercent = invoice.amount > 0 ? Math.min(100, (amountPaid / invoice.amount) * 100) : 0;
 	return {
 		amountPaid,
 		balanceDue,
 		requiredDepositAmount,
 		paidPercent,
-		isReady: amountPaid + 0.01 >= requiredDepositAmount
+		isReady: invoice.jobRelease?.isEligible ?? amountPaid + 0.01 >= requiredDepositAmount
 	};
 };
 
