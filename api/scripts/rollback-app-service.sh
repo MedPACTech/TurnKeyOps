@@ -21,4 +21,3 @@ az webapp deploy \
   --output json
 
 echo "Rollback artifact deployed to $resource_group/$app_name. Run post-deploy-smoke.sh before closing the incident."
-
