@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using IBeam.Communications.Abstractions;
 using IBeam.Communications.Email.AzureCommunications;
+using IBeam.Communications.Sms.AzureCommunications;
 using IBeam.Identity.Api.DependencyInjection;
 using IBeam.Repositories.Abstractions;
 using IBeam.Repositories.AzureTables;
@@ -34,6 +35,9 @@ public partial class Program
         {
             var builder = WebApplication.CreateBuilder(args);
             ProductionIdentityConfiguration.Validate(
+                builder.Configuration,
+                builder.Environment.EnvironmentName);
+            ProductionIntegrationConfiguration.Validate(
                 builder.Configuration,
                 builder.Environment.EnvironmentName);
 
@@ -72,16 +76,17 @@ public partial class Program
             builder.Services.AddTurnKeyOpsFeatureAzureTableMappings();
 
             builder.Services.AddHostedService<GlobalErrorHandler>();
-            builder.Services.AddExternalClients();
+            builder.Services.AddExternalClients(builder.Configuration);
             builder.Services.AddTurnKeyOpsExternalClients();
             builder.Services.AddRepositories();
             builder.Services.AddTurnKeyOpsFeatureRepositories();
-            builder.Services.AddManagedServices(enableServiceBus: hasServiceBusConnection);
+            builder.Services.AddManagedServices(builder.Configuration, enableServiceBus: hasServiceBusConnection);
             builder.Services.AddTurnKeyOpsFeatureServices();
             builder.Services.AddIBeamCommunications(builder.Configuration);
 
             // 1) Email provider (Azure Communication Services Email)
             builder.Services.AddIBeamAzureCommunicationsEmail(builder.Configuration);
+            builder.Services.AddIBeamCommunicationsSmsAzure(builder.Configuration);
 
             // IBeam Identity API: wires auth/JWT + identity services from IBeam:* configuration.
             builder.Services.AddIBeamIdentityApi(builder.Configuration);

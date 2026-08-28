@@ -15,17 +15,20 @@ namespace MedInsights.Services
         private readonly PayPalSettings _payPalSettings;
         private readonly PayPalBillingCatalogSettings _catalogSettings;
         private readonly SystemSettings _systemSettings;
+        private readonly IProviderHttpExecutor _requestExecutor;
 
         public PayPalPaymentProvider(
             HttpClient httpClient,
             IOptions<PayPalSettings> payPalSettings,
             IOptions<PayPalBillingCatalogSettings> catalogSettings,
-            IOptions<SystemSettings> systemSettings)
+            IOptions<SystemSettings> systemSettings,
+            IProviderHttpExecutor requestExecutor)
         {
             _httpClient = httpClient;
             _payPalSettings = payPalSettings.Value;
             _catalogSettings = catalogSettings.Value;
             _systemSettings = systemSettings.Value;
+            _requestExecutor = requestExecutor;
         }
 
         public string ProviderName => "PayPal";
@@ -50,7 +53,8 @@ namespace MedInsights.Services
                         cancel_url = $"{_systemSettings.MarketingDomain}/pricing"
                     }
                 },
-                ct);
+                ct,
+                dto.IdempotencyKey);
 
             using var document = JsonDocument.Parse(response);
             return new PaymentCheckoutSessionDto
@@ -137,7 +141,8 @@ namespace MedInsights.Services
                         cancel_url = $"{_systemSettings.ApplicationHost}/billing"
                     }
                 },
-                ct);
+                ct,
+                dto.IdempotencyKey);
 
             using var document = JsonDocument.Parse(response);
             return new PaymentCheckoutSessionDto
@@ -326,21 +331,33 @@ namespace MedInsights.Services
                 throw new InvalidOperationException("PayPal webhook verification failed.");
         }
 
-        private async Task<string> SendAsync(HttpMethod method, string path, object? body, CancellationToken ct)
+        private async Task<string> SendAsync(
+            HttpMethod method,
+            string path,
+            object? body,
+            CancellationToken ct,
+            string? idempotencyKey = null,
+            bool retrySafe = false)
         {
-            using var request = new HttpRequestMessage(method, path);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await GetAccessTokenAsync(ct));
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            var accessToken = await GetAccessTokenAsync(ct);
+            var canRetry = retrySafe || method == HttpMethod.Get || !string.IsNullOrWhiteSpace(idempotencyKey);
+            var response = await _requestExecutor.SendAsync(
+                _httpClient,
+                () =>
+                {
+                    var request = new HttpRequestMessage(method, path);
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    if (!string.IsNullOrWhiteSpace(idempotencyKey))
+                        request.Headers.TryAddWithoutValidation("PayPal-Request-Id", idempotencyKey);
+                    if (body is not null)
+                        request.Content = JsonContent.Create(body);
+                    return request;
+                },
+                canRetry,
+                ct);
 
-            if (body is not null)
-                request.Content = JsonContent.Create(body);
-
-            using var response = await _httpClient.SendAsync(request, ct);
-            var payload = await response.Content.ReadAsStringAsync(ct);
-            if (!response.IsSuccessStatusCode)
-                throw new HttpRequestException($"PayPal request to '{path}' failed with status {(int)response.StatusCode}: {payload}");
-
-            return payload;
+            return response.Payload;
         }
 
         private async Task<string> GetAccessTokenAsync(CancellationToken ct)
@@ -348,21 +365,24 @@ namespace MedInsights.Services
             if (string.IsNullOrWhiteSpace(_payPalSettings.ClientId) || string.IsNullOrWhiteSpace(_payPalSettings.ClientSecret))
                 throw new InvalidOperationException("PayPal client credentials are not configured.");
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/oauth2/token");
-            request.Headers.Authorization = new AuthenticationHeaderValue(
-                "Basic",
-                Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_payPalSettings.ClientId}:{_payPalSettings.ClientSecret}")));
-            request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["grant_type"] = "client_credentials"
-            });
+            var credentials = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes($"{_payPalSettings.ClientId}:{_payPalSettings.ClientSecret}"));
+            var response = await _requestExecutor.SendAsync(
+                _httpClient,
+                () =>
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Post, "/v1/oauth2/token");
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+                    request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["grant_type"] = "client_credentials"
+                    });
+                    return request;
+                },
+                retrySafe: true,
+                ct);
 
-            using var response = await _httpClient.SendAsync(request, ct);
-            var payload = await response.Content.ReadAsStringAsync(ct);
-            if (!response.IsSuccessStatusCode)
-                throw new HttpRequestException($"PayPal OAuth token request failed with status {(int)response.StatusCode}: {payload}");
-
-            using var document = JsonDocument.Parse(payload);
+            using var document = JsonDocument.Parse(response.Payload);
             return TryReadString(document.RootElement, "access_token")
                 ?? throw new InvalidOperationException("PayPal OAuth token response did not include an access token.");
         }

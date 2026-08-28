@@ -100,6 +100,8 @@ namespace MedInsights.Services
                 dto.TenantId ??= _userContext.TenantId;
                 dto.RequestedByUserId ??= _userContext.UserId;
             }
+
+            dto.IdempotencyKey = RequireIdempotencyKey(dto.IdempotencyKey);
         }
 
         private void Enrich(PurchaseCreditTopUpRequestDto dto)
@@ -109,6 +111,17 @@ namespace MedInsights.Services
                 dto.TenantId ??= _userContext.TenantId;
                 dto.RequestedByUserId ??= _userContext.UserId;
             }
+
+            dto.IdempotencyKey = RequireIdempotencyKey(dto.IdempotencyKey);
+        }
+
+        private static string RequireIdempotencyKey(string? value)
+        {
+            var normalized = value?.Trim();
+            if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > 128)
+                throw new ArgumentException("A stable idempotency key of 1-128 characters is required.", nameof(value));
+
+            return normalized;
         }
 
         private void Enrich(CreateCustomerPortalRequestDto dto)

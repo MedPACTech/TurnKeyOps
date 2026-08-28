@@ -8,23 +8,32 @@ namespace MedInsights.API.DependencyInjection
 {
     public static class ExternalDependencyInjection
     {
-        public static IServiceCollection AddExternalClients(this IServiceCollection services)
+        public static IServiceCollection AddExternalClients(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddSingleton(sp =>
+            var enabledProviders = configuration
+                .GetSection($"{BillingIntegrationOptions.SectionName}:EnabledProviders")
+                .Get<string[]>() ?? [];
+
+            if (enabledProviders.Contains("Stripe", StringComparer.OrdinalIgnoreCase))
             {
-                var opts = sp.GetRequiredService<IOptions<StripeSettings>>().Value;
+                services.AddSingleton(sp =>
+                {
+                    var opts = sp.GetRequiredService<IOptions<StripeSettings>>().Value;
 
-                if (string.IsNullOrWhiteSpace(opts.SecretKey))
-                    throw new InvalidOperationException("Stripe secret key missing (StripeSettings:SecretKey).");
+                    if (string.IsNullOrWhiteSpace(opts.SecretKey))
+                        throw new InvalidOperationException("Stripe secret key missing (StripeSettings:SecretKey).");
 
-                return new StripeClient(opts.SecretKey);
-            });
+                    return new StripeClient(opts.SecretKey);
+                });
+            }
 
             services.AddHttpClient<PayPalPaymentProvider>((sp, client) =>
             {
                 var opts = sp.GetRequiredService<IOptions<PayPalSettings>>().Value;
+                var integrationOptions = sp.GetRequiredService<IOptions<BillingIntegrationOptions>>().Value;
                 if (!string.IsNullOrWhiteSpace(opts.BaseUrl))
                     client.BaseAddress = new Uri(opts.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(Math.Clamp(integrationOptions.RequestTimeoutSeconds, 5, 120));
             });
 
             services.AddSingleton(sp =>

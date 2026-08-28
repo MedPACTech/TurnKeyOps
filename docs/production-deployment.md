@@ -46,6 +46,8 @@ Create a secured production variable group containing:
 
 Configure all API secrets through App Service settings or Key Vault references. Never copy `.local/user-secrets.json` into a deployment artifact.
 
+The complete identity, communication, billing, rotation, disable, rollback, and smoke-test contract is in `api/docs/production-integrations.md`.
+
 ## Pipelines
 
 - Web: `api/.azure-pipelines/turnkeyops-web.yml`

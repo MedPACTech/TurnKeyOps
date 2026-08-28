@@ -7,5 +7,6 @@ namespace MedInsights.Lib.Dtos
         public int Quantity { get; set; } = 1;
         public Guid? TenantId { get; set; }
         public Guid? RequestedByUserId { get; set; }
+        public string? IdempotencyKey { get; set; }
     }
 }

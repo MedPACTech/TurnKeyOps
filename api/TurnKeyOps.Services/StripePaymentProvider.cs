@@ -58,7 +58,7 @@ namespace MedInsights.Services
                     ["tenant_id"] = dto.TenantId?.ToString("D") ?? string.Empty,
                     ["requested_by_user_id"] = dto.RequestedByUserId?.ToString("D") ?? string.Empty
                 }
-            }, cancellationToken: ct);
+            }, new RequestOptions { IdempotencyKey = dto.IdempotencyKey }, ct);
 
             return new PaymentCheckoutSessionDto
             {
@@ -144,7 +144,7 @@ namespace MedInsights.Services
                     ["tenant_id"] = dto.TenantId?.ToString("D") ?? string.Empty,
                     ["requested_by_user_id"] = dto.RequestedByUserId?.ToString("D") ?? string.Empty
                 }
-            }, cancellationToken: ct);
+            }, new RequestOptions { IdempotencyKey = dto.IdempotencyKey }, ct);
 
             return new PaymentCheckoutSessionDto
             {
