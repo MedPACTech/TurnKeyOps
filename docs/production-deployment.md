@@ -1,6 +1,8 @@
 # TurnKeyOps production deployment
 
-TurnKeyOps uses one multi-tenant SvelteKit Node application and one ASP.NET Core API. The web application resolves the tenant and surface from the request hostname; do not create separate BDR and Think Pink builds.
+TurnKeyOps uses one multi-tenant SvelteKit Node application and one ASP.NET
+Core API. The web application resolves the tenant and surface from the request
+hostname; do not create separate BDR and Think Pink builds.
 
 ## Production surfaces
 
@@ -16,7 +18,9 @@ TurnKeyOps uses one multi-tenant SvelteKit Node application and one ASP.NET Core
 | `www.bdrconcrete.com` | `/bdr/public` | Public-site alias |
 | `admin.bdrconcrete.com` | `/bdr/admin` | BDR External Admin |
 
-Hostname routing is defined in `client/src/lib/config/domains.ts`. External Admin tenant configuration is defined in `client/src/lib/config/external-admin.ts`.
+Hostname routing is defined in `client/src/lib/config/domains.ts`. External
+Admin tenant configuration is defined in
+`client/src/lib/config/external-admin.ts`.
 
 ## Azure resources
 
@@ -30,44 +34,41 @@ Create these production resources:
 6. Application Insights for both web applications.
 7. Azure Key Vault for production secrets.
 
-The API and Node application must not use Azurite or `.svelte-kit` local JSON stores in production.
+The API and Node application must not use Azurite or `.svelte-kit` local JSON
+stores in production.
 
-## Azure DevOps variables
+## Deployment configuration
 
-Create a secured production variable group containing:
+GitHub Actions and Hubbsly Ship are authoritative. Azure DevOps deployment
+definitions are retired and must remain disabled. Configure the `staging` and
+`production` GitHub environments with the OIDC secrets and target variables
+listed in `docs/release-readiness.md`.
 
-- `AZURE_SERVICE_CONNECTION`
-- `TURNKEYOPS_PRODUCTION_RESOURCE_GROUP`
-- `TURNKEYOPS_WEB_APP_NAME`
-- `TURNKEYOPS_API_WEB_APP_NAME`
-- `TURNKEYOPS_API_BASE_URL`
-- `TURNKEYOPS_WEB_BASE_URL`
-- `RELEASE_APPROVERS`
+The Azure federated identity subject must be restricted to the matching GitHub
+environment in `MedPACTech/TurnKeyOps`. API secrets belong in Azure App Service
+settings or Key Vault references and must never be copied into a GitHub
+workflow, repository variable, client bundle, or deployment artifact. The
+identity, communications, billing, rotation, disable, rollback, and smoke
+contract is in `api/docs/production-integrations.md`.
 
-`TURNKEYOPS_API_BASE_URL` must be the API origin without a trailing slash, for example `https://api.turnkeyops.ai`.
+## Deployment workflows
 
-Configure all API secrets through App Service settings or Key Vault references. Never copy `.local/user-secrets.json` into a deployment artifact.
+- Pull-request gate: `.github/workflows/pull-request.yml`
+- Reusable quality gate: `.github/workflows/quality-gates.yml`
+- Reusable package/deploy workflow: `.github/workflows/deploy.yml`
+- Automatic `main` staging deploy: `.github/workflows/deploy-staging.yml`
+- Manual `main` production deploy for Hubbsly Ship: `.github/workflows/deploy-production.yml`
 
-The complete identity, communication, billing, rotation, disable, rollback, and smoke-test contract is in `api/docs/production-integrations.md`.
-
-Create equivalent staging variables using the `TURNKEYOPS_STAGING_*` prefix
-listed in `api/.azure-pipelines/README.md`.
-
-## Pipelines
-
-- Required PR validation: `api/.azure-pipelines/pr-validation.yml`
-- Staging API/web: `api/.azure-pipelines/staging-api.yml` and `staging-web.yml`
-- Production API/web: `api/.azure-pipelines/production.yml` and `turnkeyops-web.yml`
-
-`main` deploys only to staging. Production deploys only from protected
-`release-*` tags after the UAT manual-validation stage and the Azure DevOps
-`Production` environment approval. Configure the pipeline definitions only
-after their service connection, environments, approvers, and secured variables
-exist. See `docs/release-readiness.md` for the release and rollback checklist.
+Every deployment rebuilds and validates the commit, creates one immutable
+API/web artifact bundle named for the SHA, deploys those exact artifacts, runs
+post-deployment smoke checks, and publishes deployment evidence. Production
+also requires the GitHub environment approval and explicit Ship/UAT/rollback
+dispatch inputs.
 
 ## Custom domains and TLS
 
-Add every hostname in the production-surfaces table to the Node Web App. Azure will provide the verification records.
+Add every hostname in the production-surfaces table to the Node Web App. Azure
+will provide the verification records.
 
 For each apex domain:
 
@@ -79,21 +80,27 @@ For each `www` and `admin` hostname:
 1. Add the Azure `asuid.<subdomain>` TXT verification record when requested.
 2. Add a CNAME to the Node Web App default `azurewebsites.net` hostname.
 
-After Azure validates each hostname, create and bind an App Service managed certificate. Keep the existing A2 Hosting and Namecheap records in place until the Azure default hostname and all custom-domain validations pass.
+After Azure validates each hostname, create and bind an App Service managed
+certificate. Keep the existing A2 Hosting and Namecheap records in place until
+the Azure default hostname and all custom-domain validations pass.
 
 ## Release verification
 
 Before changing DNS:
 
-1. Run `npm ci`, `npm run check`, and `npm run build` in `client`.
-2. Run `dotnet restore`, `dotnet build`, and `dotnet test` against `api/TurnKeyOps.API.sln`.
+1. Confirm `Required PR validation` passed for the exact merge commit.
+2. Confirm the staging deployment and its published smoke artifact passed.
 3. Verify the Web App default hostname using explicit `Host` headers for all production domains.
 4. Confirm each public hostname returns `200`.
 5. Confirm each admin hostname redirects an anonymous browser to `/auth/login` with the correct tenant return path.
 6. Submit one test request per tenant and confirm it appears only in that tenant's External Admin.
 7. Complete an OTP login for each admin hostname.
 8. Verify uploaded files persist after an App Service restart.
+9. Complete the UAT template and create the Hubbsly Ship release record.
 
 ## DNS cutover
 
-Lower DNS TTLs at least several hours before cutover. Change one public domain at a time, verify TLS and form submission, and then add its admin subdomain. Do not remove the previous hosting configuration until the new deployment has remained healthy through the rollback window.
+Lower DNS TTLs at least several hours before cutover. Change one public domain
+at a time, verify TLS and form submission, and then add its admin subdomain. Do
+not remove the previous hosting configuration until the new deployment has
+remained healthy through the rollback window.

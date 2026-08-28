@@ -1,0 +1,50 @@
+name: Deploy TurnKeyOps - Production
+run-name: Ship production · ${{ inputs.ship-release-id }} · ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      ship-release-id:
+        description: Hubbsly Ship deployment or release identifier
+        required: true
+        type: string
+      uat-evidence:
+        description: Hubbsly card, URL, or record containing approved UAT evidence
+        required: true
+        type: string
+      rollback-reference:
+        description: Previous healthy GitHub run, artifact, or commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+concurrency:
+  group: turnkeyops-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Require main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main deployment
+        run: |
+          if [ "$GITHUB_REF" != 'refs/heads/main' ]; then
+            echo 'Production deployments must run from main.'
+            exit 1
+          fi
+
+  deploy:
+    needs: guard
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    with:
+      environment-name: production
+      aspnetcore-environment: Production
+      ship-release-id: ${{ inputs.ship-release-id }}
+      uat-evidence: ${{ inputs.uat-evidence }}
+      rollback-reference: ${{ inputs.rollback-reference }}

@@ -1,38 +1,102 @@
-# TurnKeyOps release gate and approval contract
+# TurnKeyOps GitHub Actions and Hubbsly Ship release contract
+
+## Authoritative automation
+
+GitHub Actions is the only active CI/CD system for TurnKeyOps. Hubbsly Ship
+discovers, starts, and monitors the production workflow through the GitHub
+Actions API. Azure DevOps deployment YAML has been removed; see
+`api/.azure-pipelines/README.md` for the retirement record.
+
+The workflow layout follows the shared deployment pattern used by the Bed
+Brigade platform:
+
+| Workflow | Trigger | Purpose |
+| --- | --- | --- |
+| `pull-request.yml` | pull request to `main` | Stable required check over every quality gate |
+| `quality-gates.yml` | reusable only | Repository, API, client, legacy-admin, and Playwright gates |
+| `deploy.yml` | reusable only | Validate, create immutable API/web artifacts, deploy, smoke, and publish evidence |
+| `deploy-staging.yml` | push to `main` or manual from `main` | Automatic staging deployment |
+| `deploy-production.yml` | manual dispatch from `main` only | Hubbsly Ship production entry point |
+
+Both deployment wrappers use concurrency groups with cancellation disabled so
+a release cannot be silently replaced mid-deployment. The production wrapper
+has no push, pull-request, schedule, or tag trigger.
 
 ## Required pull-request policy
 
-Create the Azure DevOps pipeline from `api/.azure-pipelines/pr-validation.yml` and add its `Required PR validation` stage as a required `main` branch build-validation policy. Disable bypass except for the repository administrators responsible for incident recovery. Require the source branch to be up to date before merge.
+Create a GitHub ruleset for `main` that:
 
-The gate deliberately has zero automatic browser-test retries. A failed test is visible, publishes its trace/screenshot/video, and blocks merge. Fix or explicitly quarantine a flaky test in a reviewed change; never mark a failing critical journey as continue-on-error.
+1. requires a pull request and an up-to-date branch;
+2. requires the `Required PR validation` status check from
+   `.github/workflows/pull-request.yml`;
+3. blocks force pushes and branch deletion;
+4. prevents check bypass except through the documented incident process; and
+5. requires approval from the designated release owners for workflow changes.
 
-| Gate | Evidence | Blocks merge when |
+The stable required job fails unless every reusable gate succeeds. Browser
+tests have zero retries. A failure remains visible and publishes Playwright
+JUnit, HTML, trace, screenshot, and video evidence; a critical journey must not
+be ignored with `continue-on-error`.
+
+| Gate | Published evidence | Blocks merge when |
 | --- | --- | --- |
-| Repository security | Scanner log | a configured secret/PII signature or conflict artifact is tracked |
-| Migration posture | Validation log | a relational migration appears without an explicit forward/rollback validation job |
-| API | TRX + dependency report | restore, Release build, any test, or vulnerability check fails |
-| SvelteKit client | npm audit + check/build/session output | a high advisory, diagnostic, auth-policy test, or build fails |
-| Legacy admin | npm audit + check/build output | a high advisory, diagnostic, or build fails |
-| Critical E2E | JUnit + Playwright HTML/traces | either brand intake, attachment persistence, authorization negative path, mobile check, or serious accessibility scan fails |
+| Repository policy | Scanner/migration log | a tracked secret/PII signature, conflict artifact, whitespace error, or unreviewed relational migration exists |
+| API | TRX and dependency report | restore, Release build, a test, or dependency audit fails |
+| SvelteKit client | audit/check/session/build output | a high advisory, diagnostic, auth-policy test, or build fails |
+| Legacy admin | audit/check/build output | a high advisory, diagnostic, or build fails |
+| Critical E2E | JUnit, HTML, traces, screenshots, video | either brand intake, attachment, authorization negative path, mobile, or serious accessibility coverage fails |
 
-## Controlled production release
+## GitHub environments and Azure OIDC
 
-Production deploy pipelines accept only annotated tags matching `release-*`; `main` pushes build but do not deploy. Protect release-tag creation to release managers. Configure the Azure DevOps `Production` environment with at least one approver who did not author the change and disallow self-approval.
+Create `staging` and `production` GitHub environments. Each environment must
+define these secrets:
 
-1. Merge through the required PR policy.
-2. Deploy the exact `main` commit to the stable staging environment.
-3. Complete the UAT record below and attach links to the validation run and staging evidence.
-4. Create an annotated `release-YYYYMMDD.N` tag on that exact commit.
-5. Approve the Production environment only after confirming the tag SHA and UAT record.
-6. Preserve API and web artifacts with the pipeline run. Deploy both artifacts from the same tag.
-7. Run `api/scripts/post-deploy-smoke.sh` with the production API and web origins. Publish its log with the release.
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+
+Each environment must define these non-secret variables:
+
+- `AZURE_RESOURCE_GROUP`
+- `API_WEBAPP_NAME`
+- `WEB_WEBAPP_NAME`
+- `API_BASE_URL`
+- `WEB_BASE_URL`
+
+The Azure identity must use workload identity federation restricted to this
+repository and the corresponding GitHub environment. Do not create a client
+secret for CI. Limit its Azure role assignments to the two App Services and
+the settings they require.
+
+Protect the `production` environment with at least one reviewer who did not
+author the change, disallow self-approval, and prevent administrators from
+bypassing the deployment protection rule. Staging can deploy automatically
+after the required quality workflow passes on `main`.
+
+## Hubbsly Ship integration
+
+Connect the `MedPACTech/TurnKeyOps` repository to Hubbsly Ship with GitHub
+Actions read/write and repository contents read access. Configure Ship to use
+workflow `deploy-production.yml`, ref `main`, and supply all three dispatch
+inputs:
+
+- `ship-release-id`: the immutable Hubbsly deployment/release identifier;
+- `uat-evidence`: the Hubbsly card, URL, or record containing approved UAT;
+- `rollback-reference`: the previous healthy GitHub run, artifact, or commit.
+
+Ship must record the GitHub Actions run ID and final conclusion. The workflow
+also writes the Ship ID, commit SHA, run ID/attempt, UAT reference, and rollback
+reference to the GitHub run summary. A non-`main` dispatch is skipped before
+the reusable deploy workflow can acquire Azure credentials.
 
 ## UAT signoff template
 
 ```text
-Release tag / commit:
-Validation pipeline run:
+Commit:
+Required PR validation run:
 Staging deployment run:
+Immutable artifact name and SHA-256:
+Hubbsly Ship release id:
 Tester and UTC time:
 
 [ ] BDR public quote with attachment is visible only in BDR admin.
@@ -42,8 +106,8 @@ Tester and UTC time:
 [ ] Anonymous API/admin and wrong-tenant access fail closed.
 [ ] Internal admin health and tenant views load live data.
 [ ] Accessibility/mobile critical E2E passed with zero retry.
-[ ] Secrets, dependency, migration/configuration, and artifact scans passed.
-[ ] Rollback artifacts and the previous healthy release tag are identified.
+[ ] Secret, dependency, migration/configuration, and artifact scans passed.
+[ ] Previous healthy deployment and rollback artifacts are identified.
 
 Business approver:
 Technical approver:
@@ -51,8 +115,25 @@ Decision: APPROVE / REJECT
 Notes:
 ```
 
-## Rollback and incident evidence
+## Production release and rollback
 
-Keep the previous healthy API and web zip artifacts until the rollback window closes. On a failed smoke check, stop the release, redeploy each previous artifact with `api/scripts/rollback-app-service.sh`, and rerun the smoke script. Record tag SHAs, pipeline run IDs, App Service deployment IDs, UTC start/end times, the failing check, and the rollback smoke log.
+1. Merge the reviewed commit through the required `main` ruleset.
+2. Wait for `Deploy TurnKeyOps - Staging` and its smoke checks to succeed.
+3. Complete the UAT record and identify the previous healthy artifact/run.
+4. Create a Hubbsly Ship deployment for that exact `main` SHA.
+5. Ship dispatches `Deploy TurnKeyOps - Production` with the evidence inputs.
+6. The GitHub `production` environment reviewer verifies the SHA, UAT, and
+   rollback reference before approving.
+7. Preserve the SHA/run/attempt-named release bundle, deployment JSON, smoke log, GitHub run ID, and
+   Ship record as card evidence.
 
-Database migrations are not used: durable application state is tenant-partitioned Azure Tables and Blob Storage. Configuration/schema compatibility is therefore enforced by API tests, the production configuration tests, the identity/table bootstrap checks, and emulator-backed E2E. A future relational store must add a forward/rollback migration job to the required gate before its first production schema change.
+If the smoke job fails, stop the release. Download the previous healthy API and
+web artifacts, redeploy each with `api/scripts/rollback-app-service.sh`, and
+rerun `api/scripts/post-deploy-smoke.sh`. Record both commits, artifact hashes,
+GitHub run IDs, Hubbsly Ship IDs, App Service deployment IDs, UTC start/end,
+the failing check, and the rollback smoke output.
+
+Application state currently uses tenant-partitioned Azure Tables and Blob
+Storage rather than relational migrations. If a relational store is added, the
+required workflow must gain tested forward and rollback migration jobs before
+the first schema change merges.
