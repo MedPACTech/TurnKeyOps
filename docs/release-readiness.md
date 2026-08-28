@@ -63,10 +63,27 @@ Each environment must define these non-secret variables:
 - `API_BASE_URL`
 - `WEB_BASE_URL`
 
+| Setting | Meaning |
+| --- | --- |
+| `AZURE_RESOURCE_GROUP` | Resource group containing that environment's API and web App Services |
+| `API_WEBAPP_NAME` | API App Service name |
+| `WEB_WEBAPP_NAME` | SvelteKit Node App Service name |
+| `API_BASE_URL` | Public API origin, with no trailing slash |
+| `WEB_BASE_URL` | Public web origin, with no trailing slash |
+
 The Azure identity must use workload identity federation restricted to this
 repository and the corresponding GitHub environment. Do not create a client
 secret for CI. Limit its Azure role assignments to the two App Services and
 the settings they require.
+
+Create the federated credentials with these exact subjects:
+
+- `repo:MedPACTech/TurnKeyOps:environment:staging`
+- `repo:MedPACTech/TurnKeyOps:environment:production`
+
+The repository or environment must not contain Azure publishing profiles or
+long-lived service-principal client secrets. Application credentials remain in
+App Service settings or Key Vault and are outside the deployment workflow.
 
 Protect the `production` environment with at least one reviewer who did not
 author the change, disallow self-approval, and prevent administrators from
@@ -88,6 +105,12 @@ Ship must record the GitHub Actions run ID and final conclusion. The workflow
 also writes the Ship ID, commit SHA, run ID/attempt, UAT reference, and rollback
 reference to the GitHub run summary. A non-`main` dispatch is skipped before
 the reusable deploy workflow can acquire Azure credentials.
+
+Immediately before dispatch, Ship must verify that the current `main` SHA is
+the SHA approved in the UAT record. If `main` moved after UAT, stop and repeat
+staging/UAT for the new SHA. The production environment reviewer performs the
+same SHA check before approval; the run summary is the authoritative record of
+the SHA that actually executed.
 
 ## UAT signoff template
 
@@ -126,6 +149,14 @@ Notes:
    rollback reference before approving.
 7. Preserve the SHA/run/attempt-named release bundle, deployment JSON, smoke log, GitHub run ID, and
    Ship record as card evidence.
+
+| Evidence | Location | Retention |
+| --- | --- | --- |
+| API tests and dependency audit | `api-test-evidence-*` GitHub artifact | 30 days |
+| Critical Playwright output | `critical-e2e-evidence-*` GitHub artifact | 30 days |
+| API/web ZIPs and SHA-256 manifest | `turnkeyops-release-*` GitHub artifact | 90 days |
+| App Service deployment JSON, manifest, and smoke log | `deployment-evidence-*` GitHub artifact | 90 days |
+| SHA, GitHub run/attempt, UAT, rollback, and Ship IDs | GitHub run summary and Hubbsly Ship release | Keep with the TKO-0014/release record |
 
 If the smoke job fails, stop the release. Download the previous healthy API and
 web artifacts, redeploy each with `api/scripts/rollback-app-service.sh`, and

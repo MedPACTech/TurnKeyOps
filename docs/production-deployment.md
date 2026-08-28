@@ -44,6 +44,11 @@ definitions are retired and must remain disabled. Configure the `staging` and
 `production` GitHub environments with the OIDC secrets and target variables
 listed in `docs/release-readiness.md`.
 
+Azure remains the application runtime; it is no longer the release control
+plane. GitHub Actions builds and deploys, and Hubbsly Ship initiates and tracks
+production releases. No Azure DevOps pipeline, service connection, variable
+group, release tag, or manual-validation group is part of this contract.
+
 The Azure federated identity subject must be restricted to the matching GitHub
 environment in `MedPACTech/TurnKeyOps`. API secrets belong in Azure App Service
 settings or Key Vault references and must never be copied into a GitHub
@@ -64,6 +69,22 @@ API/web artifact bundle named for the SHA, deploys those exact artifacts, runs
 post-deployment smoke checks, and publishes deployment evidence. Production
 also requires the GitHub environment approval and explicit Ship/UAT/rollback
 dispatch inputs.
+
+## First activation checklist
+
+1. Confirm the legacy Azure DevOps definitions are inactive; if none remain,
+   record that result as `not applicable` rather than provisioning Azure
+   DevOps solely for this audit.
+2. Create the `staging` and `production` GitHub environments and configure the
+   secrets, variables, OIDC subjects, and production reviewers in
+   `docs/release-readiness.md`.
+3. Add the required `main` ruleset and its `Required PR validation` check.
+4. Connect the repository to Hubbsly Ship and configure the production
+   workflow dispatch contract.
+5. Merge through the ruleset and retain the first successful staging workflow,
+   deployment evidence artifact, and smoke log.
+6. Complete UAT, trigger production through Ship, approve the protected GitHub
+   environment, and retain the resulting GitHub and Ship identifiers.
 
 ## Custom domains and TLS
 

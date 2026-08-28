@@ -15,7 +15,10 @@ pipelines. The authoritative workflows are:
 - `.github/workflows/deploy-staging.yml`
 - `.github/workflows/deploy-production.yml`
 
-An Azure DevOps administrator must also disable or delete every existing
-TurnKeyOps pipeline definition in the Azure DevOps UI. Repository-side removal
-makes a stale definition fail to load, but disabling it removes scheduling and
-manual-run ambiguity. Record that audit in the TKO-0014 release evidence.
+If TurnKeyOps pipeline definitions still exist in an Azure DevOps organization,
+an administrator should disable or delete them to remove scheduling and
+manual-run ambiguity. Repository-side removal already prevents those YAML
+definitions from loading a new commit. Record the retirement check in the
+TKO-0014 evidence; record `not applicable` when no active definitions or Azure
+DevOps project remain. Do not recreate an Azure DevOps project, service
+connection, variable group, environment, or approver group for this check.
