@@ -6,6 +6,8 @@ public static class ProductionIntegrationConfiguration
 {
     private static readonly HashSet<string> SupportedBillingProviders =
         new(StringComparer.OrdinalIgnoreCase) { "Stripe", "PayPal" };
+    private static readonly HashSet<string> SupportedSecretSources =
+        new(StringComparer.OrdinalIgnoreCase) { "AppServiceSettings", "KeyVault" };
 
     public static void Validate(IConfiguration configuration, string environmentName)
     {
@@ -16,13 +18,9 @@ public static class ProductionIntegrationConfiguration
         ValidateCommunications(configuration, failures);
         ValidateBilling(configuration, failures);
 
-        if (!string.Equals(
-                configuration["ProductionIntegrations:SecretsSource"]?.Trim(),
-                "KeyVault",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            failures.Add("ProductionIntegrations:SecretsSource must explicitly be KeyVault");
-        }
+        var secretSource = configuration["ProductionIntegrations:SecretsSource"]?.Trim();
+        if (string.IsNullOrWhiteSpace(secretSource) || !SupportedSecretSources.Contains(secretSource))
+            failures.Add("ProductionIntegrations:SecretsSource must explicitly be AppServiceSettings or KeyVault");
 
         if (failures.Count > 0)
         {
@@ -33,10 +31,16 @@ public static class ProductionIntegrationConfiguration
 
     private static void ValidateCommunications(IConfiguration configuration, ICollection<string> failures)
     {
+        var section = ProductionCommunicationOptions.SectionName;
+        if (!TryGetExplicitBoolean(configuration, $"{section}:Enabled", failures, out var enabled)) return;
+        if (!enabled) return;
+
         Require(configuration, "IBeam:Communications:Email:FromAddress", "ACS email sender", failures);
         Require(configuration, "IBeam:Communications:Email:Providers:AzureCommunications:ConnectionString", "ACS email connection", failures);
         Require(configuration, "IBeam:Communications:Sms:FromPhoneNumber", "ACS SMS sender", failures);
         Require(configuration, "IBeam:Communications:Sms:Providers:AzureCommunications:ConnectionString", "ACS SMS connection", failures);
+
+        if (configuration.GetValue<bool>($"{section}:UseSharedPlatformSender")) return;
 
         foreach (var tenantKey in new[] { "bdr", "thinkpink" })
         {
@@ -59,6 +63,15 @@ public static class ProductionIntegrationConfiguration
         var section = BillingIntegrationOptions.SectionName;
         var enabledProviders = configuration.GetSection($"{section}:EnabledProviders").Get<string[]>() ?? [];
         var defaultProvider = configuration[$"{section}:DefaultProvider"]?.Trim();
+
+        if (!TryGetExplicitBoolean(configuration, $"{section}:Enabled", failures, out var enabled)) return;
+
+        if (!enabled)
+        {
+            if (enabledProviders.Length > 0 || !string.IsNullOrWhiteSpace(defaultProvider))
+                failures.Add("billing is disabled but provider configuration is active");
+            return;
+        }
 
         if (enabledProviders.Length == 0)
             failures.Add("at least one production billing provider");
@@ -106,6 +119,18 @@ public static class ProductionIntegrationConfiguration
         var value = configuration[key]?.Trim();
         if (string.IsNullOrWhiteSpace(value) || IsPlaceholder(value))
             failures.Add(label);
+    }
+
+    private static bool TryGetExplicitBoolean(
+        IConfiguration configuration,
+        string key,
+        ICollection<string> failures,
+        out bool value)
+    {
+        if (bool.TryParse(configuration[key]?.Trim(), out value)) return true;
+
+        failures.Add($"{key} must be explicitly true or false");
+        return false;
     }
 
     private static void ValidateCatalog(

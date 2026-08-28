@@ -27,6 +27,8 @@ namespace MedInsights.Services
 
         public IPaymentProvider GetDefaultProvider()
         {
+            EnsureBillingEnabled();
+
             if (string.IsNullOrWhiteSpace(_options.DefaultProvider))
                 throw new InvalidOperationException("No default billing provider is configured.");
 
@@ -35,6 +37,8 @@ namespace MedInsights.Services
 
         public IPaymentProvider GetRequiredProvider(string providerName)
         {
+            EnsureBillingEnabled();
+
             if (string.IsNullOrWhiteSpace(providerName))
                 throw new ArgumentException("ProviderName is required.", nameof(providerName));
 
@@ -97,6 +101,12 @@ namespace MedInsights.Services
             }
 
             return await ResolveForTenantAsync(tenantId, null, ct);
+        }
+
+        private void EnsureBillingEnabled()
+        {
+            if (!_options.Enabled)
+                throw new InvalidOperationException("Production billing is disabled.");
         }
     }
 }

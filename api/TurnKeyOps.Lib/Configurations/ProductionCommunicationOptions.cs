@@ -4,6 +4,8 @@ public sealed class ProductionCommunicationOptions
 {
     public const string SectionName = "ProductionIntegrations:Communications";
 
+    public bool Enabled { get; set; } = true;
+    public bool UseSharedPlatformSender { get; set; }
     public Dictionary<string, TenantCommunicationProfile> Tenants { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
 }

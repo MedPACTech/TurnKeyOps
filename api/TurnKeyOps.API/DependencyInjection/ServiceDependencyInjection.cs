@@ -73,9 +73,12 @@ namespace MedInsights.API.DependencyInjection
             }
             services.AddScoped<IPaymentProviderResolver, PaymentProviderResolver>();
             services.AddSingleton<IProviderHttpExecutor, ProviderHttpExecutor>();
-            var enabledProviders = configuration
-                .GetSection($"{MedInsights.Lib.Configurations.BillingIntegrationOptions.SectionName}:EnabledProviders")
-                .Get<string[]>() ?? [];
+            var billingEnabled = configuration.GetValue<bool>(
+                $"{MedInsights.Lib.Configurations.BillingIntegrationOptions.SectionName}:Enabled");
+            var enabledProviders = billingEnabled
+                ? configuration.GetSection($"{MedInsights.Lib.Configurations.BillingIntegrationOptions.SectionName}:EnabledProviders")
+                    .Get<string[]>() ?? []
+                : [];
             if (enabledProviders.Contains("Stripe", StringComparer.OrdinalIgnoreCase))
             {
                 services.AddScoped<StripePaymentProvider>();
@@ -90,13 +93,17 @@ namespace MedInsights.API.DependencyInjection
             services.AddScoped<IBillingService, BillingService>();
             services.AddScoped<IBillingEventService, BillingEventService>();
             services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
-            if (enableServiceBus)
+            if (enableServiceBus && billingEnabled)
             {
                 services.AddHostedService<BillingEventWorker>();
-                services.AddHostedService<CreditUsageWorker>();
             }
-            services.AddHostedService<BillingRenewalWorker>();
-            services.AddHostedService<MonthlyCreditGrantWorker>();
+            if (enableServiceBus)
+                services.AddHostedService<CreditUsageWorker>();
+            if (billingEnabled)
+            {
+                services.AddHostedService<BillingRenewalWorker>();
+                services.AddHostedService<MonthlyCreditGrantWorker>();
+            }
             return services;
         }
     }

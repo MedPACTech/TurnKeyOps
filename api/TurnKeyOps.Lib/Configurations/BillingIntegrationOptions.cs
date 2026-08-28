@@ -4,6 +4,7 @@ public sealed class BillingIntegrationOptions
 {
     public const string SectionName = "BillingIntegrations";
 
+    public bool Enabled { get; set; }
     public string DefaultProvider { get; set; } = string.Empty;
     public string[] EnabledProviders { get; set; } = [];
     public int RequestTimeoutSeconds { get; set; } = 30;

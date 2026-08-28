@@ -10,9 +10,10 @@ namespace MedInsights.API.DependencyInjection
     {
         public static IServiceCollection AddExternalClients(this IServiceCollection services, IConfiguration configuration)
         {
-            var enabledProviders = configuration
-                .GetSection($"{BillingIntegrationOptions.SectionName}:EnabledProviders")
-                .Get<string[]>() ?? [];
+            var billingEnabled = configuration.GetValue<bool>($"{BillingIntegrationOptions.SectionName}:Enabled");
+            var enabledProviders = billingEnabled
+                ? configuration.GetSection($"{BillingIntegrationOptions.SectionName}:EnabledProviders").Get<string[]>() ?? []
+                : [];
 
             if (enabledProviders.Contains("Stripe", StringComparer.OrdinalIgnoreCase))
             {
