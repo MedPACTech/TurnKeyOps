@@ -1,8 +1,6 @@
-import { resolveMvpScaffold } from '$lib/mvp';
 import {
 	type BdrInvoicePaymentMethod,
 	loadBdrInvoices,
-	syncApprovedEstimateInvoices,
 	updateBdrInvoiceState
 } from '$lib/server/bdr-invoices';
 import { loadBdrBillingSettings } from '$lib/server/bdr-billing-settings';
@@ -17,21 +15,32 @@ import { fail, redirect } from '@sveltejs/kit';
 import { authTokenCookie } from '$lib/server/auth-session';
 
 export const load = async ({ fetch, cookies }) => {
-	const { snapshot, source } = await resolveMvpScaffold(fetch);
-	const billingSettings = await loadBdrBillingSettings(fetch, cookies.get(authTokenCookie));
-	const { requests } = await loadQuoteRequests(fetch);
-	const lifecycleInvoices = await syncApprovedEstimateInvoices(fetch);
-	const scheduledJobs = await loadBdrScheduledJobs(fetch);
+	const results = await Promise.allSettled([
+		loadBdrInvoices(fetch),
+		loadBdrBillingSettings(fetch, cookies.get(authTokenCookie)),
+		loadQuoteRequests(fetch),
+		loadBdrScheduledJobs(fetch)
+	]);
+	const lifecycleInvoices = results[0].status === 'fulfilled' ? results[0].value : [];
+	const billingSettings = results[1].status === 'fulfilled' ? results[1].value : { depositPercentRequired: 50 };
+	const requests = results[2].status === 'fulfilled' ? results[2].value.requests : [];
+	const scheduledJobs = results[3].status === 'fulfilled' ? results[3].value : [];
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, scheduledJobs);
+	const labels = ['invoices', 'billing settings', 'requests', 'scheduled jobs'];
+	const errors = results.flatMap((result, index) =>
+		result.status === 'rejected' ? [`Could not load ${labels[index]}. Retry to refresh live data.`] : []
+	);
 
 	return {
-		source,
-		invoices: snapshot.invoices,
-		customers: snapshot.customers,
+		source: 'TurnKeyOps API',
+		invoices: [],
+		customers: [],
 		lifecycleInvoices,
 		billingSettings,
 		scheduledJobs,
-		scheduleReadyJobs
+		scheduleReadyJobs,
+		errors,
+		loadedAtUtc: new Date().toISOString()
 	};
 };
 
