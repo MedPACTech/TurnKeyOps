@@ -19,4 +19,5 @@ extends:
     azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
     resourceGroupName: '$(TURNKEYOPS_STAGING_RESOURCE_GROUP)'
     deployBranchPrimary: 'main'
-
+    smokeApiBaseUrl: '$(TURNKEYOPS_STAGING_API_BASE_URL)'
+    smokeWebBaseUrl: '$(TURNKEYOPS_STAGING_WEB_BASE_URL)'

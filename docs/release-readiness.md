@@ -9,6 +9,7 @@ The gate deliberately has zero automatic browser-test retries. A failed test is 
 | Gate | Evidence | Blocks merge when |
 | --- | --- | --- |
 | Repository security | Scanner log | a configured secret/PII signature or conflict artifact is tracked |
+| Migration posture | Validation log | a relational migration appears without an explicit forward/rollback validation job |
 | API | TRX + dependency report | restore, Release build, any test, or vulnerability check fails |
 | SvelteKit client | npm audit + check/build/session output | a high advisory, diagnostic, auth-policy test, or build fails |
 | Legacy admin | npm audit + check/build output | a high advisory, diagnostic, or build fails |

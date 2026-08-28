@@ -27,8 +27,27 @@ stages:
       fetchDepth: 0
     - bash: python3 api/scripts/scan-repository-security.py
       displayName: 'Reject tracked secrets and PII'
-    - bash: git diff --check HEAD~1 HEAD
+    - bash: |
+        set -euo pipefail
+        if [[ -n "${SYSTEM_PULLREQUEST_TARGETBRANCH:-}" ]]; then
+          target_branch="${SYSTEM_PULLREQUEST_TARGETBRANCH#refs/heads/}"
+          git fetch origin "$target_branch"
+          comparison_base="$(git merge-base HEAD "origin/$target_branch")"
+        else
+          comparison_base="$(git rev-parse HEAD~1)"
+        fi
+        git diff --check "$comparison_base" HEAD
       displayName: 'Reject whitespace and conflict artifacts'
+    - bash: |
+        set -euo pipefail
+        migration_files="$(git ls-files 'api/**/Migrations/**' 'api/**/*.sql')"
+        if [[ -n "$migration_files" ]]; then
+          echo 'Relational migration artifacts require a reviewed forward/rollback validation job before merge.'
+          echo "$migration_files"
+          exit 1
+        fi
+        echo 'No relational migration artifacts; Azure Tables/Blob compatibility is covered by API and emulator tests.'
+      displayName: 'Enforce migration validation posture'
 
   - job: Api
     displayName: 'API build, tests, dependencies'
@@ -148,7 +167,7 @@ stages:
     - bash: npm ci
       workingDirectory: client
       displayName: 'Install locked E2E dependencies'
-    - bash: npm install --global azurite
+    - bash: npm install --global azurite@3.35.0
       displayName: 'Install Azurite emulator'
     - bash: npx playwright install --with-deps chromium
       workingDirectory: client
@@ -171,4 +190,3 @@ stages:
       inputs:
         targetPath: 'client/test-results'
         artifact: 'critical-e2e-evidence'
-
