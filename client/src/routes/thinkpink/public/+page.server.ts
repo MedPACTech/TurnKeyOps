@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { thinkPinkTenant } from '$lib/config/tenants';
 import { uploadQuoteRequestAttachments } from '$lib/server/quote-request-attachments';
 import { submitQuoteRequest } from '$lib/server/quote-requests';
@@ -8,7 +8,11 @@ const MAX_PHOTOS = 10;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const getValue = (data: FormData, key: string) => String(data.get(key) ?? '').trim();
 
-export const load = () => ({ submissionId: crypto.randomUUID() });
+export const load = ({ url }) => ({
+	submitted: url.searchParams.get('submitted') === '1',
+	submissionId: crypto.randomUUID(),
+	reference: url.searchParams.get('reference')?.trim() ?? ''
+});
 
 export const actions: Actions = {
 	quote: async ({ request, fetch }) => {
@@ -106,6 +110,9 @@ export const actions: Actions = {
 			});
 		}
 
-		return { success: true, error: null, values: null, submissionId, reference: submissionId.slice(0, 8).toUpperCase() };
+		throw redirect(
+			303,
+			`/thinkpink/public?submitted=1&reference=${encodeURIComponent(submissionId.slice(0, 8).toUpperCase())}#quote`
+		);
 	}
 };

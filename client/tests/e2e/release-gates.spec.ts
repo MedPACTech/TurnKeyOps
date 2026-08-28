@@ -20,6 +20,7 @@ const expectNoSeriousAccessibilityViolations = async (page: Page) => {
 
 test('BDR public intake persists an attachment for the BDR brand', async ({ page }) => {
 	await page.goto('/bdr/public');
+	await page.waitForLoadState('networkidle');
 	await expect(page.locator('form[action="?/submitQuoteRequest"]')).toBeVisible();
 	await page.locator('#contactName').fill('Release Gate BDR');
 	await page.locator('#phone').fill('704-555-0198');
@@ -28,15 +29,14 @@ test('BDR public intake persists an attachment for the BDR brand', async ({ page
 	await page.locator('#propertyType').selectOption({ label: 'Commercial' });
 	await page.locator('#need').fill('Verify the release-gate public intake journey.');
 	await page.locator('#attachments').setInputFiles(tinyPng);
-	await page
-		.locator('form[action="?/submitQuoteRequest"]')
-		.evaluate((form: HTMLFormElement) => form.submit());
+	await page.locator('form[action="?/submitQuoteRequest"] button[type="submit"]').click();
 	await expect(page).toHaveURL(/\/bdr\/public\?submitted=1&reference=/, { timeout: 20_000 });
 	await expect(page.getByRole('status')).toContainText(/Reference [A-F0-9]{8}/);
 });
 
 test('Think Pink public intake persists an attachment for the Think Pink brand', async ({ page }) => {
 	await page.goto('/thinkpink/public');
+	await page.waitForLoadState('networkidle');
 	await expect(page.locator('form[action="?/quote"]')).toBeVisible();
 	await page.getByLabel('Name').fill('Release Gate Think Pink');
 	await page.getByLabel('Phone').fill('614-555-0198');
@@ -46,8 +46,12 @@ test('Think Pink public intake persists an attachment for the Think Pink brand',
 	await page.getByLabel('Service needed').selectOption({ index: 1 });
 	await page.getByLabel('Timeline').selectOption({ index: 1 });
 	await page.locator('input[name="photos"]').setInputFiles(tinyPng);
-	await page.locator('form[action="?/quote"]').evaluate((form: HTMLFormElement) => form.submit());
-	await expect(page.getByText('Got it!')).toBeVisible();
+	await expect(page.getByLabel('Name')).toHaveValue('Release Gate Think Pink');
+	await expect(page.getByLabel('Phone')).toHaveValue('614-555-0198');
+	await expect(page.getByLabel('Property address')).toHaveValue('14 Release Lane, Columbus, OH');
+	await page.locator('form[action="?/quote"] button[type="submit"]').click();
+	await expect(page).toHaveURL(/\/thinkpink\/public\?submitted=1&reference=/, { timeout: 20_000 });
+	await expect(page.getByText('Got it!')).toBeVisible({ timeout: 20_000 });
 	await expect(page.getByText(/request was saved as/i)).toBeVisible();
 });
 

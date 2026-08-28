@@ -3,7 +3,17 @@
 	import { acreageOptions, serviceOptions, timelineOptions } from '$lib/tenants/thinkpink/content';
 	import type { QuoteFormResult } from '$lib/tenants/thinkpink/types';
 
-	let { form, submissionId }: { form: QuoteFormResult; submissionId: string } = $props();
+	let {
+		form,
+		submissionId,
+		submitted = false,
+		reference = ''
+	}: {
+		form: QuoteFormResult;
+		submissionId: string;
+		submitted?: boolean;
+		reference?: string;
+	} = $props();
 
 	let submitting = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -29,13 +39,13 @@
 	}
 </script>
 
-{#if form?.success}
+{#if form?.success || submitted}
 	<div
 		class="bg-ink text-bone flex flex-col items-start gap-4 rounded-xl px-8 py-12 sm:px-12 sm:py-14"
 	>
 		<span class="display text-pink-bright text-[44px] font-black">Got it!</span>
 		<p class="text-dark-body-2 text-[17px] leading-relaxed">
-			Thanks — your request was saved{form.reference ? ` as ${form.reference}` : ''}. We'll call you within one business day to schedule your free site visit.
+			Thanks — your request was saved{form?.reference || reference ? ` as ${form?.reference || reference}` : ''}. We'll call you within one business day to schedule your free site visit.
 		</p>
 		<a
 			href="#quote"
@@ -80,7 +90,7 @@
 					name="name"
 					autocomplete="name"
 					placeholder="Full name"
-					value={form?.values?.name ?? ''}
+					defaultValue={form?.values?.name ?? ''}
 					class={field}
 				/>
 			</label>
@@ -92,7 +102,7 @@
 					name="phone"
 					autocomplete="tel"
 					placeholder="(614) 555-0100"
-					value={form?.values?.phone ?? ''}
+					defaultValue={form?.values?.phone ?? ''}
 					class={field}
 				/>
 			</label>
@@ -105,7 +115,7 @@
 				name="email"
 				autocomplete="email"
 				placeholder="you@example.com"
-				value={form?.values?.email ?? ''}
+				defaultValue={form?.values?.email ?? ''}
 				class={field}
 			/>
 		</label>
@@ -117,7 +127,7 @@
 				type="text"
 				name="address"
 				placeholder="Street address, city, or nearest crossroads"
-				value={form?.values?.address ?? ''}
+				defaultValue={form?.values?.address ?? ''}
 				class={field}
 			/>
 		</label>
