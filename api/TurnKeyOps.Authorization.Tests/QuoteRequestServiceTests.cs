@@ -94,6 +94,19 @@ public sealed class QuoteRequestServiceTests
     }
 
     [Fact]
+    public async Task PublicCreateRejectsFilledBotTrapBeforePersistence()
+    {
+        var repository = new Mock<IQuoteRequestRepository>();
+        var service = CreateService(repository.Object);
+        var input = ValidCreate();
+        input.Website = "https://spam.invalid";
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreatePublicAsync("bdr", input));
+
+        repository.Verify(x => x.SaveAsync(It.IsAny<QuoteRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task PublicCreateRejectsCallerSuppliedAttachmentMetadata()
     {
         var repository = new Mock<IQuoteRequestRepository>();

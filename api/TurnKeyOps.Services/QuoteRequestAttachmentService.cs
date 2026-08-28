@@ -1,4 +1,6 @@
 using MedInsights.AzureServices.Interfaces;
+using System.Security.Cryptography;
+using System.Text;
 using TurnKeyOps.Lib.Dtos;
 using TurnKeyOps.Lib.Entities;
 using TurnKeyOps.Lib.Utils;
@@ -112,9 +114,6 @@ public sealed class QuoteRequestAttachmentService : IQuoteRequestAttachmentServi
         var entity = await GetRequestAsync(tenantId, quoteRequestId, ct);
         if (entity is null) return null;
         var request = QuoteRequestMapper.ToDto(entity);
-        if (request.Attachments.Count + uploads.Count > MaxFilesPerRequest)
-            throw new ArgumentException($"A quote request cannot contain more than {MaxFilesPerRequest} files.", nameof(uploads));
-
         var prepared = new List<PreparedUpload>(uploads.Count);
         var uploaded = new List<PreparedUpload>(uploads.Count);
         try
@@ -122,7 +121,12 @@ public sealed class QuoteRequestAttachmentService : IQuoteRequestAttachmentServi
             foreach (var upload in uploads)
                 prepared.Add(await PrepareAsync(upload, tenantId, quoteRequestId, ct));
 
-            foreach (var item in prepared)
+            var existingById = request.Attachments.ToDictionary(item => item.Id);
+            var newItems = prepared.Where(item => !existingById.ContainsKey(item.Attachment.Id)).ToArray();
+            if (request.Attachments.Count + newItems.Length > MaxFilesPerRequest)
+                throw new ArgumentException($"A quote request cannot contain more than {MaxFilesPerRequest} files.", nameof(uploads));
+
+            foreach (var item in newItems)
             {
                 item.Content.Position = 0;
                 await _blobStorage.UploadAsync(
@@ -140,13 +144,19 @@ public sealed class QuoteRequestAttachmentService : IQuoteRequestAttachmentServi
                 uploaded.Add(item);
             }
 
-            request.Attachments.AddRange(prepared.Select(item => item.Attachment));
-            request.UpdatedAtUtc = DateTime.UtcNow;
-            request.Timeline.Add(NewTimelineEvent(
-                actor,
-                prepared.Count == 1 ? "Attachment uploaded" : $"{prepared.Count} attachments uploaded"));
-            await SaveRequestAsync(entity, request, ct);
-            return prepared.Select(item => item.Attachment).ToArray();
+            if (newItems.Length > 0)
+            {
+                request.Attachments.AddRange(newItems.Select(item => item.Attachment));
+                request.UpdatedAtUtc = DateTime.UtcNow;
+                request.Timeline.Add(NewTimelineEvent(
+                    actor,
+                    newItems.Length == 1 ? "Attachment uploaded" : $"{newItems.Length} attachments uploaded"));
+                await SaveRequestAsync(entity, request, ct);
+            }
+
+            return prepared
+                .Select(item => existingById.GetValueOrDefault(item.Attachment.Id) ?? item.Attachment)
+                .ToArray();
         }
         catch
         {
@@ -192,7 +202,7 @@ public sealed class QuoteRequestAttachmentService : IQuoteRequestAttachmentServi
                 nameof(upload.ContentType));
         }
 
-        var attachmentId = Guid.NewGuid();
+        var attachmentId = BuildAttachmentId(tenantId, quoteRequestId, fileName, content);
         return new PreparedUpload(new QuoteRequestAttachmentDto
         {
             Id = attachmentId,
@@ -205,6 +215,20 @@ public sealed class QuoteRequestAttachmentService : IQuoteRequestAttachmentServi
             BlobName = BuildBlobName(tenantId, quoteRequestId, attachmentId),
             BlobUrl = null
         }, content);
+    }
+
+    private static Guid BuildAttachmentId(
+        Guid tenantId,
+        Guid quoteRequestId,
+        string fileName,
+        MemoryStream content)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData(tenantId.ToByteArray());
+        hash.AppendData(quoteRequestId.ToByteArray());
+        hash.AppendData(Encoding.UTF8.GetBytes(fileName.ToLowerInvariant()));
+        hash.AppendData(content.GetBuffer().AsSpan(0, checked((int)content.Length)));
+        return new Guid(hash.GetHashAndReset().AsSpan(0, 16));
     }
 
     private static async Task<MemoryStream> ReadBoundedAsync(Stream source, long maxBytes, CancellationToken ct)

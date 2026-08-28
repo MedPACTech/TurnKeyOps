@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TurnKeyOps.Lib.Dtos;
 using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
 [AllowAnonymous]
+[EnableRateLimiting("public-quote-intake")]
 [Route("api/public/quote-requests")]
 public sealed class PublicQuoteRequestsController : ApiControllerBase
 {

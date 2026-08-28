@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { BadgeCheck, CalendarDays, ClipboardList, MessageSquareText, ShieldCheck, Star } from 'lucide-svelte';
 	import {
 		getBdrActiveContractorPreset,
@@ -9,6 +10,7 @@
 	import type { PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
+	let submittingQuote = $state(false);
 
 	const content = $derived(data.content);
 	const year = new Date().getFullYear();
@@ -392,9 +394,24 @@
 					</ul>
 				</div>
 
-				<form method="POST" action="?/submitQuoteRequest" enctype="multipart/form-data" class="quote-form">
+				<form
+					method="POST"
+					action="?/submitQuoteRequest"
+					enctype="multipart/form-data"
+					class="quote-form"
+					aria-busy={submittingQuote}
+					use:enhance={() => {
+						submittingQuote = true;
+						return async ({ update }) => {
+							await update();
+							submittingQuote = false;
+						};
+					}}
+				>
+					<input type="hidden" name="submissionId" value={form?.submissionId ?? data.submissionId} />
+					<label class="sr-only" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off" /></label>
 					{#if data.submitted}
-						<div class="form-message success">{content.quoteForm.successMessage}</div>
+						<div class="form-message success" role="status">{content.quoteForm.successMessage}{data.reference ? ` Reference ${data.reference}.` : ''}</div>
 					{/if}
 					{#if form?.errors?.form}
 						<div class="form-message error">{form.errors.form}</div>
@@ -422,7 +439,7 @@
 										{/each}
 									</select>
 								{:else if field.type === 'file'}
-									<input id={field.key} name={field.key} type="file" multiple />
+									<input id={field.key} name={field.key} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf" multiple />
 								{:else}
 									<input
 										id={field.key}
@@ -440,9 +457,10 @@
 						{/each}
 					</div>
 
-					<button type="submit" class="btn btn-primary submit-button">
-						{content.quoteForm.submitButtonLabel}
+					<button type="submit" class="btn btn-primary submit-button" disabled={submittingQuote}>
+						{submittingQuote ? 'Submitting…' : content.quoteForm.submitButtonLabel}
 					</button>
+					<p class="privacy-note">By submitting, you consent to BDR using these details to respond to this quote request. Files are stored privately with the request. Do not upload sensitive identity or financial documents.</p>
 				</form>
 			</div>
 		</section>

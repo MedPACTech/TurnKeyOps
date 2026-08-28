@@ -36,6 +36,7 @@ public sealed class QuoteRequestDto
 public sealed class CreateQuoteRequestDto
 {
     public Guid? Id { get; set; }
+    public string Website { get; set; } = string.Empty;
     public string CompanyName { get; set; } = string.Empty;
     public string ContactName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;

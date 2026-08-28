@@ -89,6 +89,43 @@ public sealed class QuoteRequestAttachmentServiceTests
     }
 
     [Fact]
+    public async Task RepeatedUploadOfSameFileIsIdempotent()
+    {
+        var current = Entity();
+        var repository = RepositoryWithRequest(current);
+        repository.Setup(x => x.SaveAsync(It.IsAny<QuoteRequest>(), It.IsAny<CancellationToken>()))
+            .Callback((QuoteRequest saved, CancellationToken _) =>
+            {
+                current = saved;
+                repository.Setup(x => x.GetAsync(Partition(TenantId), Row(RequestId), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(() => current);
+            })
+            .ReturnsAsync((QuoteRequest saved, CancellationToken _) => saved);
+        var storage = new Mock<IAzureBlobStorageService>();
+        storage.Setup(x => x.UploadAsync(
+            QuoteRequestAttachmentService.ContainerName,
+            It.IsAny<string>(),
+            It.IsAny<Stream>(),
+            "image/png",
+            It.IsAny<IReadOnlyDictionary<string, string>>(),
+            It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService(repository.Object, storage.Object);
+
+        var first = await service.UploadPublicAsync("bdr", RequestId, [PngUpload("site.png")]);
+        var second = await service.UploadPublicAsync("bdr", RequestId, [PngUpload("site.png")]);
+
+        Assert.Equal(Assert.Single(first!).Id, Assert.Single(second!).Id);
+        storage.Verify(x => x.UploadAsync(
+            QuoteRequestAttachmentService.ContainerName,
+            It.IsAny<string>(),
+            It.IsAny<Stream>(),
+            "image/png",
+            It.IsAny<IReadOnlyDictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(x => x.SaveAsync(It.IsAny<QuoteRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task UploadRollsBackEarlierBlobsWhenLaterUploadFails()
     {
         var repository = RepositoryWithRequest(Entity());

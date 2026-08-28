@@ -26,6 +26,7 @@ export const uploadQuoteRequestAttachments = async (
 		{
 			method: 'POST',
 			headers: getTurnKeyApiHeaders(false),
+			signal: AbortSignal.timeout(30_000),
 			body: formData
 		}
 	);

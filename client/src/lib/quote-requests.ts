@@ -131,6 +131,7 @@ export type QuoteRequest = {
 export type QuoteRequestFormInput = {
 	id?: string;
 	tenantId?: string;
+	website?: string;
 	companyName: string;
 	contactName: string;
 	email: string;

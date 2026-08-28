@@ -219,6 +219,8 @@ public sealed class QuoteRequestService : IQuoteRequestService
 
     private static void ValidateCreate(CreateQuoteRequestDto dto)
     {
+        if (!string.IsNullOrWhiteSpace(dto.Website))
+            throw new ArgumentException("The request could not be accepted.", nameof(dto.Website));
         Required(dto.CompanyName, nameof(dto.CompanyName), 200);
         Required(dto.ContactName, nameof(dto.ContactName), 200);
         Required(dto.ServiceAddress, nameof(dto.ServiceAddress), 500);

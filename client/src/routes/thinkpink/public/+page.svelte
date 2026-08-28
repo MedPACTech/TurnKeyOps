@@ -10,7 +10,7 @@
 	import { site } from '$lib/tenants/thinkpink/content';
 	import type { ActionData } from './$types';
 
-	let { form }: { form: ActionData } = $props();
+	let { data, form }: { data: { submissionId: string }; form: ActionData } = $props();
 
 	const steps = [
 		'Send the form — photos help a lot.',
@@ -62,9 +62,8 @@
 			</ol>
 		</div>
 
-		<QuoteForm {form} />
+		<QuoteForm {form} submissionId={form?.submissionId ?? data.submissionId} />
 	</section>
 </main>
 
 <Footer />
-

@@ -26,6 +26,8 @@ using IBeam.Identity.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 public partial class Program
 {
@@ -192,6 +194,20 @@ public partial class Program
             // }
 
             builder.Services.AddMemoryCache();
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                options.AddPolicy("public-quote-intake", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 6,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+            });
 
             // Needed for CurrentUserContext.FromHttp(...)
             builder.Services.AddHttpContextAccessor();
@@ -284,6 +300,7 @@ public partial class Program
             });
             app.UseHttpsRedirection();
             app.UseCors("TurnKeyOpsClients");
+            app.UseRateLimiter();
             app.UseAuthentication();
             app.UseAuthorization();
 

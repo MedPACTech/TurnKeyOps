@@ -504,8 +504,10 @@ export const submitQuoteRequest = async (fetch: typeof globalThis.fetch, input: 
 	const response = await fetch(`${getApiBaseUrl()}/api/public/quote-requests/${tenantSlug}`, {
 		method: 'POST',
 		headers: getApiHeaders(),
+		signal: AbortSignal.timeout(15_000),
 		body: JSON.stringify({
 			id: request.id,
+			website: input.website ?? '',
 			companyName: request.companyName,
 			contactName: request.contactName,
 			email: request.email,
