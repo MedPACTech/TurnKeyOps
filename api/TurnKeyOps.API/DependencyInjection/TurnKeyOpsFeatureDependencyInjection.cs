@@ -20,6 +20,7 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.Configure<WeatherSettings>(configuration.GetSection("WeatherSettings"));
         services.Configure<QuoteRequestTenantOptions>(configuration.GetSection(QuoteRequestTenantOptions.SectionName));
         services.Configure<BobOperationsOptions>(configuration.GetSection(BobOperationsOptions.SectionName));
+        services.Configure<UserAdministrationOptions>(configuration.GetSection(UserAdministrationOptions.SectionName));
         return services;
     }
 

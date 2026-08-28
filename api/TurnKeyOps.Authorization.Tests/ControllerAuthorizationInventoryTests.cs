@@ -64,6 +64,7 @@ public sealed class ControllerAuthorizationInventoryTests
     [InlineData(typeof(AuthSessionController), TurnKeyAuthorizationPolicies.AuthenticatedSession)]
     [InlineData(typeof(RolesController), TurnKeyAuthorizationPolicies.TenantAdmin)]
     [InlineData(typeof(TenantMembershipController), TurnKeyAuthorizationPolicies.TenantAdmin)]
+    [InlineData(typeof(PlatformUserAdministrationController), TurnKeyAuthorizationPolicies.InternalAdmin)]
     [InlineData(typeof(BillingAdminController), TurnKeyAuthorizationPolicies.BillingAdmin)]
     [InlineData(typeof(TurnKeyOps.API.Controllers.JobsController), TurnKeyAuthorizationPolicies.TenantStaff)]
     public void SensitiveControllerUsesExpectedPolicy(Type controllerType, string expectedPolicy)

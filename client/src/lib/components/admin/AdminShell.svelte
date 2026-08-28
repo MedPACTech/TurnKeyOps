@@ -67,6 +67,7 @@
 			estimates: '📝',
 			invoices: '💰',
 			customers: '👥',
+			users: '🔐',
 			requests: '📥',
 			content: '🌐',
 			bob: '👷',

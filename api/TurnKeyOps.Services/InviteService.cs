@@ -6,15 +6,17 @@ using MedInsights.Repositories.Interfaces;
 using MedInsights.Services.Interfaces;
 using MedInsights.Services.Mappers;
 using MedInsights.Lib.Authorization;
+using MedInsights.Lib.Configurations;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
 namespace MedInsights.Services
 {
-    public sealed class InviteService : IInviteService
+    public sealed class InviteService : IInviteService, ITrustedTenantInviteService
     {
         private readonly IInviteRepository _inviteRepository;
         private readonly ITenantMembershipRepository _membershipRepository;
@@ -28,6 +30,7 @@ namespace MedInsights.Services
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IRoleDirectoryService _roleDirectoryService;
         private readonly IRoleAccessService _roleAccess;
+        private readonly BillingIntegrationOptions _billingOptions;
         private const int RedeemAttemptLimit = 5;
         private static readonly TimeSpan RedeemAttemptWindow = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RedeemBlockDuration = TimeSpan.FromMinutes(30);
@@ -44,7 +47,8 @@ namespace MedInsights.Services
             IMemoryCache memoryCache,
             IHttpContextAccessor httpContextAccessor,
             IRoleDirectoryService roleDirectoryService,
-            IRoleAccessService roleAccess)
+            IRoleAccessService roleAccess,
+            IOptions<BillingIntegrationOptions> billingOptions)
         {
             _inviteRepository = inviteRepository;
             _membershipRepository = membershipRepository;
@@ -58,6 +62,7 @@ namespace MedInsights.Services
             _httpContextAccessor = httpContextAccessor;
             _roleDirectoryService = roleDirectoryService;
             _roleAccess = roleAccess;
+            _billingOptions = billingOptions.Value;
         }
 
         public async Task<IEnumerable<InviteDto>> GetAllAsync(CancellationToken ct = default)
@@ -166,29 +171,51 @@ namespace MedInsights.Services
         {
             EnsureAuthenticated();
             await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.MembershipManage, ct);
-            ValidateInviteContact(dto.InvitedEmail, dto.InvitedPhone);
-            var onboardingPolicy = await _tenantOnboardingPolicyService.GetCurrentAsync(ct);
-            var role = await _roleDirectoryService.GetRequiredAssignableRoleAsync(_userContext.TenantId, dto.Role, ct);
+            return await CreateForTenantCoreAsync(_userContext.TenantId, dto, ct);
+        }
 
-            if (onboardingPolicy.ReserveSeatAtInviteTime)
-                await _seatEntitlementService.ReserveSeatAsync(_userContext.TenantId, ct);
+        public Task<InviteDto> CreateForTenantAsync(
+            Guid tenantId,
+            CreateInviteRequestDto dto,
+            CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            if (tenantId == Guid.Empty)
+                throw new ArgumentException("TenantId is required.", nameof(tenantId));
+
+            return CreateForTenantCoreAsync(tenantId, dto, ct);
+        }
+
+        private async Task<InviteDto> CreateForTenantCoreAsync(
+            Guid tenantId,
+            CreateInviteRequestDto dto,
+            CancellationToken ct)
+        {
+            ValidateInviteContact(dto.InvitedEmail, dto.InvitedPhone);
+            var onboardingPolicy = await _tenantOnboardingPolicyService.GetByTenantAsync(tenantId, ct);
+            var role = await _roleDirectoryService.GetRequiredAssignableRoleAsync(tenantId, dto.Role, ct);
+            var reserveSeat = _billingOptions.Enabled && onboardingPolicy.ReserveSeatAtInviteTime;
+
+            if (reserveSeat)
+                await _seatEntitlementService.ReserveSeatAsync(tenantId, ct);
 
             var membershipId = Guid.NewGuid();
             var now = DateTime.UtcNow;
             var expiresAtUtc = NormalizeInviteExpiry(dto.ExpiresAtUtc, now, onboardingPolicy.DefaultInviteExpiryDays);
             var inviteToken = GenerateInviteToken();
-            var inviterMembership = await _membershipRepository.GetByUserIdAsync(PartitionKey(), _userContext.UserId, ct);
+            var partitionKey = EntityKeyPolicy.TenantPartition(tenantId);
+            var inviterMembership = await _membershipRepository.GetByUserIdAsync(partitionKey, _userContext.UserId, ct);
 
             var membership = new TenantMembership
             {
                 Id = membershipId,
-                TenantId = _userContext.TenantId,
+                TenantId = tenantId,
                 UserId = Guid.Empty,
-                PartitionKey = PartitionKey(),
+                PartitionKey = partitionKey,
                 RowKey = EntityKeyPolicy.Row(membershipId),
                 Role = role.Key,
                 MembershipStatus = "Invited",
-                SeatStatus = onboardingPolicy.ReserveSeatAtInviteTime ? "Reserved" : "Unassigned",
+                SeatStatus = reserveSeat ? "Reserved" : "Unassigned",
                 InvitedEmail = Normalize(dto.InvitedEmail),
                 InvitedPhone = Normalize(dto.InvitedPhone),
                 IsOwner = false,
@@ -203,10 +230,10 @@ namespace MedInsights.Services
             var invite = new Invite
             {
                 Id = inviteId,
-                TenantId = _userContext.TenantId,
+                TenantId = tenantId,
                 ReservedSeatMembershipId = membershipId,
                 SentByMembershipId = inviterMembership?.Id ?? Guid.Empty,
-                PartitionKey = PartitionKey(),
+                PartitionKey = partitionKey,
                 RowKey = EntityKeyPolicy.Row(inviteId),
                 InvitedEmail = Normalize(dto.InvitedEmail),
                 InvitedPhone = Normalize(dto.InvitedPhone),
@@ -229,7 +256,10 @@ namespace MedInsights.Services
                 TargetType = "invite",
                 TargetId = invite.Id.ToString("D"),
                 Source = nameof(InviteService),
-                Description = "Created tenant invite and reserved seat.",
+                TenantId = tenantId,
+                Description = reserveSeat
+                    ? "Created tenant invite and reserved seat."
+                    : "Created tenant invite for manual launch provisioning.",
                 MetadataJson = BuildInviteAuditMetadata("created")
             }, ct);
 
@@ -358,7 +388,7 @@ namespace MedInsights.Services
                 membership.DateJoined = DateTime.UtcNow;
                 membership.DateUpdated = DateTime.UtcNow;
 
-                if (onboardingPolicy.AutoAssignSeatOnActivation)
+                if (_billingOptions.Enabled && onboardingPolicy.AutoAssignSeatOnActivation)
                 {
                     await _seatEntitlementService.AssignSeatAsync(invite.TenantId, ct);
                     membership.SeatStatus = "Assigned";

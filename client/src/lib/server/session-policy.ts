@@ -33,7 +33,7 @@ export const getSafeAdminReturnTo = (value: string | null | undefined) => {
 	try {
 		const parsed = new URL(value, 'https://turnkeyops.invalid');
 		if (parsed.origin !== 'https://turnkeyops.invalid') return '/bdr/admin/bob';
-		const allowed = ['/turnkeyops/admin', '/bdr/admin', '/thinkpink/admin'].some(
+		const allowed = ['/turnkeyops/admin', '/bdr/admin', '/thinkpink/admin', '/auth/invite'].some(
 			(prefix) => parsed.pathname === prefix || parsed.pathname.startsWith(`${prefix}/`)
 		);
 		if (allowed) return `${parsed.pathname}${parsed.search}`;

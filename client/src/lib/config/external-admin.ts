@@ -10,6 +10,7 @@ export type ExternalAdminModule =
 	| 'estimates'
 	| 'invoices'
 	| 'customers'
+	| 'users'
 	| 'settings';
 
 export type ExternalAdminTheme = {
@@ -41,12 +42,13 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 	estimates: { slug: 'estimates', label: 'Estimates', summary: 'Estimate preparation, approval, deposits, and contract status', contextLabel: 'Sales Ops', focusLabel: 'Pipeline lane', canvasLabel: 'Estimate canvas', section: 'revenue' },
 	invoices: { slug: 'invoices', label: 'Invoices', summary: 'Billing status, payment holds, and collections', contextLabel: 'Finance Ops', focusLabel: 'Collections lane', canvasLabel: 'Billing canvas', section: 'revenue' },
 	customers: { slug: 'customers', label: 'Contacts', summary: 'Customers, properties, files, and communication history', contextLabel: 'Relationship Ops', focusLabel: 'Relationship desk', canvasLabel: 'Record canvas', section: 'customers' },
+	users: { slug: 'users', label: 'Users', summary: 'Invite users, assign tenant roles, and remove access', contextLabel: 'Identity', focusLabel: 'User access', canvasLabel: 'Membership canvas', section: 'admin' },
 	settings: { slug: 'settings', label: 'Admin', summary: 'Trade defaults, website controls, and workspace configuration', contextLabel: 'Admin Ops', focusLabel: 'Configuration', canvasLabel: 'Settings canvas', section: 'admin' }
 };
 
 const tenantModules: Record<TenantSlug, ExternalAdminModule[]> = {
-	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'settings'],
-	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'settings']
+	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'users', 'settings'],
+	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'users', 'settings']
 };
 
 const themes: Record<TenantSlug, ExternalAdminTheme> = {

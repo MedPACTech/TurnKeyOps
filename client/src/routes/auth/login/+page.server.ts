@@ -24,11 +24,15 @@ const adminSessionMaxAge = 60 * 60 * 8;
 const getFormString = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
 
 const getSurfaceMeta = (returnTo: string) => {
+	const isInviteAcceptance = returnTo.startsWith('/auth/invite/');
 	const surface = getAdminSurface(returnTo);
 	return {
 		surface,
+		isInviteAcceptance,
 		label:
-			surface === 'internal-admin'
+			isInviteAcceptance
+				? 'Invite activation'
+				: surface === 'internal-admin'
 				? 'Internal Admin'
 				: returnTo.startsWith('/thinkpink/admin')
 					? 'Think Pink Admin'
@@ -48,11 +52,12 @@ export const load = async ({ cookies, url, fetch }) => {
 	const returnTo = getSafeAdminReturnTo(url.searchParams.get('returnTo'));
 	const surfaceMeta = getSurfaceMeta(returnTo);
 	const token = cookies.get(authTokenCookie);
-	const session = (await validateAdminAccessToken(fetch, token))
+	const tokenIsValid = await validateAdminAccessToken(fetch, token);
+	const session = tokenIsValid
 		? getAdminSessionFromToken(token, returnTo)
 		: null;
 
-	if (session && (surfaceMeta.surface === 'internal-admin' || session.role)) {
+	if ((surfaceMeta.isInviteAcceptance && tokenIsValid) || (session && (surfaceMeta.surface === 'internal-admin' || session.role))) {
 		throw redirect(303, returnTo);
 	}
 
@@ -128,7 +133,7 @@ export const actions = {
 
 			const roles = extractAuthRoles(authResult, accessToken);
 			const bdrRole = resolveBdrAdminRole(roles);
-			if (surfaceMeta.surface === 'external-admin' && !bdrRole) {
+			if (!surfaceMeta.isInviteAcceptance && surfaceMeta.surface === 'external-admin' && !bdrRole) {
 				return fail(403, {
 					step: 'verify',
 					message: 'Your account does not have External Admin access.',
@@ -138,7 +143,7 @@ export const actions = {
 					...surfaceMeta
 				});
 			}
-			if (surfaceMeta.surface === 'internal-admin' && !hasInternalAdminRole(roles)) {
+			if (!surfaceMeta.isInviteAcceptance && surfaceMeta.surface === 'internal-admin' && !hasInternalAdminRole(roles)) {
 				return fail(403, {
 					step: 'verify',
 					message: 'Your account does not have Internal Admin access.',

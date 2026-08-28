@@ -50,7 +50,10 @@ namespace MedInsights.API.DependencyInjection
             services.AddScoped<ITenantMembershipAuthorizationService, TenantMembershipAuthorizationService>();
             services.AddScoped<ITenantMembershipService, TenantMembershipService>();
             services.AddScoped<ITenantSeatEntitlementService, TenantSeatEntitlementService>();
-            services.AddScoped<IInviteService, InviteService>();
+            services.AddScoped<InviteService>();
+            services.AddScoped<IInviteService>(sp => sp.GetRequiredService<InviteService>());
+            services.AddScoped<ITrustedTenantInviteService>(sp => sp.GetRequiredService<InviteService>());
+            services.AddScoped<IPlatformUserAdministrationService, PlatformUserAdministrationService>();
             services.AddSingleton<ITenantCommunicationProfileResolver, TenantCommunicationProfileResolver>();
             services.AddScoped<ICreditAccountingService, CreditAccountingService>();
             if (enableServiceBus)

@@ -1,4 +1,8 @@
 <script lang="ts">
+	import type { PageProps } from './$types';
+
+	let { data, form }: PageProps = $props();
+
 	type ActorId = 'internal-admin' | 'internal-client' | 'external-admin' | 'external-client';
 	type PermissionState = 'primary' | 'conditional' | 'none';
 	type PermissionCell = {
@@ -281,6 +285,86 @@
 </script>
 
 <div class="space-y-4">
+	<section class="overflow-hidden rounded-lg border border-[var(--shell-border)] bg-white">
+		<div class="border-b border-[var(--shell-border)] px-4 py-4">
+			<p class="text-[0.64rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-text)]">User management</p>
+			<h3 class="mt-1 text-lg font-semibold text-[var(--text-strong)]">Bootstrap Customer Admin access</h3>
+			<p class="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
+				Create the first Customer Admin for BDR Construction or Pink Axe. The invite is tenant-scoped and grants that admin permission to invite and manage only their own users.
+			</p>
+		</div>
+
+		<div class="grid gap-5 p-4 xl:grid-cols-[0.72fr_1.28fr]">
+			<form method="POST" action="?/inviteCustomerAdmin" class="rounded-lg border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4">
+				<h4 class="text-sm font-semibold text-[var(--text-strong)]">Invite Customer Admin</h4>
+				<div class="mt-4 grid gap-3">
+					<label class="grid gap-1.5 text-sm font-medium text-[var(--text-strong)]">
+						Tenant
+						<select name="tenantKey" required class="min-h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm">
+							<option value="">Choose a tenant</option>
+							{#each data.managedTenants as tenant}
+								<option value={tenant.tenantKey}>{tenant.displayName}</option>
+							{/each}
+						</select>
+					</label>
+					<label class="grid gap-1.5 text-sm font-medium text-[var(--text-strong)]">
+						Work email
+						<input name="email" type="email" autocomplete="email" placeholder="admin@company.com" class="min-h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm" />
+					</label>
+					<label class="grid gap-1.5 text-sm font-medium text-[var(--text-strong)]">
+						Mobile number <span class="font-normal text-[var(--text-muted)]">(optional)</span>
+						<input name="phone" type="tel" autocomplete="tel" placeholder="+1 704 555 0100" class="min-h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm" />
+					</label>
+					<button type="submit" class="min-h-11 rounded-md bg-[var(--accent-solid)] px-4 text-sm font-semibold text-white hover:bg-[var(--accent-solid-hover)]">
+						Create invite
+					</button>
+				</div>
+				{#if form?.inviteError}
+					<p class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{form.inviteError}</p>
+				{/if}
+				{#if form?.inviteSuccess}
+					<div class="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
+						<p class="font-semibold">{form.inviteSuccess}</p>
+						{#if form.inviteUrl}
+							<p class="mt-2 break-all text-xs">Share this one-time activation link securely:</p>
+							<a class="mt-1 block break-all font-medium underline" href={form.inviteUrl}>{form.inviteUrl}</a>
+						{/if}
+					</div>
+				{/if}
+			</form>
+
+			<div class="space-y-3">
+				{#each data.managedTenants as tenant}
+					<div class="overflow-hidden rounded-lg border border-[var(--shell-border)]">
+						<div class="flex items-center justify-between bg-[var(--shell-panel)] px-4 py-3">
+							<div>
+								<p class="font-semibold text-[var(--text-strong)]">{tenant.displayName}</p>
+								<p class="text-xs text-[var(--text-muted)]">{tenant.users.length} user record{tenant.users.length === 1 ? '' : 's'}</p>
+							</div>
+							<span class="rounded-full border border-[var(--shell-border)] bg-white px-2 py-1 text-xs font-medium text-[var(--text-muted)]">{tenant.tenantKey}</span>
+						</div>
+						{#if tenant.users.length}
+							<div class="divide-y divide-[var(--shell-border)]">
+								{#each tenant.users as user}
+									<div class="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[1fr_auto_auto] sm:items-center">
+										<div>
+											<p class="font-medium text-[var(--text-strong)]">{user.email || user.phone || 'Identity pending'}</p>
+											<p class="mt-0.5 text-xs text-[var(--text-muted)]">{user.userId ? 'Verified iBeam user' : 'Awaiting invite acceptance'}</p>
+										</div>
+										<span class="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">{user.role.replaceAll('_', ' ')}</span>
+										<span class="w-fit rounded-full border border-[var(--shell-border)] bg-[var(--shell-panel)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">{user.status}</span>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="px-4 py-5 text-sm text-[var(--text-muted)]">No users have been invited yet.</p>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</div>
+	</section>
+
 	<div class="grid gap-3 xl:grid-cols-[1.18fr_0.82fr]">
 		<section class="rounded-lg border border-[var(--shell-border)] bg-white">
 			<div class="border-b border-[var(--shell-border)] px-4 py-3">
