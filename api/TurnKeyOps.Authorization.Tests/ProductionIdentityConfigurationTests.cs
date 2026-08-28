@@ -6,6 +6,25 @@ namespace MedInsights.Authorization.Tests;
 public sealed class ProductionIdentityConfigurationTests
 {
     [Fact]
+    public void BaseConfigurationContainsOnlyExplicitHttpsCorsOrigins()
+    {
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false)
+            .Build();
+
+        var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+        Assert.NotEmpty(origins);
+        Assert.All(origins, origin =>
+        {
+            Assert.True(Uri.TryCreate(origin, UriKind.Absolute, out var uri), $"Invalid CORS origin: {origin}");
+            Assert.Equal(Uri.UriSchemeHttps, uri!.Scheme);
+            Assert.DoesNotContain('*', origin);
+        });
+    }
+
+    [Fact]
     public void ProductionRejectsMissingOrDevelopmentIdentityConfiguration()
     {
         var configuration = Configuration(new Dictionary<string, string?>
