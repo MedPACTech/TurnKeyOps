@@ -12,10 +12,10 @@
 			<span class="display text-2xl font-black">
 				Think <span class="text-pink-bright">Pink</span> Land Clearing
 			</span>
-			<span class="text-dark-body text-sm">
-				{site.tagline} ·
-				<a href={site.phoneHref} class="text-pink-bright hover:underline">{site.phone}</a>
-			</span>
+			<span class="text-dark-body text-sm">{site.tagline}</span>
+			<a href={site.phoneHref} class="text-dark-body-2 w-fit text-sm underline underline-offset-2">
+				{site.phone}
+			</a>
 		</div>
 
 		<nav class="flex flex-wrap gap-6 text-sm font-semibold">
@@ -26,7 +26,6 @@
 			{/each}
 		</nav>
 
-		<span class="text-muted-2 text-[13px]">© 2026 {site.legalName}</span>
+		<span class="text-dark-body-2 text-[13px]">© 2026 {site.legalName}</span>
 	</div>
 </footer>
-

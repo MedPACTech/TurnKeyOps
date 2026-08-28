@@ -18,6 +18,18 @@ parameters:
 - name: nugetServiceConnection
   type: string
   default: ''
+- name: deployTagPrefix
+  type: string
+  default: ''
+- name: requireManualApproval
+  type: boolean
+  default: false
+- name: smokeApiBaseUrl
+  type: string
+  default: ''
+- name: smokeWebBaseUrl
+  type: string
+  default: ''
 
 stages:
 - stage: Build_Test_Publish
@@ -148,51 +160,96 @@ stages:
         PathtoPublish: '$(DEPLOY_ZIP)'
         ArtifactName: 'drop'
 
+- ${{ if eq(parameters.requireManualApproval, true) }}:
+  - stage: UAT_Approval
+    displayName: 'UAT signoff and release approval'
+    dependsOn: Build_Test_Publish
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/${{ parameters.deployTagPrefix }}'))
+    jobs:
+    - job: WaitForApproval
+      displayName: 'Validate UAT evidence and approve release'
+      pool: server
+      timeoutInMinutes: 4320
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(RELEASE_APPROVERS)'
+          instructions: |
+            Verify the release tag SHA, required PR validation run, staging/UAT signoff, rollback artifact, and both-brand authorization evidence described in docs/release-readiness.md.
+          onTimeout: 'reject'
+
 - stage: Deploy
   displayName: 'Deploy'
-  dependsOn: Build_Test_Publish
-  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranchPrimary }}'), and(ne('${{ parameters.deployBranchSecondary }}', ''), eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranchSecondary }}'))))
+  dependsOn:
+  - Build_Test_Publish
+  - ${{ if eq(parameters.requireManualApproval, true) }}:
+    - UAT_Approval
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranchPrimary }}'), and(ne('${{ parameters.deployBranchSecondary }}', ''), eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranchSecondary }}')), and(ne('${{ parameters.deployTagPrefix }}', ''), startsWith(variables['Build.SourceBranch'], 'refs/tags/${{ parameters.deployTagPrefix }}'))))
   jobs:
-  - job: DeployWebApp
+  - deployment: DeployWebApp
     displayName: 'Deploy to ${{ parameters.environmentName }}'
+    environment: '${{ parameters.environmentName }}'
     pool:
       vmImage: 'ubuntu-latest'
-    steps:
-    - task: DownloadBuildArtifacts@0
-      displayName: 'Download Artifact: drop'
-      inputs:
-        buildType: 'current'
-        downloadType: 'single'
-        artifactName: 'drop'
-        downloadPath: '$(Pipeline.Workspace)'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            displayName: 'Download Artifact: drop'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(Pipeline.Workspace)'
 
-    - task: AzureCLI@2
-      displayName: 'Zip Deploy Web App'
-      inputs:
-        azureSubscription: '${{ parameters.azureSubscription }}'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          set -euo pipefail
-          ZIP_PATH="$(Pipeline.Workspace)/drop/app.zip"
-          APP_NAME='${{ parameters.webAppName }}'
-          RG_NAME='${{ parameters.resourceGroupName }}'
+          - task: AzureCLI@2
+            displayName: 'Zip Deploy Web App'
+            inputs:
+              azureSubscription: '${{ parameters.azureSubscription }}'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -euo pipefail
+                ZIP_PATH="$(Pipeline.Workspace)/drop/app.zip"
+                APP_NAME='${{ parameters.webAppName }}'
+                RG_NAME='${{ parameters.resourceGroupName }}'
 
-          echo "Deploying: $ZIP_PATH"
-          echo "Target: $RG_NAME / $APP_NAME"
+                az webapp config appsettings set \
+                  --resource-group "$RG_NAME" \
+                  --name "$APP_NAME" \
+                  --settings ASPNETCORE_ENVIRONMENT='${{ parameters.environmentName }}' \
+                  --output table
 
-          az webapp config appsettings set \
-            --resource-group "$RG_NAME" \
-            --name "$APP_NAME" \
-            --settings ASPNETCORE_ENVIRONMENT='${{ parameters.environmentName }}' \
-            --output table
+                az webapp deploy \
+                  --resource-group "$RG_NAME" \
+                  --name "$APP_NAME" \
+                  --src-path "$ZIP_PATH" \
+                  --type zip \
+                  --clean true \
+                  --restart true \
+                  --track-status true \
+                  --output json
 
-          az webapp deploy \
-            --resource-group "$RG_NAME" \
-            --name "$APP_NAME" \
-            --src-path "$ZIP_PATH" \
-            --type zip \
-            --clean true \
-            --restart true \
-            --track-status true \
-            --output json
+- ${{ if and(ne(parameters.smokeApiBaseUrl, ''), ne(parameters.smokeWebBaseUrl, '')) }}:
+  - stage: Post_Deploy_Smoke
+    displayName: 'Post-deploy smoke and evidence'
+    dependsOn: Deploy
+    condition: succeeded()
+    jobs:
+    - job: Smoke
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+      - checkout: self
+      - bash: |
+          set -o pipefail
+          api/scripts/post-deploy-smoke.sh | tee "$(Build.ArtifactStagingDirectory)/post-deploy-smoke.log"
+        displayName: 'Verify public and authorization paths'
+        env:
+          SMOKE_API_BASE_URL: '${{ parameters.smokeApiBaseUrl }}'
+          SMOKE_WEB_BASE_URL: '${{ parameters.smokeWebBaseUrl }}'
+      - publish: '$(Build.ArtifactStagingDirectory)/post-deploy-smoke.log'
+        artifact: 'post-deploy-smoke'
+        condition: always()

@@ -10,6 +10,12 @@ parameters:
 - name: deployBranch
   type: string
   default: 'main'
+- name: deployTagPrefix
+  type: string
+  default: ''
+- name: requireManualApproval
+  type: boolean
+  default: false
 
 stages:
 - stage: Build_Test_Publish
@@ -59,10 +65,32 @@ stages:
         targetPath: '$(APP_ROOT)/build'
         artifact: '${{ parameters.artifactName }}'
 
+- ${{ if eq(parameters.requireManualApproval, true) }}:
+  - stage: UAT_Approval
+    displayName: 'UAT signoff and release approval'
+    dependsOn: Build_Test_Publish
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/${{ parameters.deployTagPrefix }}'))
+    jobs:
+    - job: WaitForApproval
+      displayName: 'Validate UAT evidence and approve release'
+      pool: server
+      timeoutInMinutes: 4320
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(RELEASE_APPROVERS)'
+          instructions: |
+            Verify the release tag SHA, required PR validation run, staging/UAT signoff, and rollback artifact described in docs/release-readiness.md.
+          onTimeout: 'reject'
+
 - stage: Deploy
   displayName: 'Deploy BDR Admin'
-  dependsOn: Build_Test_Publish
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranch }}'))
+  dependsOn:
+  - Build_Test_Publish
+  - ${{ if eq(parameters.requireManualApproval, true) }}:
+    - UAT_Approval
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranch }}'), and(ne('${{ parameters.deployTagPrefix }}', ''), startsWith(variables['Build.SourceBranch'], 'refs/tags/${{ parameters.deployTagPrefix }}'))))
   jobs:
   - deployment: DeployAdmin
     displayName: 'Deploy to Azure Static Web Apps'

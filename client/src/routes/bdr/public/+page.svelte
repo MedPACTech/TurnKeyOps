@@ -651,9 +651,9 @@
 	}
 
 	.btn-primary {
-		background: var(--bdr-primary);
+		background: #b45309;
 		color: #fff;
-		box-shadow: 0 14px 32px rgba(249, 115, 22, 0.22);
+		box-shadow: 0 14px 32px rgba(180, 83, 9, 0.24);
 	}
 
 	.btn-outline {

@@ -16,6 +16,18 @@ parameters:
 - name: deployBranch
   type: string
   default: 'main'
+- name: deployTagPrefix
+  type: string
+  default: ''
+- name: requireManualApproval
+  type: boolean
+  default: false
+- name: smokeApiBaseUrl
+  type: string
+  default: ''
+- name: smokeWebBaseUrl
+  type: string
+  default: ''
 
 stages:
 - stage: Build_Test_Publish
@@ -80,10 +92,32 @@ stages:
         targetPath: '$(Build.ArtifactStagingDirectory)/${{ parameters.artifactName }}.zip'
         artifact: '${{ parameters.artifactName }}'
 
+- ${{ if eq(parameters.requireManualApproval, true) }}:
+  - stage: UAT_Approval
+    displayName: 'UAT signoff and release approval'
+    dependsOn: Build_Test_Publish
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/${{ parameters.deployTagPrefix }}'))
+    jobs:
+    - job: WaitForApproval
+      displayName: 'Validate UAT evidence and approve release'
+      pool: server
+      timeoutInMinutes: 4320
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(RELEASE_APPROVERS)'
+          instructions: |
+            Verify the release tag SHA, required PR validation run, staging/UAT signoff, rollback artifact, and both-brand authorization evidence described in docs/release-readiness.md.
+          onTimeout: 'reject'
+
 - stage: Deploy
   displayName: 'Deploy TurnKeyOps Web'
-  dependsOn: Build_Test_Publish
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranch }}'))
+  dependsOn:
+  - Build_Test_Publish
+  - ${{ if eq(parameters.requireManualApproval, true) }}:
+    - UAT_Approval
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/${{ parameters.deployBranch }}'), and(ne('${{ parameters.deployTagPrefix }}', ''), startsWith(variables['Build.SourceBranch'], 'refs/tags/${{ parameters.deployTagPrefix }}'))))
   jobs:
   - deployment: DeployClient
     displayName: 'Deploy to Azure App Service'
@@ -132,3 +166,25 @@ stages:
                 az webapp restart \
                   --resource-group '${{ parameters.resourceGroupName }}' \
                   --name '${{ parameters.webAppName }}'
+
+- ${{ if and(ne(parameters.smokeApiBaseUrl, ''), ne(parameters.smokeWebBaseUrl, '')) }}:
+  - stage: Post_Deploy_Smoke
+    displayName: 'Post-deploy smoke and evidence'
+    dependsOn: Deploy
+    condition: succeeded()
+    jobs:
+    - job: Smoke
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+      - checkout: self
+      - bash: |
+          set -o pipefail
+          api/scripts/post-deploy-smoke.sh | tee "$(Build.ArtifactStagingDirectory)/post-deploy-smoke.log"
+        displayName: 'Verify public and authorization paths'
+        env:
+          SMOKE_API_BASE_URL: '${{ parameters.smokeApiBaseUrl }}'
+          SMOKE_WEB_BASE_URL: '${{ parameters.smokeWebBaseUrl }}'
+      - publish: '$(Build.ArtifactStagingDirectory)/post-deploy-smoke.log'
+        artifact: 'post-deploy-smoke'
+        condition: always()

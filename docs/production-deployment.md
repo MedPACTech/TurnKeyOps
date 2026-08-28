@@ -41,6 +41,8 @@ Create a secured production variable group containing:
 - `TURNKEYOPS_WEB_APP_NAME`
 - `TURNKEYOPS_API_WEB_APP_NAME`
 - `TURNKEYOPS_API_BASE_URL`
+- `TURNKEYOPS_WEB_BASE_URL`
+- `RELEASE_APPROVERS`
 
 `TURNKEYOPS_API_BASE_URL` must be the API origin without a trailing slash, for example `https://api.turnkeyops.ai`.
 
@@ -48,12 +50,20 @@ Configure all API secrets through App Service settings or Key Vault references. 
 
 The complete identity, communication, billing, rotation, disable, rollback, and smoke-test contract is in `api/docs/production-integrations.md`.
 
+Create equivalent staging variables using the `TURNKEYOPS_STAGING_*` prefix
+listed in `api/.azure-pipelines/README.md`.
+
 ## Pipelines
 
-- Web: `api/.azure-pipelines/turnkeyops-web.yml`
-- API: `api/.azure-pipelines/production.yml`
+- Required PR validation: `api/.azure-pipelines/pr-validation.yml`
+- Staging API/web: `api/.azure-pipelines/staging-api.yml` and `staging-web.yml`
+- Production API/web: `api/.azure-pipelines/production.yml` and `turnkeyops-web.yml`
 
-Both deploy from `main`. Configure the Azure DevOps pipeline definitions only after their service connection and secured variables exist.
+`main` deploys only to staging. Production deploys only from protected
+`release-*` tags after the UAT manual-validation stage and the Azure DevOps
+`Production` environment approval. Configure the pipeline definitions only
+after their service connection, environments, approvers, and secured variables
+exist. See `docs/release-readiness.md` for the release and rollback checklist.
 
 ## Custom domains and TLS
 

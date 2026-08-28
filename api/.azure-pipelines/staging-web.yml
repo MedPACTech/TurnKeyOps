@@ -1,0 +1,26 @@
+trigger:
+  batch: true
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - client/**
+    - api/.azure-pipelines/staging-web.yml
+    - api/.azure-pipelines/templates/node-app-service-deploy.yml
+
+pr: none
+
+extends:
+  template: templates/node-app-service-deploy.yml
+  parameters:
+    environmentName: 'Staging'
+    appDirectory: 'client'
+    artifactName: 'turnkeyops-web-staging'
+    azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+    resourceGroupName: '$(TURNKEYOPS_STAGING_RESOURCE_GROUP)'
+    webAppName: '$(TURNKEYOPS_STAGING_WEB_APP_NAME)'
+    apiBaseUrl: '$(TURNKEYOPS_STAGING_API_BASE_URL)'
+    deployBranch: 'main'
+    smokeApiBaseUrl: '$(TURNKEYOPS_STAGING_API_BASE_URL)'
+    smokeWebBaseUrl: '$(TURNKEYOPS_STAGING_WEB_BASE_URL)'

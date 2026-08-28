@@ -1,4 +1,10 @@
-trigger: none
+trigger:
+  branches:
+    exclude:
+    - '*'
+  tags:
+    include:
+    - release-*
 pr: none
 
 extends:
@@ -9,4 +15,8 @@ extends:
     webAppName: '$(TURNKEYOPS_API_WEB_APP_NAME)'
     azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
     resourceGroupName: '$(TURNKEYOPS_PRODUCTION_RESOURCE_GROUP)'
-    deployBranchPrimary: 'main'
+    deployBranchPrimary: '__tag_only__'
+    deployTagPrefix: 'release-'
+    requireManualApproval: true
+    smokeApiBaseUrl: '$(TURNKEYOPS_API_BASE_URL)'
+    smokeWebBaseUrl: '$(TURNKEYOPS_WEB_BASE_URL)'

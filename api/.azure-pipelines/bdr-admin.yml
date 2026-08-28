@@ -1,22 +1,12 @@
 trigger:
   branches:
+    exclude:
+    - '*'
+  tags:
     include:
-    - main
-  paths:
-    include:
-    - admin/*
-    - api/.azure-pipelines/bdr-admin.yml
-    - api/.azure-pipelines/templates/static-web-app-deploy.yml
+    - release-*
 
-pr:
-  branches:
-    include:
-    - main
-  paths:
-    include:
-    - admin/*
-    - api/.azure-pipelines/bdr-admin.yml
-    - api/.azure-pipelines/templates/static-web-app-deploy.yml
+pr: none
 
 extends:
   template: templates/static-web-app-deploy.yml
@@ -25,4 +15,6 @@ extends:
     appDirectory: 'admin'
     artifactName: 'bdr-admin'
     deploymentToken: '$(BDR_ADMIN_STATIC_WEB_APP_TOKEN)'
-    deployBranch: 'main'
+    deployBranch: '__tag_only__'
+    deployTagPrefix: 'release-'
+    requireManualApproval: true
