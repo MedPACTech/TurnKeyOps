@@ -7,7 +7,7 @@ namespace MedInsights.Controllers;
 
 [ApiController]
 [Route("api/roles")]
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
 public class RolesController : ControllerBase
 {
     private readonly ITenantRoleDefinitionService _roles;

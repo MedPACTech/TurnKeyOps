@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using IBeam.Communications.Abstractions;
 using IBeam.Communications.Email.AzureCommunications;
+using IBeam.Communications.Sms.AzureCommunications;
 using IBeam.Identity.Api.DependencyInjection;
 using IBeam.Repositories.Abstractions;
 using IBeam.Repositories.AzureTables;
@@ -22,6 +23,11 @@ using MedInsights.API.DependencyInjection;
 using IBeam.Identity.Interfaces;
 using MedInsights.Services.Events;
 using IBeam.Identity.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 public partial class Program
 {
@@ -30,6 +36,12 @@ public partial class Program
         try
         {
             var builder = WebApplication.CreateBuilder(args);
+            ProductionIdentityConfiguration.Validate(
+                builder.Configuration,
+                builder.Environment.EnvironmentName);
+            ProductionIntegrationConfiguration.Validate(
+                builder.Configuration,
+                builder.Environment.EnvironmentName);
 
             if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Local"))
             {
@@ -66,39 +78,36 @@ public partial class Program
             builder.Services.AddTurnKeyOpsFeatureAzureTableMappings();
 
             builder.Services.AddHostedService<GlobalErrorHandler>();
-            builder.Services.AddExternalClients();
+            builder.Services.AddExternalClients(builder.Configuration);
             builder.Services.AddTurnKeyOpsExternalClients();
             builder.Services.AddRepositories();
             builder.Services.AddTurnKeyOpsFeatureRepositories();
-            builder.Services.AddManagedServices(enableServiceBus: hasServiceBusConnection);
+            builder.Services.AddManagedServices(builder.Configuration, enableServiceBus: hasServiceBusConnection);
             builder.Services.AddTurnKeyOpsFeatureServices();
             builder.Services.AddIBeamCommunications(builder.Configuration);
 
             // 1) Email provider (Azure Communication Services Email)
             builder.Services.AddIBeamAzureCommunicationsEmail(builder.Configuration);
+            builder.Services.AddIBeamCommunicationsSmsAzure(builder.Configuration);
 
             // IBeam Identity API: wires auth/JWT + identity services from IBeam:* configuration.
             builder.Services.AddIBeamIdentityApi(builder.Configuration);
+            builder.Services.PostConfigureAll<JwtBearerOptions>(options =>
+                JwtValidationHardening.Apply(options, builder.Configuration));
             builder.Services.AddOtpCompleteRetryDecorator();
             builder.Services.AddScoped<IAuthLifecycleHook, UserProfileHook>();
             builder.Services.AddIBeamIdentityApiControllers();
 
             builder.Services.AddJwtDebugging();
             
-            // CORS (dev)
+            var allowedClientOrigins = builder.Configuration
+                .GetSection("Cors:AllowedOrigins")
+                .Get<string[]>() ?? Array.Empty<string>();
+
             builder.Services.AddCors(options =>
             {
-
-                options.AddPolicy("development",
-                    p => p.WithOrigins(
-                        "http://localhost:5173",
-                        "capacitor://localhost",
-                        "http://localhost:5178",
-                        "http://127.0.0.1:5178",
-                        "http://localhost:5174",
-                        "http://localhost:5180"
-
-                )
+                options.AddPolicy("TurnKeyOpsClients",
+                    p => p.WithOrigins(allowedClientOrigins)
                           .AllowAnyHeader()
                           .AllowAnyMethod());
             });
@@ -108,12 +117,6 @@ public partial class Program
             //Directory.CreateDirectory(dataDir); // create if missing
             //// Optional: expose to connection strings using |DataDirectory|
             //AppDomain.CurrentDomain.SetData("DataDirectory", dataDir);
-
-            builder.Services.AddAuthorization(options =>
-            {
-                options.AddPolicy("RequireAdmin", p => p.RequireRole("Admin"));
-            });
-            
 
             //JSON enum as strings
             builder.Services.AddControllers()
@@ -191,9 +194,24 @@ public partial class Program
             // }
 
             builder.Services.AddMemoryCache();
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                options.AddPolicy("public-quote-intake", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 6,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+            });
 
             // Needed for CurrentUserContext.FromHttp(...)
             builder.Services.AddHttpContextAccessor();
+            builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, TurnKeyAuthorizationResultHandler>();
 
             // IBeam repository tenant context (safe for both HTTP requests and startup validation).
             builder.Services.AddScoped<ITenantContext>(sp =>
@@ -239,7 +257,7 @@ public partial class Program
 
             var app = builder.Build();
 
-            app.MapGet("/", () => "OK");
+            app.MapGet("/", () => "OK").AllowAnonymous();
 
             // ---- Auto-migrate + seed (DEV only) ----
             if (app.Environment.IsDevelopment())
@@ -269,8 +287,20 @@ public partial class Program
                 app.UseSwaggerUI();
             }
 
-            app.UseCors("development");
-            // app.UseHttpsRedirection();
+            if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Local"))
+                app.UseHsts();
+
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                context.Response.Headers["X-Frame-Options"] = "DENY";
+                context.Response.Headers["Referrer-Policy"] = "no-referrer";
+                context.Response.Headers.Append("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
+                await next();
+            });
+            app.UseHttpsRedirection();
+            app.UseCors("TurnKeyOpsClients");
+            app.UseRateLimiter();
             app.UseAuthentication();
             app.UseAuthorization();
 

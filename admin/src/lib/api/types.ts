@@ -70,6 +70,7 @@ export interface JobDto {
   jobSiteName?: string;
   estimateId?: string;
   estimateNumber?: string;
+  invoiceId?: string;
   projectAddress?: string;
   projectName?: string;
   estimateSnapshot?: EstimateCalculationSnapshotDto;

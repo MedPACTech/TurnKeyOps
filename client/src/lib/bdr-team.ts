@@ -147,64 +147,9 @@ export const quoteWorkflowTaskRequirements: Record<
 	}
 };
 
-export const bdrEmployeeContacts: BdrEmployeeContact[] = [
-	{
-		id: 'employee-jordan-ellis',
-		displayName: 'Jordan Ellis',
-		title: 'Office admin',
-		team: 'Office ops',
-		employmentType: 'Full time',
-		email: 'jordan@bdr-demo.local',
-		phone: '704-555-0188',
-		accessRole: 'office-admin',
-		skills: ['intake-review', 'customer-follow-up', 'site-visit-scheduling', 'estimate-send'],
-		permissions: ['manage-quotes', 'update-customer-details', 'schedule-site-visits', 'send-estimates'],
-		availability: 'Office queue',
-		workload: 2
-	},
-	{
-		id: 'employee-casey-morgan',
-		displayName: 'Casey Morgan',
-		title: 'Estimator / field lead',
-		team: 'Field estimating',
-		employmentType: 'Full time',
-		email: 'casey@bdr-demo.local',
-		phone: '704-555-0142',
-		accessRole: 'field',
-		skills: ['field-inspection', 'estimate-drafting'],
-		permissions: ['complete-site-visits', 'draft-estimates'],
-		availability: 'Field today',
-		workload: 1
-	},
-	{
-		id: 'employee-riley-stone',
-		displayName: 'Riley Stone',
-		title: 'Estimator',
-		team: 'Estimating desk',
-		employmentType: 'Contractor',
-		email: 'riley@bdr-demo.local',
-		phone: '704-555-0164',
-		accessRole: 'field',
-		skills: ['site-visit-scheduling', 'field-inspection', 'estimate-drafting'],
-		permissions: ['schedule-site-visits', 'complete-site-visits', 'draft-estimates'],
-		availability: 'Available',
-		workload: 3
-	},
-	{
-		id: 'employee-ella-owner',
-		displayName: 'Ella Robinson',
-		title: 'Owner',
-		team: 'Leadership',
-		employmentType: 'Full time',
-		email: 'ella@bdr-demo.local',
-		phone: '704-555-0199',
-		accessRole: 'owner',
-		skills: ['closeout', 'estimate-send', 'customer-follow-up'],
-		permissions: ['close-quotes', 'send-estimates', 'manage-quotes', 'manage-admin-access'],
-		availability: 'Owner review',
-		workload: 4
-	}
-];
+// Team identities must come from the tenant user-administration API. Until that
+// directory is connected here, render an honest empty state instead of demo people.
+export const bdrEmployeeContacts: BdrEmployeeContact[] = [];
 
 export const getBdrEmployeeByName = (name: string | null | undefined) =>
 	bdrEmployeeContacts.find((employee) => employee.displayName === name?.trim()) ?? null;

@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace MedInsights.Controllers
 {
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.BillingAdmin)]
     public class TokenLedgerController : ApiControllerBase
     {
         private readonly ITokenLedgerService _service;

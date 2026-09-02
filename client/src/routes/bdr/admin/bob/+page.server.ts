@@ -54,10 +54,14 @@ type BobAnalyzeEnvelope = {
 
 const formString = (formData: FormData, key: string) => String(formData.get(key) ?? '').trim();
 type BobTenantPreset = TenantDefinition & { operatingDefaults?: unknown };
-const tenantForUrl = async (url: URL): Promise<BobTenantPreset> => {
+const tenantForUrl = async (
+	url: URL,
+	requestFetch: typeof globalThis.fetch,
+	accessToken?: string | null
+): Promise<BobTenantPreset> => {
 	const tenant = getExternalAdminTenantForPath(url.pathname) ?? bdrTenant;
 	if (tenant.slug !== 'thinkpink') return tenant;
-	const settings = await loadThinkPinkSettings();
+	const settings = await loadThinkPinkSettings(requestFetch, accessToken);
 	return {
 		...tenant,
 		services: settings.services,
@@ -295,10 +299,12 @@ const buildInspectionOffer = async (
 };
 
 export const load = async ({ fetch, url, cookies }) => {
-	const tenant = await tenantForUrl(url);
+	const token = cookies.get(authTokenCookie) ?? '';
+	const persistence = { fetch, token };
+	const tenant = await tenantForUrl(url, fetch, token);
 	const [briefing, conversations, estimateFollowups] = await Promise.all([
 		buildBobBriefing(fetch, tenant),
-		ensureBobConversations(tenant.slug),
+		ensureBobConversations(tenant.slug, persistence),
 		buildEstimateFollowups(fetch, tenant)
 	]);
 	const storedConversation =
@@ -339,51 +345,58 @@ export const load = async ({ fetch, url, cookies }) => {
 };
 
 export const actions = {
-	archiveConversation: async ({ request, url }) => {
-		const tenant = await tenantForUrl(url);
+	archiveConversation: async ({ request, url, fetch, cookies }) => {
+		const token = cookies.get(authTokenCookie) ?? '';
+		const persistence = { fetch, token };
+		const tenant = await tenantForUrl(url, fetch, token);
 		const formData = await request.formData();
-		await setBobConversationArchived(formString(formData, 'conversationId'), true, tenant.slug);
+		await setBobConversationArchived(formString(formData, 'conversationId'), true, tenant.slug, persistence);
 		throw redirect(303, bobHref(tenant));
 	},
-	restoreConversation: async ({ request, url }) => {
-		const tenant = await tenantForUrl(url);
+	restoreConversation: async ({ request, url, fetch, cookies }) => {
+		const token = cookies.get(authTokenCookie) ?? '';
+		const persistence = { fetch, token };
+		const tenant = await tenantForUrl(url, fetch, token);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
-		await setBobConversationArchived(conversationId, false, tenant.slug);
+		await setBobConversationArchived(conversationId, false, tenant.slug, persistence);
 		throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`);
 	},
-	deleteConversation: async ({ request, url }) => {
-		const tenant = await tenantForUrl(url);
+	deleteConversation: async ({ request, url, fetch, cookies }) => {
+		const token = cookies.get(authTokenCookie) ?? '';
+		const persistence = { fetch, token };
+		const tenant = await tenantForUrl(url, fetch, token);
 		const formData = await request.formData();
-		await deleteBobConversation(formString(formData, 'conversationId'), tenant.slug);
+		await deleteBobConversation(formString(formData, 'conversationId'), tenant.slug, persistence);
 		throw redirect(303, bobHref(tenant));
 	},
 	ask: async ({ request, fetch, cookies, url }) => {
-		const tenant = await tenantForUrl(url);
+		const token = cookies.get(authTokenCookie);
+		const tenant = await tenantForUrl(url, fetch, token);
 		const formData = await request.formData();
 		const question = formString(formData, 'question');
 		const conversationId = formString(formData, 'conversationId');
 		if (!question) return fail(400, { action: 'ask', message: 'Ask Bob a question.', conversationId });
-
-		const conversation = await getBobConversation(conversationId, tenant.slug);
-		const token = cookies.get(authTokenCookie);
 		if (!token) {
 			return fail(401, { action: 'ask', message: 'Sign in again before asking Bob.', conversationId });
 		}
+		const persistence = { fetch, token };
+		const conversation = await getBobConversation(conversationId, tenant.slug, persistence);
 
 		try {
 			const bobVoice = normalizeBobVoice(cookies.get(bobVoiceCookie));
 			if (conversation.mode === 'estimate-followup') {
 				const inspectionOffer = await buildInspectionOffer(fetch, conversation, question, bobVoice, tenant);
 				if (inspectionOffer) {
-					await appendBobMessage(conversation.id, 'user', question, undefined, undefined, tenant.slug);
+					await appendBobMessage(conversation.id, 'user', question, undefined, undefined, tenant.slug, persistence);
 					await appendBobMessage(
 						conversation.id,
 						'bob',
 						inspectionOffer.content,
 						undefined,
 						inspectionOffer.actions,
-						tenant.slug
+						tenant.slug,
+						persistence
 					);
 					throw redirect(
 						303,
@@ -410,7 +423,8 @@ export const actions = {
 					question,
 					analysis.fields,
 					analysis.answer,
-					tenant.slug
+					tenant.slug,
+					persistence
 				);
 				throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversation.id)}`);
 			}
@@ -422,20 +436,22 @@ export const actions = {
 					question,
 					analysis.answer || summarizeEstimateFollowups(followups),
 					analysis.suggestedReplies,
-					tenant.slug
+					tenant.slug,
+					persistence
 				);
 				throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversation.id)}`);
 			}
 
 			if (analysis.intent === 'start_estimate') {
-				const estimateConversation = await createBobConversation('estimate-builder', tenant.slug);
+				const estimateConversation = await createBobConversation('estimate-builder', tenant.slug, persistence);
 				if (Object.keys(analysis.fields).length) {
 					await advanceEstimateConversation(
 						estimateConversation.id,
 						question,
 						analysis.fields,
 						analysis.answer,
-						tenant.slug
+						tenant.slug,
+						persistence
 					);
 				}
 				throw redirect(
@@ -445,16 +461,17 @@ export const actions = {
 			}
 
 			if (analysis.intent === 'estimate_followup') {
-				const followupConversation = await createBobConversation('estimate-followup', tenant.slug);
+				const followupConversation = await createBobConversation('estimate-followup', tenant.slug, persistence);
 				const followups = await buildEstimateFollowups(fetch, tenant);
-				await appendBobMessage(followupConversation.id, 'user', question, undefined, undefined, tenant.slug);
+				await appendBobMessage(followupConversation.id, 'user', question, undefined, undefined, tenant.slug, persistence);
 				await appendBobMessage(
 					followupConversation.id,
 					'bob',
 					analysis.answer || summarizeEstimateFollowups(followups),
 					analysis.suggestedReplies,
 					undefined,
-					tenant.slug
+					tenant.slug,
+					persistence
 				);
 				throw redirect(
 					303,
@@ -464,14 +481,15 @@ export const actions = {
 
 			const targetConversation =
 				conversation.id === bobHomeConversationId
-					? await createBobConversation('general', tenant.slug)
+					? await createBobConversation('general', tenant.slug, persistence)
 					: conversation;
 			await appendGeneralConversationExchange(
 				targetConversation.id,
 				question,
 				analysis.answer || 'I need a little more detail to help with that.',
 				analysis.suggestedReplies,
-				tenant.slug
+				tenant.slug,
+				persistence
 			);
 			throw redirect(
 				303,
@@ -487,9 +505,14 @@ export const actions = {
 		}
 	},
 	scheduleInspection: async ({ request, fetch, cookies, url }) => {
-		const tenant = await tenantForUrl(url);
+		const token = cookies.get(authTokenCookie);
+		const tenant = await tenantForUrl(url, fetch, token);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
+		if (!token) {
+			return fail(401, { action: 'scheduleInspection', message: 'Sign in again before scheduling.', conversationId });
+		}
+		const persistence = { fetch, token };
 		const requestId = formString(formData, 'requestId');
 		const visitDate = formString(formData, 'visitDate');
 		const windowStart = formString(formData, 'windowStart');
@@ -546,7 +569,7 @@ export const actions = {
 					label: 'Open calendar',
 					href: `${adminBase(tenant)}/${tenant.slug === 'bdr' ? 'calendar' : 'requests'}?scheduleRequest=${encodeURIComponent(requestId)}`
 				}
-			], tenant.slug);
+			], tenant.slug, persistence);
 			throw redirect(
 				303,
 				`${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`
@@ -560,8 +583,8 @@ export const actions = {
 			});
 		}
 	},
-	approve: async ({ request, fetch, url }) => {
-		const tenant = await tenantForUrl(url);
+	approve: async ({ request, fetch, url, cookies }) => {
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
 		const formData = await request.formData();
 		const recommendationId = formString(formData, 'recommendationId');
 		const conversationId = formString(formData, 'conversationId');
@@ -587,11 +610,16 @@ export const actions = {
 			});
 		}
 	},
-	createEstimate: async ({ request, fetch, url }) => {
-		const tenant = await tenantForUrl(url);
+	createEstimate: async ({ request, fetch, url, cookies }) => {
+		const token = cookies.get(authTokenCookie);
+		const tenant = await tenantForUrl(url, fetch, token);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
-		const conversation = await getBobConversation(conversationId, tenant.slug);
+		if (!token) {
+			return fail(401, { action: 'createEstimate', message: 'Sign in again before creating the estimate.', conversationId });
+		}
+		const persistence = { fetch, token };
+		const conversation = await getBobConversation(conversationId, tenant.slug, persistence);
 		const draft = conversation.estimateDraft;
 		const progress = getEstimateBuilderProgress(draft, tenant.slug);
 		if (conversation.mode !== 'estimate-builder' || !draft || !progress.isComplete) {
@@ -638,7 +666,7 @@ export const actions = {
 			serviceAddress: draft.serviceAddress,
 			requestedTimeline: draft.timeline
 		});
-		await markEstimateConversationCreated(conversation.id, estimateRequest.id, tenant.slug);
+		await markEstimateConversationCreated(conversation.id, estimateRequest.id, tenant.slug, persistence);
 		throw redirect(303, `${adminBase(tenant)}/estimates?request=${encodeURIComponent(estimateRequest.id)}`);
 	}
 };

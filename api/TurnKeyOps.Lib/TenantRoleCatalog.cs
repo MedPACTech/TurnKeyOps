@@ -8,6 +8,8 @@ namespace MedInsights.Lib
         public const string Admin = "admin";
         public const string BillingAdmin = "billing_admin";
         public const string Member = "member";
+        public const string Staff = "staff";
+        public const string Contact = "contact";
 
         private static readonly IReadOnlyList<TenantRoleDefinitionDto> Roles = new[]
         {
@@ -43,6 +45,24 @@ namespace MedInsights.Lib
                 Key = Member,
                 Name = "Member",
                 Description = "Standard tenant member without billing administration privileges.",
+                IsAssignable = true,
+                GrantsOwnership = false,
+                GrantsBillingAdmin = false
+            },
+            new TenantRoleDefinitionDto
+            {
+                Key = Staff,
+                Name = "Staff",
+                Description = "Tenant staff member who can operate customer, estimate, invoice, and job workflows.",
+                IsAssignable = true,
+                GrantsOwnership = false,
+                GrantsBillingAdmin = false
+            },
+            new TenantRoleDefinitionDto
+            {
+                Key = Contact,
+                Name = "Contact",
+                Description = "External tenant contact with access only to explicitly exposed contact workflows.",
                 IsAssignable = true,
                 GrantsOwnership = false,
                 GrantsBillingAdmin = false

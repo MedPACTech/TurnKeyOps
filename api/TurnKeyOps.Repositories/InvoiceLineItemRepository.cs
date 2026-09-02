@@ -17,4 +17,13 @@ public class InvoiceLineItemRepository : AzureTablesRepositoryBase<InvoiceLineIt
         IOptions<RepositoryOptions> repositoryOptions) : base(store, cache, tenantContext, repositoryOptions.Value)
     {
     }
+
+    public async Task<IReadOnlyCollection<InvoiceLineItem>> ListAsync(string partitionKey, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return (await GetAllAsync(false, false))
+            .Where(item => item.PartitionKey == partitionKey && !item.IsDeleted)
+            .OrderBy(item => item.SortOrder)
+            .ToArray();
+    }
 }

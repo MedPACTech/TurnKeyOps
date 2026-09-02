@@ -7,6 +7,7 @@ public static class EstimateDefaultsMapper
 {
     public static EstimateDefaultsDto ToDto(EstimateDefaultsProfile entity) => new()
     {
+        Version = entity.ETag.ToString(),
         ConcreteCostPerYard = entity.ConcreteCostPerYard,
         MinimumLoadFee = entity.MinimumLoadFee,
         ShortLoadFee = entity.ShortLoadFee,

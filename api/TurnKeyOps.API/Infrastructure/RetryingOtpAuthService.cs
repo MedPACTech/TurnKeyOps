@@ -27,7 +27,11 @@ public sealed class RetryingOtpAuthService : IIdentityOtpAuthService
         _inner = inner;
         _logger = logger;
 
-        _localOtpBypassEnabled = environment.IsDevelopment() || environment.IsEnvironment("Local");
+        var developmentBypassRequested = configuration.GetValue<bool>("IBeam:Identity:EnableDevelopmentOtpBypass");
+        if (developmentBypassRequested && environment.IsProduction())
+            throw new InvalidOperationException("Development OTP bypass cannot be enabled in Production.");
+        _localOtpBypassEnabled = developmentBypassRequested &&
+                                 (environment.IsDevelopment() || environment.IsEnvironment("Local"));
         _otpHashSalt = configuration["IBeam:Identity:Otp:HashSalt"] ?? string.Empty;
 
         var connectionString =
@@ -53,9 +57,8 @@ public sealed class RetryingOtpAuthService : IIdentityOtpAuthService
             var challenge = await ForceLocalBypassChallengeAsync(destination, ex, ct);
             _logger.LogWarning(
                 ex,
-                "Local OTP bypass activated for destination {Destination}. Using code {Code}.",
-                destination,
-                LocalBypassCode);
+                "Explicit development OTP bypass activated for destination {Destination}.",
+                destination);
             return challenge;
         }
     }

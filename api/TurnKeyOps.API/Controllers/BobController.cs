@@ -6,10 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
+using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 [Route("api/bob")]
 public sealed class BobController : ApiControllerBase
 {
@@ -78,6 +79,7 @@ public sealed class BobController : ApiControllerBase
 
     private readonly OpenAIClient _openAIClient;
     private readonly OpenAISettings _settings;
+    private readonly IBobContextMinimizer _contextMinimizer;
 
     private static string GetVoicePrompt(string? voice) => voice?.Trim().ToLowerInvariant() switch
     {
@@ -119,10 +121,14 @@ public sealed class BobController : ApiControllerBase
             """
     };
 
-    public BobController(OpenAIClient openAIClient, IOptions<OpenAISettings> settings)
+    public BobController(
+        OpenAIClient openAIClient,
+        IOptions<OpenAISettings> settings,
+        IBobContextMinimizer contextMinimizer)
     {
         _openAIClient = openAIClient;
         _settings = settings.Value;
+        _contextMinimizer = contextMinimizer;
     }
 
     [HttpPost("respond")]
@@ -131,7 +137,8 @@ public sealed class BobController : ApiControllerBase
         if (string.IsNullOrWhiteSpace(request.Question))
             return BadRequestResponse("Ask Bob a question.", nameof(request.Question));
 
-        var contextJson = JsonSerializer.Serialize(request.Context ?? new Dictionary<string, object?>());
+        var contextJson = JsonSerializer.Serialize(
+            _contextMinimizer.Minimize(request.Context ?? new Dictionary<string, object?>()));
         var messages = new List<OpenAI.Chat.ChatMessage>
         {
             new SystemChatMessage($"{SystemPrompt}\n\n{GetVoicePrompt(request.Voice)}"),
@@ -161,14 +168,14 @@ public sealed class BobController : ApiControllerBase
         if (string.IsNullOrWhiteSpace(request.Message))
             return BadRequestResponse("Tell Bob what you need.", nameof(request.Message));
 
-        var payloadJson = JsonSerializer.Serialize(new
+        var payloadJson = JsonSerializer.Serialize(_contextMinimizer.Minimize(new
         {
             mode = string.IsNullOrWhiteSpace(request.Mode) ? "general" : request.Mode,
             currentEstimate = request.Estimate,
             operatingContext = request.Context,
             recentConversation = request.Conversation,
             latestMessage = request.Message.Trim()
-        });
+        }));
         var messages = new List<OpenAI.Chat.ChatMessage>
         {
             new SystemChatMessage($"{AnalyzeSystemPrompt}\n\n{GetVoicePrompt(request.Voice)}"),

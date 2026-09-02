@@ -12,7 +12,10 @@ namespace MedInsights.API.DependencyInjection
 
     public static class ServiceDependencyInjection
     {
-        public static IServiceCollection AddManagedServices(this IServiceCollection services, bool enableServiceBus = true)
+        public static IServiceCollection AddManagedServices(
+            this IServiceCollection services,
+            IConfiguration configuration,
+            bool enableServiceBus = true)
         {
 
 
@@ -47,7 +50,11 @@ namespace MedInsights.API.DependencyInjection
             services.AddScoped<ITenantMembershipAuthorizationService, TenantMembershipAuthorizationService>();
             services.AddScoped<ITenantMembershipService, TenantMembershipService>();
             services.AddScoped<ITenantSeatEntitlementService, TenantSeatEntitlementService>();
-            services.AddScoped<IInviteService, InviteService>();
+            services.AddScoped<InviteService>();
+            services.AddScoped<IInviteService>(sp => sp.GetRequiredService<InviteService>());
+            services.AddScoped<ITrustedTenantInviteService>(sp => sp.GetRequiredService<InviteService>());
+            services.AddScoped<IPlatformUserAdministrationService, PlatformUserAdministrationService>();
+            services.AddSingleton<ITenantCommunicationProfileResolver, TenantCommunicationProfileResolver>();
             services.AddScoped<ICreditAccountingService, CreditAccountingService>();
             if (enableServiceBus)
             {
@@ -68,9 +75,20 @@ namespace MedInsights.API.DependencyInjection
                 services.AddScoped<IBillingEventDispatchService, DisabledBillingEventDispatchService>();
             }
             services.AddScoped<IPaymentProviderResolver, PaymentProviderResolver>();
-            services.AddScoped<StripePaymentProvider>();
-            services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<StripePaymentProvider>());
-            services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<PayPalPaymentProvider>());
+            services.AddSingleton<IProviderHttpExecutor, ProviderHttpExecutor>();
+            var billingEnabled = configuration.GetValue<bool>(
+                $"{MedInsights.Lib.Configurations.BillingIntegrationOptions.SectionName}:Enabled");
+            var enabledProviders = billingEnabled
+                ? configuration.GetSection($"{MedInsights.Lib.Configurations.BillingIntegrationOptions.SectionName}:EnabledProviders")
+                    .Get<string[]>() ?? []
+                : [];
+            if (enabledProviders.Contains("Stripe", StringComparer.OrdinalIgnoreCase))
+            {
+                services.AddScoped<StripePaymentProvider>();
+                services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<StripePaymentProvider>());
+            }
+            if (enabledProviders.Contains("PayPal", StringComparer.OrdinalIgnoreCase))
+                services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<PayPalPaymentProvider>());
             services.AddScoped<IBillingAdminService, BillingAdminService>();
             services.AddScoped<ITenantBillingAccountService, TenantBillingAccountService>();
             services.AddScoped<ITenantSubscriptionService, TenantSubscriptionService>();
@@ -78,13 +96,17 @@ namespace MedInsights.API.DependencyInjection
             services.AddScoped<IBillingService, BillingService>();
             services.AddScoped<IBillingEventService, BillingEventService>();
             services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
-            if (enableServiceBus)
+            if (enableServiceBus && billingEnabled)
             {
                 services.AddHostedService<BillingEventWorker>();
-                services.AddHostedService<CreditUsageWorker>();
             }
-            services.AddHostedService<BillingRenewalWorker>();
-            services.AddHostedService<MonthlyCreditGrantWorker>();
+            if (enableServiceBus)
+                services.AddHostedService<CreditUsageWorker>();
+            if (billingEnabled)
+            {
+                services.AddHostedService<BillingRenewalWorker>();
+                services.AddHostedService<MonthlyCreditGrantWorker>();
+            }
             return services;
         }
     }

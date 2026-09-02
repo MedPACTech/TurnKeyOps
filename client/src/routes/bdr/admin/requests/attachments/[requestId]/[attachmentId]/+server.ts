@@ -1,5 +1,5 @@
 import { error, type RequestHandler } from '@sveltejs/kit';
-import { readQuoteRequestAttachment } from '$lib/server/quote-request-attachments';
+import { downloadQuoteRequestAttachment } from '$lib/server/quote-request-attachments';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
 
 export const GET: RequestHandler = async ({ fetch, locals, params }) => {
@@ -15,15 +15,14 @@ export const GET: RequestHandler = async ({ fetch, locals, params }) => {
 		throw error(404, 'Attachment was not found.');
 	}
 
-	const bytes = await readQuoteRequestAttachment(attachment);
-	if (!bytes) {
+	const response = await downloadQuoteRequestAttachment(fetch, params.requestId!, params.attachmentId!);
+	if (!response.ok || !response.body) {
 		throw error(404, 'Attachment content was not found.');
 	}
 
 	const encodedFileName = encodeURIComponent(attachment.fileName);
-	const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-	return new Response(body, {
+	return new Response(response.body, {
 		headers: {
 			'Content-Disposition': `inline; filename*=UTF-8''${encodedFileName}`,
 			'Content-Length': String(attachment.sizeBytes),

@@ -45,7 +45,6 @@
 <div
 	bind:this={el}
 	class="border-line-2 h-[340px] w-full overflow-hidden rounded-[10px] border bg-[#f4f1f2] shadow-[0_12px_40px_rgba(28,20,24,0.12)] sm:h-[460px]"
-	role="img"
+	role="region"
 	aria-label="Map of the Think Pink Land Clearing service area — roughly 50 miles around Columbus, Ohio"
 ></div>
-

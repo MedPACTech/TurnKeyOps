@@ -1,13 +1,15 @@
 <script lang="ts">
 	import AdminContextRail from '$lib/components/admin/AdminContextRail.svelte';
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
+	import { updateEstimateDefaults } from '$lib/api/estimate-defaults';
 	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
 	type EstimateDefaults = PageProps['data']['estimateDefaults'];
 	type BillingSettings = PageProps['data']['billingSettings'];
+	type DefaultsFieldKey = Exclude<keyof EstimateDefaults, 'version'>;
 	type DefaultsField = {
-		key: keyof EstimateDefaults;
+		key: DefaultsFieldKey;
 		label: string;
 		help?: string;
 		prefix?: string;
@@ -148,6 +150,9 @@
 	let defaultsForm = $state<EstimateDefaults>(untrack(() => structuredClone(data.estimateDefaults)));
 	let savedBillingSettings = $state<BillingSettings>(untrack(() => structuredClone(data.billingSettings)));
 	let billingSettingsForm = $state<BillingSettings>(untrack(() => structuredClone(data.billingSettings)));
+	let defaultsSaving = $state(false);
+	let defaultsMessage = $state('');
+	let defaultsError = $state('');
 
 	const hasChanges = $derived(JSON.stringify(savedDefaults) !== JSON.stringify(defaultsForm));
 	const billingHasChanges = $derived(JSON.stringify(savedBillingSettings) !== JSON.stringify(billingSettingsForm));
@@ -159,12 +164,12 @@
 		{ label: 'Status', value: hasChanges ? 'Unsaved changes' : 'All changes saved' }
 	]);
 
-	const displayValue = (key: keyof EstimateDefaults) => {
+	const displayValue = (key: DefaultsFieldKey) => {
 		const value = defaultsForm[key];
 		return Number.isFinite(value) ? String(value) : '';
 	};
 
-	function updateValue(key: keyof EstimateDefaults, raw: string) {
+	function updateValue(key: DefaultsFieldKey, raw: string) {
 		const numeric = raw === '' ? 0 : Number(raw);
 		const value = Number.isFinite(numeric) ? numeric : 0;
 		defaultsForm = {
@@ -177,8 +182,22 @@
 		defaultsForm = structuredClone(savedDefaults);
 	}
 
-	function saveDefaults() {
-		savedDefaults = structuredClone(defaultsForm);
+	async function saveDefaults(event: SubmitEvent) {
+		event.preventDefault();
+		defaultsSaving = true;
+		defaultsMessage = '';
+		defaultsError = '';
+
+		try {
+			const saved = await updateEstimateDefaults(defaultsForm);
+			savedDefaults = structuredClone(saved);
+			defaultsForm = structuredClone(saved);
+			defaultsMessage = 'Estimate defaults saved to TurnKeyOps API.';
+		} catch (cause) {
+			defaultsError = cause instanceof Error ? cause.message : 'Could not save estimate defaults.';
+		} finally {
+			defaultsSaving = false;
+		}
 	}
 
 	function updateDepositPercent(raw: string) {
@@ -194,10 +213,6 @@
 	}
 
 	$effect(() => {
-		if (form?.defaultsSaved && form.estimateDefaults) {
-			savedDefaults = structuredClone(form.estimateDefaults);
-			defaultsForm = structuredClone(form.estimateDefaults);
-		}
 		if (form?.billingSettingsSaved && form.billingSettings) {
 			savedBillingSettings = structuredClone(form.billingSettings);
 			billingSettingsForm = structuredClone(form.billingSettings);
@@ -269,7 +284,7 @@
 			</section>
 		</form>
 
-		<form method="POST" action="?/saveDefaults" class="space-y-5">
+		<form class="space-y-5" onsubmit={saveDefaults}>
 			<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 				<div>
 					<p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Estimator Settings</p>
@@ -291,14 +306,16 @@
 					<button
 						type="submit"
 						class="min-h-12 rounded-lg bg-[var(--accent-text)] px-5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
-						disabled={!hasChanges}
+						disabled={!hasChanges || defaultsSaving}
 					>
-						Save defaults
+						{defaultsSaving ? 'Saving…' : 'Save defaults'}
 					</button>
 				</div>
 			</div>
-			{#if form?.message}
-				<p class="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{form.message}</p>
+			{#if defaultsError}
+				<p class="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{defaultsError}</p>
+			{:else if defaultsMessage}
+				<p class="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{defaultsMessage}</p>
 			{/if}
 
 			<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">

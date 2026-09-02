@@ -3,7 +3,17 @@
 	import { acreageOptions, serviceOptions, timelineOptions } from '$lib/tenants/thinkpink/content';
 	import type { QuoteFormResult } from '$lib/tenants/thinkpink/types';
 
-	let { form }: { form: QuoteFormResult } = $props();
+	let {
+		form,
+		submissionId,
+		submitted = false,
+		reference = ''
+	}: {
+		form: QuoteFormResult;
+		submissionId: string;
+		submitted?: boolean;
+		reference?: string;
+	} = $props();
 
 	let submitting = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -29,13 +39,13 @@
 	}
 </script>
 
-{#if form?.success}
+{#if form?.success || submitted}
 	<div
 		class="bg-ink text-bone flex flex-col items-start gap-4 rounded-xl px-8 py-12 sm:px-12 sm:py-14"
 	>
 		<span class="display text-pink-bright text-[44px] font-black">Got it!</span>
 		<p class="text-dark-body-2 text-[17px] leading-relaxed">
-			Thanks — we'll call you within one business day to schedule your free site visit. Talk soon.
+			Thanks — your request was saved{form?.reference || reference ? ` as ${form?.reference || reference}` : ''}. We'll call you within one business day to schedule your free site visit.
 		</p>
 		<a
 			href="#quote"
@@ -58,7 +68,10 @@
 			};
 		}}
 		class="border-line flex flex-col gap-5 rounded-xl border bg-white p-6 shadow-[0_12px_40px_rgba(28,20,24,0.08)] sm:p-10"
+		aria-busy={submitting}
 	>
+		<input type="hidden" name="submissionId" value={submissionId} />
+		<label class="sr-only" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off" /></label>
 		{#if form?.error}
 			<p
 				class="border-pink/30 bg-pink/5 text-pink-dark rounded-md border px-4 py-3 text-sm font-semibold"
@@ -77,7 +90,7 @@
 					name="name"
 					autocomplete="name"
 					placeholder="Full name"
-					value={form?.values?.name ?? ''}
+					defaultValue={form?.values?.name ?? ''}
 					class={field}
 				/>
 			</label>
@@ -89,7 +102,7 @@
 					name="phone"
 					autocomplete="tel"
 					placeholder="(614) 555-0100"
-					value={form?.values?.phone ?? ''}
+					defaultValue={form?.values?.phone ?? ''}
 					class={field}
 				/>
 			</label>
@@ -102,7 +115,7 @@
 				name="email"
 				autocomplete="email"
 				placeholder="you@example.com"
-				value={form?.values?.email ?? ''}
+				defaultValue={form?.values?.email ?? ''}
 				class={field}
 			/>
 		</label>
@@ -114,7 +127,7 @@
 				type="text"
 				name="address"
 				placeholder="Street address, city, or nearest crossroads"
-				value={form?.values?.address ?? ''}
+				defaultValue={form?.values?.address ?? ''}
 				class={field}
 			/>
 		</label>
@@ -198,8 +211,7 @@
 			{submitting ? 'Sending…' : 'Request My Free Site Visit'}
 		</button>
 		<p class="text-faint m-0 text-center text-[13px]">
-			We'll call within one business day. No spam, ever.
+			By submitting, you consent to Think Pink using these details to respond to this quote request. Photos are stored privately with the request; do not upload sensitive identity or financial documents.
 		</p>
 	</form>
 {/if}
-

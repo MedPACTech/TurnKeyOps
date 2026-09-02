@@ -27,21 +27,30 @@ public class Job : IEntity, ITableEntity
     public string? JobSiteName { get; set; }
     public Guid? EstimateId { get; set; }
     public string? EstimateNumber { get; set; }
+    public Guid? InvoiceId { get; set; }
+    public Guid? QuoteRequestId { get; set; }
+    public string? InvoiceNumber { get; set; }
+    public string? ContactName { get; set; }
+    public string? ContactPhone { get; set; }
+    public string? ContactEmail { get; set; }
     public string? ProjectAddress { get; set; }
     public string? ProjectName { get; set; }
     public string? EstimateSnapshotBlobName { get; set; }
     public string? EstimateSnapshotJson { get; set; }
+    public string? WorkflowPayloadBlobName { get; set; }
 
     // --- Scheduling ---
     public DateTime? ScheduledStart { get; set; }
     public DateTime? ScheduledEnd { get; set; }
     public DateTime? ActualStart { get; set; }
     public DateTime? ActualEnd { get; set; }
+    public string? Crew { get; set; }
 
     // --- Financials ---
     public decimal EstimatedTotal { get; set; }
     public decimal InvoicedTotal { get; set; }
     public decimal PaidTotal { get; set; }
+    public decimal RequiredDepositPercent { get; set; }
 
     public string? Notes { get; set; }
 

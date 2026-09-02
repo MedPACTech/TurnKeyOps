@@ -3,6 +3,7 @@ using MedInsights.Repositories.Interfaces;
 using MedInsights.Services.Interfaces;
 using MedInsights.Services.Mappers;
 using MedInsights.Lib.Utils;
+using MedInsights.Lib.Authorization;
 
 namespace MedInsights.Services
 {
@@ -10,11 +11,16 @@ namespace MedInsights.Services
     {
         private readonly ITenantSubscriptionRepository _repository;
         private readonly IUserContext _userContext;
+        private readonly IRoleAccessService _roleAccess;
 
-        public TenantSubscriptionService(ITenantSubscriptionRepository repository, IUserContext userContext)
+        public TenantSubscriptionService(
+            ITenantSubscriptionRepository repository,
+            IUserContext userContext,
+            IRoleAccessService roleAccess)
         {
             _repository = repository;
             _userContext = userContext;
+            _roleAccess = roleAccess;
         }
 
         public async Task<IEnumerable<TenantSubscriptionDto>> GetAllAsync(CancellationToken ct = default)
@@ -34,6 +40,7 @@ namespace MedInsights.Services
         public async Task<TenantSubscriptionDto> UpsertAsync(TenantSubscriptionDto dto, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.BillingManage, ct);
 
             var tenantId = _userContext.TenantId;
             var entityId = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;

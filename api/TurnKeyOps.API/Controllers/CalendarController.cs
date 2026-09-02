@@ -5,7 +5,7 @@ using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 public class CalendarController : ApiControllerBase
 {
     private readonly ICalendarEventService _service;

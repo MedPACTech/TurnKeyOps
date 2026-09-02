@@ -1,0 +1,34 @@
+name: Required Pull Request Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: required-pr-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Required release validation
+    uses: ./.github/workflows/quality-gates.yml
+
+  required:
+    name: Required PR validation
+    if: always()
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every release gate
+        shell: bash
+        run: |
+          if [ "${{ needs.quality.result }}" != "success" ]; then
+            echo 'One or more required release gates failed or were cancelled.'
+            exit 1
+          fi
+          echo 'All required release gates passed.'

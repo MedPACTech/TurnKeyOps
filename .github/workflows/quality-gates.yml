@@ -1,0 +1,201 @@
+name: Quality Gates (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  repository-policy:
+    name: Repository security and migration posture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Reject tracked secrets and PII
+        run: python3 api/scripts/scan-repository-security.py
+
+      - name: Reject whitespace and conflict artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}"
+            comparison_base="$(git merge-base HEAD "origin/${{ github.base_ref }}")"
+          elif git rev-parse HEAD^ >/dev/null 2>&1; then
+            comparison_base="$(git rev-parse HEAD^)"
+          else
+            comparison_base="$(git hash-object -t tree /dev/null)"
+          fi
+          git diff --check "$comparison_base" HEAD
+
+      - name: Enforce migration validation posture
+        shell: bash
+        run: |
+          set -euo pipefail
+          migration_files="$(git ls-files 'api/**/Migrations/**' 'api/**/*.sql')"
+          if [ -n "$migration_files" ]; then
+            echo 'Relational migration artifacts require a reviewed forward/rollback validation job before merge.'
+            echo "$migration_files"
+            exit 1
+          fi
+          echo 'No relational migration artifacts; Azure Tables/Blob compatibility is covered by API and emulator tests.'
+
+  api:
+    name: API build, tests, and dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Restore API
+        run: dotnet restore api/TurnKeyOps.API.sln --configfile api/nuget.config
+
+      - name: Reject vulnerable .NET dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/api-evidence"
+          dotnet list api/TurnKeyOps.API.sln package --vulnerable --include-transitive \
+            | tee "$RUNNER_TEMP/api-evidence/dotnet-vulnerabilities.txt"
+          if grep -q 'has the following vulnerable packages' "$RUNNER_TEMP/api-evidence/dotnet-vulnerabilities.txt"; then
+            exit 1
+          fi
+
+      - name: Build API
+        run: dotnet build api/TurnKeyOps.API.sln --configuration Release --no-restore
+
+      - name: Run API tests
+        run: >-
+          dotnet test api/TurnKeyOps.API.sln
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=turnkeyops-api.trx"
+          --results-directory "$RUNNER_TEMP/api-evidence"
+
+      - name: Publish API evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-test-evidence-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/api-evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  client:
+    name: Client diagnostics, auth tests, build, and audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+        name: Install locked client dependencies
+      - run: npm audit --audit-level=high
+        name: Reject high-severity client dependencies
+      - run: npm run check
+        name: Run Svelte diagnostics
+      - run: npm run test:session
+        name: Run authorization policy tests
+      - run: npm run build
+        name: Build production client
+
+  legacy-admin:
+    name: Legacy admin diagnostics, build, and audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - run: npm ci
+        name: Install locked admin dependencies
+      - run: npm audit --audit-level=high
+        name: Reject high-severity admin dependencies
+      - run: npm run check
+        name: Run legacy admin diagnostics
+      - run: npm run build
+        name: Build legacy admin
+
+  critical-e2e:
+    name: Critical E2E, authorization, and accessibility
+    needs:
+      - repository-policy
+      - api
+      - client
+      - legacy-admin
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Restore API for E2E host
+        run: dotnet restore api/TurnKeyOps.API.sln --configfile api/nuget.config
+
+      - name: Install locked E2E dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Install pinned Azurite
+        run: npm install --global azurite@3.35.0
+
+      - name: Install Chromium
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+
+      - name: Run critical browser journeys with zero retries
+        working-directory: client
+        run: npm run test:e2e
+
+      - name: Publish Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: critical-e2e-evidence-${{ github.run_attempt }}
+          path: client/test-results
+          if-no-files-found: error
+          retention-days: 30

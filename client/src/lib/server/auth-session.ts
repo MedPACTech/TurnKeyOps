@@ -1,15 +1,19 @@
 import { env } from '$env/dynamic/private';
-import { isBdrAdminViewRole, type BdrAdminViewRole } from '$lib/config/platform';
-
-export type AdminSurface = 'external-admin' | 'internal-admin';
-
-export type AdminSession = {
-	surface: AdminSurface;
-	role: BdrAdminViewRole | null;
-	email: string;
-	tenantId: string;
-	source: 'auth-token' | 'contact-access';
-};
+import { extractTokenRoles } from './session-policy';
+export {
+	getAdminSessionFromToken,
+	getAdminSurface,
+	getDefaultAdminReturnTo,
+	getSafeAdminReturnTo,
+	getTokenSessionId,
+	hasInternalAdminRole,
+	isAdminPath,
+	isCrossSiteFormMutation,
+	isExternalAdminPath,
+	isInternalAdminPath,
+	resolveBdrAdminRole
+} from './session-policy';
+export type { AdminSession, AdminSurface } from './session-policy';
 
 export type OtpChannel = 'email' | 'sms';
 
@@ -54,34 +58,29 @@ type ApiEnvelope<T> = {
 	errors?: Array<{ message?: string }>;
 };
 
-type JwtClaims = Record<string, unknown>;
-
 export const authTokenCookie = 'tko_auth_token';
-export const bdrAdminSessionCookie = 'tko_bdr_admin_role';
-export const bdrAdminContactCookie = 'tko_bdr_admin_contact_id';
-export const internalAdminSessionCookie = 'tko_internal_admin_session';
+export const authRefreshTokenCookie = 'tko_refresh_token';
+export const legacyAdminCookieNames = [
+	'tko_bdr_admin_role',
+	'tko_bdr_admin_contact_id',
+	'tko_internal_admin_session'
+] as const;
 
 const defaultApiBaseUrl = 'http://localhost:5178';
-const roleClaimKeys = [
-	'role',
-	'roles',
-	'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'
-];
 
-export const getAuthApiBaseUrl = () =>
-	(env.PUBLIC_TKO_API_BASE_URL || env.TKO_API_BASE_URL || env.VITE_API_URL || defaultApiBaseUrl).replace(/\/$/, '');
-
-const tokenValidationCache = new Map<string, number>();
-const tokenValidationTtlMs = 30_000;
+export const getAuthApiBaseUrl = () => {
+	const configured = env.PUBLIC_TKO_API_BASE_URL || env.TKO_API_BASE_URL || env.VITE_API_URL;
+	if (!configured && env.NODE_ENV === 'production') {
+		throw new Error('Production authentication requires TKO_API_BASE_URL or PUBLIC_TKO_API_BASE_URL.');
+	}
+	return (configured || defaultApiBaseUrl).replace(/\/$/, '');
+};
 
 export const validateAdminAccessToken = async (
 	fetch: typeof globalThis.fetch,
 	token: string | null | undefined
 ) => {
 	if (!token) return false;
-
-	const cachedUntil = tokenValidationCache.get(token) ?? 0;
-	if (cachedUntil > Date.now()) return true;
 
 	try {
 		const response = await fetch(`${getAuthApiBaseUrl()}/api/auth/session`, {
@@ -90,15 +89,8 @@ export const validateAdminAccessToken = async (
 				Accept: 'application/json'
 			}
 		});
-		if (!response.ok) {
-			tokenValidationCache.delete(token);
-			return false;
-		}
-
-		tokenValidationCache.set(token, Date.now() + tokenValidationTtlMs);
-		return true;
+		return response.ok;
 	} catch {
-		tokenValidationCache.delete(token);
 		return false;
 	}
 };
@@ -111,6 +103,11 @@ const isLocalAuthApi = (baseUrl: string) => {
 		return false;
 	}
 };
+
+export const isDevelopmentAuthEnabled = () =>
+	env.NODE_ENV !== 'production' &&
+	env.TKO_DEVELOPMENT_AUTH_MODE === 'true' &&
+	isLocalAuthApi(getAuthApiBaseUrl());
 
 const normalizeOtpDestination = (identifier: string, channel?: OtpChannel) => {
 	const value = identifier.trim();
@@ -130,28 +127,6 @@ export const inferOtpChannel = (identifier: string): OtpChannel | null => {
 
 	const digits = value.replace(/\D/g, '');
 	return digits.length >= 7 && digits.length <= 15 ? 'sms' : null;
-};
-
-export const isExternalAdminPath = (pathname: string) =>
-	pathname === '/bdr/admin' ||
-	pathname.startsWith('/bdr/admin/') ||
-	pathname === '/thinkpink/admin' ||
-	pathname.startsWith('/thinkpink/admin/');
-export const isInternalAdminPath = (pathname: string) =>
-	pathname === '/turnkeyops/admin' || pathname.startsWith('/turnkeyops/admin/');
-export const isAdminPath = (pathname: string) => isExternalAdminPath(pathname) || isInternalAdminPath(pathname);
-
-export const getAdminSurface = (pathname: string): AdminSurface =>
-	isInternalAdminPath(pathname) ? 'internal-admin' : 'external-admin';
-
-export const getDefaultAdminReturnTo = (surface: AdminSurface) =>
-	surface === 'internal-admin' ? '/turnkeyops/admin/dashboard' : '/bdr/admin/bob';
-
-export const getSafeAdminReturnTo = (value: string | null | undefined) => {
-	if (value?.startsWith('/turnkeyops/admin')) return value;
-	if (value?.startsWith('/bdr/admin')) return value;
-	if (value?.startsWith('/thinkpink/admin')) return value;
-	return '/bdr/admin/bob';
 };
 
 export const buildLoginRedirect = (url: URL) => {
@@ -209,7 +184,6 @@ export const startOtp = async (fetch: typeof globalThis.fetch, identifier: strin
 		throw new Error('Enter a valid email address or mobile number.');
 	}
 
-	const apiBaseUrl = getAuthApiBaseUrl();
 	const result = await postAuthApi<StartOtpResponse>(fetch, '/auth/startotp', {
 		destination: normalizeOtpDestination(identifier, channel),
 		preferredChannel: channel
@@ -218,7 +192,7 @@ export const startOtp = async (fetch: typeof globalThis.fetch, identifier: strin
 	return {
 		...result,
 		channel: result.channel ?? channel,
-		devCode: result.devCode ?? (isLocalAuthApi(apiBaseUrl) ? '123456' : null)
+		devCode: isDevelopmentAuthEnabled() ? (result.devCode ?? '123456') : null
 	};
 };
 
@@ -239,6 +213,9 @@ export const completeOtp = (
 	});
 };
 
+export const refreshAuthSession = (fetch: typeof globalThis.fetch, refreshToken: string) =>
+	postAuthApi<AuthResult>(fetch, '/auth/refresh', { refreshToken });
+
 export const extractAccessToken = (result: AuthResult) => {
 	if (typeof result.token === 'object' && result.token !== null) {
 		return result.token.accessToken ?? null;
@@ -255,19 +232,6 @@ export const extractRefreshToken = (result: AuthResult) => {
 	return result.refreshToken ?? result.auth?.refreshToken ?? null;
 };
 
-const decodeJwtClaims = (token: string | null | undefined): JwtClaims => {
-	if (!token) return {};
-	const [, payload] = token.split('.');
-	if (!payload) return {};
-
-	try {
-		const padded = payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '=');
-		return JSON.parse(globalThis.atob(padded)) as JwtClaims;
-	} catch {
-		return {};
-	}
-};
-
 const asStringArray = (value: unknown): string[] => {
 	if (Array.isArray(value)) {
 		return value.filter((item): item is string => typeof item === 'string');
@@ -277,71 +241,7 @@ const asStringArray = (value: unknown): string[] => {
 };
 
 export const extractAuthRoles = (result: AuthResult | null | undefined, token: string | null | undefined) => {
-	const claims = decodeJwtClaims(token);
-	const claimRoles = roleClaimKeys.flatMap((key) => asStringArray(claims[key]));
 	const resultRoles = result ? [...asStringArray(result.roles), ...asStringArray(result.user?.roles)] : [];
 
-	return [...resultRoles, ...claimRoles];
-};
-
-export const resolveBdrAdminRole = (
-	roles: string[],
-	fallbackRole?: string | null
-): BdrAdminViewRole | null => {
-	if (isBdrAdminViewRole(fallbackRole)) return fallbackRole;
-
-	const normalized = roles.map((role) => role.trim().toLowerCase().replace(/[_\s]+/g, '-'));
-	if (normalized.includes('owner') || normalized.includes('company-owner') || normalized.includes('tenant-owner')) {
-		return 'owner';
-	}
-
-	if (
-		normalized.some((role) =>
-			['office-admin', 'company-admin', 'tenant-admin', 'admin', 'administrator'].includes(role)
-		)
-	) {
-		return 'office-admin';
-	}
-
-	return null;
-};
-
-const getClaimString = (claims: JwtClaims, keys: string[]) => {
-	for (const key of keys) {
-		const value = claims[key];
-		if (typeof value === 'string') return value;
-	}
-
-	return '';
-};
-
-const isExpired = (claims: JwtClaims) => {
-	const rawExp = claims.exp;
-	const exp = typeof rawExp === 'number' ? rawExp : Number(rawExp);
-	return Number.isFinite(exp) && exp > 0 && Date.now() / 1000 > exp;
-};
-
-export const getAdminSessionFromToken = (
-	token: string | null | undefined,
-	pathname: string,
-	fallbackRole?: string | null
-): AdminSession | null => {
-	const claims = decodeJwtClaims(token);
-	if (!Object.keys(claims).length || isExpired(claims)) return null;
-
-	const roles = extractAuthRoles(null, token);
-	const role = resolveBdrAdminRole(roles, fallbackRole);
-	const surface = getAdminSurface(pathname);
-
-	if (surface === 'external-admin' && !role) {
-		return null;
-	}
-
-	return {
-		surface,
-		role,
-		email: getClaimString(claims, ['email', 'unique_name', 'preferred_username']),
-		tenantId: getClaimString(claims, ['tenant_id', 'tenant', 'tid']),
-		source: 'auth-token'
-	};
+	return [...resultRoles, ...extractTokenRoles(token)];
 };

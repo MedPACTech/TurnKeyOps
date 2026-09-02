@@ -21,7 +21,16 @@ This document defines the required controls for:
 - Invite redemption must not allow a user to claim an invite with an alternate verified contact.
 - Invite redemption is audit logged as a security event.
 - Invite redemption must only transition an invite from `Invited` to `Redeemed` once.
-- Seat assignment happens only after successful redemption.
+- When billing is enabled, seat assignment happens only after successful redemption.
+- When billing is disabled for manual launch provisioning, invites and active memberships use `Unassigned` seat state and do not require a paid subscription.
+
+## Manual Launch Provisioning
+
+- Internal Admin may invite a Customer Admin only through the configured managed-tenant directory; callers cannot supply an arbitrary tenant GUID.
+- The platform user-management controller requires the explicit `internal_admin` identity-provider role.
+- Customer Admin is the tenant-scoped `admin` role and may manage only the tenant in the validated JWT.
+- Controllers delegate invitation and membership business rules to services.
+- One-time activation links must be shared through an approved secure channel and become unusable after redemption, cancellation, or expiration.
 
 ## Verified Contact Change Controls
 

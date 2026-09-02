@@ -18,6 +18,9 @@ public static class TurnKeyOpsFeatureDependencyInjection
     public static IServiceCollection AddTurnKeyOpsFeatureConfigurations(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<WeatherSettings>(configuration.GetSection("WeatherSettings"));
+        services.Configure<QuoteRequestTenantOptions>(configuration.GetSection(QuoteRequestTenantOptions.SectionName));
+        services.Configure<BobOperationsOptions>(configuration.GetSection(BobOperationsOptions.SectionName));
+        services.Configure<UserAdministrationOptions>(configuration.GetSection(UserAdministrationOptions.SectionName));
         return services;
     }
 
@@ -33,6 +36,20 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddAzureEntityMapping<Customer>(o =>
         {
             o.TableName = "Customers";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = true;
+        });
+
+        services.AddAzureEntityMapping<QuoteRequest>(o =>
+        {
+            o.TableName = "QuoteRequests";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = true;
+        });
+
+        services.AddAzureEntityMapping<QuoteEstimate>(o =>
+        {
+            o.TableName = "QuoteEstimates";
             o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
             o.EnableIdLocator = true;
         });
@@ -70,6 +87,27 @@ public static class TurnKeyOpsFeatureDependencyInjection
             o.TableName = "EstimateDefaults";
             o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
             o.EnableIdLocator = true;
+        });
+
+        services.AddAzureEntityMapping<TenantSettingsDocument>(o =>
+        {
+            o.TableName = "TenantSettings";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = true;
+        });
+
+        services.AddAzureEntityMapping<ContactAccessGrant>(o =>
+        {
+            o.TableName = "ContactAccessGrants";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = true;
+        });
+
+        services.AddAzureEntityMapping<BobActionRecord>(o =>
+        {
+            o.TableName = "BobActions";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = false;
         });
 
         services.AddAzureEntityMapping<EstimateLineItem>(o =>
@@ -111,11 +149,26 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IBaseRepositoryAsync<Customer>>(sp => sp.GetRequiredService<ICustomerRepository>());
 
+        services.AddScoped<IQuoteRequestRepository, QuoteRequestRepository>();
+        services.AddScoped<IBaseRepositoryAsync<QuoteRequest>>(sp => sp.GetRequiredService<IQuoteRequestRepository>());
+
+        services.AddScoped<IQuoteEstimateRepository, QuoteEstimateRepository>();
+        services.AddScoped<IBaseRepositoryAsync<QuoteEstimate>>(sp => sp.GetRequiredService<IQuoteEstimateRepository>());
+
         services.AddScoped<IEstimateRepository, EstimateRepository>();
         services.AddScoped<IBaseRepositoryAsync<Estimate>>(sp => sp.GetRequiredService<IEstimateRepository>());
 
         services.AddScoped<IEstimateDefaultsRepository, EstimateDefaultsRepository>();
         services.AddScoped<IBaseRepositoryAsync<EstimateDefaultsProfile>>(sp => sp.GetRequiredService<IEstimateDefaultsRepository>());
+
+        services.AddScoped<ITenantSettingsRepository, TenantSettingsRepository>();
+        services.AddScoped<IBaseRepositoryAsync<TenantSettingsDocument>>(sp => sp.GetRequiredService<ITenantSettingsRepository>());
+
+        services.AddScoped<IContactAccessGrantRepository, ContactAccessGrantRepository>();
+        services.AddScoped<IBaseRepositoryAsync<ContactAccessGrant>>(sp => sp.GetRequiredService<IContactAccessGrantRepository>());
+
+        services.AddScoped<IBobActionRepository, BobActionRepository>();
+        services.AddScoped<IBaseRepositoryAsync<BobActionRecord>>(sp => sp.GetRequiredService<IBobActionRepository>());
 
         services.AddScoped<IEstimateLineItemRepository, EstimateLineItemRepository>();
         services.AddScoped<IBaseRepositoryAsync<EstimateLineItem>>(sp => sp.GetRequiredService<IEstimateLineItemRepository>());
@@ -142,15 +195,28 @@ public static class TurnKeyOpsFeatureDependencyInjection
     {
         services.AddScoped<ICalendarEventService, CalendarEventService>();
         services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<IQuoteRequestTenantResolver, QuoteRequestTenantResolver>();
+        services.AddScoped<IQuoteRequestService, QuoteRequestService>();
+        services.AddScoped<IQuoteRequestAttachmentService, QuoteRequestAttachmentService>();
+        services.AddScoped<IQuoteEstimateService, QuoteEstimateService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IEstimateWorkflowPayloadStore, EstimateWorkflowPayloadStore>();
         services.AddScoped<IEstimateService, EstimateService>();
         services.AddScoped<IEstimateDefaultsService, EstimateDefaultsService>();
+        services.AddScoped<ITenantSettingsService, TenantSettingsService>();
+        services.AddScoped<IContactAccessGrantService, ContactAccessGrantService>();
+        services.AddScoped<IInvoiceWorkflowPayloadStore, InvoiceWorkflowPayloadStore>();
         services.AddScoped<IInvoiceService, InvoiceService>();
+        services.AddScoped<IInvoiceWebhookService, InvoiceWebhookService>();
+        services.AddScoped<IJobWorkflowPayloadStore, JobWorkflowPayloadStore>();
         services.AddScoped<IJobService, JobService>();
         services.AddScoped<IJobSiteService, JobSiteService>();
         services.AddScoped<IWeatherService, WeatherService>();
         services.AddScoped<ITurnKeyChatService, TurnKeyChatService>();
+        services.AddScoped<IBobContextMinimizer, BobContextMinimizer>();
+        services.AddScoped<IBobOperationsService, BobOperationsService>();
+        services.AddScoped<IBobActionProvider, BobConversationReadProvider>();
+        services.AddScoped<IBobActionProvider, BobConversationArchiveProvider>();
 
         return services;
     }

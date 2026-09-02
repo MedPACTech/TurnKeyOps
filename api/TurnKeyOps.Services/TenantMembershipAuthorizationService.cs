@@ -37,8 +37,20 @@ namespace MedInsights.Services
             if (!_userContext.IsAuthenticated)
                 throw new UnauthorizedAccessException();
 
-            return await _membershipRepository.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(_userContext.TenantId), _userContext.UserId, ct)
-                   ?? throw new ForbiddenAccessException("Current user is not an active tenant member.");
+            var membership = await _membershipRepository.GetByUserIdAsync(
+                EntityKeyPolicy.TenantPartition(_userContext.TenantId),
+                _userContext.UserId,
+                ct);
+
+            if (membership is null
+                || membership.IsDeleted
+                || membership.DateRemoved.HasValue
+                || !string.Equals(membership.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ForbiddenAccessException("Current user is not an active tenant member.");
+            }
+
+            return membership;
         }
     }
 }

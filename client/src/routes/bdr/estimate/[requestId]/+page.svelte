@@ -10,6 +10,13 @@
 		depthInches: number;
 		wastePercent: number;
 		numberOfPours: number;
+		squareFeet?: number;
+		cubicYards?: number;
+		formLinearFeet?: number;
+		rebarLinearFeet?: number;
+		materialCost?: number;
+		laborCost?: number;
+		estimatedTotal?: number;
 	};
 
 	type CalculatedLocation = EstimateLocation & {
@@ -24,27 +31,16 @@
 
 	let { data, form }: PageProps = $props();
 
-	const concreteCostPerYard = $derived(data.estimateDefaults?.concreteCostPerYard ?? 165);
-	const laborRatePerSquareFoot = $derived(data.estimateDefaults?.laborRatePerSquareFoot ?? 4);
-	const rebarUnitCost = $derived(data.estimateDefaults?.rebarUnitCost ?? 1.5);
-
 	const calculateLocation = (location: EstimateLocation): CalculatedLocation => {
-		const squareFeet = Math.max(0, location.lengthFeet) * Math.max(0, location.widthFeet);
-		const cubicYardsBase = (squareFeet * Math.max(0, location.depthInches)) / 12 / 27;
-		const cubicYards = Math.ceil(cubicYardsBase * (1 + Math.max(0, location.wastePercent)) * 10) / 10;
-		const formLinearFeet = Math.ceil(4 * Math.sqrt(squareFeet) * 1.1);
-		const rebarLinearFeet = Math.ceil(Math.ceil(Math.sqrt(squareFeet)) * Math.sqrt(squareFeet) * 2 * 1.1);
-		const materialCost = cubicYards * concreteCostPerYard + rebarLinearFeet * rebarUnitCost;
-		const laborCost = squareFeet * laborRatePerSquareFoot;
 		return {
 			...location,
-			squareFeet,
-			cubicYards,
-			formLinearFeet,
-			rebarLinearFeet,
-			materialCost,
-			laborCost,
-			estimatedTotal: materialCost + laborCost
+			squareFeet: location.squareFeet ?? 0,
+			cubicYards: location.cubicYards ?? 0,
+			formLinearFeet: location.formLinearFeet ?? 0,
+			rebarLinearFeet: location.rebarLinearFeet ?? 0,
+			materialCost: location.materialCost ?? 0,
+			laborCost: location.laborCost ?? 0,
+			estimatedTotal: location.estimatedTotal ?? 0
 		};
 	};
 
@@ -179,9 +175,11 @@
 				<p class="mt-2 text-sm leading-6 text-slate-600">Approving tells BDR to move this estimate into invoice and job handoff. If something is off, leave a note and the office will revise it.</p>
 				<div class="mt-5 grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
 					<form method="POST" action="?/approve">
+						<input type="hidden" name="accessToken" value={data.accessToken} />
 						<button type="submit" class="w-full rounded-md bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 sm:w-auto">Approve estimate</button>
 					</form>
 					<form method="POST" action="?/requestChanges" class="grid gap-3">
+						<input type="hidden" name="accessToken" value={data.accessToken} />
 						<textarea name="responseNote" rows="3" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-orange-300" placeholder="What should BDR adjust?"></textarea>
 						<button type="submit" class="rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50">Request changes</button>
 						{#if form?.changeMessage}

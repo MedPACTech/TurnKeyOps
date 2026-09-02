@@ -1,6 +1,8 @@
 using MedInsights.Lib;
+using MedInsights.Lib.Configurations;
 using MedInsights.Repositories.Interfaces;
 using MedInsights.Services.Interfaces;
+using Microsoft.Extensions.Options;
 
 namespace MedInsights.Services
 {
@@ -9,28 +11,45 @@ namespace MedInsights.Services
         private readonly IReadOnlyDictionary<string, IPaymentProvider> _providers;
         private readonly ITenantBillingAccountRepository _billingAccountRepository;
         private readonly ITenantSubscriptionRepository _subscriptionRepository;
+        private readonly BillingIntegrationOptions _options;
 
         public PaymentProviderResolver(
             IEnumerable<IPaymentProvider> providers,
             ITenantBillingAccountRepository billingAccountRepository,
-            ITenantSubscriptionRepository subscriptionRepository)
+            ITenantSubscriptionRepository subscriptionRepository,
+            IOptions<BillingIntegrationOptions> options)
         {
             _providers = providers.ToDictionary(x => x.ProviderName, StringComparer.OrdinalIgnoreCase);
             _billingAccountRepository = billingAccountRepository;
             _subscriptionRepository = subscriptionRepository;
+            _options = options.Value;
         }
 
-        public IPaymentProvider GetDefaultProvider() => GetRequiredProvider("Stripe");
+        public IPaymentProvider GetDefaultProvider()
+        {
+            EnsureBillingEnabled();
+
+            if (string.IsNullOrWhiteSpace(_options.DefaultProvider))
+                throw new InvalidOperationException("No default billing provider is configured.");
+
+            return GetRequiredProvider(_options.DefaultProvider);
+        }
 
         public IPaymentProvider GetRequiredProvider(string providerName)
         {
+            EnsureBillingEnabled();
+
             if (string.IsNullOrWhiteSpace(providerName))
                 throw new ArgumentException("ProviderName is required.", nameof(providerName));
 
-            if (_providers.TryGetValue(providerName.Trim(), out var provider))
+            var normalized = providerName.Trim();
+            if (!_options.EnabledProviders.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Payment provider '{normalized}' is disabled.");
+
+            if (_providers.TryGetValue(normalized, out var provider))
                 return provider;
 
-            throw new InvalidOperationException($"Payment provider '{providerName}' is not registered.");
+            throw new InvalidOperationException($"Payment provider '{normalized}' is not registered.");
         }
 
         public async Task<IPaymentProvider> ResolveForTenantAsync(Guid? tenantId, string? providerName, CancellationToken ct = default)
@@ -82,6 +101,12 @@ namespace MedInsights.Services
             }
 
             return await ResolveForTenantAsync(tenantId, null, ct);
+        }
+
+        private void EnsureBillingEnabled()
+        {
+            if (!_options.Enabled)
+                throw new InvalidOperationException("Production billing is disabled.");
         }
     }
 }

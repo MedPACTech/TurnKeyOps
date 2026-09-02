@@ -207,7 +207,7 @@
 	const calculateLocation = (location: EstimateLocation): CalculatedLocation => {
 		const squareFeet = Math.max(0, location.lengthFeet) * Math.max(0, location.widthFeet);
 		const cubicYardsBase = (squareFeet * Math.max(0, location.depthInches)) / 12 / 27;
-		const cubicYards = Math.ceil(cubicYardsBase * (1 + Math.max(0, location.wastePercent)) * 10) / 10;
+		const cubicYards = Math.ceil(cubicYardsBase * (1 + Math.max(0, location.wastePercent) / 100) * 10) / 10;
 		const cubicYardsPerPour = cubicYards / Math.max(1, location.numberOfPours);
 		const formLinearFeet = Math.ceil(4 * Math.sqrt(squareFeet) * 1.1);
 		const rebarLinearFeet = Math.ceil(Math.ceil(Math.sqrt(squareFeet)) * Math.sqrt(squareFeet) * 2 * 1.1);

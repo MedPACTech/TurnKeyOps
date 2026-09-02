@@ -7,14 +7,14 @@
 	--color-ink-line: #3a2c33;
 	--color-bone: #faf7f8;
 	--color-bone-2: #f3ebef;
-	--color-pink: #d40f80;
+	--color-pink: #c20d74;
 	--color-pink-dark: #a50c64;
 	--color-pink-bright: #ff4fb2;
-	--color-pink-pale: #fbd7ea;
+	--color-pink-pale: #ffffff;
 	--color-body: #4a3e44;
 	--color-muted: #6e5f66;
-	--color-muted-2: #8a7681;
-	--color-faint: #9c8e95;
+	--color-muted-2: #6e5f66;
+	--color-faint: #6e5f66;
 	--color-line: #eadde3;
 	--color-line-2: #e3d2db;
 	--color-line-3: #dccbd4;
@@ -56,4 +56,3 @@
 	text-transform: uppercase;
 	line-height: 1;
 }
-

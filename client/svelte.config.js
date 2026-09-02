@@ -14,6 +14,11 @@ const config = {
 		}
 	},
 	kit: {
+		csrf: {
+			// The server hook performs the same-origin form check so rejected requests
+			// receive the application's security headers and session-cookie cleanup.
+			trustedOrigins: ['*']
+		},
 		// The client uses server routes and cookie-backed sessions, so deploy it as
 		// a Node application (Azure App Service), not as a static web application.
 		adapter: adapter({

@@ -1,60 +1,60 @@
-const fsModuleName = 'node:fs/promises';
-const getCwd = () =>
-	(globalThis as typeof globalThis & { process?: { cwd: () => string } }).process?.cwd() ?? '.';
-const localStoreDir = `${getCwd()}/.svelte-kit`;
-const localStorePath = `${localStoreDir}/local-bdr-contact-access.json`;
+import {
+	listContactAccessGrants,
+	updateContactAccessGrant,
+	type ContactAccessRole
+} from '$lib/api/tenant-settings';
 
 export const bdrContactAccessRoles = ['none', 'field', 'office-admin', 'owner'] as const;
 export type BdrContactAccessRole = (typeof bdrContactAccessRoles)[number];
 
-type FsPromises = {
-	mkdir: (path: string, options: { recursive: boolean }) => Promise<unknown>;
-	readFile: (path: string, encoding: 'utf-8') => Promise<string>;
-	writeFile: (path: string, data: string) => Promise<unknown>;
+export const isBdrContactAccessRole = (
+	value: string | null | undefined
+): value is BdrContactAccessRole => bdrContactAccessRoles.includes(value as BdrContactAccessRole);
+
+export const isBdrAdminContactAccessRole = (
+	value: string | null | undefined
+): value is 'office-admin' | 'owner' => value === 'office-admin' || value === 'owner';
+
+export const loadBdrContactAccessRoles = async (
+	fetcher: typeof globalThis.fetch = globalThis.fetch,
+	accessToken?: string | null
+): Promise<Record<string, BdrContactAccessRole>> => {
+	const grants = await listContactAccessGrants(fetcher, accessToken);
+	return Object.fromEntries(
+		grants
+			.filter((grant) => grant.enabled && isBdrContactAccessRole(grant.role))
+			.map((grant) => [grant.contactId, grant.role])
+	);
 };
 
-const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
-
-export const isBdrContactAccessRole = (value: string | null | undefined): value is BdrContactAccessRole =>
-	bdrContactAccessRoles.includes(value as BdrContactAccessRole);
-
-export const isBdrAdminContactAccessRole = (value: string | null | undefined): value is 'office-admin' | 'owner' =>
-	value === 'office-admin' || value === 'owner';
-
-export const loadBdrContactAccessRoles = async (): Promise<Record<string, BdrContactAccessRole>> => {
-	try {
-		const fs = await getFs();
-		const text = await fs.readFile(localStorePath, 'utf-8');
-		const parsed = JSON.parse(text) as Record<string, string>;
-
-		return Object.fromEntries(
-			Object.entries(parsed).filter((entry): entry is [string, BdrContactAccessRole] =>
-				Boolean(entry[0] && isBdrContactAccessRole(entry[1]))
-			)
-		);
-	} catch {
-		return {};
-	}
-};
-
-export const saveBdrContactAccessRole = async (contactId: string, role: BdrContactAccessRole) => {
+export const saveBdrContactAccessRole = async (
+	contactId: string,
+	role: BdrContactAccessRole,
+	fetcher: typeof globalThis.fetch = globalThis.fetch,
+	accessToken?: string | null
+) => {
 	const trimmedContactId = contactId.trim();
-	if (!trimmedContactId) {
-		throw new Error('Contact id is required.');
-	}
+	if (!trimmedContactId) throw new Error('Contact id is required.');
 
-	const fs = await getFs();
-	const roles = await loadBdrContactAccessRoles();
-	const nextRoles = { ...roles, [trimmedContactId]: role };
-	await fs.mkdir(localStoreDir, { recursive: true });
-	await fs.writeFile(localStorePath, `${JSON.stringify(nextRoles, null, 2)}\n`);
-
-	return nextRoles;
+	const grants = await listContactAccessGrants(fetcher, accessToken);
+	const current = grants.find((grant) => grant.contactId === trimmedContactId);
+	await updateContactAccessGrant(
+		trimmedContactId,
+		role as ContactAccessRole,
+		current?.version,
+		fetcher,
+		accessToken
+	);
+	return loadBdrContactAccessRoles(fetcher, accessToken);
 };
 
-export const getPersistedBdrAdminRole = async (contactId: string | undefined) => {
-	if (!contactId) return null;
-	const roles = await loadBdrContactAccessRoles();
+export const getPersistedBdrAdminRole = async (
+	contactId: string | undefined,
+	fetcher: typeof globalThis.fetch = globalThis.fetch,
+	accessToken?: string | null
+) => {
+	if (!contactId || !accessToken) return null;
+	const roles = await loadBdrContactAccessRoles(fetcher, accessToken);
 	const role = roles[contactId];
 	return isBdrAdminContactAccessRole(role) ? role : null;
 };

@@ -5,47 +5,7 @@ import {
 	getBdrInvoiceBalanceDue,
 	type BdrInvoiceRecord
 } from '$lib/server/bdr-invoices';
-
-const fsModuleName = 'node:fs/promises';
-const getCwd = () =>
-	(globalThis as typeof globalThis & { process?: { cwd: () => string } }).process?.cwd() ?? '.';
-
-type FsPromises = {
-	mkdir: (path: string, options: { recursive: boolean }) => Promise<unknown>;
-	readFile: (path: string, encoding: 'utf-8') => Promise<string>;
-	writeFile: (path: string, data: string) => Promise<unknown>;
-};
-
-export type BdrScheduledJobRecord = {
-	id: string;
-	invoiceId: string;
-	sourceRequestId: string;
-	invoiceNumber: string;
-	customerName: string;
-	siteName: string;
-	serviceSummary: string;
-	serviceAddress: string;
-	contactName: string;
-	phone: string;
-	email: string;
-	amount: number;
-	amountPaidAtScheduling: number;
-	depositPercentRequired: number;
-	scheduledDate: string;
-	windowStart: string;
-	windowEnd: string;
-	crew: string;
-	notes?: string;
-	status: BdrProductionJobStatus;
-	scheduledAtUtc: string;
-	scheduledBy: string;
-	updatedAtUtc: string;
-	completedAtUtc?: string;
-	cancelledAtUtc?: string;
-	holdReason?: string;
-	planning: BdrProductionJobPlanning;
-	activity: BdrProductionJobActivity[];
-};
+import { getTurnKeyApiBaseUrl, getTurnKeyApiHeaders, unwrapTurnKeyApiEnvelope } from '$lib/server/turnkey-api';
 
 export type BdrProductionJobStatus = 'scheduled' | 'in-progress' | 'on-hold' | 'completed' | 'cancelled';
 export type BdrProductionJobConfirmationStatus = 'pending' | 'confirmed' | 'needs-reschedule';
@@ -69,12 +29,7 @@ export type BdrProductionJobPlanning = {
 		confirmationNote?: string;
 		accessNotes?: string;
 	};
-	schedule: {
-		targetDate: string;
-		prepDate?: string;
-		pourDate?: string;
-		cleanupDate?: string;
-	};
+	schedule: { targetDate: string; prepDate?: string; pourDate?: string; cleanupDate?: string };
 	materials: {
 		baseMaterialStatus: BdrProductionJobOrderStatus;
 		baseMaterialSupplier?: string;
@@ -107,6 +62,38 @@ export type BdrProductionJobActivity = {
 	occurredAtUtc: string;
 	actor: string;
 	note?: string;
+};
+
+export type BdrScheduledJobRecord = {
+	id: string;
+	invoiceId: string;
+	sourceRequestId: string;
+	invoiceNumber: string;
+	customerName: string;
+	siteName: string;
+	serviceSummary: string;
+	serviceAddress: string;
+	contactName: string;
+	phone: string;
+	email: string;
+	amount: number;
+	amountPaidAtScheduling: number;
+	depositPercentRequired: number;
+	scheduledDate: string;
+	windowStart: string;
+	windowEnd: string;
+	crew: string;
+	notes?: string;
+	status: BdrProductionJobStatus;
+	scheduledAtUtc: string;
+	scheduledBy: string;
+	updatedAtUtc: string;
+	completedAtUtc?: string;
+	cancelledAtUtc?: string;
+	holdReason?: string;
+	planning: BdrProductionJobPlanning;
+	activity: BdrProductionJobActivity[];
+	version: string;
 };
 
 export type BdrProductionJobPlanningUpdateInput = {
@@ -161,560 +148,309 @@ export type BdrScheduleReadyJob = {
 	scheduledJob?: BdrScheduledJobRecord;
 };
 
-const getStoreDir = () => `${getCwd()}/.svelte-kit`;
-const getStorePath = () => `${getStoreDir()}/local-bdr-scheduled-jobs.json`;
-const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
-
-const normalizeTime = (value: unknown, fallback: string) => {
-	const normalized = String(value ?? '').trim();
-	return /^\d{2}:\d{2}$/.test(normalized) ? normalized : fallback;
+type JobApiMaterial = {
+	id?: string;
+	kind: string;
+	status: string;
+	supplier?: string | null;
+	deliveryDate?: string | null;
+	deliveryWindow?: string | null;
+	quantity?: number | null;
+	unit?: string | null;
+	specification?: string | null;
+	notes?: string | null;
 };
 
-const normalizeDate = (value: unknown) => {
-	const normalized = String(value ?? '').trim();
-	return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : '';
+type JobApiPlanning = {
+	customerConfirmationStatus?: string;
+	customerConfirmedAtUtc?: string | null;
+	customerConfirmationNote?: string | null;
+	accessNotes?: string | null;
+	targetDate?: string | null;
+	prepDate?: string | null;
+	pourDate?: string | null;
+	cleanupDate?: string | null;
+	materials?: JobApiMaterial[];
+	checklist?: Record<string, boolean>;
+	updatedAtUtc?: string | null;
+	updatedBy?: string | null;
 };
 
-const normalizeJobStatus = (value: unknown): BdrProductionJobStatus => {
-	const normalized = String(value ?? '').trim();
-	if (normalized === 'in-progress' || normalized === 'on-hold' || normalized === 'completed' || normalized === 'cancelled') {
-		return normalized;
-	}
-	return 'scheduled';
+type JobApiRecord = {
+	id: string;
+	name: string;
+	description?: string | null;
+	status: string;
+	invoiceId?: string | null;
+	quoteRequestId?: string | null;
+	invoiceNumber?: string | null;
+	customerName?: string | null;
+	jobSiteName?: string | null;
+	projectAddress?: string | null;
+	projectName?: string | null;
+	contactName?: string | null;
+	contactPhone?: string | null;
+	contactEmail?: string | null;
+	scheduledStart?: string | null;
+	scheduledEnd?: string | null;
+	actualEnd?: string | null;
+	crew?: string | null;
+	estimatedTotal?: number;
+	paidTotal?: number;
+	requiredDepositPercent?: number;
+	notes?: string | null;
+	planning?: JobApiPlanning;
+	activity?: Array<{ id: string; type: string; label: string; occurredAtUtc: string; actor: string; note?: string | null }>;
+	version: string;
+	dateCreated?: string | null;
+	dateUpdated?: string | null;
 };
 
-const normalizeConfirmationStatus = (value: unknown): BdrProductionJobConfirmationStatus => {
-	const normalized = String(value ?? '').trim();
-	if (normalized === 'confirmed' || normalized === 'needs-reschedule') return normalized;
-	return 'pending';
-};
-
-const normalizeOrderStatus = (value: unknown): BdrProductionJobOrderStatus => {
-	const normalized = String(value ?? '').trim();
-	if (normalized === 'requested' || normalized === 'ordered' || normalized === 'confirmed' || normalized === 'delivered') {
-		return normalized;
-	}
-	return 'not-started';
-};
+type JobPageEnvelope = { data: JobApiRecord[]; success: boolean; continuationToken?: string | null };
 
 const checklistKeys: BdrProductionJobChecklistKey[] = [
-	'customer-confirmed',
-	'site-access',
-	'utility-locate',
-	'base-material-ordered',
-	'equipment-reserved',
-	'concrete-ordered',
-	'forms-reinforcement',
-	'weather-check',
-	'pour-confirmed',
-	'cleanup-walkthrough'
+	'customer-confirmed', 'site-access', 'utility-locate', 'base-material-ordered', 'equipment-reserved',
+	'concrete-ordered', 'forms-reinforcement', 'weather-check', 'pour-confirmed', 'cleanup-walkthrough'
 ];
 
-const defaultChecklist = (): Record<BdrProductionJobChecklistKey, boolean> =>
+const defaultChecklist = () =>
 	Object.fromEntries(checklistKeys.map((key) => [key, false])) as Record<BdrProductionJobChecklistKey, boolean>;
 
-const normalizeChecklist = (value: unknown): Record<BdrProductionJobChecklistKey, boolean> => {
-	const checklist = defaultChecklist();
-	if (value && typeof value === 'object') {
-		for (const key of checklistKeys) {
-			checklist[key] = Boolean((value as Partial<Record<BdrProductionJobChecklistKey, boolean>>)[key]);
-		}
-	}
-	return checklist;
+const api = (path: string, init?: RequestInit, fetcher: typeof globalThis.fetch = fetch) =>
+	fetcher(`${getTurnKeyApiBaseUrl()}${path}`, {
+		...init,
+		headers: { ...getTurnKeyApiHeaders(init?.body !== undefined), ...(init?.headers ?? {}) }
+	});
+
+const time = (value?: string | null) => value?.slice(11, 16) || '08:00';
+const date = (value?: string | null) => value?.slice(0, 10) || '';
+const iso = (day: string, value: string) => `${day}T${value}:00.000Z`;
+const orderStatus = (value?: string | null): BdrProductionJobOrderStatus => {
+	const normalized = value?.toLowerCase();
+	return normalized === 'requested' || normalized === 'ordered' || normalized === 'confirmed' || normalized === 'delivered'
+		? normalized
+		: 'not-started';
 };
-
-const normalizeOptionalNumber = (value: unknown) => {
-	const amount = typeof value === 'number' ? value : Number.parseFloat(String(value ?? '').trim());
-	return Number.isFinite(amount) && amount > 0 ? amount : undefined;
+const jobStatus = (value: string): BdrProductionJobStatus => {
+	const normalized = value.replaceAll('_', '').replaceAll('-', '').toLowerCase();
+	if (normalized === 'inprogress') return 'in-progress';
+	if (normalized === 'onhold') return 'on-hold';
+	if (normalized === 'completed' || normalized === 'closed') return 'completed';
+	if (normalized === 'cancelled') return 'cancelled';
+	return 'scheduled';
 };
+const apiStatus = (value: BdrProductionJobStatus) =>
+	value === 'in-progress' ? 'InProgress' : value === 'on-hold' ? 'OnHold' : value[0].toUpperCase() + value.slice(1);
+const material = (planning: JobApiPlanning | undefined, kind: string) =>
+	planning?.materials?.find((item) => item.kind.toLowerCase() === kind) ?? null;
 
-const buildDefaultPlanning = (scheduledDate: string, actor = 'Office admin'): BdrProductionJobPlanning => ({
-	customer: {
-		confirmationStatus: 'pending'
-	},
-	schedule: {
-		targetDate: scheduledDate,
-		prepDate: scheduledDate,
-		pourDate: scheduledDate
-	},
-	materials: {
-		baseMaterialStatus: 'not-started',
-		reinforcementStatus: 'not-started',
-		equipmentStatus: 'not-started',
-		concreteStatus: 'not-started',
-		pumpNeeded: false
-	},
-	checklist: defaultChecklist(),
-	updatedAtUtc: new Date().toISOString(),
-	updatedBy: actor
-});
-
-const normalizePlanning = (
-	value: unknown,
-	fallback: { scheduledDate: string; actor?: string }
-): BdrProductionJobPlanning => {
-	if (!value || typeof value !== 'object') return buildDefaultPlanning(fallback.scheduledDate, fallback.actor);
-	const record = value as Partial<BdrProductionJobPlanning>;
-	const defaultPlanning = buildDefaultPlanning(fallback.scheduledDate, fallback.actor);
-	const materials = (record.materials ?? {}) as Partial<BdrProductionJobPlanning['materials']>;
+const mapJob = (job: JobApiRecord): BdrScheduledJobRecord => {
+	const start = job.scheduledStart || job.dateCreated || new Date(0).toISOString();
+	const end = job.scheduledEnd || start;
+	const planning = job.planning ?? {};
+	const base = material(planning, 'base-material');
+	const reinforcement = material(planning, 'reinforcement');
+	const equipment = material(planning, 'equipment');
+	const concrete = material(planning, 'concrete');
+	const checklist = { ...defaultChecklist(), ...(planning.checklist ?? {}) } as Record<BdrProductionJobChecklistKey, boolean>;
+	const activity: BdrProductionJobActivity[] = (job.activity ?? []).map((item) => ({
+		id: item.id,
+		type:
+			item.type === 'status_updated' ? 'status-updated' :
+			item.type === 'planning_updated' ? 'planning-updated' :
+			item.type === 'job_created' ? 'scheduled' :
+			(item.type.replaceAll('_', '-') as BdrProductionJobActivity['type']),
+		label: item.label,
+		occurredAtUtc: item.occurredAtUtc,
+		actor: item.actor,
+		note: item.note || undefined
+	}));
 	return {
-		customer: {
-			confirmationStatus: normalizeConfirmationStatus(record.customer?.confirmationStatus),
-			confirmedAtUtc: record.customer?.confirmedAtUtc?.trim() || undefined,
-			confirmationNote: record.customer?.confirmationNote?.trim() || undefined,
-			accessNotes: record.customer?.accessNotes?.trim() || undefined
+		id: job.id,
+		invoiceId: job.invoiceId ?? '',
+		sourceRequestId: job.quoteRequestId ?? '',
+		invoiceNumber: job.invoiceNumber ?? '',
+		customerName: job.customerName ?? '',
+		siteName: job.jobSiteName ?? job.name,
+		serviceSummary: job.description ?? '',
+		serviceAddress: job.projectAddress ?? '',
+		contactName: job.contactName ?? job.customerName ?? '',
+		phone: job.contactPhone ?? '',
+		email: job.contactEmail ?? '',
+		amount: job.estimatedTotal ?? 0,
+		amountPaidAtScheduling: job.paidTotal ?? 0,
+		depositPercentRequired: job.requiredDepositPercent ?? 50,
+		scheduledDate: date(start), windowStart: time(start), windowEnd: time(end), crew: job.crew ?? '',
+		notes: job.notes || undefined,
+		status: jobStatus(job.status),
+		scheduledAtUtc: job.dateCreated || start,
+		scheduledBy: activity.at(-1)?.actor ?? 'Office admin',
+		updatedAtUtc: job.dateUpdated || start,
+		completedAtUtc: jobStatus(job.status) === 'completed' ? job.actualEnd || job.dateUpdated || undefined : undefined,
+		cancelledAtUtc: jobStatus(job.status) === 'cancelled' ? job.dateUpdated || undefined : undefined,
+		holdReason: jobStatus(job.status) === 'on-hold' ? activity[0]?.note : undefined,
+		planning: {
+			customer: {
+				confirmationStatus: (planning.customerConfirmationStatus === 'confirmed' || planning.customerConfirmationStatus === 'needs-reschedule'
+					? planning.customerConfirmationStatus : 'pending'),
+				confirmedAtUtc: planning.customerConfirmedAtUtc || undefined,
+				confirmationNote: planning.customerConfirmationNote || undefined,
+				accessNotes: planning.accessNotes || undefined
+			},
+			schedule: {
+				targetDate: planning.targetDate || date(start), prepDate: planning.prepDate || undefined,
+				pourDate: planning.pourDate || undefined, cleanupDate: planning.cleanupDate || undefined
+			},
+			materials: {
+				baseMaterialStatus: orderStatus(base?.status), baseMaterialSupplier: base?.supplier || undefined,
+				baseMaterialDeliveryDate: base?.deliveryDate || undefined, baseMaterialDeliveryWindow: base?.deliveryWindow || undefined,
+				reinforcementStatus: orderStatus(reinforcement?.status), reinforcementSupplier: reinforcement?.supplier || undefined,
+				equipmentStatus: orderStatus(equipment?.status), equipmentVendor: equipment?.supplier || undefined,
+				equipmentDeliveryDate: equipment?.deliveryDate || undefined, equipmentDeliveryWindow: equipment?.deliveryWindow || undefined,
+				concreteStatus: orderStatus(concrete?.status), concreteSupplier: concrete?.supplier || undefined,
+				concreteDeliveryDate: concrete?.deliveryDate || undefined, concreteDeliveryWindow: concrete?.deliveryWindow || undefined,
+				concreteYards: concrete?.quantity || undefined, concreteMix: concrete?.specification || undefined,
+				pumpNeeded: concrete?.unit === 'pump', notes: concrete?.notes || undefined
+			},
+			checklist, updatedAtUtc: planning.updatedAtUtc || undefined, updatedBy: planning.updatedBy || undefined
 		},
-		schedule: {
-			targetDate: normalizeDate(record.schedule?.targetDate) || fallback.scheduledDate,
-			prepDate: normalizeDate(record.schedule?.prepDate) || undefined,
-			pourDate: normalizeDate(record.schedule?.pourDate) || undefined,
-			cleanupDate: normalizeDate(record.schedule?.cleanupDate) || undefined
-		},
-		materials: {
-			baseMaterialStatus: normalizeOrderStatus(materials.baseMaterialStatus),
-			baseMaterialSupplier: materials.baseMaterialSupplier?.trim() || undefined,
-			baseMaterialDeliveryDate: normalizeDate(materials.baseMaterialDeliveryDate) || undefined,
-			baseMaterialDeliveryWindow: materials.baseMaterialDeliveryWindow?.trim() || undefined,
-			reinforcementStatus: normalizeOrderStatus(materials.reinforcementStatus),
-			reinforcementSupplier: materials.reinforcementSupplier?.trim() || undefined,
-			equipmentStatus: normalizeOrderStatus(materials.equipmentStatus),
-			equipmentVendor: materials.equipmentVendor?.trim() || undefined,
-			equipmentDeliveryDate: normalizeDate(materials.equipmentDeliveryDate) || undefined,
-			equipmentDeliveryWindow: materials.equipmentDeliveryWindow?.trim() || undefined,
-			concreteStatus: normalizeOrderStatus(materials.concreteStatus),
-			concreteSupplier: materials.concreteSupplier?.trim() || undefined,
-			concreteDeliveryDate: normalizeDate(materials.concreteDeliveryDate) || undefined,
-			concreteDeliveryWindow: materials.concreteDeliveryWindow?.trim() || undefined,
-			concreteYards: normalizeOptionalNumber(materials.concreteYards),
-			concreteMix: materials.concreteMix?.trim() || undefined,
-			pumpNeeded: Boolean(materials.pumpNeeded),
-			notes: materials.notes?.trim() || undefined
-		},
-		checklist: {
-			...defaultPlanning.checklist,
-			...normalizeChecklist(record.checklist)
-		},
-		updatedAtUtc: record.updatedAtUtc?.trim() || undefined,
-		updatedBy: record.updatedBy?.trim() || undefined
+		activity,
+		version: job.version
 	};
 };
 
-const buildActivity = (
-	type: BdrProductionJobActivity['type'],
-	label: string,
-	actor: string,
-	note?: string,
-	occurredAtUtc = new Date().toISOString()
-): BdrProductionJobActivity => ({
-	id: `${type}-${occurredAtUtc}-${Math.random().toString(16).slice(2)}`,
-	type,
-	label,
-	occurredAtUtc,
-	actor: actor.trim() || 'Office admin',
-	note: note?.trim() || undefined
-});
-
-const normalizeActivity = (value: unknown): BdrProductionJobActivity | null => {
-	if (!value || typeof value !== 'object') return null;
-	const record = value as Partial<BdrProductionJobActivity>;
-	const type =
-		record.type === 'status-updated' ||
-		record.type === 'rescheduled' ||
-		record.type === 'planning-updated' ||
-		record.type === 'note'
-			? record.type
-			: 'scheduled';
-	const occurredAtUtc = String(record.occurredAtUtc ?? '').trim();
-	return {
-		id: String(record.id ?? `${type}-${occurredAtUtc || Date.now()}`).trim(),
-		type,
-		label: String(record.label ?? '').trim() || 'Job updated',
-		occurredAtUtc: occurredAtUtc || new Date().toISOString(),
-		actor: String(record.actor ?? 'Office admin').trim(),
-		note: record.note?.trim() || undefined
-	};
+const getJob = async (jobId: string, fetcher: typeof globalThis.fetch) => {
+	const response = await api(`/api/jobs/${encodeURIComponent(jobId)}`, undefined, fetcher);
+	if (response.status === 404) return null;
+	return unwrapTurnKeyApiEnvelope<JobApiRecord>(response, 'Load job');
 };
-
-const normalizeScheduledJob = (value: unknown): BdrScheduledJobRecord | null => {
-	if (!value || typeof value !== 'object') return null;
-	const record = value as Partial<BdrScheduledJobRecord>;
-	const invoiceId = String(record.invoiceId ?? '').trim();
-	if (!invoiceId) return null;
-	const now = new Date().toISOString();
-	const scheduledAtUtc = String(record.scheduledAtUtc ?? '').trim() || now;
-	const scheduledDate = String(record.scheduledDate ?? '').trim() || now.slice(0, 10);
-	const activity = Array.isArray(record.activity)
-		? record.activity.map(normalizeActivity).filter((item): item is BdrProductionJobActivity => Boolean(item))
-		: [];
-	return {
-		id: String(record.id ?? `job-${invoiceId}`).trim(),
-		invoiceId,
-		sourceRequestId: String(record.sourceRequestId ?? '').trim(),
-		invoiceNumber: String(record.invoiceNumber ?? '').trim(),
-		customerName: String(record.customerName ?? '').trim(),
-		siteName: String(record.siteName ?? '').trim(),
-		serviceSummary: String(record.serviceSummary ?? '').trim(),
-		serviceAddress: String(record.serviceAddress ?? '').trim(),
-		contactName: String(record.contactName ?? '').trim(),
-		phone: String(record.phone ?? '').trim(),
-		email: String(record.email ?? '').trim(),
-		amount: Number.isFinite(Number(record.amount)) ? Number(record.amount) : 0,
-		amountPaidAtScheduling: Number.isFinite(Number(record.amountPaidAtScheduling)) ? Number(record.amountPaidAtScheduling) : 0,
-		depositPercentRequired: Number.isFinite(Number(record.depositPercentRequired)) ? Number(record.depositPercentRequired) : 50,
-		scheduledDate,
-		windowStart: normalizeTime(record.windowStart, '08:00'),
-		windowEnd: normalizeTime(record.windowEnd, '12:00'),
-		crew: String(record.crew ?? 'Production crew').trim(),
-		notes: record.notes?.trim() || undefined,
-		status: normalizeJobStatus(record.status),
-		scheduledAtUtc,
-		scheduledBy: String(record.scheduledBy ?? 'Office admin').trim(),
-		updatedAtUtc: String(record.updatedAtUtc ?? '').trim() || scheduledAtUtc,
-		completedAtUtc: record.completedAtUtc?.trim() || undefined,
-		cancelledAtUtc: record.cancelledAtUtc?.trim() || undefined,
-		holdReason: record.holdReason?.trim() || undefined,
-		planning: normalizePlanning(record.planning, {
-			scheduledDate,
-			actor: String(record.scheduledBy ?? 'Office admin')
-		}),
-		activity:
-			activity.length > 0
-				? activity
-				: [
-						buildActivity(
-							'scheduled',
-							`Scheduled for ${scheduledDate}`,
-							String(record.scheduledBy ?? 'Office admin'),
-							record.notes,
-							scheduledAtUtc
-						)
-					]
-	};
-};
-
-const findRequest = (requests: QuoteRequest[], invoice: Pick<BdrInvoiceRecord, 'sourceRequestId'>) =>
-	requests.find((request) => request.id === invoice.sourceRequestId) ?? null;
 
 export const getBdrInvoiceSchedulingEligibility = (
-	invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'>,
+	invoice: Pick<BdrInvoiceRecord, 'amount' | 'payments' | 'state' | 'paidAtUtc'> &
+		Partial<Pick<BdrInvoiceRecord, 'amountPaid' | 'balanceDue' | 'jobRelease'>>,
 	settings: BdrBillingSettings
 ) => {
 	const amountPaid = getBdrInvoiceAmountPaid(invoice);
 	const balanceDue = getBdrInvoiceBalanceDue(invoice);
-	const requiredDepositAmount = Math.min(invoice.amount, invoice.amount * (settings.depositPercentRequired / 100));
-	const paidPercent = invoice.amount > 0 ? Math.min(100, (amountPaid / invoice.amount) * 100) : 0;
+	const requiredDepositAmount = invoice.jobRelease?.requiredDepositAmount ?? Math.min(invoice.amount, invoice.amount * (settings.depositPercentRequired / 100));
 	return {
-		amountPaid,
-		balanceDue,
-		requiredDepositAmount,
-		paidPercent,
-		isReady: amountPaid + 0.01 >= requiredDepositAmount
+		amountPaid, balanceDue, requiredDepositAmount,
+		paidPercent: invoice.amount > 0 ? Math.min(100, (amountPaid / invoice.amount) * 100) : 0,
+		isReady: invoice.jobRelease?.isEligible ?? amountPaid + 0.01 >= requiredDepositAmount
 	};
 };
 
-export const loadBdrScheduledJobs = async () => {
-	try {
-		const fs = await getFs();
-		const raw = await fs.readFile(getStorePath(), 'utf-8');
-		const parsed = JSON.parse(raw) as unknown[];
-		if (!Array.isArray(parsed)) return [];
-		return parsed.map(normalizeScheduledJob).filter((record): record is BdrScheduledJobRecord => Boolean(record));
-	} catch {
-		return [];
-	}
-};
-
-const saveBdrScheduledJobs = async (jobs: BdrScheduledJobRecord[]) => {
-	const fs = await getFs();
-	await fs.mkdir(getStoreDir(), { recursive: true });
-	await fs.writeFile(getStorePath(), JSON.stringify(jobs, null, 2));
+export const loadBdrScheduledJobs = async (fetcher: typeof globalThis.fetch = fetch) => {
+	const jobs: JobApiRecord[] = [];
+	let continuationToken: string | null = null;
+	do {
+		const query = new URLSearchParams({ pageSize: '100' });
+		if (continuationToken) query.set('continuationToken', continuationToken);
+		const response = await api(`/api/jobs/paged?${query}`, undefined, fetcher);
+		if (!response.ok) throw new Error(`Load jobs failed with ${response.status}.`);
+		const page = (await response.json()) as JobPageEnvelope;
+		if (!page.success || !Array.isArray(page.data)) throw new Error('Load jobs returned an invalid response.');
+		jobs.push(...page.data);
+		continuationToken = page.continuationToken ?? null;
+	} while (continuationToken);
+	return jobs.map(mapJob);
 };
 
 export const buildBdrScheduleReadyJobs = (
-	invoices: BdrInvoiceRecord[],
-	requests: QuoteRequest[],
-	settings: BdrBillingSettings,
-	scheduledJobs: BdrScheduledJobRecord[]
+	invoices: BdrInvoiceRecord[], requests: QuoteRequest[], settings: BdrBillingSettings, scheduledJobs: BdrScheduledJobRecord[]
 ): BdrScheduleReadyJob[] => {
 	const scheduledByInvoiceId = new Map(scheduledJobs.map((job) => [job.invoiceId, job]));
-	return invoices
-		.filter((invoice) => invoice.state !== 'draft')
-		.map((invoice) => {
-			const request = findRequest(requests, invoice);
-			const eligibility = getBdrInvoiceSchedulingEligibility(invoice, settings);
-			const scheduledJob = scheduledByInvoiceId.get(invoice.id);
-			return {
-				invoiceId: invoice.id,
-				sourceRequestId: invoice.sourceRequestId,
-				invoiceNumber: invoice.invoiceNumber,
-				customerName: invoice.customerName,
-				siteName: invoice.siteName,
-				serviceSummary: invoice.serviceSummary,
-				serviceAddress: request?.serviceAddress ?? invoice.siteName,
-				contactName: request?.contactName ?? invoice.customerName,
-				phone: request?.phone ?? invoice.customerPhone,
-				email: request?.email ?? invoice.customerEmail,
-				amount: invoice.amount,
-				amountPaid: eligibility.amountPaid,
-				balanceDue: eligibility.balanceDue,
-				requiredDepositAmount: eligibility.requiredDepositAmount,
-				depositPercentRequired: settings.depositPercentRequired,
-				paidPercent: eligibility.paidPercent,
-				isReady: eligibility.isReady,
-				isScheduled: Boolean(scheduledJob),
-				scheduledJob
-			};
-		})
-		.filter((job) => job.isReady)
+	return invoices.filter((invoice) => invoice.state !== 'draft').map((invoice) => {
+		const request = requests.find((item) => item.id === invoice.sourceRequestId) ?? null;
+		const eligibility = getBdrInvoiceSchedulingEligibility(invoice, settings);
+		const scheduledJob = scheduledByInvoiceId.get(invoice.id);
+		return {
+			invoiceId: invoice.id, sourceRequestId: invoice.sourceRequestId, invoiceNumber: invoice.invoiceNumber,
+			customerName: invoice.customerName, siteName: invoice.siteName, serviceSummary: invoice.serviceSummary,
+			serviceAddress: request?.serviceAddress ?? invoice.siteName, contactName: request?.contactName ?? invoice.customerName,
+			phone: request?.phone ?? invoice.customerPhone, email: request?.email ?? invoice.customerEmail, amount: invoice.amount,
+			amountPaid: eligibility.amountPaid, balanceDue: eligibility.balanceDue,
+			requiredDepositAmount: eligibility.requiredDepositAmount, depositPercentRequired: settings.depositPercentRequired,
+			paidPercent: eligibility.paidPercent, isReady: eligibility.isReady, isScheduled: Boolean(scheduledJob), scheduledJob
+		};
+	}).filter((job) => job.isReady)
 		.sort((a, b) => Number(a.isScheduled) - Number(b.isScheduled) || b.paidPercent - a.paidPercent);
 };
 
 export const scheduleBdrJobFromInvoice = async (
-	invoice: BdrInvoiceRecord,
-	request: QuoteRequest | null,
-	settings: BdrBillingSettings,
-	input: {
-		scheduledDate: string;
-		windowStart: string;
-		windowEnd: string;
-		crew: string;
-		notes?: string;
-		scheduledBy?: string;
-	}
+	invoice: BdrInvoiceRecord, request: QuoteRequest | null, settings: BdrBillingSettings,
+	input: { scheduledDate: string; windowStart: string; windowEnd: string; crew: string; notes?: string; scheduledBy?: string },
+	fetcher: typeof globalThis.fetch = fetch
 ) => {
-	const now = new Date().toISOString();
 	const eligibility = getBdrInvoiceSchedulingEligibility(invoice, settings);
-	if (!eligibility.isReady) {
-		throw new Error('Invoice has not met the scheduling deposit gate.');
-	}
-	const job: BdrScheduledJobRecord = {
-		id: `job-${invoice.id}`,
-		invoiceId: invoice.id,
-		sourceRequestId: invoice.sourceRequestId,
-		invoiceNumber: invoice.invoiceNumber,
-		customerName: invoice.customerName,
-		siteName: invoice.siteName,
-		serviceSummary: invoice.serviceSummary,
-		serviceAddress: request?.serviceAddress ?? invoice.siteName,
-		contactName: request?.contactName ?? invoice.customerName,
-		phone: request?.phone ?? invoice.customerPhone,
-		email: request?.email ?? invoice.customerEmail,
-		amount: invoice.amount,
-		amountPaidAtScheduling: eligibility.amountPaid,
-		depositPercentRequired: settings.depositPercentRequired,
-		scheduledDate: input.scheduledDate,
-		windowStart: normalizeTime(input.windowStart, '08:00'),
-		windowEnd: normalizeTime(input.windowEnd, '12:00'),
-		crew: input.crew.trim() || 'Production crew',
-		notes: input.notes?.trim() || undefined,
-		status: 'scheduled',
-		scheduledAtUtc: now,
-		scheduledBy: input.scheduledBy?.trim() || 'Office admin',
-		updatedAtUtc: now,
-		planning: buildDefaultPlanning(input.scheduledDate, input.scheduledBy?.trim() || 'Office admin'),
-		activity: [
-			buildActivity(
-				'scheduled',
-				`Scheduled for ${input.scheduledDate}`,
-				input.scheduledBy?.trim() || 'Office admin',
-				input.notes
-			)
-		]
+	if (!eligibility.isReady) throw new Error('Invoice has not met the scheduling deposit gate.');
+	const body = {
+		id: invoice.id, name: invoice.siteName || invoice.customerName, description: invoice.serviceSummary,
+		status: 'Scheduled', invoiceId: invoice.id, quoteRequestId: invoice.sourceRequestId,
+		invoiceNumber: invoice.invoiceNumber, customerName: invoice.customerName, jobSiteName: invoice.siteName,
+		projectAddress: request?.serviceAddress ?? invoice.siteName, projectName: invoice.serviceSummary,
+		contactName: request?.contactName ?? invoice.customerName, contactPhone: request?.phone ?? invoice.customerPhone,
+		contactEmail: request?.email ?? invoice.customerEmail, scheduledStart: iso(input.scheduledDate, input.windowStart),
+		scheduledEnd: iso(input.scheduledDate, input.windowEnd), crew: input.crew, estimatedTotal: invoice.amount,
+		paidTotal: eligibility.amountPaid, requiredDepositPercent: settings.depositPercentRequired, notes: input.notes,
+		planning: { customerConfirmationStatus: 'pending', targetDate: input.scheduledDate, prepDate: input.scheduledDate, pourDate: input.scheduledDate }
 	};
-	const existing = await loadBdrScheduledJobs();
-	const next = [job, ...existing.filter((item) => item.invoiceId !== invoice.id)];
-	await saveBdrScheduledJobs(next);
-	return job;
+	return mapJob(await unwrapTurnKeyApiEnvelope<JobApiRecord>(
+		await api('/api/jobs', { method: 'POST', body: JSON.stringify(body) }, fetcher), 'Create job'));
 };
 
 export const updateBdrScheduledJobStatus = async (
-	jobId: string,
-	input: {
-		status: BdrProductionJobStatus;
-		note?: string;
-		actor?: string;
-	}
+	jobId: string, input: { status: BdrProductionJobStatus; note?: string; actor?: string },
+	fetcher: typeof globalThis.fetch = fetch
 ): Promise<BdrScheduledJobRecord | null> => {
-	const existing = await loadBdrScheduledJobs();
-	const now = new Date().toISOString();
-	let updatedJob: BdrScheduledJobRecord | null = null;
-	const next = existing.map((job) => {
-		if (job.id !== jobId) return job;
-		const nextJob: BdrScheduledJobRecord = {
-			...job,
-			status: input.status,
-			updatedAtUtc: now,
-			completedAtUtc: input.status === 'completed' ? now : job.completedAtUtc,
-			cancelledAtUtc: input.status === 'cancelled' ? now : job.cancelledAtUtc,
-			holdReason: input.status === 'on-hold' ? input.note?.trim() || job.holdReason : undefined,
-			activity: [
-				buildActivity('status-updated', `Status changed to ${input.status.replace('-', ' ')}`, input.actor ?? 'Office admin', input.note),
-				...job.activity
-			]
-		};
-		updatedJob = nextJob;
-		return nextJob;
-	});
-	await saveBdrScheduledJobs(next);
-	return updatedJob;
+	const current = await getJob(jobId, fetcher); if (!current) return null;
+	return mapJob(await unwrapTurnKeyApiEnvelope<JobApiRecord>(await api(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
+		method: 'PUT', body: JSON.stringify({ status: apiStatus(input.status), note: input.note, expectedVersion: current.version })
+	}, fetcher), 'Update job status'));
 };
 
 export const rescheduleBdrScheduledJob = async (
-	jobId: string,
-	input: {
-		scheduledDate: string;
-		windowStart: string;
-		windowEnd: string;
-		crew: string;
-		note?: string;
-		actor?: string;
-	}
+	jobId: string, input: { scheduledDate: string; windowStart: string; windowEnd: string; crew: string; note?: string; actor?: string },
+	fetcher: typeof globalThis.fetch = fetch
 ): Promise<BdrScheduledJobRecord | null> => {
-	const existing = await loadBdrScheduledJobs();
-	const now = new Date().toISOString();
-	let updatedJob: BdrScheduledJobRecord | null = null;
-	const next = existing.map((job) => {
-		if (job.id !== jobId) return job;
-		const planning = normalizePlanning(job.planning, { scheduledDate: job.scheduledDate, actor: job.scheduledBy });
-		const nextJob: BdrScheduledJobRecord = {
-			...job,
-			scheduledDate: input.scheduledDate,
-			windowStart: normalizeTime(input.windowStart, job.windowStart),
-			windowEnd: normalizeTime(input.windowEnd, job.windowEnd),
-			crew: input.crew.trim() || job.crew,
-			notes: input.note?.trim() || job.notes,
-			updatedAtUtc: now,
-			planning: {
-				...planning,
-				schedule: {
-					...planning.schedule,
-					targetDate: input.scheduledDate,
-					prepDate: planning.schedule.prepDate || input.scheduledDate,
-					pourDate: planning.schedule.pourDate || input.scheduledDate
-				},
-				updatedAtUtc: now,
-				updatedBy: input.actor?.trim() || 'Office admin'
-			},
-			activity: [
-				buildActivity('rescheduled', `Rescheduled for ${input.scheduledDate}`, input.actor ?? 'Office admin', input.note),
-				...job.activity
-			]
-		};
-		updatedJob = nextJob;
-		return nextJob;
-	});
-	await saveBdrScheduledJobs(next);
-	return updatedJob;
+	const current = await getJob(jobId, fetcher); if (!current) return null;
+	return mapJob(await unwrapTurnKeyApiEnvelope<JobApiRecord>(await api(`/api/jobs/${encodeURIComponent(jobId)}/schedule`, {
+		method: 'PUT', body: JSON.stringify({ scheduledStart: iso(input.scheduledDate, input.windowStart),
+			scheduledEnd: iso(input.scheduledDate, input.windowEnd), crew: input.crew, note: input.note, expectedVersion: current.version })
+	}, fetcher), 'Reschedule job'));
 };
 
-const materialIsOrdered = (status: BdrProductionJobOrderStatus) =>
-	status === 'ordered' || status === 'confirmed' || status === 'delivered';
+const apiMaterial = (kind: string, status: BdrProductionJobOrderStatus, supplier?: string, deliveryDate?: string,
+	deliveryWindow?: string, quantity?: number, unit?: string, specification?: string, notes?: string): JobApiMaterial =>
+	({ kind, status, supplier, deliveryDate, deliveryWindow, quantity, unit, specification, notes });
 
 export const updateBdrScheduledJobPlanning = async (
-	jobId: string,
-	input: BdrProductionJobPlanningUpdateInput
+	jobId: string, input: BdrProductionJobPlanningUpdateInput, fetcher: typeof globalThis.fetch = fetch
 ): Promise<BdrScheduledJobRecord | null> => {
-	const existing = await loadBdrScheduledJobs();
-	const now = new Date().toISOString();
-	const actor = input.actor?.trim() || 'Office admin';
-	let updatedJob: BdrScheduledJobRecord | null = null;
-	const next = existing.map((job) => {
-		if (job.id !== jobId) return job;
-		const checklist = defaultChecklist();
-		for (const key of input.checklist) {
-			checklist[key] = true;
-		}
-		checklist['customer-confirmed'] = checklist['customer-confirmed'] || input.customerConfirmationStatus === 'confirmed';
-		checklist['base-material-ordered'] =
-			checklist['base-material-ordered'] || materialIsOrdered(input.baseMaterialStatus);
-		checklist['equipment-reserved'] = checklist['equipment-reserved'] || materialIsOrdered(input.equipmentStatus);
-		checklist['concrete-ordered'] = checklist['concrete-ordered'] || materialIsOrdered(input.concreteStatus);
-
-		const planning: BdrProductionJobPlanning = {
-			customer: {
-				confirmationStatus: input.customerConfirmationStatus,
-				confirmedAtUtc:
-					input.customerConfirmationStatus === 'confirmed'
-						? job.planning.customer.confirmedAtUtc ?? now
-						: undefined,
-				confirmationNote: input.customerConfirmationNote?.trim() || undefined,
-				accessNotes: input.accessNotes?.trim() || undefined
-			},
-			schedule: {
-				targetDate: normalizeDate(input.targetDate) || job.scheduledDate,
-				prepDate: normalizeDate(input.prepDate) || undefined,
-				pourDate: normalizeDate(input.pourDate) || undefined,
-				cleanupDate: normalizeDate(input.cleanupDate) || undefined
-			},
-			materials: {
-				baseMaterialStatus: input.baseMaterialStatus,
-				baseMaterialSupplier: input.baseMaterialSupplier?.trim() || undefined,
-				baseMaterialDeliveryDate: normalizeDate(input.baseMaterialDeliveryDate) || undefined,
-				baseMaterialDeliveryWindow: input.baseMaterialDeliveryWindow?.trim() || undefined,
-				reinforcementStatus: input.reinforcementStatus,
-				reinforcementSupplier: input.reinforcementSupplier?.trim() || undefined,
-				equipmentStatus: input.equipmentStatus,
-				equipmentVendor: input.equipmentVendor?.trim() || undefined,
-				equipmentDeliveryDate: normalizeDate(input.equipmentDeliveryDate) || undefined,
-				equipmentDeliveryWindow: input.equipmentDeliveryWindow?.trim() || undefined,
-				concreteStatus: input.concreteStatus,
-				concreteSupplier: input.concreteSupplier?.trim() || undefined,
-				concreteDeliveryDate: normalizeDate(input.concreteDeliveryDate) || undefined,
-				concreteDeliveryWindow: input.concreteDeliveryWindow?.trim() || undefined,
-				concreteYards: normalizeOptionalNumber(input.concreteYards),
-				concreteMix: input.concreteMix?.trim() || undefined,
-				pumpNeeded: Boolean(input.pumpNeeded),
-				notes: input.materialNotes?.trim() || undefined
-			},
-			checklist,
-			updatedAtUtc: now,
-			updatedBy: actor
-		};
-		const completeCount = checklistKeys.filter((key) => checklist[key]).length;
-		const nextJob: BdrScheduledJobRecord = {
-			...job,
-			planning,
-			updatedAtUtc: now,
-			activity: [
-				buildActivity(
-					'planning-updated',
-					`Job plan updated (${completeCount}/${checklistKeys.length})`,
-					actor,
-					input.materialNotes || input.customerConfirmationNote
-				),
-				...job.activity
-			]
-		};
-		updatedJob = nextJob;
-		return nextJob;
-	});
-	await saveBdrScheduledJobs(next);
-	return updatedJob;
+	const current = await getJob(jobId, fetcher); if (!current) return null;
+	const checklist = Object.fromEntries(checklistKeys.map((key) => [key, input.checklist.includes(key)]));
+	const planning = {
+		customerConfirmationStatus: input.customerConfirmationStatus, customerConfirmationNote: input.customerConfirmationNote,
+		accessNotes: input.accessNotes, targetDate: input.targetDate, prepDate: input.prepDate, pourDate: input.pourDate,
+		cleanupDate: input.cleanupDate, checklist,
+		materials: [
+			apiMaterial('base-material', input.baseMaterialStatus, input.baseMaterialSupplier, input.baseMaterialDeliveryDate, input.baseMaterialDeliveryWindow),
+			apiMaterial('reinforcement', input.reinforcementStatus, input.reinforcementSupplier),
+			apiMaterial('equipment', input.equipmentStatus, input.equipmentVendor, input.equipmentDeliveryDate, input.equipmentDeliveryWindow),
+			apiMaterial('concrete', input.concreteStatus, input.concreteSupplier, input.concreteDeliveryDate,
+				input.concreteDeliveryWindow, input.concreteYards, input.pumpNeeded ? 'pump' : 'yard', input.concreteMix, input.materialNotes)
+		]
+	};
+	return mapJob(await unwrapTurnKeyApiEnvelope<JobApiRecord>(await api(`/api/jobs/${encodeURIComponent(jobId)}/planning`, {
+		method: 'PUT', body: JSON.stringify({ planning, expectedVersion: current.version })
+	}, fetcher), 'Update job planning'));
 };
 
 export const addBdrScheduledJobNote = async (
-	jobId: string,
-	input: {
-		note: string;
-		actor?: string;
-	}
+	jobId: string, input: { note: string; actor?: string }, fetcher: typeof globalThis.fetch = fetch
 ): Promise<BdrScheduledJobRecord | null> => {
-	const note = input.note.trim();
-	if (!note) return null;
-	const existing = await loadBdrScheduledJobs();
-	const now = new Date().toISOString();
-	let updatedJob: BdrScheduledJobRecord | null = null;
-	const next = existing.map((job) => {
-		if (job.id !== jobId) return job;
-		const nextJob: BdrScheduledJobRecord = {
-			...job,
-			notes: note,
-			updatedAtUtc: now,
-			activity: [buildActivity('note', 'Job note added', input.actor ?? 'Office admin', note), ...job.activity]
-		};
-		updatedJob = nextJob;
-		return nextJob;
-	});
-	await saveBdrScheduledJobs(next);
-	return updatedJob;
+	const current = await getJob(jobId, fetcher); if (!current) return null;
+	return mapJob(await unwrapTurnKeyApiEnvelope<JobApiRecord>(await api(`/api/jobs/${encodeURIComponent(jobId)}/notes`, {
+		method: 'POST', body: JSON.stringify({ note: input.note, expectedVersion: current.version })
+	}, fetcher), 'Add job note'));
 };

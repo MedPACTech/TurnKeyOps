@@ -17,4 +17,16 @@ public class JobRepository : AzureTablesRepositoryBase<Job>, IJobRepository
         IOptions<RepositoryOptions> repositoryOptions) : base(store, cache, tenantContext, repositoryOptions.Value)
     {
     }
+
+    public Task<Job?> GetAsync(string partitionKey, string rowKey, CancellationToken ct = default) =>
+        GetByKeysAsync(partitionKey, rowKey, ct);
+
+    public async Task<IReadOnlyCollection<Job>> ListAsync(string partitionKey, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return (await GetAllAsync(false, false))
+            .Where(item => item.PartitionKey == partitionKey && !item.IsDeleted)
+            .OrderByDescending(item => item.DateUpdated)
+            .ToArray();
+    }
 }

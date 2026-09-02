@@ -10,7 +10,7 @@ namespace MedInsights.Controllers
 {
     [ApiController]
     [Route("api/activity-logs")]
-    [Authorize]
+    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
     public class ActivityLogsController : ApiControllerBase
     {
         private readonly IActivityLogService _service;

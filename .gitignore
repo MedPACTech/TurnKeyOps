@@ -5,6 +5,7 @@ obj/
 *.suo
 appsettings.*.json
 !appsettings.json
+!api/TurnKeyOps.API/appsettings.Development.json
 node_modules/
 .svelte-kit/
 build/
@@ -32,3 +33,10 @@ api/scripts/codex-card-preflight.sh
 api/scripts/codex-cli-preflight.sh
 /api/memory
 /api/scripts
+!/api/scripts/
+/api/scripts/*
+!/api/scripts/scan-repository-security.py
+!/api/scripts/post-deploy-smoke.sh
+!/api/scripts/rollback-app-service.sh
+api/.azurite/
+client/test-results/

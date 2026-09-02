@@ -3,6 +3,7 @@ using MedInsights.Repositories.Interfaces;
 using MedInsights.Services.Interfaces;
 using MedInsights.Services.Mappers;
 using MedInsights.Lib.Utils;
+using MedInsights.Lib.Authorization;
 
 namespace MedInsights.Services
 {
@@ -10,11 +11,16 @@ namespace MedInsights.Services
     {
         private readonly ITenantBillingAccountRepository _repository;
         private readonly IUserContext _userContext;
+        private readonly IRoleAccessService _roleAccess;
 
-        public TenantBillingAccountService(ITenantBillingAccountRepository repository, IUserContext userContext)
+        public TenantBillingAccountService(
+            ITenantBillingAccountRepository repository,
+            IUserContext userContext,
+            IRoleAccessService roleAccess)
         {
             _repository = repository;
             _userContext = userContext;
+            _roleAccess = roleAccess;
         }
 
         public async Task<TenantBillingAccountDto?> GetCurrentAsync(CancellationToken ct = default)
@@ -27,6 +33,7 @@ namespace MedInsights.Services
         public async Task<TenantBillingAccountDto> UpsertAsync(TenantBillingAccountDto dto, CancellationToken ct = default)
         {
             EnsureAuthenticated();
+            await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.BillingManage, ct);
 
             var tenantId = _userContext.TenantId;
             var partitionKey = EntityKeyPolicy.TenantPartition(tenantId);

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
-	import { buildInvoiceViews, getScaffoldBanner } from '$lib/mvp-display';
+	import { buildInvoiceViews } from '$lib/mvp-display';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import type { PageProps } from './$types';
 
@@ -64,6 +64,8 @@
 		};
 	};
 	type InvoicePageData = PageProps['data'] & {
+		errors?: string[];
+		loadedAtUtc?: string;
 		approvedEstimateDrafts?: ApprovedEstimateDraft[];
 		lifecycleInvoices?: Array<{
 			id: string;
@@ -160,7 +162,6 @@
 	let selectedReadyEstimateId = $state('');
 	let reviewingReadyInvoiceId = $state('');
 	let sendingReadyInvoiceId = $state('');
-	let queuedReadyInvoiceId = $state('');
 	let copiedCustomerLink = $state('');
 	let paymentDraftInvoiceId = $state('');
 	let paymentAmount = $state('');
@@ -327,9 +328,6 @@
 	const isSendingReadyInvoice = $derived(
 		Boolean(selectedReadyEstimate && sendingReadyInvoiceId === selectedReadyEstimate.requestId)
 	);
-	const isReadyInvoiceQueued = $derived(
-		Boolean(selectedReadyEstimate && queuedReadyInvoiceId === selectedReadyEstimate.requestId)
-	);
 	const bobSuggestions = $derived.by(() => {
 		if (activeInvoiceMode === 'ready' && selectedReadyEstimate) {
 			return [
@@ -423,7 +421,7 @@
 		{
 			label: 'Invoices',
 			value: String(totalInvoiceCount),
-			detail: getScaffoldBanner(pageData.source),
+			detail: pageData.loadedAtUtc ? `Live data refreshed ${formatDate(pageData.loadedAtUtc)}` : 'Live TurnKeyOps API data',
 			icon: '💸'
 		}
 	]);
@@ -478,6 +476,14 @@
 		}
 	});
 </script>
+
+{#if pageData.errors?.length}
+	<div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+		<p class="font-semibold">Some live billing data could not be loaded.</p>
+		<p class="mt-1">{pageData.errors.join(' ')}</p>
+		<a href="/bdr/admin/invoices" class="mt-2 inline-block font-semibold underline">Retry</a>
+	</div>
+{/if}
 
 <AdminWorkspace
 	kicker="External Admin / Invoices"
@@ -687,7 +693,7 @@
 									<p class="mt-1 text-sm text-[var(--text-muted)]">Choose how this draft invoice should reach the customer.</p>
 								</div>
 								<span class="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-text)]">
-									{isReadyInvoiceQueued ? 'Queued' : 'Ready'}
+									Ready
 								</span>
 							</div>
 
@@ -715,11 +721,6 @@
 								</div>
 							</div>
 
-							{#if isReadyInvoiceQueued}
-								<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-									Invoice send is queued locally for this demo. The production hook should send email/SMS and move this invoice to Active.
-								</p>
-							{/if}
 							{#if form?.invoiceActionMessage}
 								<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
 									{form.invoiceActionMessage}
@@ -732,7 +733,6 @@
 									<button
 										type="submit"
 										class="inline-flex justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]"
-										onclick={() => (queuedReadyInvoiceId = selectedReadyEstimate.requestId)}
 									>
 										Submit invoice
 									</button>

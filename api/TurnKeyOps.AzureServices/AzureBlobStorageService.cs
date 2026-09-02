@@ -18,7 +18,7 @@ namespace MedInsights.AzureServices
             _connectionString = settings.ConnectionString;
 
             // Azurite may lag latest service API versions; pin a compatible version for local emulator usage.
-            if (_connectionString.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase))
+            if (IsDevelopmentStorageConnectionString(_connectionString))
             {
                 var options = new BlobClientOptions(BlobClientOptions.ServiceVersion.V2021_12_02);
                 _blobServiceClient = new BlobServiceClient(_connectionString, options);
@@ -28,6 +28,10 @@ namespace MedInsights.AzureServices
                 _blobServiceClient = new BlobServiceClient(_connectionString);
             }
         }
+
+        private static bool IsDevelopmentStorageConnectionString(string connectionString) =>
+            connectionString.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.Contains("AccountName=devstoreaccount1", StringComparison.OrdinalIgnoreCase);
 
         public async Task<bool> Save(string containerName, string blobName, byte[] data)
         {
@@ -76,8 +80,29 @@ namespace MedInsights.AzureServices
             });
         }
 
+        public async Task UploadAsync(
+            string containerName,
+            string blobName,
+            Stream content,
+            string contentType,
+            IReadOnlyDictionary<string, string>? metadata = null,
+            CancellationToken ct = default)
+        {
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: ct);
 
-        public async Task<byte[]> Get(string containerName, string blobName)
+            var blobClient = containerClient.GetBlobClient(blobName);
+            await blobClient.UploadAsync(content, new BlobUploadOptions
+            {
+                HttpHeaders = new BlobHttpHeaders { ContentType = contentType },
+                Metadata = metadata is null
+                    ? null
+                    : new Dictionary<string, string>(metadata, StringComparer.OrdinalIgnoreCase)
+            }, ct);
+        }
+
+
+        public async Task<byte[]?> Get(string containerName, string blobName)
         {
             try
             {
@@ -113,6 +138,16 @@ namespace MedInsights.AzureServices
             var resp = await blobClient.DownloadStreamingAsync(cancellationToken: ct);
             // Caller disposes the stream
             return resp.Value.Content;
+        }
+
+        public async Task DeleteIfExistsAsync(
+            string containerName,
+            string blobName,
+            CancellationToken ct = default)
+        {
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            var blobClient = containerClient.GetBlobClient(blobName);
+            await blobClient.DeleteIfExistsAsync(DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: ct);
         }
     }
 }

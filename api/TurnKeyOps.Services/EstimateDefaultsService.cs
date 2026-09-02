@@ -4,6 +4,9 @@ using TurnKeyOps.Lib.Utils;
 using TurnKeyOps.Repositories.Interfaces;
 using TurnKeyOps.Services.Interfaces;
 using TurnKeyOps.Services.Mappers;
+using MedInsights.Lib.Authorization;
+using MedInsights.Services.Interfaces;
+using MedInsights.Lib.Dtos;
 
 namespace TurnKeyOps.Services;
 
@@ -13,11 +16,19 @@ public class EstimateDefaultsService : IEstimateDefaultsService
 
     private readonly IEstimateDefaultsRepository _repository;
     private readonly IUserContext _userContext;
+    private readonly IRoleAccessService _roleAccess;
+    private readonly IAuditService _audit;
 
-    public EstimateDefaultsService(IEstimateDefaultsRepository repository, IUserContext userContext)
+    public EstimateDefaultsService(
+        IEstimateDefaultsRepository repository,
+        IUserContext userContext,
+        IRoleAccessService roleAccess,
+        IAuditService audit)
     {
         _repository = repository;
         _userContext = userContext;
+        _roleAccess = roleAccess;
+        _audit = audit;
     }
 
     public async Task<EstimateDefaultsDto> GetAsync(CancellationToken ct = default)
@@ -28,7 +39,14 @@ public class EstimateDefaultsService : IEstimateDefaultsService
 
     public async Task<EstimateDefaultsDto> UpsertAsync(EstimateDefaultsDto dto, CancellationToken ct = default)
     {
-        var existing = await _repository.GetAsync(PartitionKey(), DefaultsRowKey, ct) ?? new EstimateDefaultsProfile
+        await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.EstimateDefaultsManage, ct);
+        Validate(dto);
+
+        var existing = await _repository.GetAsync(PartitionKey(), DefaultsRowKey, ct);
+        ValidateVersion(existing, dto.Version);
+        var isCreate = existing is null;
+
+        existing ??= new EstimateDefaultsProfile
         {
             Id = _userContext.TenantId,
             PartitionKey = PartitionKey(),
@@ -42,10 +60,71 @@ public class EstimateDefaultsService : IEstimateDefaultsService
         entity.DateCreated = existing.DateCreated == default ? DateTime.UtcNow : existing.DateCreated;
 
         var saved = await _repository.SaveAsync(entity, ct);
+        await _audit.RecordAsync(new RecordAuditEventRequestDto
+        {
+            TenantId = _userContext.TenantId,
+            Category = "tenant-settings",
+            Action = isCreate ? "created" : "updated",
+            TargetType = "estimate-defaults",
+            TargetId = DefaultsRowKey,
+            Source = "api",
+            Description = "Tenant estimate defaults were updated."
+        }, ct);
         return EstimateDefaultsMapper.ToDto(saved);
     }
 
     private string PartitionKey() => RepositoryKeyHelper.ToTenantPartitionKey(_userContext.TenantId);
+
+    private static void ValidateVersion(EstimateDefaultsProfile? existing, string? expectedVersion)
+    {
+        if (existing is null)
+        {
+            if (!string.IsNullOrWhiteSpace(expectedVersion))
+            {
+                throw new ArgumentException(
+                    "A version cannot be supplied when creating estimate defaults.",
+                    nameof(expectedVersion));
+            }
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(expectedVersion) ||
+            !string.Equals(existing.ETag.ToString(), expectedVersion.Trim(), StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "The estimate defaults changed after they were loaded. Refresh and try again.",
+                nameof(expectedVersion));
+        }
+    }
+
+    private static void Validate(EstimateDefaultsDto dto)
+    {
+        if (dto.DefaultCrewSize < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(dto.DefaultCrewSize),
+                dto.DefaultCrewSize,
+                "Default crew size must be at least one.");
+        }
+
+        foreach (var property in typeof(EstimateDefaultsDto).GetProperties())
+        {
+            if (property.PropertyType != typeof(decimal))
+            {
+                continue;
+            }
+
+            var value = (decimal)(property.GetValue(dto) ?? 0m);
+            if (value < 0m)
+            {
+                throw new ArgumentOutOfRangeException(
+                    property.Name,
+                    value,
+                    $"{property.Name} cannot be negative.");
+            }
+        }
+    }
 
     private static EstimateDefaultsDto CreateBaselineDefaults() => new()
     {

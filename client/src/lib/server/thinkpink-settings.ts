@@ -1,16 +1,5 @@
 import { thinkPinkTenant } from '$lib/config/tenants';
-
-const fsModuleName = 'node:fs/promises';
-const getCwd = () =>
-	(globalThis as typeof globalThis & { process?: { cwd: () => string } }).process?.cwd() ?? '.';
-const storeDir = `${getCwd()}/.svelte-kit`;
-const storePath = `${storeDir}/local-thinkpink-settings.json`;
-
-type FsPromises = {
-	mkdir: (path: string, options: { recursive: boolean }) => Promise<unknown>;
-	readFile: (path: string, encoding: 'utf-8') => Promise<string>;
-	writeFile: (path: string, data: string) => Promise<unknown>;
-};
+import { getTenantSettings, updateTenantSettings } from '$lib/api/tenant-settings';
 
 export type ThinkPinkSettings = {
 	depositPercentRequired: number;
@@ -78,7 +67,6 @@ export const defaultThinkPinkSettings: ThinkPinkSettings = {
 	jobStages: [...thinkPinkTenant.jobStages]
 };
 
-const getFs = async () => (await import(/* @vite-ignore */ fsModuleName)) as FsPromises;
 const numericKeys = Object.keys(defaultThinkPinkSettings).filter(
 	(key) => typeof defaultThinkPinkSettings[key as keyof ThinkPinkSettings] === 'number'
 ) as Array<keyof ThinkPinkSettings>;
@@ -102,19 +90,26 @@ const normalize = (value: unknown): ThinkPinkSettings => {
 	return result;
 };
 
-export const loadThinkPinkSettings = async () => {
-	try {
-		const fs = await getFs();
-		return normalize(JSON.parse(await fs.readFile(storePath, 'utf-8')));
-	} catch {
-		return structuredClone(defaultThinkPinkSettings);
-	}
+export const loadThinkPinkSettings = async (
+	fetcher: typeof globalThis.fetch = globalThis.fetch,
+	accessToken?: string | null
+) => {
+	const document = await getTenantSettings<ThinkPinkSettings>('operational', fetcher, accessToken);
+	return normalize(document.values);
 };
 
-export const saveThinkPinkSettings = async (value: unknown) => {
-	const settings = normalize(value);
-	const fs = await getFs();
-	await fs.mkdir(storeDir, { recursive: true });
-	await fs.writeFile(storePath, JSON.stringify(settings, null, 2));
-	return settings;
+export const saveThinkPinkSettings = async (
+	value: unknown,
+	fetcher: typeof globalThis.fetch = globalThis.fetch,
+	accessToken?: string | null
+) => {
+	const current = await getTenantSettings<ThinkPinkSettings>('operational', fetcher, accessToken);
+	const saved = await updateTenantSettings(
+		'operational',
+		normalize(value),
+		current.version,
+		fetcher,
+		accessToken
+	);
+	return normalize(saved.values);
 };

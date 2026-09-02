@@ -8,7 +8,7 @@ namespace MedInsights.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAccess)]
     public class TenantProfileController : ApiControllerBase
     {
         private readonly ITenantProfileService _service;
@@ -39,6 +39,7 @@ namespace MedInsights.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         public async Task<IActionResult> Create([FromBody] TenantProfileDto dto, CancellationToken ct)
         {
             var created = await _service.CreateAsync(dto, ct);
@@ -46,6 +47,7 @@ namespace MedInsights.Controllers
         }
 
         [HttpPut("{id:guid}")]
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         public async Task<IActionResult> Update(Guid id, [FromBody] JsonElement payload, CancellationToken ct)
         {
             var updated = await _service.UpdateAsync(id, payload, ct);
@@ -53,6 +55,7 @@ namespace MedInsights.Controllers
         }
 
         [HttpDelete("{id:guid}")]
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
         {
             await _service.DeleteAsync(id, ct);

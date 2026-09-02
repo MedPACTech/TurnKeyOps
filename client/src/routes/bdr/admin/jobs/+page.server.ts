@@ -16,6 +16,7 @@ import {
 	type BdrProductionJobStatus
 } from '$lib/server/bdr-job-scheduling';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
+import { authTokenCookie } from '$lib/server/auth-session';
 
 const productionStatuses = ['scheduled', 'in-progress', 'on-hold', 'completed', 'cancelled'] as const;
 const confirmationStatuses = ['pending', 'confirmed', 'needs-reschedule'] as const;
@@ -77,11 +78,11 @@ const normalizeChecklistInput = (formData: FormData) => {
 
 const getJobId = (formData: FormData) => String(formData.get('jobId') ?? '').trim();
 
-export const load = async ({ fetch, url }) => {
+export const load = async ({ fetch, url, cookies }) => {
 	const { requests } = await loadQuoteRequests(fetch);
-	const billingSettings = await loadBdrBillingSettings();
-	const lifecycleInvoices = await loadBdrInvoices();
-	const jobs = await loadBdrScheduledJobs();
+	const billingSettings = await loadBdrBillingSettings(fetch, cookies.get(authTokenCookie));
+	const lifecycleInvoices = await loadBdrInvoices(fetch);
+	const jobs = await loadBdrScheduledJobs(fetch);
 	const scheduleReadyJobs = buildBdrScheduleReadyJobs(lifecycleInvoices, requests, billingSettings, jobs);
 	const selectedJobId = url.searchParams.get('job')?.trim() ?? '';
 
@@ -94,7 +95,7 @@ export const load = async ({ fetch, url }) => {
 };
 
 export const actions = {
-	scheduleReadyJob: async ({ request, fetch }) => {
+	scheduleReadyJob: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 		const invoiceId = String(formData.get('invoiceId') ?? '').trim();
 		const scheduledDate = normalizeDateInput(formData.get('scheduledDate'));
@@ -106,8 +107,8 @@ export const actions = {
 		if (!scheduledDate) return fail(400, { jobActionMessage: 'Choose a target job date.' });
 		if (!crew) return fail(400, { jobActionMessage: 'Assign a crew or scheduler before creating the job.' });
 
-		const billingSettings = await loadBdrBillingSettings();
-		const invoice = (await loadBdrInvoices()).find((record) => record.id === invoiceId);
+		const billingSettings = await loadBdrBillingSettings(fetch, cookies.get(authTokenCookie));
+		const invoice = (await loadBdrInvoices(fetch)).find((record) => record.id === invoiceId);
 		if (!invoice) return fail(404, { jobActionMessage: 'Invoice not found.' });
 		if (invoice.state === 'draft') return fail(400, { jobActionMessage: 'Send the invoice before creating a job.' });
 		const eligibility = getBdrInvoiceSchedulingEligibility(invoice, billingSettings);
@@ -126,13 +127,13 @@ export const actions = {
 			crew,
 			notes,
 			scheduledBy: 'Office admin'
-		});
+		}, fetch);
 		return {
 			jobActionMessage: `${job.siteName || job.customerName} is now a production job.`,
 			selectedJobId: job.id
 		};
 	},
-	updateStatus: async ({ request }) => {
+	updateStatus: async ({ request, fetch }) => {
 		const formData = await request.formData();
 		const jobId = getJobId(formData);
 		const status = normalizeStatus(formData.get('status'));
@@ -142,14 +143,14 @@ export const actions = {
 			status,
 			note,
 			actor: 'Office admin'
-		});
+		}, fetch);
 		if (!job) return fail(404, { jobActionMessage: 'Job not found.' });
 		return {
 			jobActionMessage: `${job.siteName || job.customerName} moved to ${status.replace('-', ' ')}.`,
 			selectedJobId: job.id
 		};
 	},
-	rescheduleJob: async ({ request }) => {
+	rescheduleJob: async ({ request, fetch }) => {
 		const formData = await request.formData();
 		const jobId = getJobId(formData);
 		const scheduledDate = normalizeDateInput(formData.get('scheduledDate'));
@@ -167,14 +168,14 @@ export const actions = {
 			crew,
 			note,
 			actor: 'Office admin'
-		});
+		}, fetch);
 		if (!job) return fail(404, { jobActionMessage: 'Job not found.' });
 		return {
 			jobActionMessage: `${job.siteName || job.customerName} was rescheduled for ${job.scheduledDate}.`,
 			selectedJobId: job.id
 		};
 	},
-	updatePlanning: async ({ request }) => {
+	updatePlanning: async ({ request, fetch }) => {
 		const formData = await request.formData();
 		const jobId = getJobId(formData);
 		if (!jobId) return fail(400, { jobActionMessage: 'Choose a job before updating the plan.' });
@@ -206,14 +207,14 @@ export const actions = {
 			materialNotes: String(formData.get('materialNotes') ?? '').trim(),
 			checklist: normalizeChecklistInput(formData),
 			actor: 'Office admin'
-		});
+		}, fetch);
 		if (!job) return fail(404, { jobActionMessage: 'Job not found.' });
 		return {
 			jobActionMessage: `${job.siteName || job.customerName} plan was updated.`,
 			selectedJobId: job.id
 		};
 	},
-	addJobNote: async ({ request }) => {
+	addJobNote: async ({ request, fetch }) => {
 		const formData = await request.formData();
 		const jobId = getJobId(formData);
 		const note = String(formData.get('jobNote') ?? '').trim();
@@ -222,7 +223,7 @@ export const actions = {
 		const job = await addBdrScheduledJobNote(jobId, {
 			note,
 			actor: 'Office admin'
-		});
+		}, fetch);
 		if (!job) return fail(404, { jobActionMessage: 'Job not found.' });
 		return {
 			jobActionMessage: `Note added to ${job.siteName || job.customerName}.`,

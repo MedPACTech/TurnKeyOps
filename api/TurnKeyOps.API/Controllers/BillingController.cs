@@ -5,7 +5,7 @@ using MedInsights.Services.Interfaces;
 
 [ApiController]
 [Route("billing")]
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.BillingAdmin)]
 public class BillingController : ControllerBase
 {
     private readonly IBillingService _billingService;
@@ -17,8 +17,12 @@ public class BillingController : ControllerBase
 
 
     [HttpPost("checkout")]
-    public async Task<IActionResult> CreateCheckout([FromBody] CreateSubscriptionCheckoutRequestDto req, CancellationToken ct)
+    public async Task<IActionResult> CreateCheckout(
+        [FromBody] CreateSubscriptionCheckoutRequestDto req,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
+        req.IdempotencyKey ??= idempotencyKey;
         var session = await _billingService.CreateSubscriptionCheckoutAsync(req, ct);
         return Ok(new { url = session.Url, sessionId = session.SessionId, provider = session.Provider });
     }
@@ -39,8 +43,12 @@ public class BillingController : ControllerBase
         => Ok(await _billingService.ScheduleSeatReductionAsync(req, ct));
 
     [HttpPost("topups/checkout")]
-    public async Task<IActionResult> PurchaseTopUp([FromBody] PurchaseCreditTopUpRequestDto req, CancellationToken ct)
+    public async Task<IActionResult> PurchaseTopUp(
+        [FromBody] PurchaseCreditTopUpRequestDto req,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
+        req.IdempotencyKey ??= idempotencyKey;
         var session = await _billingService.PurchaseCreditTopUpAsync(req, ct);
         return Ok(new { url = session.Url, sessionId = session.SessionId, provider = session.Provider });
     }

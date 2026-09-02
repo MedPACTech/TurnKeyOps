@@ -125,7 +125,8 @@ namespace MedInsights.Services
             membership.DateRemoved = DateTime.UtcNow;
             membership.DateUpdated = DateTime.UtcNow;
             await _repository.SaveAsync(membership, ct);
-            await _seatEntitlementService.ReleaseSeatAsync(_userContext.TenantId, previousSeatStatus, ct);
+            if (UsesSeat(previousSeatStatus))
+                await _seatEntitlementService.ReleaseSeatAsync(_userContext.TenantId, previousSeatStatus, ct);
 
             await _inviteService.CreateAsync(new CreateInviteRequestDto
             {
@@ -167,7 +168,8 @@ namespace MedInsights.Services
             membership.DateUpdated = DateTime.UtcNow;
 
             await _repository.SaveAsync(membership, ct);
-            await _seatEntitlementService.ReleaseSeatAsync(_userContext.TenantId, previousSeatStatus, ct);
+            if (UsesSeat(previousSeatStatus))
+                await _seatEntitlementService.ReleaseSeatAsync(_userContext.TenantId, previousSeatStatus, ct);
 
             await _auditService.RecordAsync(new RecordAuditEventRequestDto
             {
@@ -194,6 +196,10 @@ namespace MedInsights.Services
             if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(phone))
                 throw new ArgumentException("Either invited email or invited phone is required.");
         }
+
+        private static bool UsesSeat(string? seatStatus) =>
+            string.Equals(seatStatus, "Assigned", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(seatStatus, "Reserved", StringComparison.OrdinalIgnoreCase);
 
         private async Task ApplyRoleAsync(TenantMembershipDto dto, bool isOwner, CancellationToken ct)
         {

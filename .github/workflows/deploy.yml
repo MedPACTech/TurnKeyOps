@@ -1,0 +1,369 @@
+name: Deploy TurnKeyOps (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment-name:
+        description: GitHub environment containing the target's variables, secrets, and approval rules
+        required: true
+        type: string
+      aspnetcore-environment:
+        description: ASPNETCORE_ENVIRONMENT value for the API
+        required: true
+        type: string
+      ship-release-id:
+        description: Hubbsly Ship deployment or release identifier
+        required: false
+        default: automatic-staging
+        type: string
+      uat-evidence:
+        description: UAT record URL or identifier
+        required: false
+        default: not-required-for-staging
+        type: string
+      rollback-reference:
+        description: Previous healthy run, artifact, or commit used for rollback
+        required: false
+        default: staging-uses-latest-healthy
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+env:
+  CI: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  quality:
+    name: Validate release candidate
+    uses: ./.github/workflows/quality-gates.yml
+
+  package:
+    name: Build immutable deployment artifacts
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Publish API
+        run: |
+          set -euo pipefail
+          dotnet restore api/TurnKeyOps.API.sln --configfile api/nuget.config
+          dotnet publish api/TurnKeyOps.API/TurnKeyOps.API.csproj \
+            --configuration Release \
+            --no-restore \
+            --output "$RUNNER_TEMP/api-package"
+          find "$RUNNER_TEMP/api-package" -type f \( -name '*.pdb' -o -name '*.xml' \) -delete
+          python3 api/scripts/scan-repository-security.py --path "$RUNNER_TEMP/api-package"
+          (cd "$RUNNER_TEMP/api-package" && zip -rq "$RUNNER_TEMP/turnkeyops-api.zip" .)
+          package_contents="$(unzip -Z1 "$RUNNER_TEMP/turnkeyops-api.zip")"
+          grep -Eq '^(\./)?TurnKeyOps\.API\.dll$' <<< "$package_contents"
+
+      - name: Build and package Node application
+        working-directory: client
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          mkdir -p "$RUNNER_TEMP/web-package"
+          cp -R build "$RUNNER_TEMP/web-package/build"
+          cp package.json package-lock.json "$RUNNER_TEMP/web-package/"
+          (cd "$RUNNER_TEMP/web-package" && npm ci --omit=dev --ignore-scripts)
+          test -f "$RUNNER_TEMP/web-package/build/index.js"
+          python3 ../api/scripts/scan-repository-security.py --path "$RUNNER_TEMP/web-package"
+          (cd "$RUNNER_TEMP/web-package" && zip -rq "$RUNNER_TEMP/turnkeyops-web.zip" .)
+
+      - name: Write artifact manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$RUNNER_TEMP" && sha256sum turnkeyops-api.zip turnkeyops-web.zip) \
+            | tee "$RUNNER_TEMP/release-manifest.txt"
+          jq --null-input \
+            --arg commit "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '{commit: $commit, github_run_id: $run_id, github_run_attempt: $run_attempt}' \
+            > "$RUNNER_TEMP/release-metadata.json"
+
+      - name: Publish immutable release bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: turnkeyops-release-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/turnkeyops-api.zip
+            ${{ runner.temp }}/turnkeyops-web.zip
+            ${{ runner.temp }}/release-manifest.txt
+            ${{ runner.temp }}/release-metadata.json
+          if-no-files-found: error
+          retention-days: 90
+
+  deploy:
+    name: Deploy API and web
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ inputs.environment-name }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download immutable release bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: turnkeyops-release-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release
+
+      - name: Verify immutable release bundle
+        shell: bash
+        working-directory: ${{ runner.temp }}/release
+        run: |
+          set -euo pipefail
+          sha256sum --check release-manifest.txt
+          jq --exit-status \
+            --arg commit "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '.commit == $commit and .github_run_id == $run_id and .github_run_attempt == $run_attempt' \
+            release-metadata.json > /dev/null
+          api_contents="$(unzip -Z1 turnkeyops-api.zip)"
+          grep -Eq '^(\./)?TurnKeyOps\.API\.dll$' <<< "$api_contents"
+          web_contents="$(unzip -Z1 turnkeyops-web.zip)"
+          grep -Eq '^(\./)?build/index\.js$' <<< "$web_contents"
+
+      - name: Validate release and environment contract
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_WEBAPP_NAME: ${{ vars.API_WEBAPP_NAME }}
+          WEB_WEBAPP_NAME: ${{ vars.WEB_WEBAPP_NAME }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          WEB_BASE_URL: ${{ vars.WEB_BASE_URL }}
+          SHIP_RELEASE_ID: ${{ inputs.ship-release-id }}
+          UAT_EVIDENCE: ${{ inputs.uat-evidence }}
+          ROLLBACK_REFERENCE: ${{ inputs.rollback-reference }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_RESOURCE_GROUP API_WEBAPP_NAME WEB_WEBAPP_NAME API_BASE_URL WEB_BASE_URL SHIP_RELEASE_ID UAT_EVIDENCE ROLLBACK_REFERENCE; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing deployment contract value: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Sign in to Azure with workload identity federation
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate deployed API configuration
+        shell: bash
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_WEBAPP_NAME: ${{ vars.API_WEBAPP_NAME }}
+        run: |
+          set -euo pipefail
+          settings_json="$(az webapp config appsettings list \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$API_WEBAPP_NAME" \
+            --output json)"
+
+          setting_value() {
+            jq -r --arg name "$1" '[.[] | select(.name == $name) | .value][0] // empty' <<< "$settings_json"
+          }
+
+          required_settings=(
+            AzureStorageSettings__ConnectionString
+            IBeam__Identity__AzureTable__StorageConnectionString
+            IBeam__Repositories__AzureTables__ConnectionString
+            IBeam__Identity__Jwt__SigningKey
+            IBeam__Identity__Otp__HashSalt
+            IBeam__Identity__Otp__VerificationTokenSecret
+            IBeam__Communications__Email__Providers__AzureCommunications__ConnectionString
+            IBeam__Communications__Sms__Providers__AzureCommunications__ConnectionString
+          )
+
+          for setting_name in "${required_settings[@]}"; do
+            value="$(setting_value "$setting_name")"
+            if [ -z "$value" ]; then
+              echo "Required API App Service setting is missing: $setting_name"
+              exit 1
+            fi
+            if [[ "$value" == *'UseDevelopmentStorage=true'* ]] || [[ "$value" == *'devstoreaccount1'* ]]; then
+              echo "API App Service setting uses development storage: $setting_name"
+              exit 1
+            fi
+            if [[ "$value" == *'<required'* ]] || [[ "$value" == *'<TEST_'* ]] || [[ "$value" == *'development-only'* ]]; then
+              echo "API App Service setting contains a placeholder value: $setting_name"
+              exit 1
+            fi
+          done
+
+          for setting_name in \
+            IBeam__Identity__Jwt__SigningKey \
+            IBeam__Identity__Otp__HashSalt \
+            IBeam__Identity__Otp__VerificationTokenSecret; do
+            value="$(setting_value "$setting_name")"
+            if [ "${#value}" -lt 32 ]; then
+              echo "API App Service secret is shorter than 32 characters: $setting_name"
+              exit 1
+            fi
+          done
+
+      - name: Deploy API package
+        shell: bash
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_WEBAPP_NAME: ${{ vars.API_WEBAPP_NAME }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          WEB_BASE_URL: ${{ vars.WEB_BASE_URL }}
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.aspnetcore-environment }}
+        run: |
+          set -euo pipefail
+          az webapp config appsettings set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$API_WEBAPP_NAME" \
+            --settings \
+              ASPNETCORE_ENVIRONMENT="$DEPLOYMENT_ENVIRONMENT" \
+              SystemSettings__APIHost="$API_BASE_URL" \
+              Cors__AllowedOrigins__9="$WEB_BASE_URL" \
+            --output none
+          az webapp deploy \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$API_WEBAPP_NAME" \
+            --src-path "$RUNNER_TEMP/release/turnkeyops-api.zip" \
+            --type zip \
+            --clean true \
+            --restart true \
+            --track-status true \
+            --output json | tee "$RUNNER_TEMP/api-deployment.json"
+
+      - name: Deploy web package
+        shell: bash
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          WEB_WEBAPP_NAME: ${{ vars.WEB_WEBAPP_NAME }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          az webapp config set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$WEB_WEBAPP_NAME" \
+            --linux-fx-version 'NODE|22-lts' \
+            --startup-file 'node build' \
+            --output none
+          az webapp config appsettings set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$WEB_WEBAPP_NAME" \
+            --settings \
+              NODE_ENV=production \
+              PUBLIC_TKO_API_BASE_URL="$API_BASE_URL" \
+              TKO_API_BASE_URL="$API_BASE_URL" \
+              PROTOCOL_HEADER=x-forwarded-proto \
+              HOST_HEADER=x-forwarded-host \
+            --output none
+          az webapp deploy \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$WEB_WEBAPP_NAME" \
+            --src-path "$RUNNER_TEMP/release/turnkeyops-web.zip" \
+            --type zip \
+            --clean true \
+            --restart true \
+            --track-status true \
+            --output json | tee "$RUNNER_TEMP/web-deployment.json"
+
+      - name: Run post-deployment smoke checks
+        shell: bash
+        env:
+          SMOKE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          SMOKE_WEB_BASE_URL: ${{ vars.WEB_BASE_URL }}
+        run: |
+          set -o pipefail
+          api/scripts/post-deploy-smoke.sh | tee "$RUNNER_TEMP/post-deploy-smoke.log"
+
+      - name: Write deployment record
+        if: always()
+        shell: bash
+        env:
+          DEPLOYMENT_ENVIRONMENT_NAME: ${{ inputs.environment-name }}
+          SHIP_RELEASE_ID: ${{ inputs.ship-release-id }}
+          UAT_EVIDENCE: ${{ inputs.uat-evidence }}
+          ROLLBACK_REFERENCE: ${{ inputs.rollback-reference }}
+        run: |
+          set -euo pipefail
+          jq --null-input \
+            --arg environment "$DEPLOYMENT_ENVIRONMENT_NAME" \
+            --arg commit "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg ship_release_id "$SHIP_RELEASE_ID" \
+            --arg uat_evidence "$UAT_EVIDENCE" \
+            --arg rollback_reference "$ROLLBACK_REFERENCE" \
+            '{
+              environment: $environment,
+              commit: $commit,
+              github_run_id: $run_id,
+              github_run_attempt: $run_attempt,
+              github_run_url: $run_url,
+              hubbsly_ship_release_id: $ship_release_id,
+              uat_evidence: $uat_evidence,
+              rollback_reference: $rollback_reference
+            }' > "$RUNNER_TEMP/deployment-record.json"
+
+      - name: Publish deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-evidence-${{ inputs.environment-name }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/api-deployment.json
+            ${{ runner.temp }}/web-deployment.json
+            ${{ runner.temp }}/post-deploy-smoke.log
+            ${{ runner.temp }}/deployment-record.json
+            ${{ runner.temp }}/release/release-manifest.txt
+            ${{ runner.temp }}/release/release-metadata.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Record Hubbsly Ship release identifiers
+        if: always()
+        shell: bash
+        env:
+          DEPLOYMENT_ENVIRONMENT_NAME: ${{ inputs.environment-name }}
+          SHIP_RELEASE_ID: ${{ inputs.ship-release-id }}
+          UAT_EVIDENCE: ${{ inputs.uat-evidence }}
+          ROLLBACK_REFERENCE: ${{ inputs.rollback-reference }}
+        run: |
+          {
+            echo '## TurnKeyOps deployment record'
+            echo "- Environment: $DEPLOYMENT_ENVIRONMENT_NAME"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- GitHub run: \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\`"
+            echo "- Hubbsly Ship release: \`$SHIP_RELEASE_ID\`"
+            echo "- UAT evidence: $UAT_EVIDENCE"
+            echo "- Rollback reference: $ROLLBACK_REFERENCE"
+          } >> "$GITHUB_STEP_SUMMARY"

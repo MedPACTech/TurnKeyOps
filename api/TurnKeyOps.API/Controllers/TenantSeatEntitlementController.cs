@@ -6,7 +6,7 @@ namespace MedInsights.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.BillingAdmin)]
     public class TenantSeatEntitlementController : ApiControllerBase
     {
         private readonly ITenantSeatEntitlementService _service;

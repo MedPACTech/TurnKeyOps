@@ -13,5 +13,7 @@ export type QuoteFormResult = {
 	success: boolean;
 	error?: string | null;
 	values?: QuoteValues | null;
+	submissionId?: string;
+	reference?: string;
+	durableRequestCreated?: boolean;
 } | null;
-

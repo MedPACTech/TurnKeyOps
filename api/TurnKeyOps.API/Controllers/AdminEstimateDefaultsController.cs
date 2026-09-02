@@ -5,7 +5,7 @@ using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
-[Authorize]
+[Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 [Route("api/admin/estimate-defaults")]
 public class AdminEstimateDefaultsController : ApiControllerBase
 {
@@ -24,6 +24,7 @@ public class AdminEstimateDefaultsController : ApiControllerBase
     }
 
     [HttpPut]
+    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
     public async Task<IActionResult> Put([FromBody] EstimateDefaultsDto dto, CancellationToken ct)
     {
         var result = await _service.UpsertAsync(dto, ct);

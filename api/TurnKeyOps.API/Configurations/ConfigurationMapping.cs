@@ -24,6 +24,10 @@ public static class ConfigurationMapping
         services.Configure<StripeBillingCatalogSettings>(configuration.GetSection("StripeBillingCatalogSettings"));
         services.Configure<PayPalSettings>(configuration.GetSection("PayPalSettings"));
         services.Configure<PayPalBillingCatalogSettings>(configuration.GetSection("PayPalBillingCatalogSettings"));
+        services.Configure<BillingIntegrationOptions>(
+            configuration.GetSection(BillingIntegrationOptions.SectionName));
+        services.Configure<ProductionCommunicationOptions>(
+            configuration.GetSection(ProductionCommunicationOptions.SectionName));
 
         services.Configure<AzureSpeechSettings>(configuration.GetSection("AzureSpeechSettings"));
 

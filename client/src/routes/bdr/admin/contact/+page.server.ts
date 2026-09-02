@@ -5,10 +5,11 @@ import {
 	loadBdrContactAccessRoles,
 	saveBdrContactAccessRole
 } from '$lib/server/bdr-contact-access';
+import { authTokenCookie } from '$lib/server/auth-session';
 
-export const load = async ({ fetch }) => {
+export const load = async ({ fetch, cookies }) => {
 	const { snapshot, source } = await resolveMvpScaffold(fetch);
-	const accessOverrides = await loadBdrContactAccessRoles();
+	const accessOverrides = await loadBdrContactAccessRoles(fetch, cookies.get(authTokenCookie));
 
 	return {
 		source,
@@ -20,7 +21,7 @@ export const load = async ({ fetch }) => {
 };
 
 export const actions = {
-	updateAccessRole: async ({ locals, request }) => {
+	updateAccessRole: async ({ locals, request, fetch, cookies }) => {
 		if (!locals.bdrAdminSession) {
 			throw error(403, 'Admin access is required to change contact app access.');
 		}
@@ -37,7 +38,7 @@ export const actions = {
 			throw error(403, 'Only an owner can grant owner access.');
 		}
 
-		await saveBdrContactAccessRole(contactId, role);
+		await saveBdrContactAccessRole(contactId, role, fetch, cookies.get(authTokenCookie));
 
 		return {
 			message: 'Contact access saved.',

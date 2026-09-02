@@ -1,10 +1,9 @@
-import { thinkPinkTenant } from '$lib/config/tenants';
-import { loadQuoteRequests } from '$lib/server/quote-requests';
+import { loadBdrScheduledJobs } from '$lib/server/bdr-job-scheduling';
 
 export const load = async ({ fetch }) => {
-	const { requests, source } = await loadQuoteRequests(fetch, thinkPinkTenant.id);
-	return {
-		source,
-		requests: requests.filter((request) => request.status === 'won')
-	};
+	try {
+		return { jobs: await loadBdrScheduledJobs(fetch), error: null, loadedAtUtc: new Date().toISOString() };
+	} catch {
+		return { jobs: [], error: 'Live production jobs could not be loaded.', loadedAtUtc: new Date().toISOString() };
+	}
 };

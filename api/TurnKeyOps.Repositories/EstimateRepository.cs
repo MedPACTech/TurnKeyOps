@@ -17,4 +17,7 @@ public class EstimateRepository : AzureTablesRepositoryBase<Estimate>, IEstimate
         IOptions<RepositoryOptions> repositoryOptions) : base(store, cache, tenantContext, repositoryOptions.Value)
     {
     }
+
+    public Task<Estimate?> GetAsync(string partitionKey, string rowKey, CancellationToken ct = default) =>
+        GetByKeysAsync(partitionKey, rowKey, ct);
 }
