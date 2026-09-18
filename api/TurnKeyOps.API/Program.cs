@@ -119,7 +119,8 @@ public partial class Program
             //AppDomain.CurrentDomain.SetData("DataDirectory", dataDir);
 
             //JSON enum as strings
-            builder.Services.AddControllers()
+            builder.Services.AddControllers(options =>
+                options.Conventions.Add(new IdentityOtpAnonymousConvention()))
                 .AddJsonOptions(options =>
                 {
                     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: true));
