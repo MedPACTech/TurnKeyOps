@@ -67,8 +67,8 @@ contract is in `api/docs/production-integrations.md`.
 Every deployment rebuilds and validates the commit, creates one immutable
 API/web artifact bundle named for the SHA, deploys those exact artifacts, runs
 post-deployment smoke checks, and publishes deployment evidence. Production
-also requires the GitHub environment approval and explicit Ship/UAT/rollback
-dispatch inputs.
+requires the GitHub environment approval. In Hubbsly, select Production and
+`main`, then run; no release ID, UAT link, or rollback reference is required.
 
 Linux App Service ZIP deployment submits asynchronously with Azure CLI startup
 tracking disabled. The repository-owned smoke script is the authoritative
@@ -90,8 +90,8 @@ after the CLI request has timed out.
    workflow dispatch contract.
 5. Merge through the ruleset and retain the first successful staging workflow,
    deployment evidence artifact, and smoke log.
-6. Complete UAT, trigger production through Ship, approve the protected GitHub
-   environment, and retain the resulting GitHub and Ship identifiers.
+6. Trigger production through Ship, approve the protected GitHub environment,
+   and retain the resulting GitHub run.
 
 ## Custom domains and TLS
 
@@ -124,7 +124,8 @@ Before changing DNS:
 6. Submit one test request per tenant and confirm it appears only in that tenant's External Admin.
 7. Complete an OTP login for each admin hostname.
 8. Verify uploaded files persist after an App Service restart.
-9. Complete the UAT template and create the Hubbsly Ship release record.
+9. Retain any manual testing notes with the release; these are optional
+   documentation, not required workflow inputs.
 
 ## DNS cutover
 
