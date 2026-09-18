@@ -29,12 +29,12 @@ export const productionDomains: ProductionDomain[] = [
 		routePrefix: '/turnkeyops/admin'
 	},
 	{
-		hostname: 'thinkpinklc.com',
+		hostname: 'thinkpinklandclearing.com',
 		surface: 'thinkpink-public',
 		routePrefix: '/thinkpink/public'
 	},
 	{
-		hostname: 'www.thinkpinklc.com',
+		hostname: 'www.thinkpinklandclearing.com',
 		surface: 'thinkpink-public',
 		routePrefix: '/thinkpink/public'
 	},
@@ -87,4 +87,27 @@ export const resolveProductionPathname = (hostname: string, pathname: string) =>
 	}
 
 	return `${domain.routePrefix}${pathname}`;
+};
+
+// Redirects are served by Azure, including the domains registered elsewhere.
+export const productionRedirects: Record<string, string> = {
+	'thinkpinklc.com': 'thinkpinklandclearing.com',
+	'www.thinkpinklc.com': 'thinkpinklandclearing.com',
+	'www.thinkpinklandclearing.com': 'thinkpinklandclearing.com',
+	'www.turnkeyops.ai': 'turnkeyops.ai',
+	'bdr.construction': 'bdrconcrete.com',
+	'www.bdr.construction': 'bdrconcrete.com',
+	'www.bdrconcrete.com': 'bdrconcrete.com'
+};
+
+export const resolveProductionRedirect = (url: URL): string | null => {
+	const hostname = Object.hasOwn(productionRedirects, url.hostname.toLowerCase())
+		? productionRedirects[url.hostname.toLowerCase()]
+		: undefined;
+	if (!hostname) return null;
+	const destination = new URL(url);
+	destination.protocol = 'https:';
+	destination.hostname = hostname;
+	destination.port = '';
+	return destination.href;
 };

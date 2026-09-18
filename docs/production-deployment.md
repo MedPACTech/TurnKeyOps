@@ -11,8 +11,8 @@ hostname; do not create separate BDR and Think Pink builds.
 | `turnkeyops.ai` | `/turnkeyops/public` | TurnKeyOps public site |
 | `www.turnkeyops.ai` | `/turnkeyops/public` | Public-site alias |
 | `admin.turnkeyops.ai` | `/turnkeyops/admin` | Platform administration |
-| `thinkpinklc.com` | `/thinkpink/public` | Think Pink public site |
-| `www.thinkpinklc.com` | `/thinkpink/public` | Public-site alias |
+| `thinkpinklandclearing.com` | `/thinkpink/public` | Think Pink public site |
+| `www.thinkpinklandclearing.com` | `/thinkpink/public` | Public-site alias |
 | `admin.thinkpinklc.com` | `/thinkpink/admin` | Think Pink External Admin |
 | `bdrconcrete.com` | `/bdr/public` | BDR public site |
 | `www.bdrconcrete.com` | `/bdr/public` | Public-site alias |
@@ -132,3 +132,21 @@ Lower DNS TTLs at least several hours before cutover. Change one public domain
 at a time, verify TLS and form submission, and then add its admin subdomain. Do
 not remove the previous hosting configuration until the new deployment has
 remained healthy through the rollback window.
+
+## Canonical redirects and email
+
+Azure serves permanent HTTP 308 redirects, preserving paths and query strings:
+
+- `thinkpinklc.com` and `www.thinkpinklc.com` → `thinkpinklandclearing.com`
+- `bdr.construction` and `www.bdr.construction` → `bdrconcrete.com`
+- The `www` variants of each public site → its apex domain
+
+Bind and certificate every redirect hostname on the same Node Web App. DNS
+alone does not implement these redirects. Replace registrar parking/forwarding
+only after the corresponding Azure application and hostname are ready.
+
+Hosting.com/cPanel hosts email for `bdrconcrete.com`, `thinkpinklc.com`, and
+`turnkeyops.ai`. DNS may remain with Namecheap or Hosting.com. Keep MX and mail
+host A records pointing to Hosting.com, with its SPF, DKIM and DMARC records.
+Do not point mail hosts at Azure or use an alias to the website apex. Provision
+`chance@thinkpinklc.com` before changing its MX from Namecheap forwarding.
