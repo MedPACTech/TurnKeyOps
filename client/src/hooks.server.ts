@@ -13,7 +13,7 @@ import {
 	refreshAuthSession,
 	validateAdminAccessToken
 } from '$lib/server/auth-session';
-import { resolveProductionPathname } from '$lib/config/domains';
+import { resolveProductionPathname, resolveProductionRedirect } from '$lib/config/domains';
 import { getExternalAdminTenantForPath } from '$lib/config/external-admin';
 import { getTenantById } from '$lib/config/tenants';
 
@@ -90,6 +90,14 @@ const accessFailure = (
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
+	const destination = resolveProductionRedirect(event.url);
+	if (destination) {
+		return withSecurityHeaders(
+			new Response(null, { status: 308, headers: { Location: destination } }),
+			event.url.protocol === 'https:'
+		);
+	}
+
 	if (
 		isCrossSiteFormMutation(
 			event.request.method,
