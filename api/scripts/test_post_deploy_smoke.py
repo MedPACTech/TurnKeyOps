@@ -20,6 +20,13 @@ if os.environ['PROBE_MODE']=='timeout':
  time.sleep(float(args[args.index('--max-time')+1]))
  print('000',end='');sys.exit(28)
 if '--head' in args:
+ mode=os.environ['PROBE_MODE']
+ if mode=='admin-timeout' or (mode=='startup' and 'thinkpink' in args[-1] and open(os.environ['PROBE_LOG']).read().splitlines().count(args[-1])==1):
+  print('HTTP/1.1 500 Internal Server Error');sys.exit(0)
+ if mode=='unprotected':
+  print('HTTP/1.1 200 OK');sys.exit(0)
+ if mode=='wrong-redirect':
+  print('HTTP/1.1 303 See Other');print('Location: /public');sys.exit(0)
  print('HTTP/1.1 303 See Other\\nLocation: /auth/login?returnTo=protected\\n')
 else:
  print('401' if args[-1].endswith('/api/quote-requests') else '200',end='')
@@ -57,6 +64,22 @@ else:
         self.assertNotEqual(result.returncode, 0)
         self.assertLess(elapsed, 5)
         self.assertEqual(len(calls), 1)
+
+    def test_startup_failure_recovers_without_skipping_admin_probe(self):
+        result, calls, _ = self.run_smoke('web', 'startup')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls.count('https://web.invalid/thinkpink/admin/dashboard'), 2)
+
+    def test_incorrect_authorization_fails_without_retry(self):
+        for mode in ['unprotected', 'wrong-redirect']:
+            result, calls, _ = self.run_smoke('web', mode)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(calls.count('https://web.invalid/bdr/admin/dashboard'), 1)
+
+    def test_admin_startup_obeys_total_deadline(self):
+        result, calls, elapsed = self.run_smoke('web', 'admin-timeout', '2')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertLess(elapsed, 5)
 
     def test_invalid_component_stops_before_network(self):
         result, calls, _ = self.run_smoke('typo')

@@ -74,14 +74,31 @@ for path in /bdr/public /thinkpink/public; do
   retry_get "$web_base$path" 200
 done
 
+retry_admin_redirect() {
+  local url="$1" attempt headers code remaining delay
+  for ((attempt = 1; attempt <= max_attempts; attempt += 1)); do
+    headers="$(bounded_curl --silent --show-error --head --header 'Accept: text/html' "$url" || true)"
+    if grep -Eq '^HTTP/[^ ]+ 30[237]' <<<"$headers" && grep -Eqi '^location: .*/auth/login\?returnTo=' <<<"$headers"; then
+      echo "PASS anonymous admin redirect $url"
+      return 0
+    fi
+    code="$(awk '/^HTTP\// {code=$2} END {print code}' <<<"$headers")"
+    # Retry only transport/startup failures. A 200 or incorrect redirect is an
+    # authorization regression and must fail immediately, even during startup.
+    if [[ -n "$code" && ! "$code" =~ ^5[0-9][0-9]$ ]]; then break; fi
+    remaining=$((smoke_deadline - SECONDS))
+    if (( remaining <= 0 || attempt == max_attempts )); then break; fi
+    delay=5
+    (( remaining >= delay )) || delay="$remaining"
+    sleep "$delay"
+  done
+  echo "FAIL anonymous admin smoke for $url" >&2
+  echo "$headers" >&2
+  return 1
+}
+
 for path in /bdr/admin/dashboard /thinkpink/admin/dashboard /turnkeyops/admin/dashboard; do
-  headers="$(bounded_curl --silent --show-error --head --header 'Accept: text/html' "$web_base$path")"
-  if ! grep -Eq '^HTTP/[^ ]+ 30[237]' <<<"$headers" || ! grep -Eqi '^location: .*/auth/login\?returnTo=' <<<"$headers"; then
-    echo "FAIL anonymous admin smoke for $path" >&2
-    echo "$headers" >&2
-    exit 1
-  fi
-  echo "PASS anonymous admin redirect $path"
+  retry_admin_redirect "$web_base$path"
 done
 
 echo 'Post-deploy smoke checks passed.'
