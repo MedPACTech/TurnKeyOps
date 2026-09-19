@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+    import { hasModuleAccess } from '$lib/module-access';
 	import type { Snippet } from 'svelte';
 	import AdminShell from '$lib/components/admin/AdminShell.svelte';
 	import {
@@ -19,6 +20,7 @@
 		children: Snippet;
 		data: {
 			role: BdrAdminRole;
+            modulePermissions?: string[];
 			bobVoice: BobVoiceId;
 			adminSession?: { email?: string };
 		};
@@ -37,7 +39,7 @@
 	{activePath}
 	{activeNav}
 	initialBobVoice={data.bobVoice}
-	navItems={config.navigation}
+	navItems={config.navigation.filter(item => !data.modulePermissions || hasModuleAccess(data.modulePermissions, item.slug === 'customers' ? 'contacts' : item.slug))}
 	tenantName={config.tenant.name}
 	workspaceLabel={config.workspaceLabel}
 	workspaceSummary={config.workspaceSummary}

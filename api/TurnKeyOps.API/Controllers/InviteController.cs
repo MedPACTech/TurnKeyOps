@@ -7,7 +7,7 @@ namespace MedInsights.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
+    [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.AuthenticatedSession)]
     public class InviteController : ApiControllerBase
     {
         private readonly IInviteService _service;
@@ -17,10 +17,12 @@ namespace MedInsights.Controllers
             _service = service;
         }
 
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         [HttpGet]
         public async Task<IActionResult> GetAll(CancellationToken ct)
             => OkResponse(await _service.GetAllAsync(ct));
 
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> Get(Guid id, CancellationToken ct)
         {
@@ -33,14 +35,17 @@ namespace MedInsights.Controllers
         public async Task<IActionResult> GetAcceptanceContext(Guid id, [FromQuery] string token, CancellationToken ct)
             => OkResponse(await _service.GetAcceptanceContextAsync(id, token, ct));
 
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateInviteRequestDto dto, CancellationToken ct)
             => OkResponse(await _service.CreateAsync(dto, ct));
 
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         [HttpPost("{id:guid}/resend")]
         public async Task<IActionResult> Resend(Guid id, CancellationToken ct)
             => OkResponse(await _service.ResendAsync(id, ct));
 
+        [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantAdmin)]
         [HttpPost("{id:guid}/cancel")]
         public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)
             => OkResponse(await _service.CancelAsync(id, ct));

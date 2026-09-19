@@ -1,3 +1,5 @@
+import { adminModule, hasModuleAccess, firstAllowedAdminPage } from '$lib/module-access';
+import { peopleRequest } from '$lib/server/people';
 import { withApiSession } from '$lib/server/api-session-request';
 import { getTurnKeyApiBaseUrl } from '$lib/server/turnkey-api';
 import type { Handle, HandleFetch } from '@sveltejs/kit';
@@ -149,6 +151,19 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 
 		event.locals.adminSession = authSession;
+        if (authSession.surface === 'external-admin') {
+            const permissions = await peopleRequest<string[]>(event, '/api/my-module-access');
+            event.locals.modulePermissions = permissions;
+            const module = adminModule(authPathname);
+            const write = !['GET', 'HEAD'].includes(event.request.method);
+            if (!write && /^\/(bdr|thinkpink)\/admin\/?$/.test(authPathname)) {
+                const landing = firstAllowedAdminPage(permissions);
+                if (landing) return withSecurityHeaders(new Response(null, {status:303,
+                    headers:{Location:`${authPathname.replace(/\/$/,'')}/${landing}`}}), event.url.protocol === 'https:');
+            }
+            if (module && !hasModuleAccess(permissions, module, write))
+                return withSecurityHeaders(new Response('You do not have permission to access this module.', {status:403}), event.url.protocol === 'https:');
+        }
 		if (authSession.surface === 'external-admin' && authSession.role) {
 			event.locals.bdrAdminSession = {
 				role: authSession.role,

@@ -10,7 +10,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"test:session": "node --test --experimental-strip-types tests/session-policy.test.ts tests/domain-routing.test.ts tests/api-session-request.test.ts",
+		"test:session": "node --test --experimental-strip-types tests/session-policy.test.ts tests/domain-routing.test.ts tests/api-session-request.test.ts tests/module-access.test.ts",
 		"test:e2e": "playwright test",
 		"test:e2e:list": "playwright test --list"
 	},

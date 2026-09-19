@@ -40,7 +40,7 @@ namespace MedInsights.Services
             var pk = EntityKeyPolicy.TenantPartition(tenantId);
             var rk = EntityKeyPolicy.Row(userId);
 
-            var existing = await _userProfileRepository.GetAsync(pk, rk, ct);
+            var existing = await _userProfileRepository.GetAsync(pk, rk, ct, includeDeleted: true);
             if (existing is not null)
             {
                 return UserProfileMapper.ToDto(existing);
@@ -92,6 +92,15 @@ namespace MedInsights.Services
 
             // 💥 PRESERVE server-managed fields
             entity.ApplicationUserId = existingEntity.ApplicationUserId;
+            entity.ProfileTypes = existingEntity.ProfileTypes;
+            entity.CompanyName = existingEntity.CompanyName;
+            entity.Team = existingEntity.Team;
+            entity.CustomerId = existingEntity.CustomerId;
+            entity.ContactEmail = existingEntity.ContactEmail;
+            entity.ContactPhone = existingEntity.ContactPhone;
+            entity.ModulePermissions = existingEntity.ModulePermissions;
+            entity.IsActive = existingEntity.IsActive;
+            entity.IsDeleted = existingEntity.IsDeleted;
 
             // 💥 Preserve concurrency + timestamp fields
             entity.ETag = existingEntity.ETag;
@@ -107,7 +116,7 @@ namespace MedInsights.Services
             var pk = EntityKeyPolicy.TenantPartition(tenantId);
             var rk = EntityKeyPolicy.Row(userId);
 
-            var existing = await _userProfileRepository.GetAsync(pk, rk, ct);
+            var existing = await _userProfileRepository.GetAsync(pk, rk, ct, includeDeleted: true);
             if (existing is not null)
             {
                 return;

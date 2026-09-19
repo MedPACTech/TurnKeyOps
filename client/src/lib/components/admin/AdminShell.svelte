@@ -153,7 +153,7 @@
 				<div class={`flex gap-3 ${navCollapsed ? 'flex-col items-center' : 'items-center'}`}>
 					<button
 						type="button"
-						class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-solid)] text-xs font-bold text-white"
+						class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-text)] text-xs font-bold text-white"
 						aria-label="Open profile"
 						title="Profile"
 						onclick={() => (profileOpen = true)}
@@ -242,7 +242,7 @@
 								profileOpen = true;
 							}}
 						>
-							<span class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--brand-solid)] text-xs font-bold text-white">{operatorInitials}</span>
+							<span class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-text)] text-xs font-bold text-white">{operatorInitials}</span>
 							Profile & Bob voice
 						</button>
 					</div>
