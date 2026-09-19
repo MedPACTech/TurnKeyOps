@@ -22,7 +22,7 @@ class BundleTests(unittest.TestCase):
                     with zipfile.ZipFile(root/f'turnkeyops-{name}.zip', 'w') as archive:
                         archive.writestr(entry, 'test artifact')
                 env = os.environ | {'DEPLOY_COMPONENT': component, 'RUNNER_TEMP': directory,
-                    'GITHUB_SHA': 'test-commit', 'GITHUB_RUN_ID': '42', 'GITHUB_RUN_ATTEMPT': '1'}
+                    'GITHUB_SHA': 'test-commit', 'GITHUB_RUN_ID': '42', 'GITHUB_RUN_ATTEMPT': '1', 'PACKAGED_RUN_ATTEMPT': '1'}
                 def run(name):
                     return subprocess.run(['bash', '-c', step_script(name)], cwd=root, env=env,
                                           capture_output=True, text=True)
@@ -30,6 +30,12 @@ class BundleTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 result = run('Verify immutable release bundle')
                 self.assertEqual(result.returncode, 0, result.stderr)
+                # Deployment-only retries use the original packaging attempt.
+                env['GITHUB_RUN_ATTEMPT'] = '2'
+                self.assertEqual(run('Verify immutable release bundle').returncode, 0)
+                env['PACKAGED_RUN_ATTEMPT'] = '2'
+                self.assertNotEqual(run('Verify immutable release bundle').returncode, 0)
+                env['PACKAGED_RUN_ATTEMPT'] = '1'
                 # A package from another component/run may not be substituted.
                 env['DEPLOY_COMPONENT'] = 'web' if component == 'api' else 'api'
                 self.assertNotEqual(run('Verify immutable release bundle').returncode, 0)

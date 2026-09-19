@@ -49,6 +49,9 @@ jobs:
 
   package:
     name: Build immutable deployment artifacts
+    outputs:
+      artifact-name: turnkeyops-release-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      run-attempt: ${{ github.run_attempt }}
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -149,10 +152,12 @@ jobs:
       - name: Download immutable release bundle
         uses: actions/download-artifact@v8
         with:
-          name: turnkeyops-release-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ needs.package.outputs.artifact-name }}
           path: ${{ runner.temp }}/release
 
       - name: Verify immutable release bundle
+        env:
+          PACKAGED_RUN_ATTEMPT: ${{ needs.package.outputs.run-attempt }}
         shell: bash
         working-directory: ${{ runner.temp }}/release
         run: |
@@ -162,7 +167,7 @@ jobs:
             --arg component "$DEPLOY_COMPONENT" \
             --arg commit "$GITHUB_SHA" \
             --arg run_id "$GITHUB_RUN_ID" \
-            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg run_attempt "$PACKAGED_RUN_ATTEMPT" \
             '.component == $component and .commit == $commit and .github_run_id == $run_id and .github_run_attempt == $run_attempt' \
             release-metadata.json > /dev/null
           if [[ "$DEPLOY_COMPONENT" != web ]]; then
