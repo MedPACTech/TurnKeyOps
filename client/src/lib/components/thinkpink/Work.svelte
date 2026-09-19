@@ -46,6 +46,8 @@
 						<span class="text-muted text-sm">{proj.meta}</span>
 					</figcaption>
 				</figure>
+			{:else}
+				<p class="text-muted">Project photos will be added when available.</p>
 			{/each}
 		</div>
 	</div>

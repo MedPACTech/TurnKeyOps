@@ -3,7 +3,7 @@ import { loadBdrScheduledJobs } from '$lib/server/bdr-job-scheduling';
 import { loadQuoteRequests, recordQuoteRequestActivity } from '$lib/server/quote-requests';
 import { updateBdrInvoiceState } from '$lib/server/bdr-invoices';
 import { addBdrScheduledJobNote } from '$lib/server/bdr-job-scheduling';
-import { resolveMvpScaffold } from '$lib/server/mvp';
+import { listQuoteEstimates } from '$lib/server/quote-estimates';
 import { bdrTenant, type TenantDefinition } from '$lib/config/tenants';
 
 export type BobActionKind = 'invoice-reminder' | 'quote-follow-up' | 'job-note' | 'open-record';
@@ -186,11 +186,11 @@ export const buildBobBriefing = async (
 			}
 		};
 	}
-	const [{ requests }, invoices, jobs, { snapshot }] = await Promise.all([
+	const [{ requests }, invoices, jobs, estimates] = await Promise.all([
 		loadQuoteRequests(fetch),
 		loadBdrInvoices(fetch),
 		loadBdrScheduledJobs(fetch),
-		resolveMvpScaffold(fetch)
+		listQuoteEstimates(fetch)
 	]);
 
 	const activeQuotes = requests.filter((request) => !['won', 'closed'].includes(request.status));
@@ -358,9 +358,8 @@ export const buildBobBriefing = async (
 				checklistComplete: Object.values(job.planning.checklist).filter(Boolean).length
 			})),
 			estimates: {
-				count: snapshot.summary.estimateCount,
-				value: snapshot.summary.estimateValue,
-				pipelineValue: snapshot.summary.pipelineValue
+				count: estimates.length,
+				value: estimates.reduce((sum, estimate) => sum + estimate.totals.estimatedTotal, 0)
 			}
 		}
 	};

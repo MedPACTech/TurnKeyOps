@@ -1,8 +1,8 @@
 export const site = {
 	name: 'Think Pink Land Clearing',
 	legalName: 'Think Pink Land Clearing LLC',
-	phone: '(614) 555-0199',
-	phoneHref: 'tel:+16145550199',
+	phone: '',
+	phoneHref: '',
 	region: 'Central Ohio',
 	tagline: 'Central Ohio · Licensed & Insured',
 	/** Flip to true to show the storm-response banner above the header. */
@@ -52,23 +52,7 @@ export type Project = {
 	placeholder: string;
 };
 
-export const projects: Project[] = [
-	{
-		title: '12-acre pasture reclaim',
-		meta: 'Delaware County · Forestry mulching',
-		placeholder: 'before/after pair'
-	},
-	{
-		title: 'Building site prep',
-		meta: 'Licking County · Land clearing',
-		placeholder: 'before/after pair'
-	},
-	{
-		title: 'Fence line clearing',
-		meta: 'Madison County · Right-of-way',
-		placeholder: 'before/after pair'
-	}
-];
+export const projects: Project[] = [];
 
 export const counties = [
 	'Franklin County',

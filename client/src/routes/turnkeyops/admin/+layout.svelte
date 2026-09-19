@@ -18,11 +18,7 @@
 						label: 'Context',
 						title: 'Portfolio sequencing',
 						summary: 'Implementation work gets cleaner when tenant status, blockers, and expansion bets are visible in one shared operating rail.',
-						metrics: [
-							{ label: 'Configured tenants', value: '2', detail: 'BDR and Think Pink now run from explicit tenant and trade profiles.' },
-							{ label: 'Live tenants', value: '1', detail: 'BDR is live; Think Pink is in configuration and workflow validation.' },
-							{ label: 'Trade profiles', value: '2', detail: 'Concrete construction and land clearing now have separate operating defaults.' }
-						]
+						metrics: []
 					},
 					focus: {
 						label: 'Focus',
@@ -52,11 +48,7 @@
 						label: 'Context',
 						title: 'Reusable operating knowledge',
 						summary: 'Playbooks convert one-off launch lessons into repeatable implementation assets and product requirements, including the shared workflow data model behind request, visit, and estimate handoffs.',
-						metrics: [
-							{ label: 'Active playbooks', value: '6', detail: 'Now includes the shared request-to-estimate schema map alongside rollout-stage standards.' },
-							{ label: 'Vertical templates', value: '3', detail: 'Contractor, field services, and white-glove service variants are being shaped.' },
-							{ label: 'Recent updates', value: '8', detail: 'Implementation lessons from BDR drove process and product edits this week.' }
-						]
+						metrics: []
 					},
 					focus: {
 						label: 'Focus',
@@ -86,11 +78,7 @@
 						label: 'Context',
 						title: 'Shared service confidence',
 						summary: 'Platform health matters because every weak integration or brittle workflow is multiplied across tenants.',
-						metrics: [
-							{ label: 'Critical services', value: '6', detail: 'Auth, documents, billing, notifications, calendar, and CRM sync are on the watch list.' },
-							{ label: 'Open incidents', value: '2', detail: 'Both are degraded-mode issues, not full outages.' },
-							{ label: 'Release confidence', value: '84%', detail: 'Healthy enough to keep shipping, but integration debt is visible.' }
-						]
+						metrics: []
 					},
 					focus: {
 						label: 'Focus',
@@ -120,11 +108,7 @@
 						label: 'Context',
 						title: 'Control plane discipline',
 						summary: 'A serious admin surface needs a clear place for permissions, environments, approvals, and operational safeguards.',
-						metrics: [
-							{ label: 'Role sets', value: '7', detail: 'Platform, implementation, support, finance, and tenant-scoped access are modeled separately.' },
-							{ label: 'Audit events / day', value: '1.2k', detail: 'Enough volume to need summaries and exceptions rather than raw logs.' },
-							{ label: 'Launch gates', value: '4', detail: 'Data, training, billing, and admin readiness must pass before go-live.' }
-						]
+						metrics: []
 					},
 					focus: {
 						label: 'Focus',
@@ -154,11 +138,7 @@
 						label: 'Context',
 						title: 'Portfolio command view',
 						summary: 'This route sets the tone for the whole console: less “tenant office dashboard,” more “platform operating cockpit.”',
-						metrics: [
-							{ label: 'Launches in motion', value: '2', detail: 'BDR is live and Think Pink is moving through configuration and workflow validation.' },
-							{ label: 'Platform commitments', value: '9', detail: 'Shared backlog items tied directly to rollout readiness and product integrity.' },
-							{ label: 'Exec watchlist', value: '5', detail: 'The top risks that could delay expansion or erode operator trust.' }
-						]
+						metrics: []
 					},
 					focus: {
 						label: 'Focus',

@@ -3,7 +3,7 @@
 
 	const stats = [
 		{ value: 'Free', label: 'On-site quotes' },
-		{ value: '1–100+', label: 'Acres handled' },
+		{ value: 'On-site', label: 'Property assessment' },
 		{ value: 'Fast', label: 'Scheduling' }
 	];
 
@@ -38,10 +38,10 @@
 			>
 				Schedule a Free Site Visit
 			</a>
-			<a href={site.phoneHref} class="text-ink hover:text-pink flex flex-col gap-0.5 transition-colors">
+			{#if site.phone}<a href={site.phoneHref} class="text-ink hover:text-pink flex flex-col gap-0.5 transition-colors">
 				<span class="text-muted text-xs font-bold tracking-[0.12em] uppercase">Or call us</span>
 				<span class="text-xl font-bold">{site.phone}</span>
-			</a>
+			</a>{/if}
 		</div>
 
 		<div class="border-line mt-3 flex flex-wrap gap-7 border-t pt-5">

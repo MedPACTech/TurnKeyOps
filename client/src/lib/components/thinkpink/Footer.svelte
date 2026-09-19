@@ -13,9 +13,9 @@
 				Think <span class="text-pink-bright">Pink</span> Land Clearing
 			</span>
 			<span class="text-dark-body text-sm">{site.tagline}</span>
-			<a href={site.phoneHref} class="text-dark-body-2 w-fit text-sm underline underline-offset-2">
+			{#if site.phone}<a href={site.phoneHref} class="text-dark-body-2 w-fit text-sm underline underline-offset-2">
 				{site.phone}
-			</a>
+			</a>{/if}
 		</div>
 
 		<nav class="flex flex-wrap gap-6 text-sm font-semibold">

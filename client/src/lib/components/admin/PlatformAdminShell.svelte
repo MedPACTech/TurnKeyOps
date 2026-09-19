@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import type { TurnkeyOpsAdminNavItem } from '$lib/config/platform';
 
 	type ShellMetric = { label: string; value: string; detail: string };
@@ -17,8 +18,8 @@
 
 	let theme = $state<'light' | 'dark'>('light');
 	let profileOpen = $state(false);
-	const currentUserName = 'Ella Robinson';
-	const currentUserEmail = 'ella.robinson@medpactech.com';
+	const currentUserName = 'Signed-in account';
+	const currentUserEmail = $derived(page.data.adminSession?.email || 'Authenticated administrator');
 
 	const applyTheme = (value: 'light' | 'dark') => {
 		theme = value;
@@ -97,7 +98,7 @@
 				</div>
 			</div>
 
-			<button class="inline-flex items-center gap-2 rounded-md border border-[var(--shell-border-strong)] bg-[var(--module-bg)] px-2.5 py-1.5 text-sm font-medium text-[var(--text-strong)] shadow-[0_1px_2px_rgba(15,23,42,0.05)]" onclick={() => (profileOpen = true)}><span class="flex h-7 w-7 items-center justify-center rounded-[999px] bg-[var(--accent-solid)] text-xs font-semibold text-white">ER</span><span class="hidden sm:inline">Profile</span></button>
+			<button class="inline-flex items-center gap-2 rounded-md border border-[var(--shell-border-strong)] bg-[var(--module-bg)] px-2.5 py-1.5 text-sm font-medium text-[var(--text-strong)] shadow-[0_1px_2px_rgba(15,23,42,0.05)]" onclick={() => (profileOpen = true)}><span class="flex h-7 w-7 items-center justify-center rounded-[999px] bg-[var(--accent-solid)] text-xs font-semibold text-white">TK</span><span class="hidden sm:inline">Profile</span></button>
 		</div>
 	</header>
 
@@ -145,7 +146,7 @@
 								<p class="text-[0.62rem] uppercase tracking-[0.22em] text-[var(--muted)]">{focus.label}</p>
 								<h2 class="mt-1 text-base font-semibold text-[var(--text-strong)]">{focus.title}</h2>
 							</div>
-							<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-2 py-1 text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)]">Active</span>
+							<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-2 py-1 text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)]">Guide</span>
 						</div>
 						<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">{focus.summary}</p>
 
@@ -159,6 +160,7 @@
 						</div>
 					</section>
 
+					{#if context.metrics.length}
 					<section class="rounded-lg border border-[var(--shell-border)] bg-white p-4">
 						<p class="text-[0.62rem] uppercase tracking-[0.22em] text-[var(--muted)]">Live signals</p>
 						<div class="mt-3 space-y-2.5">
@@ -173,6 +175,7 @@
 							{/each}
 						</div>
 					</section>
+					{/if}
 				</div>
 			</div>
 		</aside>
