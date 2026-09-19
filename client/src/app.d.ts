@@ -4,6 +4,7 @@ declare global {
 	namespace App {
 		// interface Error {}
 		interface Locals {
+            modulePermissions?: string[];
 			adminSession?: {
 				surface: 'external-admin' | 'internal-admin';
 				role: 'owner' | 'office-admin' | null;

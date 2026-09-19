@@ -42,7 +42,7 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 	estimates: { slug: 'estimates', label: 'Estimates', summary: 'Estimate preparation, approval, deposits, and contract status', contextLabel: 'Sales Ops', focusLabel: 'Pipeline lane', canvasLabel: 'Estimate canvas', section: 'revenue' },
 	invoices: { slug: 'invoices', label: 'Invoices', summary: 'Billing status, payment holds, and collections', contextLabel: 'Finance Ops', focusLabel: 'Collections lane', canvasLabel: 'Billing canvas', section: 'revenue' },
 	customers: { slug: 'customers', label: 'Contacts', summary: 'Customers, properties, files, and communication history', contextLabel: 'Relationship Ops', focusLabel: 'Relationship desk', canvasLabel: 'Record canvas', section: 'customers' },
-	users: { slug: 'users', label: 'Users', summary: 'Invite users, assign tenant roles, and remove access', contextLabel: 'Identity', focusLabel: 'User access', canvasLabel: 'Membership canvas', section: 'admin' },
+	users: { slug: 'users', label: 'People & access', summary: 'Users, employees, customers, vendors, and company permissions', contextLabel: 'Identity', focusLabel: 'User access', canvasLabel: 'Membership canvas', section: 'admin' },
 	settings: { slug: 'settings', label: 'Admin', summary: 'Trade defaults, website controls, and workspace configuration', contextLabel: 'Admin Ops', focusLabel: 'Configuration', canvasLabel: 'Settings canvas', section: 'admin' }
 };
 
@@ -59,7 +59,7 @@ const themes: Record<TenantSlug, ExternalAdminTheme> = {
 const adminBase = (tenant: TenantDefinition) => tenant.adminPath.replace(/\/bob$/, '');
 
 const moduleHref = (tenant: TenantDefinition, module: ExternalAdminModule) => {
-	if (tenant.slug === 'bdr' && module === 'customers') return `${adminBase(tenant)}/contact`;
+
 	return `${adminBase(tenant)}/${module}`;
 };
 

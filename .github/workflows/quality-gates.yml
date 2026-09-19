@@ -194,7 +194,9 @@ jobs:
 
       - name: Run critical browser journeys with zero retries
         working-directory: client
-        run: npm run test:e2e
+        run: |
+          npm run test:e2e
+          npx playwright test --config playwright.people.config.ts
 
       - name: Publish Playwright evidence
         if: always()

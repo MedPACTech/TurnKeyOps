@@ -119,8 +119,13 @@ public partial class Program
             //AppDomain.CurrentDomain.SetData("DataDirectory", dataDir);
 
             //JSON enum as strings
-            builder.Services.AddControllers(options =>
-                options.Conventions.Add(new IdentityOtpAnonymousConvention()))
+            builder.Services.AddScoped<MedInsights.Services.ManagedPeopleService>();
+            builder.Services.AddScoped<MedInsights.Services.UserModuleAccessService>();
+            builder.Services.AddScoped<UserModuleAccessFilter>();
+            builder.Services.AddControllers(options => {
+                options.Conventions.Add(new IdentityOtpAnonymousConvention());
+                options.Filters.AddService<UserModuleAccessFilter>();
+            })
                 .AddJsonOptions(options =>
                 {
                     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: true));

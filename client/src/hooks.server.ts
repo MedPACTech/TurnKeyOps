@@ -1,3 +1,5 @@
+import { adminModule, hasModuleAccess } from '$lib/module-access';
+import { peopleRequest } from '$lib/server/people';
 import { withApiSession } from '$lib/server/api-session-request';
 import { getTurnKeyApiBaseUrl } from '$lib/server/turnkey-api';
 import type { Handle, HandleFetch } from '@sveltejs/kit';
@@ -149,6 +151,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 
 		event.locals.adminSession = authSession;
+        if (authSession.surface === 'external-admin') {
+            const permissions = await peopleRequest<string[]>(event, '/api/my-module-access');
+            event.locals.modulePermissions = permissions;
+            const module = adminModule(authPathname);
+            const write = !['GET', 'HEAD'].includes(event.request.method);
+            if (module && !hasModuleAccess(permissions, module, write))
+                return accessFailure(event, 403, 'You do not have permission to access this module.');
+        }
 		if (authSession.surface === 'external-admin' && authSession.role) {
 			event.locals.bdrAdminSession = {
 				role: authSession.role,

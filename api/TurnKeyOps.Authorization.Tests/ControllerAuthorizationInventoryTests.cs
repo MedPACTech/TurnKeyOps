@@ -44,6 +44,17 @@ public sealed class ControllerAuthorizationInventoryTests
     }
 
     [Fact]
+    public void InviteRedemptionRequiresLoginButNotPreexistingAdminMembership()
+    {
+        var controller = typeof(InviteController);
+        Assert.Contains(controller.GetCustomAttributes<AuthorizeAttribute>(), a => a.Policy == TurnKeyAuthorizationPolicies.AuthenticatedSession);
+        Assert.DoesNotContain(controller.GetCustomAttributes<AuthorizeAttribute>(), a => a.Policy == TurnKeyAuthorizationPolicies.TenantAdmin);
+        Assert.Empty(controller.GetMethod("Redeem")!.GetCustomAttributes<AuthorizeAttribute>());
+        foreach (var name in new[] { "GetAll", "Get", "Create", "Resend", "Cancel" })
+            Assert.Contains(controller.GetMethod(name)!.GetCustomAttributes<AuthorizeAttribute>(), a => a.Policy == TurnKeyAuthorizationPolicies.TenantAdmin);
+    }
+
+    [Fact]
     public void DiagnosticAuthenticationEndpointsAreAbsentFromProductionAssembly()
     {
         var diagnosticControllers = typeof(TenantProfileController).Assembly.GetTypes()

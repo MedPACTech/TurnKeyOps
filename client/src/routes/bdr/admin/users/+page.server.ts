@@ -1,3 +1,4 @@
+import { loadPeople, peopleActions } from '$lib/server/people';
 import { fail } from '@sveltejs/kit';
 import { authTokenCookie } from '$lib/server/auth-session';
 import {
@@ -11,12 +12,14 @@ import {
 const allowedRoles = new Set(['admin', 'staff', 'member']);
 const value = (data: FormData, key: string) => String(data.get(key) ?? '').trim();
 
-export const load = async ({ fetch, cookies }) => ({
+export const load = async (event) => ({
+ ...(await loadPeople(event)),
 	tenantName: 'BDR Construction',
-	users: await listCurrentTenantUsers(fetch, cookies.get(authTokenCookie))
+	users: await listCurrentTenantUsers(event.fetch, event.cookies.get(authTokenCookie))
 });
 
 export const actions = {
+ ...peopleActions,
 	invite: async ({ request, fetch, cookies, url }) => {
 		const data = await request.formData();
 		const email = value(data, 'email');

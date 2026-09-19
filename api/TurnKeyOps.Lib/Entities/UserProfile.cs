@@ -31,6 +31,15 @@ namespace MedInsights.Lib.Entities
         public string? State { get; set; }
         public string? PostalCode { get; set; }
         public string? Title { get; set; }
+        // Company-specific business profiles, independent of the global login identity.
+        public string[] ProfileTypes { get; set; } = [];
+        public string? CompanyName { get; set; }
+        public string? Team { get; set; }
+        public Guid? CustomerId { get; set; }
+        public string? ContactEmail { get; set; }
+        public string? ContactPhone { get; set; }
+        // null preserves existing role defaults; an empty array explicitly denies every module.
+        public string[]? ModulePermissions { get; set; }
         public string? Suffix { get; set; }
 
         [AzureTableProjectedColumn]

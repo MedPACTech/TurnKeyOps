@@ -12,6 +12,7 @@
 		children: Snippet;
 		data: {
 			role: BdrAdminRole;
+            modulePermissions: string[];
 			bobVoice: BobVoiceId;
 			apiAccessToken?: string | null;
 			adminSession?: { email?: string };
