@@ -1,4 +1,6 @@
-import type { Handle } from '@sveltejs/kit';
+import { withApiSession } from '$lib/server/api-session-request';
+import { getTurnKeyApiBaseUrl } from '$lib/server/turnkey-api';
+import type { Handle, HandleFetch } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import {
 	authRefreshTokenCookie,
@@ -169,4 +171,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	return accessFailure(event, 401, 'A valid authorized admin session is required.');
+};
+
+// Page loaders and actions share the authenticated user's API identity.
+export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
+	const token = event.locals.adminSession ? event.cookies.get(authTokenCookie) : null;
+	return fetch(withApiSession(request, getTurnKeyApiBaseUrl(), token));
 };
