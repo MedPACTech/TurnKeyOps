@@ -192,6 +192,17 @@ jobs:
         working-directory: client
         run: npx playwright install --with-deps chromium
 
+      - name: Verify real profile storage and concurrency
+        run: |
+          azurite --silent --location /tmp/tko-profile-storage > /tmp/tko-profile-storage.log 2>&1 &
+          storage_pid=$!
+          trap 'kill "$storage_pid"' EXIT
+          for attempt in {1..20}; do
+            if curl --silent --output /dev/null http://127.0.0.1:10002/devstoreaccount1; then break; fi
+            sleep 1
+          done
+          TKO_STORAGE_TESTS=1 dotnet test api/TurnKeyOps.Authorization.Tests/TurnKeyOps.Authorization.Tests.csproj --no-restore --filter Category=StorageIntegration
+
       - name: Run critical browser journeys with zero retries
         working-directory: client
         run: |

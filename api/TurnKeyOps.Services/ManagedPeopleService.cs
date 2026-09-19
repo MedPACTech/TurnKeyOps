@@ -15,7 +15,7 @@ using MedInsights.Services.Interfaces;
 
 namespace MedInsights.Services;
 
-public sealed class ManagedPeopleService(IAzureTablesRepositoryStore<UserProfile> profiles,
+public sealed class ManagedPeopleService(IManagedProfileStore profiles,
     IAzureTablesRepositoryStore<TurnKeyOps.Lib.Entities.Customer> customers,
     ITenantMembershipRepository memberships, IIdentityUserStore identities,
     IUserContext user, UserModuleAccessService access, ITenantMembershipService membershipService,
@@ -33,7 +33,7 @@ public sealed class ManagedPeopleService(IAzureTablesRepositoryStore<UserProfile
         await RequireAsync(false, ct);
         var rows = new Dictionary<Guid, UserProfile>();
         var partition = Partition;
-        await foreach (var p in profiles.QueryAsync(p => p.PartitionKey == partition, ct, "PartitionKey"))
+        await foreach (var p in profiles.ListAsync(partition, ct))
             rows[p.Id] = p;
         // Existing owners/members appear immediately, without a destructive migration.
         string? continuation = null;

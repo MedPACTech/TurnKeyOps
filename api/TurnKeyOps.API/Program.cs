@@ -119,6 +119,7 @@ public partial class Program
             //AppDomain.CurrentDomain.SetData("DataDirectory", dataDir);
 
             //JSON enum as strings
+            builder.Services.AddScoped<MedInsights.Services.Interfaces.IManagedProfileStore, MedInsights.Services.ManagedProfileStore>();
             builder.Services.AddScoped<MedInsights.Services.ManagedPeopleService>();
             builder.Services.AddScoped<MedInsights.Services.UserModuleAccessService>();
             builder.Services.AddScoped<UserModuleAccessFilter>();

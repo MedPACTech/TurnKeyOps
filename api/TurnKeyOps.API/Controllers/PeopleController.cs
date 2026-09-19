@@ -38,6 +38,7 @@ public sealed class PeopleInputErrorsAttribute : ExceptionFilterAttribute
             ArgumentException e => (400, e.Message),
             KeyNotFoundException e => (404, e.Message),
             Azure.RequestFailedException e when e.Status is 409 or 412 => (409, "This record changed. Reload and try again."),
+            Exception e when e.InnerException is Azure.RequestFailedException { Status: 409 or 412 } => (409, "This record changed. Reload and try again."),
             _ => (0, "")
         };
         if (status == 0) return;

@@ -29,6 +29,6 @@ The application supports shared identity across companies; each company controls
 
 ## Verification
 
-Authorization tests cover role ceilings, empty overrides, owner preservation, cross-company lookup, stale edits, contact/identity separation, archive/revoke, restoration without access, and customer-link scope. An isolated browser/API-contract fixture exercises create, edit, reload persistence, multiple profiles, module selection, archive/restore, owner protections, and accessibility. The fixture is test-only and does not use production storage or send OTPs. Standard release E2E tests run against the local API and Azurite.
+Authorization tests cover role ceilings, empty overrides, owner preservation, cross-company lookup, stale edits, contact/identity separation, archive/revoke, restoration without access, and customer-link scope. An isolated browser/API-contract fixture exercises create, edit, reload persistence, multiple profiles, module selection, archive/restore, owner protections, and accessibility. The fixture is test-only and does not use production storage or send OTPs. Standard release E2E tests run against the local API and Azurite. A separate real Azure Tables test verifies envelope serialization, physical ETag concurrency, stale-write rejection, archived listing/restoration, and empty permission arrays. The managed profile adapter reads payload and ETag from the same physical row because IBeam 2.0.32 drops envelope ETags on typed readback.
 
 Implemented and validated by OpenAI Codex at Christian Armstrong's request.

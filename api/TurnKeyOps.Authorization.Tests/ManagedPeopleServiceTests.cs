@@ -81,7 +81,7 @@ public sealed class ManagedPeopleServiceTests
     }
     private sealed class Fixture {
         public Guid Actor=Guid.NewGuid(),Target=Guid.NewGuid(),Tenant=Guid.NewGuid();
-        public Mock<IAzureTablesRepositoryStore<UserProfile>> Profiles=new();
+        public Mock<IManagedProfileStore> Profiles=new();
         public Mock<ITenantMembershipRepository> Members=new();
         public Mock<IIdentityUserStore> Identities=new();
         public Mock<ITenantMembershipService> MembershipService=new();
@@ -91,7 +91,7 @@ public sealed class ManagedPeopleServiceTests
         public Fixture() {
             var context=new Mock<IUserContext>();context.SetupGet(x=>x.IsAuthenticated).Returns(true);context.SetupGet(x=>x.UserId).Returns(Actor);context.SetupGet(x=>x.TenantId).Returns(Tenant);
             Members.Setup(m=>m.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(Tenant),Actor,It.IsAny<CancellationToken>())).ReturnsAsync(new TenantMembership {Role="owner",IsOwner=true,MembershipStatus="Active"});
-            var access=new UserModuleAccessService(Members.Object,Profiles.Object,context.Object);
+            var access=new UserModuleAccessService(Members.Object,new Mock<IAzureTablesRepositoryStore<UserProfile>>().Object,context.Object);
             Profile=new() {Id=Target,ApplicationUserId=Target,PartitionKey=EntityKeyPolicy.TenantPartition(Tenant),RowKey=EntityKeyPolicy.Row(Target),IsActive=true,PrimaryEmail="login@example.com",ETag=new("v1")};
             Service=new(Profiles.Object,new Mock<IAzureTablesRepositoryStore<TurnKeyOps.Lib.Entities.Customer>>().Object,Members.Object,Identities.Object,context.Object,access,MembershipService.Object,new Mock<IAuditService>().Object,new Mock<IInviteService>().Object,new Mock<ITenantRoleStore>().Object);
         }
