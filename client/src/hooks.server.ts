@@ -1,4 +1,4 @@
-import { adminModule, hasModuleAccess } from '$lib/module-access';
+import { adminModule, hasModuleAccess, firstAllowedAdminPage } from '$lib/module-access';
 import { peopleRequest } from '$lib/server/people';
 import { withApiSession } from '$lib/server/api-session-request';
 import { getTurnKeyApiBaseUrl } from '$lib/server/turnkey-api';
@@ -156,8 +156,13 @@ export const handle: Handle = async ({ event, resolve }) => {
             event.locals.modulePermissions = permissions;
             const module = adminModule(authPathname);
             const write = !['GET', 'HEAD'].includes(event.request.method);
+            if (!write && /^\/(bdr|thinkpink)\/admin\/?$/.test(authPathname)) {
+                const landing = firstAllowedAdminPage(permissions);
+                if (landing) return withSecurityHeaders(new Response(null, {status:303,
+                    headers:{Location:`${authPathname.replace(/\/$/,'')}/${landing}`}}), event.url.protocol === 'https:');
+            }
             if (module && !hasModuleAccess(permissions, module, write))
-                return accessFailure(event, 403, 'You do not have permission to access this module.');
+                return withSecurityHeaders(new Response('You do not have permission to access this module.', {status:403}), event.url.protocol === 'https:');
         }
 		if (authSession.surface === 'external-admin' && authSession.role) {
 			event.locals.bdrAdminSession = {

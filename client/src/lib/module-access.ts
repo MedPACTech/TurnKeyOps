@@ -9,3 +9,10 @@ export const hasModuleAccess = (permissions: string[], module: string, write = f
  if (module==='dashboard' || module==='bob') return ['calendar','jobs','requests','estimates','invoices','contacts'].every(m=>permissions.includes(`${m}.read`) && (module!=='bob' || permissions.includes(`${m}.write`)));
  return true;
 };
+
+export const firstAllowedAdminPage = (permissions: string[]): string | null => {
+ for (const module of ['bob','dashboard','jobs','calendar','requests','estimates','invoices','contacts','users','settings']) {
+  if (hasModuleAccess(permissions,module)) return module === 'contacts' ? 'customers' : module;
+ }
+ return null;
+};
