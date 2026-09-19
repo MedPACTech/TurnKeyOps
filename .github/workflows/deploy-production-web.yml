@@ -1,5 +1,5 @@
-name: Deploy TurnKeyOps - Production (API + Web)
-run-name: Production · ${{ github.sha }}
+name: Deploy TurnKeyOps - Production Web
+run-name: Production Web · ${{ github.sha }}
 
 on:
   workflow_dispatch:
@@ -23,3 +23,4 @@ jobs:
     with:
       environment-name: production
       aspnetcore-environment: Production
+      component: web

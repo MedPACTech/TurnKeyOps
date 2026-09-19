@@ -11,6 +11,11 @@ on:
         description: ASPNETCORE_ENVIRONMENT value for the API
         required: true
         type: string
+      component:
+        description: Component to package and deploy (api, web, or all)
+        required: false
+        default: all
+        type: string
       ship-release-id:
         description: Hubbsly Ship deployment or release identifier
         required: false
@@ -33,6 +38,7 @@ permissions:
   actions: read
 
 env:
+  DEPLOY_COMPONENT: ${{ inputs.component }}
   CI: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
@@ -49,12 +55,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Validate component
+        shell: bash
+        run: |
+          case "$DEPLOY_COMPONENT" in api|web|all) ;; *) echo 'Invalid deployment component'; exit 1 ;; esac
+
       - name: Set up .NET 10
+        if: inputs.component != 'web'
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.x
 
       - name: Set up Node.js 22
+        if: inputs.component != 'api'
         uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -62,6 +75,7 @@ jobs:
           cache-dependency-path: client/package-lock.json
 
       - name: Publish API
+        if: inputs.component != 'web'
         run: |
           set -euo pipefail
           dotnet restore api/TurnKeyOps.API.sln --configfile api/nuget.config
@@ -76,6 +90,7 @@ jobs:
           grep -Eq '^(\./)?TurnKeyOps\.API\.dll$' <<< "$package_contents"
 
       - name: Build and package Node application
+        if: inputs.component != 'api'
         working-directory: client
         run: |
           set -euo pipefail
@@ -95,13 +110,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          (cd "$RUNNER_TEMP" && sha256sum turnkeyops-api.zip turnkeyops-web.zip) \
+          (cd "$RUNNER_TEMP" && sha256sum turnkeyops-*.zip) \
             | tee "$RUNNER_TEMP/release-manifest.txt"
           jq --null-input \
+            --arg component "$DEPLOY_COMPONENT" \
             --arg commit "$GITHUB_SHA" \
             --arg run_id "$GITHUB_RUN_ID" \
             --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
-            '{commit: $commit, github_run_id: $run_id, github_run_attempt: $run_attempt}' \
+            '{component: $component, commit: $commit, github_run_id: $run_id, github_run_attempt: $run_attempt}' \
             > "$RUNNER_TEMP/release-metadata.json"
 
       - name: Publish immutable release bundle
@@ -117,10 +133,14 @@ jobs:
           retention-days: 90
 
   deploy:
-    name: Deploy API and web
+    name: Deploy ${{ inputs.component }}
     needs: package
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # All four apps share one plan; serialize deployment/restarts across environments.
+    concurrency:
+      group: turnkeyops-shared-hosting-deployment
+      cancel-in-progress: false
     environment:
       name: ${{ inputs.environment-name }}
     steps:
@@ -139,15 +159,20 @@ jobs:
           set -euo pipefail
           sha256sum --check release-manifest.txt
           jq --exit-status \
+            --arg component "$DEPLOY_COMPONENT" \
             --arg commit "$GITHUB_SHA" \
             --arg run_id "$GITHUB_RUN_ID" \
             --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
-            '.commit == $commit and .github_run_id == $run_id and .github_run_attempt == $run_attempt' \
+            '.component == $component and .commit == $commit and .github_run_id == $run_id and .github_run_attempt == $run_attempt' \
             release-metadata.json > /dev/null
-          api_contents="$(unzip -Z1 turnkeyops-api.zip)"
-          grep -Eq '^(\./)?TurnKeyOps\.API\.dll$' <<< "$api_contents"
-          web_contents="$(unzip -Z1 turnkeyops-web.zip)"
-          grep -Eq '^(\./)?build/index\.js$' <<< "$web_contents"
+          if [[ "$DEPLOY_COMPONENT" != web ]]; then
+            api_contents="$(unzip -Z1 turnkeyops-api.zip)"
+            grep -Eq '^(\./)?TurnKeyOps\.API\.dll$' <<< "$api_contents"
+          fi
+          if [[ "$DEPLOY_COMPONENT" != api ]]; then
+            web_contents="$(unzip -Z1 turnkeyops-web.zip)"
+            grep -Eq '^(\./)?build/index\.js$' <<< "$web_contents"
+          fi
 
       - name: Validate release and environment contract
         shell: bash
@@ -163,7 +188,10 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_RESOURCE_GROUP API_WEBAPP_NAME WEB_WEBAPP_NAME API_BASE_URL WEB_BASE_URL; do
+          required=(AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_RESOURCE_GROUP API_BASE_URL WEB_BASE_URL)
+          [[ "$DEPLOY_COMPONENT" == web ]] || required+=(API_WEBAPP_NAME)
+          [[ "$DEPLOY_COMPONENT" == api ]] || required+=(WEB_WEBAPP_NAME)
+          for name in "${required[@]}"; do
             if [ -z "${!name:-}" ]; then
               echo "Missing deployment contract value: $name"
               missing=1
@@ -179,6 +207,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Validate deployed API configuration
+        if: inputs.component != 'web'
         shell: bash
         env:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
@@ -233,6 +262,7 @@ jobs:
           done
 
       - name: Deploy API package
+        if: inputs.component != 'web'
         shell: bash
         env:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
@@ -261,7 +291,18 @@ jobs:
             --track-status false \
             --output json | tee "$RUNNER_TEMP/api-deployment.json"
 
+      - name: Verify API readiness before deploying web
+        if: inputs.component == 'all'
+        shell: bash
+        env:
+          SMOKE_COMPONENT: api
+          SMOKE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          set -o pipefail
+          api/scripts/post-deploy-smoke.sh | tee "$RUNNER_TEMP/api-readiness.log"
+
       - name: Deploy web package
+        if: inputs.component != 'api'
         shell: bash
         env:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
@@ -299,6 +340,7 @@ jobs:
       - name: Run post-deployment smoke checks
         shell: bash
         env:
+          SMOKE_COMPONENT: ${{ inputs.component }}
           SMOKE_API_BASE_URL: ${{ vars.API_BASE_URL }}
           SMOKE_WEB_BASE_URL: ${{ vars.WEB_BASE_URL }}
         run: |
@@ -317,6 +359,7 @@ jobs:
           set -euo pipefail
           jq --null-input \
             --arg environment "$DEPLOYMENT_ENVIRONMENT_NAME" \
+            --arg component "$DEPLOY_COMPONENT" \
             --arg commit "$GITHUB_SHA" \
             --arg run_id "$GITHUB_RUN_ID" \
             --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
@@ -325,6 +368,7 @@ jobs:
             --arg uat_evidence "$UAT_EVIDENCE" \
             --arg rollback_reference "$ROLLBACK_REFERENCE" \
             '{
+              component: $component,
               environment: $environment,
               commit: $commit,
               github_run_id: $run_id,
@@ -344,6 +388,7 @@ jobs:
             ${{ runner.temp }}/api-deployment.json
             ${{ runner.temp }}/web-deployment.json
             ${{ runner.temp }}/post-deploy-smoke.log
+            ${{ runner.temp }}/api-readiness.log
             ${{ runner.temp }}/deployment-record.json
             ${{ runner.temp }}/release/release-manifest.txt
             ${{ runner.temp }}/release/release-metadata.json
@@ -361,6 +406,7 @@ jobs:
         run: |
           {
             echo '## TurnKeyOps deployment record'
+            echo "- Component: $DEPLOY_COMPONENT"
             echo "- Environment: $DEPLOYMENT_ENVIRONMENT_NAME"
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- GitHub run: \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\`"

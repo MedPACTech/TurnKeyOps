@@ -37,6 +37,8 @@ api/scripts/codex-cli-preflight.sh
 /api/scripts/*
 !/api/scripts/scan-repository-security.py
 !/api/scripts/post-deploy-smoke.sh
+!/api/scripts/test_post_deploy_smoke.py
+!/api/scripts/test_release_bundle.py
 !/api/scripts/rollback-app-service.sh
 api/.azurite/
 client/test-results/

@@ -58,24 +58,51 @@ contract is in `api/docs/production-integrations.md`.
 
 ## Deployment workflows
 
-- Pull-request gate: `.github/workflows/pull-request.yml`
-- Reusable quality gate: `.github/workflows/quality-gates.yml`
-- Reusable package/deploy workflow: `.github/workflows/deploy.yml`
-- Automatic `main` staging deploy: `.github/workflows/deploy-staging.yml`
-- Manual `main` production deploy for Hubbsly Ship: `.github/workflows/deploy-production.yml`
+Production has three input-free GitHub Actions entry points for Hubbsly:
 
-Every deployment rebuilds and validates the commit, creates one immutable
-API/web artifact bundle named for the SHA, deploys those exact artifacts, runs
-post-deployment smoke checks, and publishes deployment evidence. Initiating production
-in Hubbsly is the deployment approval; there is no second GitHub approval. In Hubbsly, select Production and
-`main`, then run; no release ID, UAT link, or rollback reference is required.
+| Hubbsly workflow | File | Packages and deploys |
+| --- | --- | --- |
+| Deploy TurnKeyOps - Production API | `deploy-production-api.yml` | API only |
+| Deploy TurnKeyOps - Production Web | `deploy-production-web.yml` | Shared web app, covering all six surfaces |
+| Deploy TurnKeyOps - Production (API + Web) | `deploy-production.yml` | Both, with API readiness checked before web deployment |
 
-Linux App Service ZIP deployment submits asynchronously with Azure CLI startup
-tracking disabled. The repository-owned smoke script is the authoritative
-readiness check and waits up to five minutes by default for each API and web
-surface, with `SMOKE_MAX_ATTEMPTS` available for an explicit override.
-This avoids Azure CLI 504 false failures when Kudu finishes a OneDeploy package
-after the CLI request has timed out.
+Select `main` and initiate the desired run. The run itself is the human
+production approval. No release ID, UAT link, rollback reference, or second
+GitHub environment approval is required. PR validation and branch protections
+remain. Refresh Hubbsly's workflow definitions after merge to discover the new
+entry points.
+
+Use Web for changes confined to `client/`; use API for changes confined to
+`api/`. Use Both for coordinated contract changes or when dependencies span
+both components. Independent deployment assumes the new component remains
+compatible with the currently deployed counterpart. Component selection is
+explicit; there is no last-commit-only change detection that could overlook
+changes since an unsuccessful deployment.
+
+All runs retain the full quality workflow, including cross-component browser
+tests. Only the selected component is packaged and deployed; Web does not
+change API configuration or restart the API, and API does not deploy or
+restart the web app. Deployment records include component, SHA, run ID,
+attempt, artifact hashes, and smoke results. Existing rollback scripts accept
+the selected component's ZIP as before.
+
+Staging remains an automatic combined deployment on `main`. Production
+entry points share a production concurrency group; staging and production
+also share a deployment-job lock because their apps share one hosting plan.
+GitHub's concurrency queue retains at most one pending job per group; a newer
+pending request can replace an older pending request. Running deployments are
+not cancelled. Builds run on GitHub runners and may execute concurrently.
+
+Smoke checks have a 300-second elapsed-time budget per invocation, including
+HTTP timeouts and retry delays. Override with `SMOKE_TIMEOUT_SECONDS` when
+necessary. API-only smoke probes API health and anonymous-access rejection;
+Web/Both smoke also probes public pages and all three admin redirects. Web
+smoke verifies the existing API dependency without deploying it. Both runs
+include a separate bounded API-readiness invocation before deploying web.
+
+The runtime remains one .NET API and one Node web app per environment. These
+workflows do not split the six surfaces into separate runtime applications,
+change hosting tiers, or provision additional resources.
 
 ## First activation checklist
 
