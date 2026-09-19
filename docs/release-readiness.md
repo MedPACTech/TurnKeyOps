@@ -20,11 +20,15 @@ Brigade platform:
 | `quality-gates.yml` | reusable only | Repository, API, client, legacy-admin, and Playwright gates |
 | `deploy.yml` | reusable only | Validate, create immutable API/web artifacts, deploy, smoke, and publish evidence |
 | `deploy-staging.yml` | push to `main` or manual from `main` | Automatic staging deployment |
-| `deploy-production.yml` | manual dispatch from `main` only | Hubbsly Ship production entry point |
+| `deploy-production.yml` | manual dispatch from `main` only | API + Web production |
+| `deploy-production-api.yml` | manual dispatch from `main` only | API-only production |
+| `deploy-production-web.yml` | manual dispatch from `main` only | Web-only production |
 
-Both deployment wrappers use concurrency groups with cancellation disabled so
-a release cannot be silently replaced mid-deployment. The production wrapper
-has no push, pull-request, schedule, or tag trigger.
+Deployment wrappers use concurrency groups with cancellation disabled for
+running releases. Deployment jobs additionally share a cross-environment lock
+on the shared hosting plan. GitHub retains only one pending item per group;
+newer queued requests can replace older pending requests. Production wrappers
+have no push, pull-request, schedule, or tag trigger.
 
 ## Required pull-request policy
 
@@ -35,7 +39,10 @@ Create a GitHub ruleset for `main` that:
    `.github/workflows/pull-request.yml`;
 3. blocks force pushes and branch deletion;
 4. prevents check bypass except through the documented incident process; and
-5. requires approval from the designated release owners for workflow changes.
+5. keeps change attribution explicit. The configured required review count is
+   zero and last-push approval is disabled; the separate rule for unattributed
+   changes remains enabled. Codex implementations are identified in commit
+   messages and PR descriptions.
 
 The stable required job fails unless every reusable gate succeeds. Browser
 tests have zero retries. A failure remains visible and publishes Playwright
@@ -119,8 +126,9 @@ after the required quality workflow passes on `main`.
 
 Connect the `MedPACTech/TurnKeyOps` repository to Hubbsly Ship with GitHub
 Actions read/write and repository contents read access. Configure Ship to use
-workflow `deploy-production.yml`, ref `main`, with no workflow inputs. Select
-Production and initiate the run. If Hubbsly shows the old three fields after
+the API, Web, or combined production workflow described in
+`docs/production-deployment.md`, ref `main`, with no workflow inputs. Select
+the component and initiate the run. If Hubbsly shows the old three fields after
 this change merges, refresh its workflow definition from `main` and reopen
 the run dialog; remove saved mappings for the retired dispatch inputs.
 
@@ -165,7 +173,7 @@ Notes:
 
 1. Merge the reviewed commit through the required `main` ruleset.
 2. Wait for `Deploy TurnKeyOps - Staging` and its smoke checks to succeed.
-3. In Hubbsly Ship, select Production and `main`, then initiate the run.
+3. In Hubbsly Ship, select Production API, Production Web, or Production (API + Web), select `main`, and initiate the run.
 4. The automated checks and deployment proceed without another manual approval.
 5. Verify smoke results and retain the automatically generated run evidence.
    Manual UAT notes and release records may be attached when useful.

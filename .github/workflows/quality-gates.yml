@@ -23,6 +23,11 @@ jobs:
       - name: Reject tracked secrets and PII
         run: python3 api/scripts/scan-repository-security.py
 
+      - name: Test deployment bundle selection and bounded smoke checks
+        run: |
+          python3 api/scripts/test_release_bundle.py
+          python3 api/scripts/test_post_deploy_smoke.py
+
       - name: Reject whitespace and conflict artifacts
         shell: bash
         run: |
