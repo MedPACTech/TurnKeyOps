@@ -1,6 +1,6 @@
 <script lang="ts">
 	import SurfaceCard from '$lib/components/SurfaceCard.svelte';
-	import { bdrDashboardStats, surfaceDefinitions, turnkeyOpsPillars } from '$lib/config/platform';
+	import { surfaceDefinitions, turnkeyOpsPillars } from '$lib/config/platform';
 </script>
 
 <svelte:head>
@@ -50,29 +50,10 @@
 
 		<section class="mt-8 grid gap-6 lg:grid-cols-[1fr_0.95fr]">
 			<div class="rounded-[2rem] border border-white/10 bg-slate-950/45 p-6 backdrop-blur">
-				<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">TurnKeyOps pillars</p>
-				<div class="mt-5 grid gap-4 md:grid-cols-3">
-					{#each turnkeyOpsPillars as pillar}
-						<div class="rounded-[1.4rem] border border-white/8 bg-white/4 p-4">
-							<h2 class="text-lg font-semibold text-white">{pillar.title}</h2>
-							<p class="mt-2 text-sm leading-6 text-slate-300">{pillar.copy}</p>
-						</div>
-					{/each}
-				</div>
-			</div>
-
-			<div class="rounded-[2rem] border border-white/10 bg-slate-950/45 p-6 backdrop-blur">
-				<p class="text-[0.68rem] uppercase tracking-[0.24em] text-slate-400">BDR live operating snapshot</p>
-				<div class="mt-5 grid gap-4 sm:grid-cols-2">
-					{#each bdrDashboardStats as stat}
-						<div class="rounded-[1.4rem] border border-white/8 bg-white/4 p-4">
-							<p class="text-xs uppercase tracking-[0.2em] text-slate-400">{stat.label}</p>
-							<p class="mt-2 text-3xl font-semibold text-white">{stat.value}</p>
-							<p class="mt-2 text-sm leading-6 text-slate-300">{stat.detail}</p>
-						</div>
-					{/each}
-				</div>
-			</div>
+                <h2 class="text-lg font-semibold text-white">Company operations</h2>
+                <p class="mt-3 text-sm leading-6 text-slate-300">Sign in to your company admin to view its current requests, estimates, invoices, and jobs.</p>
+                <a href="/bdr/admin" class="mt-4 inline-block text-white underline">Open BDR admin</a>
+            </div>
 		</section>
 	</div>
 </div>

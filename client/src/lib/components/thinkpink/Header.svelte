@@ -18,9 +18,9 @@
 			{#each navLinks as link (link.href)}
 				<a href={link.href} class="text-ink hover:text-pink transition-colors">{link.label}</a>
 			{/each}
-			<a href={site.phoneHref} class="text-muted hover:text-pink font-bold transition-colors">
+			{#if site.phone}<a href={site.phoneHref} class="text-muted hover:text-pink font-bold transition-colors">
 				{site.phone}
-			</a>
+			</a>{/if}
 			<a
 				href="#quote"
 				class="bg-pink hover:bg-pink-dark rounded-md px-[22px] py-[11px] font-bold tracking-[0.02em] text-white transition-colors"
@@ -31,10 +31,10 @@
 
 		<div class="flex items-center gap-3 lg:hidden">
 			<a
-				href={site.phoneHref}
+				href={site.phoneHref || "#quote"}
 				class="bg-pink hover:bg-pink-dark rounded-md px-4 py-2.5 text-sm font-bold text-white transition-colors"
 			>
-				Call
+				{site.phone ? "Call" : "Get a quote"}
 			</a>
 			<button
 				type="button"

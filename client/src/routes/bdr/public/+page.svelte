@@ -156,7 +156,7 @@
 				<a class="btn btn-primary btn-small" href={content.navigation.primaryCtaHref}>
 					{content.navigation.primaryCtaLabel}
 				</a>
-				{#if content.navigation.showPhoneButton}
+				{#if content.navigation.showPhoneButton && content.navigation.phoneNumber}
 					<a
 						class="btn btn-outline btn-small"
 						href={`tel:${content.navigation.phoneNumber.replace(/[^0-9+]/g, '')}`}
@@ -493,8 +493,8 @@
 
 			<div>
 				<h3>{content.footer.contactEyebrow}</h3>
-				<a href={`tel:${content.footer.phone.replace(/[^0-9+]/g, '')}`}>{content.footer.phone}</a>
-				<a href={`mailto:${content.footer.email}`}>{content.footer.email}</a>
+				{#if content.footer.phone}<a href={`tel:${content.footer.phone.replace(/[^0-9+]/g, '')}`}>{content.footer.phone}</a>{/if}
+				{#if content.footer.email}<a href={`mailto:${content.footer.email}`}>{content.footer.email}</a>{/if}
 				<p>{content.footer.address}</p>
 			</div>
 		</div>

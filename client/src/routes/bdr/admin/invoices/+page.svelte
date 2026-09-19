@@ -1,6 +1,6 @@
 <script lang="ts">
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
-	import { buildInvoiceViews } from '$lib/mvp-display';
+	import { buildInvoiceViews } from '$lib/invoice-display';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import type { PageProps } from './$types';
 
@@ -182,11 +182,7 @@
 	}
 	const invoiceDueTime = (invoice: InvoiceView) => new Date(invoice.dueDateUtc ?? '').getTime();
 	const isOverdue = (invoice: InvoiceView) => !isPaid(invoice) && Number.isFinite(invoiceDueTime(invoice)) && invoiceDueTime(invoice) < Date.now();
-	const needsFollowUp = (invoice: InvoiceView) =>
-		!isPaid(invoice) &&
-		(!invoice.checkHold.toLowerCase().startsWith('no hold') ||
-			invoice.owner.toLowerCase().includes('collections') ||
-			invoice.nextStep.toLowerCase().includes('collect'));
+	const needsFollowUp = (invoice: InvoiceView) => !isPaid(invoice) && invoice.status.toLowerCase().includes('follow-up');
 	const getBillingDeskState = (invoice: InvoiceView): BillingDeskState => {
 		if (isPaid(invoice)) return 'Paid';
 		if (isOverdue(invoice)) return 'Overdue';

@@ -12,7 +12,7 @@
 	<section class="overflow-hidden rounded-lg border border-[var(--shell-border)] bg-white">
 		<div class="border-b border-[var(--shell-border)] px-4 py-3">
 			<p class="text-[0.64rem] uppercase tracking-[0.18em] text-[var(--muted)]">Tenant board</p>
-			<h3 class="mt-1 text-lg font-semibold text-[var(--text-strong)]">Readiness, blockers, and next milestone</h3>
+			<h3 class="mt-1 text-lg font-semibold text-[var(--text-strong)]">Configured companies and trade profiles</h3>
 		</div>
 		<div class="divide-y divide-[var(--shell-border)]">
 			{#each tenants as tenant}
@@ -22,7 +22,7 @@
 							<p class="text-base font-semibold text-[var(--text-strong)]">{tenant.name}</p>
 							<span class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-2 py-1 text-[0.68rem] uppercase tracking-[0.14em] text-[var(--muted)]">{tenant.tradeLabel}</span>
 						</div>
-						<p class="mt-1 text-sm capitalize text-[var(--text-muted)]">{tenant.status} · {tenant.services.length} configured services</p>
+						<p class="mt-1 text-sm capitalize text-[var(--text-muted)]">{tenant.services.length} configured services</p>
 					</div>
 					<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-3">
 						<p class="text-[0.62rem] uppercase tracking-[0.16em] text-[var(--muted)]">Trade profile</p>

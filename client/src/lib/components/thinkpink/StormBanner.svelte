@@ -7,8 +7,8 @@
 >
 	<span class="text-pink-bright text-xs font-bold tracking-[0.1em] uppercase">Storm response</span>
 	<span>
-		Crews available now for storm cleanup across {site.region} — call
-		<a href={site.phoneHref} class="text-pink-bright hover:underline">{site.phone}</a>
+		Crews available now for storm cleanup across {site.region} —
+		<a href={site.phoneHref || "#quote"} class="text-pink-bright hover:underline">{site.phone || "request help"}</a>
 	</span>
 </div>
 

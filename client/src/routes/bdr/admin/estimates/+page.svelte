@@ -1,6 +1,5 @@
 <script lang="ts">
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
-	import { buildEstimateViews } from '$lib/mvp-display';
 	import { quoteRequestStatusMeta, type QuoteRequest, type QuoteRequestStatus } from '$lib/quote-requests';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import type { PageProps } from './$types';
@@ -76,7 +75,6 @@
 	const quoteRequests = $derived((pageData.quoteRequests ?? []) as QuoteRequest[]);
 	const estimateDrafts = $derived((pageData.estimateDrafts ?? {}) as Record<string, EstimateDraftRecord>);
 	const estimateDefaults = $derived((pageData.estimateDefaults ?? {}) as EstimateDefaults);
-	const allEstimates = $derived(buildEstimateViews(pageData.estimates, pageData.customers));
 	const workingEstimateStatuses: QuoteRequestStatus[] = [
 		'qualified',
 		'inspection-scheduled',
@@ -274,7 +272,7 @@
 	const metrics = $derived([
 		{ label: 'Quote requests', value: String(requestQueue.length) },
 		{ label: 'Locations', value: String(locations.length) },
-		{ label: sentDraftCount ? 'Sent estimates' : 'Existing estimates', value: String(sentDraftCount || allEstimates.length) }
+		{ label: 'Sent estimates', value: String(sentDraftCount) }
 	]);
 
 	const results = $derived([

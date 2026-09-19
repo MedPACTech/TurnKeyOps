@@ -833,8 +833,8 @@ export const bdrSiteContent: BdrSiteContent = {
 		],
 		primaryCtaLabel: 'Get a Free Quote',
 		primaryCtaHref: '#quote-request',
-		phoneNumber: '(704) 555-0100',
-		showPhoneButton: true,
+		phoneNumber: '',
+		showPhoneButton: false,
 		showThemeControl: false,
 		stickyHeader: true,
 		layout: 'logo-left'
@@ -847,9 +847,9 @@ export const bdrSiteContent: BdrSiteContent = {
 		primaryCtaLabel: 'Get a free quote',
 		primaryCtaHref: '#quote-request',
 		primaryCtaType: 'anchor',
-		secondaryCtaLabel: '(704) 555-0100',
-		secondaryCtaHref: '(704) 555-0100',
-		secondaryCtaType: 'phone',
+		secondaryCtaLabel: 'Request a quote',
+		secondaryCtaHref: '#quote-request',
+		secondaryCtaType: 'anchor',
 		heroImageAssetKey: 'hero-driveway-scene',
 		heroImageAltText: 'Fresh concrete driveway work in front of a residential garage',
 		backgroundImageAssetKey: 'hero-driveway-scene',
@@ -860,11 +860,6 @@ export const bdrSiteContent: BdrSiteContent = {
 				iconAssetKey: 'service-driveways-icon-white',
 				title: 'Licensed & Insured',
 				description: 'Fully licensed in NC'
-			},
-			{
-				iconAssetKey: 'service-sidewalks-icon-white',
-				title: '5-Star Rated',
-				description: '100+ happy customers'
 			},
 			{
 				iconAssetKey: 'service-slabs-icon-white',
@@ -941,9 +936,9 @@ export const bdrSiteContent: BdrSiteContent = {
 		overlayOpacity: 0.74,
 		primaryCtaLabel: 'Request a quote',
 		primaryCtaHref: '#quote-request',
-		secondaryCtaLabel: '(704) 555-0100',
-		secondaryCtaType: 'phone',
-		secondaryCtaHref: '(704) 555-0100'
+		secondaryCtaLabel: 'Request a quote',
+		secondaryCtaType: 'anchor',
+		secondaryCtaHref: '#quote-request'
 	},
 	quoteForm: {
 		eyebrow: 'Request a quote',
@@ -1027,7 +1022,7 @@ export const bdrSiteContent: BdrSiteContent = {
 		submitButtonLabel: 'Get My Free Quote',
 		successMessage:
 			'BDR now has your project details and can follow up, confirm scope, and move the request into inspection and estimate handling.',
-		notificationRecipients: ['office@bdrconstruction.com', 'estimating@bdrconstruction.com'],
+		notificationRecipients: [],
 		queueDestination: 'External Admin Intake Queue'
 	},
 	supportingSections: [
@@ -1077,8 +1072,8 @@ export const bdrSiteContent: BdrSiteContent = {
 			'If you need a driveway, patio, sidewalk, slab, or decorative concrete work, BDR Construction can help you move from estimate to finished pour with a cleaner process.',
 		primaryCtaLabel: 'Request a quote',
 		primaryCtaHref: '#quote-request',
-		secondaryCtaLabel: 'Call BDR',
-		secondaryCtaHref: 'tel:7045550100'
+		secondaryCtaLabel: 'Request a quote',
+		secondaryCtaHref: '#quote-request'
 	},
 	footer: {
 		eyebrow: 'Footer',
@@ -1105,26 +1100,10 @@ export const bdrSiteContent: BdrSiteContent = {
 			{ href: '#services', label: 'Decorative Concrete' }
 		],
 		contactEyebrow: 'Contact',
-		phone: '(704) 555-0100',
-		email: 'office@bdrconstruction.com',
-		address: 'Charlotte, NC',
-		socialLinks: [
-			{
-				platform: 'Facebook',
-				url: 'https://facebook.com/bdrconstruction',
-				iconAssetKey: 'social-facebook-icon'
-			},
-			{
-				platform: 'Instagram',
-				url: 'https://instagram.com/bdrconstruction',
-				iconAssetKey: 'social-instagram-icon'
-			},
-			{
-				platform: 'LinkedIn',
-				url: 'https://linkedin.com/company/bdrconstruction',
-				iconAssetKey: 'social-linkedin-icon'
-			}
-		]
+		phone: '',
+		email: '',
+		address: '',
+		socialLinks: []
 	},
 	postFooter: {
 		legalLinksEyebrow: 'Legal',

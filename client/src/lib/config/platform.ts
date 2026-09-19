@@ -324,13 +324,6 @@ export const bdrAdminRoleMeta: Record<
 	}
 };
 
-export const bdrDashboardStats: StatCard[] = [
-	{ label: 'Open estimates', value: '18', detail: '6 awaiting signature, 4 need follow-up today' },
-	{ label: 'Jobs on calendar', value: '11', detail: '3 installs, 5 inspections, 3 punch-list visits' },
-	{ label: 'Receivables due', value: '$48.2k', detail: '2 checks on hold, 5 invoices due this week' },
-	{ label: 'Weather watch', value: '2 risks', detail: 'Wednesday rain impacts one install and one inspection window' }
-];
-
 export const bdrServiceHighlights = [
 	'Residential roof replacement',
 	'Commercial roofing and repair',
@@ -375,11 +368,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Office pulse',
 			title: 'Today’s operating picture',
 			summary: 'This left rail mirrors the kind of contextual desk a real backoffice team needs: what is moving, what is blocked, and what can slip if nobody owns it.',
-			metrics: [
-				{ label: 'Front office', value: '18 open', detail: 'Estimate follow-ups and proposal revisions still in motion.' },
-				{ label: 'Production', value: '11 jobs', detail: 'Install, inspection, and punch-list activity on the shared calendar.' },
-				{ label: 'Collections', value: '$48.2k', detail: 'Receivables visible without leaving the owner dashboard.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Executive watch',
@@ -409,11 +398,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Scheduling context',
 			title: 'What dispatch has to protect',
 			summary: 'A useful contractor calendar is not just dates on a grid. It has to show readiness, weather, ownership, and whether billing or paperwork blocks the next move.',
-			metrics: [
-				{ label: 'This week', value: '11 events', detail: 'Shared across inspections, installs, drops, and punch-list work.' },
-				{ label: 'Weather holds', value: '2 risks', detail: 'Jobs likely to need a go/no-go call before trucks roll.' },
-				{ label: 'Schedule owners', value: '3 roles', detail: 'Owner, office admin, and estimator all read from the same operating calendar.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Dispatch rules',
@@ -443,11 +428,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Production context',
 			title: 'What the job desk owns',
 			summary: 'The office needs a place to run actual work after the invoice clears the release gate. Jobs should not be buried inside invoices or calendar events once crews start moving.',
-			metrics: [
-				{ label: 'Lifecycle', value: '5 states', detail: 'Scheduled, running, hold, complete, and cancelled states stay explicit.' },
-				{ label: 'Billing link', value: 'Invoice-tied', detail: 'Deposit and invoice context remains attached after scheduling.' },
-				{ label: 'Crew control', value: 'Live desk', detail: 'Crew assignment, schedule window, notes, and blockers stay editable.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Production habits',
@@ -477,11 +458,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Revenue context',
 			title: 'How the quote lane behaves',
 			summary: 'The office needs to see customer-ready packets and internal costing posture at once, because both determine whether work can actually move forward.',
-			metrics: [
-				{ label: 'Quote queue', value: '18 active', detail: 'Every quote stays tied to customer record and next action.' },
-				{ label: 'Approvals', value: '6 pending', detail: 'Near-term work most likely to get blocked on signature or deposit.' },
-				{ label: 'Production ready', value: '4 close', detail: 'Estimate packets almost ready for the schedule board.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Commercial logic',
@@ -511,11 +488,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Relationship context',
 			title: 'What every account record should carry',
 			summary: 'A contractor admin needs customer records to anchor properties, documents, status, communication history, and what happens next.',
-			metrics: [
-				{ label: 'Account base', value: '6 active', detail: 'Live scaffold customers visible in the BDR workspace.' },
-				{ label: 'Open quote links', value: '4 linked', detail: 'Customers already tied to active estimate work.' },
-				{ label: 'Billing activity', value: '5 accounts', detail: 'Collections or payment posture visible from the same record lane.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Record design',
@@ -545,11 +518,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Inbox context',
 			title: 'Why this route exists',
 			summary: 'Wellderly-style admin behavior is mostly about context and workflow discipline. This route adapts that into a quote-request inbox for BDR, where every submission keeps an owner, a status, and a next action.',
-			metrics: [
-				{ label: 'Intake source', value: 'Public + office', detail: 'Website forms and manual office entries live in one inbox.' },
-				{ label: 'Processing lane', value: '7 stages', detail: 'Requests can move from new intake through win/close in UI.' },
-				{ label: 'Connected flow', value: 'Quote-first', detail: 'This lane bridges marketing response into the estimate desk and schedule board.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Office habits',
@@ -579,11 +548,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Content context',
 			title: 'What this new route owns',
 			summary: 'The content desk is structured around the actual sections on the BDR public site: navigation, hero, services, trust, process, support blocks, contact CTA, footer, and the utility strip.',
-			metrics: [
-				{ label: 'Site sections', value: '8 managed', detail: 'Public homepage sections and utility areas now grouped into editable admin modules.' },
-				{ label: 'Content posture', value: 'Scaffolded', detail: 'Ready for backend persistence without redesigning the admin flow.' },
-				{ label: 'Owner outcome', value: 'Self-serve', detail: 'Client-facing site changes can now live in the portal instead of code only.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Content operations',
@@ -613,11 +578,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Finance context',
 			title: 'What the billing lane protects',
 			summary: 'Receivables are not just accounting output. They determine whether work proceeds, whether closeout happens cleanly, and where the owner needs to intervene.',
-			metrics: [
-				{ label: 'Receivables queue', value: '$48.2k', detail: 'Current outstanding value visible to owner and office ops.' },
-				{ label: 'Check holds', value: '2 at risk', detail: 'Invoices that should stay visibly constrained until resolved.' },
-				{ label: 'Billing stages', value: '3 phases', detail: 'Deposit, progress, and final billing all present in the same queue.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Collections posture',
@@ -647,11 +608,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'AI context',
 			title: 'What Bob can help with',
 			summary: 'Bob should read across quotes, estimates, schedule, invoices, contacts, and settings so owners can ask plain-language business questions.',
-			metrics: [
-				{ label: 'Connected lanes', value: '6', detail: 'Quotes, estimates, calendar, invoices, contacts, and public-site context.' },
-				{ label: 'Posture', value: 'Assistant', detail: 'Bob suggests next moves without hiding the source workflow.' },
-				{ label: 'Access', value: 'Admin only', detail: 'Business-wide AI answers stay behind owner and office-admin access.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Conversation posture',
@@ -681,11 +638,7 @@ const bdrAdminShellStates: Record<string, BdrAdminShellState> = {
 			label: 'Configuration context',
 			title: 'What belongs here',
 			summary: 'These settings govern quoting, approval, billing, and release behavior. The surface is meant to feel like an admin console, not a placeholder feature inventory.',
-			metrics: [
-				{ label: 'Domains', value: '4 active', detail: 'Estimate logic, pricing controls, payment holds, and workflow guardrails.' },
-				{ label: 'Editable rules', value: '14 visible', detail: 'Scaffolded defaults exposed in operator language.' },
-				{ label: 'Persistence', value: 'Scaffolded', detail: 'Ready to wire into backend settings storage later.' }
-			]
+			metrics: []
 		},
 		focus: {
 			label: 'Operator outcomes',
