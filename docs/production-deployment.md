@@ -66,8 +66,8 @@ contract is in `api/docs/production-integrations.md`.
 
 Every deployment rebuilds and validates the commit, creates one immutable
 API/web artifact bundle named for the SHA, deploys those exact artifacts, runs
-post-deployment smoke checks, and publishes deployment evidence. Production
-requires the GitHub environment approval. In Hubbsly, select Production and
+post-deployment smoke checks, and publishes deployment evidence. Initiating production
+in Hubbsly is the deployment approval; there is no second GitHub approval. In Hubbsly, select Production and
 `main`, then run; no release ID, UAT link, or rollback reference is required.
 
 Linux App Service ZIP deployment submits asynchronously with Azure CLI startup
@@ -83,15 +83,15 @@ after the CLI request has timed out.
    record that result as `not applicable` rather than provisioning Azure
    DevOps solely for this audit.
 2. Create the `staging` and `production` GitHub environments and configure the
-   secrets, variables, OIDC subjects, and production reviewers in
+   secrets, variables, OIDC subjects, and branch restrictions in
    `docs/release-readiness.md`.
 3. Add the required `main` ruleset and its `Required PR validation` check.
 4. Connect the repository to Hubbsly Ship and configure the production
    workflow dispatch contract.
 5. Merge through the ruleset and retain the first successful staging workflow,
    deployment evidence artifact, and smoke log.
-6. Trigger production through Ship, approve the protected GitHub environment,
-   and retain the resulting GitHub run.
+6. Trigger production through Ship and retain the resulting GitHub run.
+   Dispatch is the human approval; checks and deployment proceed automatically.
 
 ## Custom domains and TLS
 

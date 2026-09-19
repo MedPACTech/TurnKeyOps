@@ -109,9 +109,10 @@ The repository or environment must not contain Azure publishing profiles or
 long-lived service-principal client secrets. Application credentials remain in
 App Service settings or Key Vault and are outside the deployment workflow.
 
-Protect the `production` environment with at least one reviewer who did not
-author the change, disallow self-approval, and prevent administrators from
-bypassing the deployment protection rule. Staging can deploy automatically
+Initiating the production run in Hubbsly is the human deployment approval.
+Configure the GitHub `production` environment with no required reviewers or
+wait timer; retain its protected-branch deployment restriction and OIDC scope.
+Do not add a second approval after dispatch. Staging deploys automatically
 after the required quality workflow passes on `main`.
 
 ## Hubbsly Ship integration
@@ -130,8 +131,8 @@ Optional metadata fields remain supported only by the reusable workflow for
 other callers; empty values do not claim approval or a rollback target.
 
 The existing quality gates, main-only restriction, Azure environment contract,
-and protected production environment approval remain. Review the run's exact
-commit and test results before approving deployment. A non-`main` dispatch is
+and production environment branch restrictions remain. Review the selected
+commit before initiating the run in Hubbsly. A non-`main` dispatch is
 skipped before the reusable workflow can acquire Azure credentials.
 
 ## Optional UAT signoff template
@@ -165,7 +166,7 @@ Notes:
 1. Merge the reviewed commit through the required `main` ruleset.
 2. Wait for `Deploy TurnKeyOps - Staging` and its smoke checks to succeed.
 3. In Hubbsly Ship, select Production and `main`, then initiate the run.
-4. Approve the GitHub `production` environment after reviewing the commit and checks.
+4. The automated checks and deployment proceed without another manual approval.
 5. Verify smoke results and retain the automatically generated run evidence.
    Manual UAT notes and release records may be attached when useful.
 
