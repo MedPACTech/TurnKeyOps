@@ -109,34 +109,33 @@ The repository or environment must not contain Azure publishing profiles or
 long-lived service-principal client secrets. Application credentials remain in
 App Service settings or Key Vault and are outside the deployment workflow.
 
-Protect the `production` environment with at least one reviewer who did not
-author the change, disallow self-approval, and prevent administrators from
-bypassing the deployment protection rule. Staging can deploy automatically
+Initiating the production run in Hubbsly is the human deployment approval.
+Configure the GitHub `production` environment with no required reviewers or
+wait timer; retain its protected-branch deployment restriction and OIDC scope.
+Do not add a second approval after dispatch. Staging deploys automatically
 after the required quality workflow passes on `main`.
 
 ## Hubbsly Ship integration
 
 Connect the `MedPACTech/TurnKeyOps` repository to Hubbsly Ship with GitHub
 Actions read/write and repository contents read access. Configure Ship to use
-workflow `deploy-production.yml`, ref `main`, and supply all three dispatch
-inputs:
+workflow `deploy-production.yml`, ref `main`, with no workflow inputs. Select
+Production and initiate the run. If Hubbsly shows the old three fields after
+this change merges, refresh its workflow definition from `main` and reopen
+the run dialog; remove saved mappings for the retired dispatch inputs.
 
-- `ship-release-id`: the immutable Hubbsly deployment/release identifier;
-- `uat-evidence`: the Hubbsly card, URL, or record containing approved UAT;
-- `rollback-reference`: the previous healthy GitHub run, artifact, or commit.
+The workflow records the commit SHA, run ID/attempt, artifacts, and smoke
+results automatically. No separate Ship release record, approved UAT link, or
+manually entered rollback reference is required to initiate production.
+Optional metadata fields remain supported only by the reusable workflow for
+other callers; empty values do not claim approval or a rollback target.
 
-Ship must record the GitHub Actions run ID and final conclusion. The workflow
-also writes the Ship ID, commit SHA, run ID/attempt, UAT reference, and rollback
-reference to the GitHub run summary. A non-`main` dispatch is skipped before
-the reusable deploy workflow can acquire Azure credentials.
+The existing quality gates, main-only restriction, Azure environment contract,
+and production environment branch restrictions remain. Review the selected
+commit before initiating the run in Hubbsly. A non-`main` dispatch is
+skipped before the reusable workflow can acquire Azure credentials.
 
-Immediately before dispatch, Ship must verify that the current `main` SHA is
-the SHA approved in the UAT record. If `main` moved after UAT, stop and repeat
-staging/UAT for the new SHA. The production environment reviewer performs the
-same SHA check before approval; the run summary is the authoritative record of
-the SHA that actually executed.
-
-## UAT signoff template
+## Optional UAT signoff template
 
 ```text
 Commit:
@@ -166,13 +165,10 @@ Notes:
 
 1. Merge the reviewed commit through the required `main` ruleset.
 2. Wait for `Deploy TurnKeyOps - Staging` and its smoke checks to succeed.
-3. Complete the UAT record and identify the previous healthy artifact/run.
-4. Create a Hubbsly Ship deployment for that exact `main` SHA.
-5. Ship dispatches `Deploy TurnKeyOps - Production` with the evidence inputs.
-6. The GitHub `production` environment reviewer verifies the SHA, UAT, and
-   rollback reference before approving.
-7. Preserve the SHA/run/attempt-named release bundle, deployment JSON, smoke log, GitHub run ID, and
-   Ship record as card evidence.
+3. In Hubbsly Ship, select Production and `main`, then initiate the run.
+4. The automated checks and deployment proceed without another manual approval.
+5. Verify smoke results and retain the automatically generated run evidence.
+   Manual UAT notes and release records may be attached when useful.
 
 | Evidence | Location | Retention |
 | --- | --- | --- |

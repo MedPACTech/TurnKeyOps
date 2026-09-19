@@ -14,17 +14,17 @@ on:
       ship-release-id:
         description: Hubbsly Ship deployment or release identifier
         required: false
-        default: automatic-staging
+        default: ""
         type: string
       uat-evidence:
         description: UAT record URL or identifier
         required: false
-        default: not-required-for-staging
+        default: ""
         type: string
       rollback-reference:
         description: Previous healthy run, artifact, or commit used for rollback
         required: false
-        default: staging-uses-latest-healthy
+        default: ""
         type: string
 
 permissions:
@@ -160,38 +160,15 @@ jobs:
           WEB_WEBAPP_NAME: ${{ vars.WEB_WEBAPP_NAME }}
           API_BASE_URL: ${{ vars.API_BASE_URL }}
           WEB_BASE_URL: ${{ vars.WEB_BASE_URL }}
-          SHIP_RELEASE_ID: ${{ inputs.ship-release-id }}
-          UAT_EVIDENCE: ${{ inputs.uat-evidence }}
-          ROLLBACK_REFERENCE: ${{ inputs.rollback-reference }}
-          DEPLOYMENT_ENVIRONMENT_NAME: ${{ inputs.environment-name }}
         run: |
           set -euo pipefail
           missing=0
-          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_RESOURCE_GROUP API_WEBAPP_NAME WEB_WEBAPP_NAME API_BASE_URL WEB_BASE_URL SHIP_RELEASE_ID UAT_EVIDENCE ROLLBACK_REFERENCE; do
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_RESOURCE_GROUP API_WEBAPP_NAME WEB_WEBAPP_NAME API_BASE_URL WEB_BASE_URL; do
             if [ -z "${!name:-}" ]; then
               echo "Missing deployment contract value: $name"
               missing=1
             fi
           done
-          if [ "$DEPLOYMENT_ENVIRONMENT_NAME" = "production" ]; then
-            if [[ "$UAT_EVIDENCE" == *"The Hubbsly TKO-0014 card URL"* ]] ||
-               [[ "$UAT_EVIDENCE" == *"record containing the approved"* ]] ||
-               [[ "$UAT_EVIDENCE" == *"not-required-for-"* ]] ||
-               [[ "$UAT_EVIDENCE" == *"placeholder"* ]]; then
-              echo "UAT_EVIDENCE must be a real approved UAT URL or record identifier, not placeholder text"
-              missing=1
-            fi
-            if [[ "$ROLLBACK_REFERENCE" == "staging-uses-latest-healthy" ]] ||
-               [[ "$ROLLBACK_REFERENCE" == *"placeholder"* ]]; then
-              echo "ROLLBACK_REFERENCE must identify an approved healthy run, artifact, or commit"
-              missing=1
-            fi
-            if [[ "$SHIP_RELEASE_ID" == "automatic-staging" ]] ||
-               [[ "$SHIP_RELEASE_ID" == *"placeholder"* ]]; then
-              echo "SHIP_RELEASE_ID must identify the real Ship release"
-              missing=1
-            fi
-          fi
           exit "$missing"
 
       - name: Sign in to Azure with workload identity federation
@@ -373,7 +350,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-      - name: Record Hubbsly Ship release identifiers
+      - name: Record deployment identifiers
         if: always()
         shell: bash
         env:
@@ -387,7 +364,7 @@ jobs:
             echo "- Environment: $DEPLOYMENT_ENVIRONMENT_NAME"
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- GitHub run: \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\`"
-            echo "- Hubbsly Ship release: \`$SHIP_RELEASE_ID\`"
-            echo "- UAT evidence: $UAT_EVIDENCE"
-            echo "- Rollback reference: $ROLLBACK_REFERENCE"
+            echo "- Hubbsly Ship release: \`${SHIP_RELEASE_ID:-Not supplied}\`"
+            echo "- Optional UAT evidence: ${UAT_EVIDENCE:-Not supplied}"
+            echo "- Optional rollback reference: ${ROLLBACK_REFERENCE:-Not supplied}"
           } >> "$GITHUB_STEP_SUMMARY"
