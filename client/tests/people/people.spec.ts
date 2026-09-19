@@ -49,3 +49,18 @@ test('user CRUD persists across reloads with multiple profiles and module permis
  await expect(page.getByRole('button',{name:'Archive user',exact:true})).toHaveCount(0);
  await expect(page.getByText('Owners retain full company access.')).toBeVisible();
 });
+
+test('restricted administrators land on an allowed module and retain their session after denial',async({page,context})=>{
+ const claims={sub:'44444444-4444-4444-4444-444444444444',role:['admin'],tid:'7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b',fixtureRestricted:true,exp:Math.floor(Date.now()/1000)+3600};
+ const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.ui-fixture`;
+ await context.addCookies([{name:'tko_auth_token',value:token,url:'http://127.0.0.1:5191'}]);
+ await page.goto('/bdr/admin');
+ await expect(page).toHaveURL(/\/bdr\/admin\/users$/);
+ await expect(page.getByRole('heading',{name:'People & access',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Add user',exact:true})).toHaveCount(0);
+ const denied=await page.goto('/bdr/admin/jobs');
+ expect(denied?.status()).toBe(403);
+ expect((await context.cookies()).some(c=>c.name==='tko_auth_token')).toBe(true);
+ await page.goto('/bdr/admin/users');
+ await expect(page.getByRole('heading',{name:'People & access',exact:true})).toBeVisible();
+});

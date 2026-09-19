@@ -10,7 +10,10 @@ http.createServer(async(req,res)=>{
  if(url.pathname==='/reset'){people=[{...owner}];return send('OK');}
  if(!req.headers.authorization?.startsWith('Bearer ')) return send(null,401);
  if(url.pathname==='/api/auth/session') return send({valid:true});
- if(url.pathname==='/api/my-module-access')return send(modules.flatMap(m=>[m+'.read',m+'.write']));
+ if(url.pathname==='/api/my-module-access'){
+  const claims=JSON.parse(Buffer.from(req.headers.authorization.split('.')[1],'base64url').toString());
+  return send(claims.fixtureRestricted ? ['users.read'] : modules.flatMap(m=>[m+'.read',m+'.write']));
+ }
  if(url.pathname==='/api/people/customers')return send([{id:'22222222-2222-2222-2222-222222222222',name:'Customer record'}]);
  if(url.pathname==='/api/TenantMembership'||url.pathname==='/api/Invite')return send([]);
  if(url.pathname==='/api/people' && req.method==='GET')return send(people);
