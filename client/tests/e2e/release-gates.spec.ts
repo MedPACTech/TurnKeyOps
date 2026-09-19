@@ -83,3 +83,56 @@ test('public pages remain accessible on mobile', async ({ page }) => {
 		await expectNoSeriousAccessibilityViolations(page);
 	}
 });
+
+test('OTP forms send once while pending and recover after delivery failure', async ({ page }) => {
+	await page.goto('/auth/login?returnTo=%2Fbdr%2Fadmin%2Fbob');
+	await page.waitForLoadState('networkidle');
+	let sends = 0;
+	let release!: () => void;
+	const gate = new Promise<void>((resolve) => { release = resolve; });
+	await page.route('**/auth/login?*/request', async (route) => {
+		sends++;
+		await gate;
+		await route.fulfill({ status: 200, contentType: 'application/json',
+			body: JSON.stringify({ type: 'failure', status: 400, data: '[{"step":1,"message":2,"identifier":3},"request","Test provider unavailable","6145550100"]' }) });
+	});
+	await page.getByLabel('Work email or mobile number').fill('6145550100');
+	await page.locator('form[action="?/request"]').evaluate((form: HTMLFormElement) => {
+		form.requestSubmit(); form.requestSubmit();
+	});
+	await expect.poll(() => sends).toBe(1);
+	await expect(page.getByRole('button', { name: 'Sending…' })).toBeDisabled();
+	release();
+	await expect(page.getByText('Test provider unavailable')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Send code' })).toBeEnabled();
+	await page.getByRole('button', { name: 'Send code' }).click();
+	await expect.poll(() => sends).toBe(2);
+});
+
+test('OTP resend is single-flight and refreshing the page does not resend', async ({ page }) => {
+	await page.goto('/auth/login?returnTo=%2Fbdr%2Fadmin%2Fbob');
+	await page.waitForLoadState('networkidle');
+	let sends = 0;
+	let release!: () => void;
+	const gate = new Promise<void>((resolve) => { release = resolve; });
+	await page.route('**/auth/login?*/request', async (route) => {
+		sends++;
+		if (sends > 1) await gate;
+		await route.fulfill({ status: 200, contentType: 'application/json',
+			body: JSON.stringify({ type: 'success', status: 200,
+				data: '[{"step":1,"identifier":2,"otpState":3},"verify","6145550100",{"channel":4,"challengeId":5},"sms","test-challenge"]' }) });
+	});
+	await page.getByLabel('Work email or mobile number').fill('6145550100');
+	await page.getByRole('button', { name: 'Send code', exact: true }).click();
+	await expect(page.getByLabel('Verification code')).toBeVisible();
+	await page.locator('form[action="?/request"]').evaluate((form: HTMLFormElement) => {
+		form.requestSubmit(); form.requestSubmit();
+	});
+	await expect.poll(() => sends).toBe(2);
+	await expect(page.getByRole('button', { name: 'Resend code' })).toBeDisabled();
+	release();
+	await expect(page.getByRole('button', { name: 'Resend code' })).toBeEnabled();
+	await page.reload();
+	await expect(page.getByRole('button', { name: 'Send code', exact: true })).toBeVisible();
+	expect(sends).toBe(2);
+});

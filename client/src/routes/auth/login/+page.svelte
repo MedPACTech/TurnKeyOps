@@ -1,7 +1,19 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	let submitting = $state(false);
+	const submitOnce: SubmitFunction = ({ cancel }) => {
+		if (submitting) { cancel(); return; }
+		submitting = true;
+		return async ({ update }) => {
+			try { await update({ reset: false }); }
+			finally { submitting = false; }
+		};
+	};
 
 	const step = $derived(form?.step ?? 'request');
 	const returnTo = $derived(form?.returnTo ?? data.returnTo);
@@ -30,7 +42,7 @@
 			{/if}
 
 			{#if step === 'request'}
-				<form method="POST" action="?/request" class="space-y-4">
+				<form use:enhance={submitOnce} method="POST" action="?/request" class="space-y-4">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<div>
 						<label class="label" for="identifier">Work email or mobile number</label>
@@ -45,10 +57,10 @@
 						/>
 						<p class="mt-2 text-xs text-slate-500">We’ll email an address or text a mobile number automatically.</p>
 					</div>
-					<button type="submit" class="btn-primary w-full">Send code</button>
+					<button disabled={submitting} type="submit" class="btn-primary w-full">{submitting ? 'Sending…' : 'Send code'}</button>
 				</form>
 			{:else}
-				<form method="POST" action="?/verify" class="space-y-4">
+				<form use:enhance={submitOnce} method="POST" action="?/verify" class="space-y-4">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<input type="hidden" name="identifier" value={identifier} />
 					<input type="hidden" name="challengeId" value={otpState?.challengeId ?? ''} />
@@ -70,13 +82,13 @@
 							required
 						/>
 					</div>
-					<button type="submit" class="btn-primary w-full">Verify and sign in</button>
+					<button disabled={submitting} type="submit" class="btn-primary w-full">Verify and sign in</button>
 				</form>
 
-				<form method="POST" action="?/request" class="mt-3">
+				<form use:enhance={submitOnce} method="POST" action="?/request" class="mt-3">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<input type="hidden" name="identifier" value={identifier} />
-					<button type="submit" class="btn-secondary w-full">Resend code</button>
+					<button disabled={submitting} type="submit" class="btn-secondary w-full">Resend code</button>
 				</form>
 
 				<div class="mt-4 text-center">
