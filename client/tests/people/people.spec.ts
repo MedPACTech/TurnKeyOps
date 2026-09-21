@@ -37,8 +37,9 @@ test('user CRUD persists across reloads with multiple profiles and module permis
  expect(violations).toEqual([]);
  await page.getByRole('heading',{name:'People & access',exact:true}).scrollIntoViewIfNeeded();
  await page.screenshot({path:test.info().outputPath('people.png'),fullPage:true});
- await page.getByRole('button',{name:'Archive user',exact:true}).click();
- await expect(page.getByRole('status')).toContainText('archived');
+ await page.getByRole('button',{name:'Delete user',exact:true}).click();
+ await page.getByRole('button',{name:'Confirm delete',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('deleted from this company');
  await page.getByRole('combobox',{name:'Profile',exact:true}).selectOption('archived');
  await page.getByRole('button',{name:/Alexandra Rivera/}).click();
  await page.getByRole('button',{name:'Restore user',exact:true}).click();
@@ -46,7 +47,7 @@ test('user CRUD persists across reloads with multiple profiles and module permis
  await page.getByRole('combobox',{name:'Profile',exact:true}).selectOption('all');
  await expect(page.getByRole('button',{name:/Alexandra Rivera/})).toBeVisible();
  await page.getByRole('button',{name:/Existing Owner/}).click();
- await expect(page.getByRole('button',{name:'Archive user',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Delete user',exact:true})).toBeVisible();
  await expect(page.getByText('Owners retain full company access.')).toBeVisible();
 });
 

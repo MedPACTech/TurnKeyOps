@@ -10,8 +10,10 @@ namespace MedInsights.Controllers;
 [Route("api/people")]
 [PeopleInputErrors]
 [Authorize(Policy = TurnKeyAuthorizationPolicies.TenantAdmin)]
-public sealed class PeopleController(ManagedPeopleService people) : ControllerBase
+public sealed class PeopleController(ManagedPeopleService people, UserModuleAccessService access) : ControllerBase
 {
+    [HttpGet("capabilities")] public async Task<IActionResult> Capabilities(CancellationToken ct) => Ok(new { data = new { canDeleteUsers = await access.IsOwnerAsync(ct) } });
+    [HttpPost("{id:guid}/delete")] public async Task<IActionResult> Delete(Guid id, [FromQuery] string version, CancellationToken ct) { await people.DeleteAsync(id, version, ct); return NoContent(); }
     [HttpGet("customers")] public async Task<IActionResult> Customers(CancellationToken ct) => Ok(new { data = await people.CustomersAsync(ct) });
     [HttpPost("{id:guid}/role")] public async Task<IActionResult> Role(Guid id, [FromBody] UpdateMembershipRoleRequestDto input, CancellationToken ct) { await people.UpdateRoleAsync(id, input.Role, ct); return NoContent(); }
     [HttpPost("{id:guid}/invite")] public async Task<IActionResult> Invite(Guid id, [FromBody] UpdateMembershipRoleRequestDto input, CancellationToken ct) => Ok(new { data = await people.InviteAsync(id, input.Role, ct) });

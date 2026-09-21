@@ -59,7 +59,7 @@ public sealed class UserModulePermissionTests
         Assert.Empty(missing);
     }
     [Theory]
-    [InlineData("People","users")] [InlineData("Jobs","jobs")] [InlineData("Invoices","invoices")]
+    [InlineData("Contacts","contacts")] [InlineData("People","users")] [InlineData("Jobs","jobs")] [InlineData("Invoices","invoices")]
     [InlineData("BobActions","bob")] [InlineData("TenantMembership","users")]
     public void SensitiveEndpointsHaveModuleEnforcement(string controller,string module) => Assert.Equal(module,UserModuleAccessFilter.ModuleFor(controller));
 }

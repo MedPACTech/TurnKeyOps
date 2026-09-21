@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {adminModule,hasModuleAccess,firstAllowedAdminPage} from '../src/lib/module-access.ts';
 test('company routes map to the same modules as the API',()=>{
  assert.equal(adminModule('/bdr/admin/users'),'users');
- assert.equal(adminModule('/thinkpink/admin/contact'),'users');
+ assert.equal(adminModule('/thinkpink/admin/contact'),'contacts');
  assert.equal(adminModule('/bdr/admin/customers'),'contacts');
  assert.equal(adminModule('/bdr/admin/website'),'settings');
  assert.equal(adminModule('/turnkeyops/admin/access'),null);

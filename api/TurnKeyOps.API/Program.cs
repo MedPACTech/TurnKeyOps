@@ -121,6 +121,7 @@ public partial class Program
             //JSON enum as strings
             builder.Services.AddScoped<MedInsights.Services.Interfaces.IManagedProfileStore, MedInsights.Services.ManagedProfileStore>();
             builder.Services.AddScoped<MedInsights.Services.ManagedPeopleService>();
+            builder.Services.AddScoped<MedInsights.Services.ContactWorkService>();
             builder.Services.AddScoped<MedInsights.Services.UserModuleAccessService>();
             builder.Services.AddScoped<UserModuleAccessFilter>();
             builder.Services.AddControllers(options => {

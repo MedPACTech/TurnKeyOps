@@ -1,3 +1,6 @@
-<div class="rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] p-6 text-sm text-[var(--text-muted)]">
-	Contact moved to the canonical `/bdr/admin/contact` route.
-</div>
+<script lang="ts">
+ import ContactsManagement from '$lib/components/admin/ContactsManagement.svelte';
+ import type { PageProps } from './$types';
+ let {data,form}:PageProps=$props();
+</script>
+<ContactsManagement contacts={data.contacts} customerLinks={data.customerLinks} selectedId={data.selectedId} work={data.work} contactSaved={data.contactSaved} {form} canWrite={data.modulePermissions.includes('contacts.write')} canManagePeople={data.modulePermissions.includes('users.read')}/>

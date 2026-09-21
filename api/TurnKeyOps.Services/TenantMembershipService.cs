@@ -158,8 +158,13 @@ namespace MedInsights.Services
             var membership = await _repository.GetAsync(EntityKeyPolicy.TenantPartition(_userContext.TenantId), EntityKeyPolicy.Row(membershipId), ct)
                 ?? throw new KeyNotFoundException("Membership not found.");
 
-            if (membership.IsOwner)
-                throw new InvalidOperationException("Owner membership cannot be removed.");
+            if (membership.UserId == _userContext.UserId)
+                throw new ArgumentException("You cannot remove your own company access.");
+            if (membership.IsOwner || membership.Role.Equals("owner", StringComparison.OrdinalIgnoreCase)) {
+                var actor = await _repository.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(_userContext.TenantId), _userContext.UserId, ct);
+                if (!MedInsights.Lib.Authorization.UserModulePermissions.IsActive(actor) || !(actor!.IsOwner || actor.Role == "owner"))
+                    throw new MedInsights.Lib.ForbiddenAccessException("Only an owner can remove another owner.");
+            }
 
             var previousSeatStatus = membership.SeatStatus;
             membership.MembershipStatus = "Removed";

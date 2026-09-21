@@ -79,6 +79,49 @@ public sealed class ManagedPeopleServiceTests
         await service.CreateUserProfileAsync(tenant,id);
         repository.Verify(r=>r.SaveAsync(It.IsAny<UserProfile>(),It.IsAny<CancellationToken>()),Times.Never);
     }
+    [Fact] public async Task OwnerCanDeleteAnotherOwnerButCannotDeleteSelf() {
+        var f=new Fixture();f.TargetMember.IsOwner=true;f.TargetMember.Role="owner";f.Existing();
+        await f.Service.DeleteAsync(f.Target,"v1",default);
+        f.MembershipService.Verify(m=>m.RemoveAsync(f.TargetMember.Id,It.IsAny<CancellationToken>()),Times.Once);
+        Assert.True(f.Profile.IsDeleted);Assert.False(f.Profile.IsActive);
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.DeleteAsync(f.Actor,"",default));
+    }
+    [Fact] public async Task NonOwnerCannotUseDeleteEvenWithUserWriteAccess() {
+        var f=new Fixture();f.Existing();f.ActAsAdmin(["users.read","users.write"]);
+        await Assert.ThrowsAsync<ForbiddenAccessException>(()=>f.Service.DeleteAsync(f.Target,"v1",default));
+        f.MembershipService.VerifyNoOtherCalls();
+    }
+    [Fact] public async Task ContactEditorCannotManageAccessAndPreservesEmployeePermissions() {
+        var f=new Fixture();f.Existing();f.ActAsAdmin(["contacts.read","contacts.write"]);
+        f.Profile.ProfileTypes=["employee","customer"];f.Profile.ModulePermissions=["jobs.read"];f.Profile.Team="Field";
+        var contact=await f.Service.SaveContactAsync(f.Target,new() {FirstName="Updated",ProfileTypes=["vendor"],ExpectedVersion="v1",Notes="Delivery entrance",Address="1 Test St"},default);
+        Assert.Equal(["employee","vendor"],f.Profile.ProfileTypes);Assert.Equal(["jobs.read"],f.Profile.ModulePermissions);
+        Assert.Equal("Field",f.Profile.Team);Assert.Equal("login@example.com",f.Profile.PrimaryEmail);
+        Assert.Equal("Delivery entrance",contact.Notes);Assert.Equal("1 Test St",contact.Address);
+        f.MembershipService.VerifyNoOtherCalls();f.Identities.VerifyNoOtherCalls();
+        await Assert.ThrowsAsync<ForbiddenAccessException>(()=>f.Service.ListAsync(default));
+        await Assert.ThrowsAsync<ForbiddenAccessException>(()=>f.Service.UpdateRoleAsync(f.Target,"owner",default));
+    }
+    [Fact] public async Task ContactReadOnlyCannotWriteAndCrossTenantContactIsNotFound() {
+        var f=new Fixture();f.ActAsAdmin(["contacts.read"]);
+        await Assert.ThrowsAsync<ForbiddenAccessException>(()=>f.Service.SaveContactAsync(f.Target,new() {FirstName="Test"},default));
+        await Assert.ThrowsAsync<KeyNotFoundException>(()=>f.Service.ContactAsync(f.Target,default));
+    }
+    [Fact] public async Task StaleContactCannotOverwriteAndUnknownProfileCannotGrantEmployeeAccess() {
+        var f=new Fixture();f.Existing();f.Profile.ProfileTypes=["customer"];
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.SaveContactAsync(f.Target,new() {FirstName="Test",ExpectedVersion="old"},default));
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.SaveContactAsync(f.Target,new() {FirstName="Test",ProfileTypes=["employee"],ExpectedVersion="v1"},default));
+        f.Profiles.Verify(p=>p.UpdateAsync(It.IsAny<Guid>(),It.IsAny<UserProfile>(),It.IsAny<TableUpdateMode>(),It.IsAny<ETag>(),It.IsAny<CancellationToken>()),Times.Never);
+    }
+    [Fact] public async Task ContactWorkDoesNotReadUnauthorizedModules() {
+        var f=new Fixture();f.Existing();f.Profile.ProfileTypes=["customer"];f.Profile.CustomerId=Guid.NewGuid();f.ActAsAdmin(["contacts.read"]);
+        var jobs=new Mock<IAzureTablesRepositoryStore<TurnKeyOps.Lib.Entities.Job>>(MockBehavior.Strict);
+        var invoices=new Mock<IAzureTablesRepositoryStore<TurnKeyOps.Lib.Entities.Invoice>>(MockBehavior.Strict);
+        var service=new ContactWorkService(f.Service,f.Access,f.Context.Object,jobs.Object,invoices.Object);
+        var result=await service.GetAsync(f.Target,default);
+        Assert.False(result.CanViewJobs);Assert.False(result.CanViewInvoices);Assert.Empty(result.Jobs);Assert.Empty(result.Invoices);
+        jobs.VerifyNoOtherCalls();invoices.VerifyNoOtherCalls();
+    }
     private sealed class Fixture {
         public Guid Actor=Guid.NewGuid(),Target=Guid.NewGuid(),Tenant=Guid.NewGuid();
         public Mock<IManagedProfileStore> Profiles=new();
@@ -88,12 +131,19 @@ public sealed class ManagedPeopleServiceTests
         public TenantMembership TargetMember=new() {Id=Guid.NewGuid(),Role="staff",MembershipStatus="Active"};
         public UserProfile Profile;
         public ManagedPeopleService Service;
+        public Mock<IUserContext> Context=new();
+        public Mock<IAzureTablesRepositoryStore<UserProfile>> AccessProfiles=new();
+        public UserModuleAccessService Access;
         public Fixture() {
-            var context=new Mock<IUserContext>();context.SetupGet(x=>x.IsAuthenticated).Returns(true);context.SetupGet(x=>x.UserId).Returns(Actor);context.SetupGet(x=>x.TenantId).Returns(Tenant);
+            var context=Context;context.SetupGet(x=>x.IsAuthenticated).Returns(true);context.SetupGet(x=>x.UserId).Returns(Actor);context.SetupGet(x=>x.TenantId).Returns(Tenant);
             Members.Setup(m=>m.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(Tenant),Actor,It.IsAny<CancellationToken>())).ReturnsAsync(new TenantMembership {Role="owner",IsOwner=true,MembershipStatus="Active"});
-            var access=new UserModuleAccessService(Members.Object,new Mock<IAzureTablesRepositoryStore<UserProfile>>().Object,context.Object);
+            var access=Access=new UserModuleAccessService(Members.Object,AccessProfiles.Object,context.Object);
             Profile=new() {Id=Target,ApplicationUserId=Target,PartitionKey=EntityKeyPolicy.TenantPartition(Tenant),RowKey=EntityKeyPolicy.Row(Target),IsActive=true,PrimaryEmail="login@example.com",ETag=new("v1")};
             Service=new(Profiles.Object,new Mock<IAzureTablesRepositoryStore<TurnKeyOps.Lib.Entities.Customer>>().Object,Members.Object,Identities.Object,context.Object,access,MembershipService.Object,new Mock<IAuditService>().Object,new Mock<IInviteService>().Object,new Mock<ITenantRoleStore>().Object);
+        }
+        public void ActAsAdmin(string[] permissions) {
+            Members.Setup(m=>m.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(Tenant),Actor,It.IsAny<CancellationToken>())).ReturnsAsync(new TenantMembership {Role="admin",MembershipStatus="Active"});
+            AccessProfiles.Setup(p=>p.GetByKeysAsync(EntityKeyPolicy.TenantPartition(Tenant),EntityKeyPolicy.Row(Actor),It.IsAny<CancellationToken>())).ReturnsAsync(new UserProfile {IsActive=true,ModulePermissions=permissions});
         }
         public void Existing() {
             Profiles.Setup(p=>p.GetByKeysAsync(Profile.PartitionKey,Profile.RowKey,It.IsAny<CancellationToken>())).ReturnsAsync(Profile);

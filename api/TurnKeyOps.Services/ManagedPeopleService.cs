@@ -22,11 +22,11 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
     IAuditService audit, IInviteService invites, ITenantRoleStore identityRoles)
 {
     private string Partition => EntityKeyPolicy.TenantPartition(user.TenantId);
-    private async Task RequireAsync(bool write, CancellationToken ct)
+    private async Task RequireAsync(bool write, CancellationToken ct, string module = "users")
     {
         if (!user.IsAuthenticated || user.TenantId == Guid.Empty) throw new UnauthorizedAccessException();
-        if (!UserModulePermissions.Allows(await access.GetAsync(ct), "users", write))
-            throw new ForbiddenAccessException("User management access is required.");
+        if (!UserModulePermissions.Allows(await access.GetAsync(ct), module, write))
+            throw new ForbiddenAccessException("Access to this module is required.");
     }
     public async Task<IReadOnlyList<ManagedPersonDto>> ListAsync(CancellationToken ct)
     {
@@ -49,9 +49,11 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         return rows.Values.Select(p => View(p, memberRows.FirstOrDefault(m => m.UserId == p.Id && UserModulePermissions.IsActive(m))))
             .OrderBy(p => p.FirstName).ThenBy(p => p.LastName).ToArray();
     }
-    public async Task<ManagedPersonDto> SaveAsync(Guid? id, SaveManagedPersonDto input, CancellationToken ct)
+    public Task<ManagedPersonDto> SaveAsync(Guid? id, SaveManagedPersonDto input, CancellationToken ct)
+        => SaveCoreAsync(id, input, ct);
+    private async Task<ManagedPersonDto> SaveCoreAsync(Guid? id, SaveManagedPersonDto input, CancellationToken ct, SaveContactRecordDto? contact = null)
     {
-        await RequireAsync(true, ct);
+        await RequireAsync(true, ct, contact is null ? "users" : "contacts");
         Validate(input);
         if (input.CustomerId.HasValue && await customers.GetByKeysAsync(Partition, EntityKeyPolicy.Row(input.CustomerId.Value), ct) is not { IsDeleted: false })
             throw new ArgumentException("The linked customer must belong to this company.");
@@ -86,14 +88,14 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         if (existing is not null && existing.ETag.ToString() != input.ExpectedVersion)
             throw new ArgumentException("This record changed. Reload before saving.");
         var membership = await memberships.GetByUserIdAsync(Partition, id!.Value, ct);
-        if (UserModulePermissions.IsActive(membership) && membership!.Role is "owner" or "admin" or "staff" or "member" && !input.ProfileTypes.Contains("employee"))
+        if (contact is null && UserModulePermissions.IsActive(membership) && membership!.Role is "owner" or "admin" or "staff" or "member" && !input.ProfileTypes.Contains("employee"))
             throw new ArgumentException("Users with employee access roles must retain their employee profile.");
         var owner = membership?.IsOwner == true || membership?.Role == "owner";
-        if (owner && input.ModulePermissions is not null) throw new ArgumentException("Owners retain full module access.");
-        if (id == user.UserId && input.ModulePermissions is not null) throw new ArgumentException("You cannot restrict your own access.");
+        if (contact is null && owner && input.ModulePermissions is not null) throw new ArgumentException("Owners retain full module access.");
+        if (contact is null && id == user.UserId && input.ModulePermissions is not null) throw new ArgumentException("You cannot restrict your own access.");
         var currentPermissions = await access.GetAsync(ct);
         var actor = await memberships.GetByUserIdAsync(Partition, user.UserId, ct);
-        if (actor?.IsOwner != true && actor?.Role != "owner") {
+        if (contact is null && actor?.IsOwner != true && actor?.Role != "owner") {
             if (owner) throw new ForbiddenAccessException("Only an owner can edit another owner.");
             if (input.ModulePermissions is null || input.ModulePermissions.Except(currentPermissions).Any())
                 throw new ForbiddenAccessException("Choose explicit permissions within your own access.");
@@ -102,40 +104,90 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
             RowKey = EntityKeyPolicy.Row(id.Value), PrimaryEmail = loginEmail ?? membership?.InvitedEmail, PrimaryPhone = loginPhone ?? membership?.InvitedPhone, IsActive = true, Role = membership?.Role ?? "contact" };
         p.FirstName = input.FirstName.Trim(); p.LastName = input.LastName.Trim();
         p.ContactEmail = input.ContactEmail?.Trim(); p.ContactPhone = input.ContactPhone?.Trim();
-        p.ProfileTypes = input.ProfileTypes.Distinct().ToArray(); p.CompanyName = input.CompanyName?.Trim();
-        p.Title = input.Title?.Trim(); p.Team = input.Team?.Trim(); p.CustomerId = input.CustomerId;
-        p.ModulePermissions = UserModulePermissions.Validate(input.ModulePermissions);
+        p.ProfileTypes = contact is null ? input.ProfileTypes.Distinct().ToArray()
+            : p.ProfileTypes.Where(t => t == "employee").Concat(input.ProfileTypes).Distinct().ToArray();
+        p.CompanyName = input.CompanyName?.Trim(); p.CustomerId = input.CustomerId;
+        if (contact is null) {
+            p.Title = input.Title?.Trim(); p.Team = input.Team?.Trim();
+            p.ModulePermissions = UserModulePermissions.Validate(input.ModulePermissions);
+        } else {
+            p.AddressLine1 = contact.Address?.Trim(); p.City = contact.City?.Trim();
+            p.State = contact.State?.Trim(); p.PostalCode = contact.PostalCode?.Trim(); p.ContactNotes = contact.Notes?.Trim();
+        }
         if (existing is null) await profiles.AddAsync(user.TenantId, p, ct);
         else await profiles.UpdateAsync(user.TenantId, p, TableUpdateMode.Replace, existing.ETag, ct);
-        await AuditAsync(p.Id, "user_profile_saved", ct);
+        await AuditAsync(p.Id, contact is null ? "user_profile_saved" : "contact_saved", ct);
         var saved = await profiles.GetByKeysAsync(Partition, p.RowKey, ct) ?? p;
         return View(saved, membership);
     }
-    public async Task ArchiveAsync(Guid id, string version, CancellationToken ct)
+    public async Task DeleteAsync(Guid id, string version, CancellationToken ct)
     {
         await RequireAsync(true, ct);
-        if (id == user.UserId) throw new ArgumentException("You cannot archive yourself.");
+        if (!await access.IsOwnerAsync(ct)) throw new ForbiddenAccessException("Only an owner can delete a user.");
+        await ArchiveCoreAsync(id, version, true, ct);
+    }
+    public Task ArchiveAsync(Guid id, string version, CancellationToken ct) => ArchiveCoreAsync(id, version, false, ct);
+    private async Task ArchiveCoreAsync(Guid id, string version, bool ownerRemoval, CancellationToken ct)
+    {
+        await RequireAsync(true, ct);
+        if (id == user.UserId) throw new ArgumentException("You cannot delete your own company access. Ask another owner to remove you.");
         var m = await memberships.GetByUserIdAsync(Partition, id, ct);
-        if (m?.IsOwner == true || m?.Role == "owner") throw new ArgumentException("Owner accounts cannot be archived.");
+        if (!ownerRemoval && (m?.IsOwner == true || m?.Role == "owner")) throw new ArgumentException("Use the owner-only Delete user action to remove another owner.");
         var p = await profiles.GetByKeysAsync(Partition, EntityKeyPolicy.Row(id), ct);
         if (p is null && m is null) throw new KeyNotFoundException("User not found in this company.");
-        if (p is not null && p.ETag.ToString() != version) throw new ArgumentException("This record changed. Reload before archiving.");
+        if (p is not null && p.ETag.ToString() != version) throw new ArgumentException("This record changed. Reload before removing the user.");
         if (m is not null && UserModulePermissions.IsActive(m)) await membershipService.RemoveAsync(m.Id, ct);
         if (p is not null) {
             p.IsActive = false; p.IsDeleted = true;
             await profiles.UpdateAsync(user.TenantId, p, TableUpdateMode.Replace, p.ETag, ct);
         }
-        await AuditAsync(id, "user_archived", ct);
+        await AuditAsync(id, ownerRemoval ? "user_deleted_from_company" : "user_archived", ct);
     }
-    public async Task<IReadOnlyList<object>> CustomersAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<object>> CustomersAsync(CancellationToken ct, bool forContacts = false)
     {
-        await RequireAsync(false, ct);
+        await RequireAsync(false, ct, forContacts ? "contacts" : "users");
         var partition = Partition;
         var result = new List<object>();
         await foreach (var c in customers.QueryAsync(c => c.PartitionKey == partition, ct, "PartitionKey"))
             if (!c.IsDeleted) result.Add(new { c.Id, Name = $"{c.FirstName} {c.LastName}".Trim(), c.CompanyName });
         return result;
     }
+    public async Task<IReadOnlyList<ContactRecordDto>> ContactsAsync(CancellationToken ct)
+    {
+        await RequireAsync(false, ct, "contacts");
+        var result = new List<ContactRecordDto>();
+        await foreach (var p in profiles.ListAsync(Partition, ct))
+            if (p.IsActive && !p.IsDeleted && p.ProfileTypes.Any(t => t is "customer" or "vendor")) result.Add(ContactView(p));
+        return result.OrderBy(p => p.FirstName).ThenBy(p => p.LastName).ToArray();
+    }
+    public async Task<ContactRecordDto> ContactAsync(Guid id, CancellationToken ct)
+    {
+        await RequireAsync(false, ct, "contacts");
+        var p = await profiles.GetByKeysAsync(Partition, EntityKeyPolicy.Row(id), ct);
+        if (p is null || !p.IsActive || p.IsDeleted || !p.ProfileTypes.Any(t => t is "customer" or "vendor"))
+            throw new KeyNotFoundException("Contact not found in this company.");
+        return ContactView(p);
+    }
+    public async Task<ContactRecordDto> SaveContactAsync(Guid? id, SaveContactRecordDto input, CancellationToken ct)
+    {
+        await RequireAsync(true, ct, "contacts");
+        if (input.ProfileTypes is null || input.ProfileTypes.Length == 0 || input.ProfileTypes.Any(t => t is not ("customer" or "vendor")))
+            throw new ArgumentException("Choose Customer, Vendor, or both.");
+        if (new[] {input.Address, input.City, input.State, input.PostalCode}.Any(s => s?.Length > 200) || input.Notes?.Length > 4000)
+            throw new ArgumentException("Address fields must be at most 200 characters and notes at most 4000.");
+        if (id.HasValue) await ContactAsync(id.Value, ct);
+        var saved = await SaveCoreAsync(id, new() {
+            FirstName = input.FirstName, LastName = input.LastName, ContactEmail = input.ContactEmail,
+            ContactPhone = input.ContactPhone, CompanyName = input.CompanyName, ProfileTypes = input.ProfileTypes,
+            CustomerId = input.CustomerId, ExpectedVersion = input.ExpectedVersion,
+            LoginIdentifier = string.IsNullOrWhiteSpace(input.ContactEmail) ? input.ContactPhone : input.ContactEmail
+        }, ct, input);
+        return await ContactAsync(saved.Id, ct);
+    }
+    private static ContactRecordDto ContactView(UserProfile p) => new(p.Id, p.FirstName, p.LastName,
+        p.ContactEmail ?? p.PrimaryEmail, p.ContactPhone ?? p.PrimaryPhone, p.CompanyName,
+        p.ProfileTypes.Where(t => t is "customer" or "vendor").ToArray(), p.CustomerId,
+        p.AddressLine1, p.City, p.State, p.PostalCode, p.ContactNotes, p.ETag.ToString());
     public async Task UpdateRoleAsync(Guid id, string role, CancellationToken ct)
     {
         await RequireAsync(true, ct);
