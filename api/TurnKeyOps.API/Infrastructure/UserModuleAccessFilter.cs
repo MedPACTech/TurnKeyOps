@@ -12,7 +12,7 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
 {
     public static string? ModuleFor(string controller) => controller switch {
         "People" or "TenantMembership" or "Invite" or "Roles" or "AdminContactAccess" => "users",
-        "Customers" or "JobSites" => "contacts",
+        "Contacts" or "Customers" or "JobSites" => "contacts",
         "Jobs" => "jobs",
         "Calendar" or "Weather" => "calendar",
         "QuoteRequests" or "QuoteRequestAttachments" => "requests",

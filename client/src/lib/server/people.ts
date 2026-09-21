@@ -18,7 +18,7 @@ export async function peopleRequest<T>(event: Pick<RequestEvent, 'fetch' | 'cook
  if (!response.ok) throw error(response.status, payload?.error || payload?.errors?.map((e: {message?: string}) => e.message).join(', ') || payload?.message || 'Could not save the user.');
  return payload && 'data' in payload ? payload.data : payload;
 }
-export const loadPeople = async (event: RequestEvent) => ({people: await peopleRequest<Person[]>(event, '/api/people'), customerLinks: await peopleRequest<{id:string;name:string;companyName?:string}[]>(event, '/api/people/customers')});
+export const loadPeople = async (event: RequestEvent) => ({...(await peopleRequest<{canDeleteUsers:boolean}>(event, '/api/people/capabilities')), people: await peopleRequest<Person[]>(event, '/api/people'), customerLinks: await peopleRequest<{id:string;name:string;companyName?:string}[]>(event, '/api/people/customers')});
 const text = (d: FormData, key: string) => String(d.get(key) ?? '').trim();
 async function action(event: RequestEvent, operation: (d: FormData) => Promise<Record<string, unknown>>) {
  try { return await operation(await event.request.formData()); }
@@ -26,6 +26,10 @@ async function action(event: RequestEvent, operation: (d: FormData) => Promise<R
   return fail(c.status && c.status >= 400 && c.status <= 599 ? c.status : 400, {error: c.body?.message || c.message || 'Could not complete this change.'}); }
 }
 export const peopleActions = {
+ deletePerson:(event: RequestEvent) => action(event,async d => {
+  await peopleRequest(event,`/api/people/${encodeURIComponent(text(d,'id'))}/delete?version=${encodeURIComponent(text(d,'version'))}`,{method:'POST'});
+  return {message:'User deleted from this company. App access was removed; business history is retained.'};
+ }),
  updatePersonRole:(event: RequestEvent) => action(event,async d => {
   await peopleRequest(event,`/api/people/${encodeURIComponent(text(d,'id'))}/role`,{method:'POST',body:JSON.stringify({role:text(d,'role')})});
   return {message:'User access role updated.'};

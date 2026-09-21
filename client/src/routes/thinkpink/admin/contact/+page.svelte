@@ -1,6 +1,6 @@
 <script lang="ts">
- import PeopleManagement from '$lib/components/admin/PeopleManagement.svelte';
+ import ContactsManagement from '$lib/components/admin/ContactsManagement.svelte';
  import type { PageProps } from './$types';
  let {data,form}:PageProps=$props();
 </script>
-<PeopleManagement people={data.people} customerLinks={data.customerLinks} {form} canWrite={data.modulePermissions.includes('users.write')}/>
+<ContactsManagement contacts={data.contacts} customerLinks={data.customerLinks} selectedId={data.selectedId} work={data.work} contactSaved={data.contactSaved} {form} canWrite={data.modulePermissions.includes('contacts.write')} canManagePeople={data.modulePermissions.includes('users.read')}/>
