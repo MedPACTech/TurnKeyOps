@@ -1,3 +1,4 @@
+import { parseQuoteSignatureInput } from '$lib/quote-signatures';
 import { error, fail } from '@sveltejs/kit';
 import { decidePublicQuoteEstimate, getPublicQuoteEstimate } from '$lib/server/quote-estimates';
 
@@ -11,7 +12,8 @@ const loadPacket = async (fetcher: typeof globalThis.fetch, requestId: string, t
 	}
 };
 
-export const load = async ({ fetch, params, url }) => {
+export const load = async ({ fetch, params, url, setHeaders }) => {
+	setHeaders({ 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex, nofollow' });
 	const requestId = decodeURIComponent(params.requestId);
 	const token = url.searchParams.get('token')?.trim() ?? '';
 	const result = await loadPacket(fetch, requestId, token);
@@ -22,9 +24,15 @@ export const load = async ({ fetch, params, url }) => {
 export const actions = {
 	approve: async ({ fetch, request, params }) => {
 		const requestId = decodeURIComponent(params.requestId);
-		const token = String((await request.formData()).get('accessToken') ?? '').trim();
-		await decidePublicQuoteEstimate(fetch, 'bdr', requestId, token, 'approve');
-		return { approved: true };
+		const data = await request.formData();
+		const token = String(data.get('accessToken') ?? '').trim();
+		const parsed = parseQuoteSignatureInput(data);
+		if (!token || !parsed.signature) return fail(400, { approvalError: parsed.error || 'Open the current estimate link before signing.', signerPrintedName: parsed.signerPrintedName });
+		try {
+			const saved = await decidePublicQuoteEstimate(fetch, 'bdr', requestId, token, 'approve', undefined, parsed.signature);
+			if (saved.delivery?.status !== 'approved' || !saved.approvalSignature) throw new Error('Unconfirmed signature');
+			return { approved: true, approvalSignature: saved.approvalSignature };
+		} catch { return fail(409, { approvalError: 'Your signature was not confirmed. Reload this estimate to check its latest status before retrying.', signerPrintedName: parsed.signerPrintedName }); }
 	},
 	requestChanges: async ({ fetch, request, params }) => {
 		const requestId = decodeURIComponent(params.requestId);

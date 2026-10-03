@@ -154,6 +154,12 @@ Before changing DNS:
 9. Retain any manual testing notes with the release; these are optional
    documentation, not required workflow inputs.
 
+Carl Zipf public intake accepts up to 45 MB of photos in one request, and the
+field handoff can send up to 40 MB. Set the Node Web App's `BODY_SIZE_LIMIT` to
+at least `50M` (the adapter's default is `512K`) and allow the same size through
+any upstream proxy. Verify the final limit with a multi-photo request before
+enabling the flow for customers.
+
 ## DNS cutover
 
 Lower DNS TTLs at least several hours before cutover. Change one public domain

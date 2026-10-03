@@ -98,6 +98,37 @@ public sealed class TenantSettingsServiceTests
     }
 
     [Fact]
+    public async Task OperationalSettingsCanBeUpdatedWhenTableAdapterReturnsNoETag()
+    {
+        var fixture = new Fixture();
+        var existing = Entity(TenantSettingKinds.Operational, "v1", "{\"defaultCrewSize\":2}");
+        existing.ETag = default;
+        existing.DateUpdated = new DateTime(2026, 10, 2, 12, 0, 0, DateTimeKind.Utc);
+        fixture.Repository
+            .Setup(repository => repository.GetAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .ReturnsAsync(existing);
+        fixture.Repository
+            .Setup(repository => repository.SaveAsync(
+                It.IsAny<TenantSettingsDocument>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TenantSettingsDocument entity, CancellationToken _) => entity);
+
+        var loaded = await fixture.Service.GetProtectedAsync(TenantSettingKinds.Operational);
+        Assert.False(string.IsNullOrWhiteSpace(loaded.Version));
+
+        var saved = await fixture.Service.UpsertAsync(
+            TenantSettingKinds.Operational,
+            Input(new { defaultCrewSize = 3 }, expectedVersion: loaded.Version));
+
+        Assert.Equal(3, saved.Values.GetProperty("defaultCrewSize").GetInt32());
+        Assert.NotEqual(loaded.Version, saved.Version);
+    }
+
+    [Fact]
     public async Task PublicContentCannotPersistSecretsOrSensitivePayloadKeys()
     {
         var fixture = new Fixture();

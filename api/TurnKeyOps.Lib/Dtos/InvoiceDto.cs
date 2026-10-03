@@ -40,6 +40,7 @@ public class InvoiceDto
     public List<InvoicePaymentDto> Payments { get; set; } = [];
     public List<InvoiceReminderDto> Reminders { get; set; } = [];
     public List<InvoiceAuditEventDto> AuditEvents { get; set; } = [];
+    public InvoiceCompletionSignatureDto? CompletionSignature { get; set; }
     public InvoiceJobReleaseDto JobRelease { get; set; } = new();
     public string Version { get; set; } = string.Empty;
     public DateTime? DateCreated { get; set; }
@@ -127,6 +128,25 @@ public sealed class InvoiceMutationInputDto
     public string? ExpectedVersion { get; set; }
 }
 
+public sealed class InvoiceCompletionSignatureInputDto
+{
+    public string SignerPrintedName { get; set; } = string.Empty;
+    public bool IntentToSign { get; set; }
+    public string? ExpectedVersion { get; set; }
+}
+
+public sealed class InvoiceCompletionSignatureDto
+{
+    public string SignerPrintedName { get; set; } = string.Empty;
+    public string ConsentText { get; set; } = string.Empty;
+    public string ConsentVersion { get; set; } = "work-completion-v1";
+    public DateTime SignedAtUtc { get; set; }
+    public string RecordedByStaff { get; set; } = string.Empty;
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public decimal InvoiceTotal { get; set; }
+    public string DocumentHash { get; set; } = string.Empty;
+}
+
 public sealed class InvoiceWorkflowPayloadDto
 {
     public DateTime? SentAtUtc { get; set; }
@@ -140,6 +160,7 @@ public sealed class InvoiceWorkflowPayloadDto
     public List<InvoicePaymentDto> Payments { get; set; } = [];
     public List<InvoiceReminderDto> Reminders { get; set; } = [];
     public List<InvoiceAuditEventDto> AuditEvents { get; set; } = [];
+    public InvoiceCompletionSignatureDto? CompletionSignature { get; set; }
 }
 
 public sealed class InvoiceProviderWebhookResultDto

@@ -1,7 +1,9 @@
+import type { QuoteApprovalSignature, QuoteApprovalSignatureInput } from '$lib/quote-signatures';
 import { getTurnKeyApiBaseUrl, getTurnKeyApiHeaders, unwrapTurnKeyApiEnvelope } from './turnkey-api';
 
 export type QuoteEstimateLocation = { id: string; name: string; lengthFeet: number; widthFeet: number; depthInches: number; wastePercent: number; numberOfPours: number; squareFeet?: number; cubicYards?: number; formLinearFeet?: number; rebarLinearFeet?: number; materialCost?: number; laborCost?: number; estimatedTotal?: number };
 export type QuoteEstimate = {
+	approvalConsentText: string; approvalConsentVersion: string; documentHash: string; approvalSignature?: QuoteApprovalSignature | null;
 	id: string; quoteRequestId: string; revisionNumber: number; customerName: string; siteName: string;
 	serviceSummary: string; visitFindings: string; scopeLineItems: string[]; notes: string; assumptions: string[];
 	status: 'draft' | 'ready-to-send' | 'sent'; commercialSummary: string; locations: QuoteEstimateLocation[];
@@ -41,12 +43,12 @@ export const getPublicQuoteEstimate = async (fetcher: typeof globalThis.fetch, t
 		{ headers: { Accept: 'application/json' } }
 	), 'Load estimate');
 
-export const decidePublicQuoteEstimate = async (fetcher: typeof globalThis.fetch, tenantSlug: string, requestId: string, token: string, decision: 'approve' | 'request-changes', responseNote?: string) =>
+export const decidePublicQuoteEstimate = async (fetcher: typeof globalThis.fetch, tenantSlug: string, requestId: string, token: string, decision: 'approve' | 'request-changes', responseNote?: string, signature?: QuoteApprovalSignatureInput) =>
 	unwrapTurnKeyApiEnvelope<QuoteEstimate>(await fetcher(
 		`${getTurnKeyApiBaseUrl()}/api/public/quote-estimates/${tenantSlug}/${requestId}/${decision}`,
 		{
 			method: 'POST',
 			headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ accessToken: token, responseNote })
+			body: JSON.stringify({ accessToken: token, responseNote, ...signature })
 		}
 	), 'Record estimate decision');

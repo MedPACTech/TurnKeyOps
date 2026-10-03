@@ -28,9 +28,9 @@ public class CustomersController : ApiControllerBase
     }
 
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string query)
+    public async Task<IActionResult> Search([FromQuery] string? query)
     {
-        var results = await _service.SearchAsync(query);
+        var results = await _service.SearchAsync(query ?? string.Empty);
         return OkResponse(results);
     }
 

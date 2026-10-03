@@ -162,8 +162,21 @@ const landClearingEstimateQuestions: typeof estimateQuestions = [
 		suggestedReplies: ['None']
 	}
 ];
+const locksmithEstimateQuestions: typeof estimateQuestions = [
+	{ key: 'contactName', prompt: 'Who is the customer or primary contact?' },
+	{ key: 'companyName', prompt: 'Is this a commercial customer? Give the company name, or say “residential”.', suggestedReplies: ['Residential'] },
+	{ key: 'email', prompt: 'What email should this request be tied to?' },
+	{ key: 'phone', prompt: 'What is the best phone number for the customer?' },
+	{ key: 'serviceAddress', prompt: 'What is the service address or property name?' },
+	{ key: 'projectType', prompt: 'Is this door/frame replacement, hardware installation, repair, or rekeying?' },
+	{ key: 'scope', prompt: 'Which named openings need work, and what should be supplied or repaired?' },
+	{ key: 'dimensions', prompt: 'What opening, slab, and frame measurements are known? Mark estimates clearly.' },
+	{ key: 'depth', prompt: 'What is known about handing, swing, jamb depth, existing locks, and hardware preparation?' },
+	{ key: 'timeline', prompt: 'When does the customer want an assessment or installation?', suggestedReplies: ['No firm deadline'] },
+	{ key: 'notes', prompt: 'Any access restrictions, photos, product preferences, or other site notes? Say “none” if not.', suggestedReplies: ['None'] }
+];
 const questionsForTenant = (tenantSlug: string) =>
-	tenantSlug === 'thinkpink' ? landClearingEstimateQuestions : estimateQuestions;
+	tenantSlug === 'thinkpink' ? landClearingEstimateQuestions : tenantSlug === 'carlzipf' ? locksmithEstimateQuestions : estimateQuestions;
 
 const makeId = () => globalThis.crypto.randomUUID();
 

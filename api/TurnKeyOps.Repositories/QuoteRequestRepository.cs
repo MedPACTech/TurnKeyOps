@@ -10,6 +10,8 @@ namespace TurnKeyOps.Repositories;
 
 public sealed class QuoteRequestRepository : AzureTablesRepositoryBase<QuoteRequest>, IQuoteRequestRepository
 {
+    private readonly IAzureTablesRepositoryStore<QuoteRequest> _store;
+
     public QuoteRequestRepository(
         IAzureTablesRepositoryStore<QuoteRequest> store,
         IMemoryCache cache,
@@ -17,6 +19,7 @@ public sealed class QuoteRequestRepository : AzureTablesRepositoryBase<QuoteRequ
         IOptions<RepositoryOptions> repositoryOptions)
         : base(store, cache, tenantContext, repositoryOptions.Value)
     {
+        _store = store;
     }
 
     public Task<QuoteRequest?> GetAsync(string partitionKey, string rowKey, CancellationToken ct = default) =>
@@ -27,10 +30,11 @@ public sealed class QuoteRequestRepository : AzureTablesRepositoryBase<QuoteRequ
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var all = await GetAllAsync(false, false);
-        return all
-            .Where(item => item.PartitionKey == partitionKey && !item.IsDeleted)
-            .OrderByDescending(item => item.SubmittedAtUtc)
-            .ToArray();
+        var results = new List<QuoteRequest>();
+        await foreach (var item in _store.QueryAsync(item => item.PartitionKey == partitionKey, ct))
+        {
+            if (!item.IsDeleted) results.Add(item);
+        }
+        return results.OrderByDescending(item => item.SubmittedAtUtc).ToArray();
     }
 }

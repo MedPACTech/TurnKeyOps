@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Globalization;
 using MedInsights.Lib.Authorization;
 using MedInsights.Lib.Dtos;
 using MedInsights.Services.Interfaces;
@@ -166,6 +167,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         if (string.Equals(kind, TenantSettingKinds.Operational, StringComparison.Ordinal))
         {
             ValidateOperationalValues(input.Values);
+            if (input.Values.TryGetProperty("locksmith", out var locksmith)) LocksmithPolicy.Validate(locksmith);
         }
     }
 
@@ -286,7 +288,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         }
 
         if (string.IsNullOrWhiteSpace(expectedVersion) ||
-            !string.Equals(existing.ETag.ToString(), expectedVersion.Trim(), StringComparison.Ordinal))
+            !string.Equals(VersionOf(existing), expectedVersion.Trim(), StringComparison.Ordinal))
         {
             throw new ArgumentException(
                 "The settings changed after they were loaded. Refresh and try again.",
@@ -312,9 +314,17 @@ public sealed class TenantSettingsService : ITenantSettingsService
             IsPublic = entity.IsPublic,
             Values = values.RootElement.Clone(),
             ConfiguredSecretKeys = secretKeys,
-            Version = entity.ETag.ToString(),
+            Version = VersionOf(entity),
             UpdatedUtc = entity.DateUpdated
         };
+    }
+
+    private static string VersionOf(TenantSettingsDocument entity)
+    {
+        var etag = entity.ETag.ToString();
+        return !string.IsNullOrWhiteSpace(etag)
+            ? etag
+            : entity.DateUpdated.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture);
     }
 
     private static TenantSettingsDocumentDto CreateDefault(string kind, bool isPublic)

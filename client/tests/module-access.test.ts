@@ -6,6 +6,9 @@ test('company routes map to the same modules as the API',()=>{
  assert.equal(adminModule('/thinkpink/admin/contact'),'contacts');
  assert.equal(adminModule('/bdr/admin/customers'),'contacts');
  assert.equal(adminModule('/bdr/admin/website'),'settings');
+ assert.equal(adminModule('/carlzipf/admin/estimates'),'estimates');
+ assert.equal(adminModule('/carlzipf/admin/invoices'),'invoices');
+ assert.equal(adminModule('/carlzipf/admin/users'),'users');
  assert.equal(adminModule('/turnkeyops/admin/access'),null);
 });
 test('view does not authorize mutation or aggregate data',()=>{

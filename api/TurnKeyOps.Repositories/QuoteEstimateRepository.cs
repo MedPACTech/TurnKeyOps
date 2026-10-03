@@ -10,12 +10,13 @@ namespace TurnKeyOps.Repositories;
 
 public sealed class QuoteEstimateRepository : AzureTablesRepositoryBase<QuoteEstimate>, IQuoteEstimateRepository
 {
+    private readonly IAzureTablesRepositoryStore<QuoteEstimate> _store;
     public QuoteEstimateRepository(
         IAzureTablesRepositoryStore<QuoteEstimate> store,
         IMemoryCache cache,
         ITenantContext tenantContext,
         IOptions<RepositoryOptions> repositoryOptions)
-        : base(store, cache, tenantContext, repositoryOptions.Value) { }
+        : base(store, cache, tenantContext, repositoryOptions.Value) { _store = store; }
 
     public Task<QuoteEstimate?> GetAsync(string partitionKey, string rowKey, CancellationToken ct = default) =>
         GetByKeysAsync(partitionKey, rowKey, ct);
@@ -23,9 +24,9 @@ public sealed class QuoteEstimateRepository : AzureTablesRepositoryBase<QuoteEst
     public async Task<IReadOnlyCollection<QuoteEstimate>> ListAsync(string partitionKey, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return (await GetAllAsync(false, false))
-            .Where(item => item.PartitionKey == partitionKey && !item.IsDeleted)
-            .OrderByDescending(item => item.DateUpdated)
-            .ToArray();
+        var results = new List<QuoteEstimate>();
+        await foreach (var item in _store.QueryAsync(item => item.PartitionKey == partitionKey, ct))
+            if (!item.IsDeleted) results.Add(item);
+        return results.OrderByDescending(item => item.DateUpdated).ToArray();
     }
 }

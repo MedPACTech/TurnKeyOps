@@ -23,16 +23,16 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto?> GetAsync(Guid id)
     {
-        var entity = await _repo.GetByIdAsync(id);
-        return entity is null || entity.IsDeleted ? null : CustomerMapper.ToDto(entity);
+        var entity = await _repo.GetAsync(PartitionKeyForTenant(), RepositoryKeyHelper.ToRowKey(id));
+        return entity is null || entity.IsDeleted || entity.PartitionKey != PartitionKeyForTenant()
+            ? null : CustomerMapper.ToDto(entity);
     }
 
     public async Task<(IEnumerable<CustomerDto> Items, string? ContinuationToken)> GetPagedAsync(int pageSize, string? continuationToken)
     {
         var pk = PartitionKeyForTenant();
         var offset = int.TryParse(continuationToken, out var parsed) ? parsed : 0;
-        var all = (await _repo.GetAllAsync(false, false))
-            .Where(x => x.PartitionKey == pk && !x.IsDeleted)
+        var all = (await _repo.ListAsync(pk))
             .OrderByDescending(x => x.DateUpdated)
             .ToList();
         var items = all.Skip(offset).Take(pageSize).ToList();
@@ -43,7 +43,7 @@ public class CustomerService : ICustomerService
     public async Task<IEnumerable<CustomerDto>> SearchAsync(string query)
     {
         var pk = PartitionKeyForTenant();
-        var all = await _repo.GetAllAsync(false, false);
+        var all = await _repo.ListAsync(pk);
         var q = query.ToLowerInvariant();
         return all
             .Where(c => c.PartitionKey == pk && !c.IsDeleted &&
@@ -64,8 +64,10 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto> UpdateAsync(CustomerDto dto)
     {
-        var existing = await _repo.GetByIdAsync(dto.Id)
+        var existing = await _repo.GetAsync(PartitionKeyForTenant(), RepositoryKeyHelper.ToRowKey(dto.Id))
             ?? throw new ArgumentException("Customer not found", nameof(dto.Id));
+        if (existing.IsDeleted || existing.PartitionKey != PartitionKeyForTenant())
+            throw new ArgumentException("Customer not found", nameof(dto.Id));
         var entity = CustomerMapper.ToEntity(dto, existing.PartitionKey);
         entity.DateCreated = existing.DateCreated;
         await _repo.SaveAsync(entity);
@@ -74,8 +76,8 @@ public class CustomerService : ICustomerService
 
     public async Task DeleteAsync(Guid id)
     {
-        var entity = await _repo.GetByIdAsync(id);
-        if (entity is null) return;
+        var entity = await _repo.GetAsync(PartitionKeyForTenant(), RepositoryKeyHelper.ToRowKey(id));
+        if (entity is null || entity.IsDeleted || entity.PartitionKey != PartitionKeyForTenant()) return;
         entity.IsDeleted = true;
         entity.DateUpdated = DateTime.UtcNow;
         await _repo.SaveAsync(entity);
