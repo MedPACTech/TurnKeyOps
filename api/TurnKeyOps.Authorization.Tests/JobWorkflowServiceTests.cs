@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Azure;
 using MedInsights.Lib.Utils;
+using MedInsights.Lib.Entities;
+using MedInsights.Repositories.Interfaces;
 using Moq;
 using TurnKeyOps.Lib.Dtos;
 using TurnKeyOps.Lib.Entities;
@@ -17,6 +19,125 @@ public sealed class JobWorkflowServiceTests
     private static readonly Guid TenantA = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static readonly Guid TenantB = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private static readonly Guid InvoiceId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+
+    [Fact]
+    public async Task LocksmithJobsRequireJobTypeAndEligibleActiveTechnician()
+    {
+        var tenantId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var member = new TenantMembership
+        {
+            Id = memberId, TenantId = tenantId, UserId = Guid.NewGuid(), Role = "staff",
+            MembershipStatus = "Active", SeatStatus = "Assigned"
+        };
+        var settingsJson = JsonSerializer.Serialize(new
+        {
+            locksmith = new
+            {
+                techCapabilities = new Dictionary<string, string[]> { [memberId.ToString()] = ["residential"] }
+            }
+        });
+        var fixture = CreateFixture(tenantId, members: [member], settingsJson: settingsJson);
+        var untyped = ScheduledJob(Guid.NewGuid(), "Crew A", 8, 12);
+        var tradeError = await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.AddAsync(untyped));
+        Assert.Contains("doors and locksmith trade", tradeError.Message);
+        var job = ScheduledJob(Guid.NewGuid(), string.Empty, 8, 12);
+        job.TradeType = TradeType.DoorsLocksmith;
+        job.LocksmithJobType = "residential";
+        job.AssignedTechnicianMembershipId = memberId;
+
+        var saved = await fixture.Service.AddAsync(job);
+
+        Assert.Equal(memberId, saved.AssignedTechnicianMembershipId);
+        Assert.Equal("residential", saved.LocksmithJobType);
+        Assert.StartsWith("Technician ", saved.Crew);
+
+        var ineligible = ScheduledJob(Guid.NewGuid(), string.Empty, 13, 16, Guid.NewGuid());
+        ineligible.TradeType = TradeType.DoorsLocksmith;
+        ineligible.LocksmithJobType = "commercial";
+        ineligible.AssignedTechnicianMembershipId = memberId;
+        var capabilityError = await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.AddAsync(ineligible));
+        Assert.Contains("not eligible", capabilityError.Message);
+
+        ineligible.LocksmithJobType = "residential";
+        ineligible.AssignedTechnicianMembershipId = Guid.NewGuid();
+        var membershipError = await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.AddAsync(ineligible));
+        Assert.Contains("not an active assigned member", membershipError.Message);
+
+        ineligible.AssignedTechnicianMembershipId = memberId;
+        ineligible.LocksmithJobType = null;
+        var typeError = await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.AddAsync(ineligible));
+        Assert.Contains("job type is required", typeError.Message);
+    }
+
+    [Fact]
+    public async Task LocksmithScheduleRejectsOverlappingJobsForTheSameTechnician()
+    {
+        var tenantId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var member = new TenantMembership
+        {
+            Id = memberId, TenantId = tenantId, UserId = Guid.NewGuid(), Role = "staff",
+            MembershipStatus = "Active", SeatStatus = "Assigned"
+        };
+        var settingsJson = JsonSerializer.Serialize(new
+        {
+            locksmith = new
+            {
+                techCapabilities = new Dictionary<string, string[]> { [memberId.ToString()] = ["residential", "commercial"] }
+            }
+        });
+        var fixture = CreateFixture(tenantId, members: [member], settingsJson: settingsJson);
+        var first = ScheduledJob(Guid.NewGuid(), "Alex", 8, 12);
+        first.TradeType = TradeType.DoorsLocksmith;
+        first.LocksmithJobType = "residential";
+        first.AssignedTechnicianMembershipId = memberId;
+        await fixture.Service.AddAsync(first);
+
+        var second = ScheduledJob(Guid.NewGuid(), "Different label", 11, 14, Guid.NewGuid());
+        second.TradeType = TradeType.DoorsLocksmith;
+        second.LocksmithJobType = "commercial";
+        second.AssignedTechnicianMembershipId = memberId;
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.AddAsync(second));
+
+        Assert.Contains("overlapping assignment", error.Message);
+    }
+
+    [Fact]
+    public async Task LocksmithScheduleRejectsOverlappingSiteVisitForTheSameTechnician()
+    {
+        var tenantId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var member = new TenantMembership
+        {
+            Id = memberId, TenantId = tenantId, UserId = Guid.NewGuid(), Role = "staff",
+            MembershipStatus = "Active", SeatStatus = "Assigned"
+        };
+        var settingsJson = JsonSerializer.Serialize(new
+        {
+            locksmith = new
+            {
+                techCapabilities = new Dictionary<string, string[]> { [memberId.ToString()] = ["residential"] }
+            }
+        });
+        var job = ScheduledJob(Guid.NewGuid(), "Carl", 8, 12);
+        job.TradeType = TradeType.DoorsLocksmith;
+        job.LocksmithJobType = "residential";
+        job.AssignedTechnicianMembershipId = memberId;
+        var visit = new CalendarEvent
+        {
+            Id = Guid.NewGuid(), EventType = CalendarEventType.SiteVisit,
+            AssignedTechnicianMembershipId = memberId,
+            StartUtc = job.ScheduledStart!.Value.AddHours(1),
+            EndUtc = job.ScheduledStart.Value.AddHours(2)
+        };
+        var fixture = CreateFixture(tenantId, members: [member], settingsJson: settingsJson,
+            calendarEvents: [visit]);
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.AddAsync(job));
+
+        Assert.Contains("overlapping calendar assignment", error.Message);
+    }
 
     [Fact]
     public async Task CreatePersistsTenantScopedWorkflowAndRejectsCrewConflict()
@@ -111,6 +232,24 @@ public sealed class JobWorkflowServiceTests
         Assert.Empty(fixture.State.Payloads);
     }
 
+    [Fact]
+    public async Task JobCanBeRescheduledWhenTableAdapterReturnsNoETag()
+    {
+        var fixture = CreateFixture(TenantA, noETag: true);
+        var created = await fixture.Service.AddAsync(ScheduledJob(Guid.NewGuid(), "Crew A", 8, 12));
+        Assert.False(string.IsNullOrWhiteSpace(created.Version));
+
+        var rescheduled = await fixture.Service.ScheduleAsync(created.Id, new JobScheduleInputDto
+        {
+            ScheduledStart = DateTime.UtcNow.Date.AddDays(2).AddHours(8),
+            ScheduledEnd = DateTime.UtcNow.Date.AddDays(2).AddHours(12),
+            Crew = "Crew A",
+            ExpectedVersion = created.Version
+        });
+
+        Assert.NotEqual(created.Version, rescheduled.Version);
+    }
+
     private static JobDto ScheduledJob(Guid id, string crew, int startHour, int endHour, Guid? invoiceId = null)
     {
         var day = DateTime.UtcNow.Date.AddDays(1);
@@ -127,7 +266,9 @@ public sealed class JobWorkflowServiceTests
         };
     }
 
-    private static Fixture CreateFixture(Guid tenantId, State? state = null, bool failSave = false)
+    private static Fixture CreateFixture(Guid tenantId, State? state = null, bool failSave = false, bool noETag = false,
+        IReadOnlyList<TenantMembership>? members = null, string? settingsJson = null,
+        IReadOnlyCollection<CalendarEvent>? calendarEvents = null)
     {
         state ??= new State();
         var jobs = new Mock<IJobRepository>();
@@ -145,7 +286,7 @@ public sealed class JobWorkflowServiceTests
             jobs.Setup(x => x.SaveAsync(It.IsAny<Job>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Job item, CancellationToken _) =>
                 {
-                    item.ETag = new ETag($"v{++state.Version}");
+                    if (!noETag) item.ETag = new ETag($"v{++state.Version}");
                     state.Jobs[(item.PartitionKey, item.RowKey)] = item;
                     return item;
                 });
@@ -160,7 +301,17 @@ public sealed class JobWorkflowServiceTests
         invoices.Setup(x => x.GetJobReleaseAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InvoiceJobReleaseDto { IsEligible = true, Reason = "Deposit rule satisfied." });
         var payloads = new MemoryPayloadStore(state);
-        var service = new JobService(jobs.Object, estimates.Object, payloads, invoices.Object, new User(tenantId));
+        var memberships = new Mock<ITenantMembershipRepository>();
+        memberships.Setup(x => x.GetActiveAssignedByTenantAsync(tenantId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(members ?? []);
+        var settings = new Mock<ITenantSettingsRepository>();
+        settings.Setup(x => x.GetAsync(It.IsAny<string>(), "SETTINGS|OPERATIONAL", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(settingsJson is null ? null : new TenantSettingsDocument { ValuesJson = settingsJson });
+        var calendar = new Mock<ICalendarEventRepository>();
+        calendar.Setup(x => x.ListAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(calendarEvents ?? []);
+        var service = new JobService(jobs.Object, estimates.Object, payloads, invoices.Object, new User(tenantId),
+            memberships.Object, settings.Object, calendar.Object);
         return new(service, state);
     }
 

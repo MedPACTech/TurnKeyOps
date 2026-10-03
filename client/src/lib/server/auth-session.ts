@@ -11,6 +11,7 @@ export {
 	isCrossSiteFormMutation,
 	isExternalAdminPath,
 	isInternalAdminPath,
+	isTechnicianPath,
 	resolveBdrAdminRole
 } from './session-policy';
 export type { AdminSession, AdminSurface } from './session-policy';

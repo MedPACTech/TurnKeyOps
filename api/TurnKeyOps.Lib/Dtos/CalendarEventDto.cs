@@ -15,6 +15,8 @@ public class CalendarEventDto
     public string? JobName { get; set; }
     public Guid? JobSiteId { get; set; }
     public string? JobSiteName { get; set; }
+    public string? LocksmithJobType { get; set; }
+    public Guid? AssignedTechnicianMembershipId { get; set; }
     public string? Color { get; set; }
 
     // Weather overlay

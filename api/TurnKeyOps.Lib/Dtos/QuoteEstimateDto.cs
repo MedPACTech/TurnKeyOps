@@ -2,6 +2,10 @@ namespace TurnKeyOps.Lib.Dtos;
 
 public sealed class QuoteEstimateDto
 {
+    public string DocumentHash { get; set; } = string.Empty;
+    public string ApprovalConsentText => QuoteApprovalConsent.Text;
+    public string ApprovalConsentVersion => QuoteApprovalConsent.Version;
+    public QuoteEstimateSignatureDto? ApprovalSignature { get; set; }
     public Guid Id { get; set; }
     public Guid QuoteRequestId { get; set; }
     public int RevisionNumber { get; set; } = 1;
@@ -16,6 +20,7 @@ public sealed class QuoteEstimateDto
     public string CommercialSummary { get; set; } = string.Empty;
     public List<QuoteEstimateLocationDto> Locations { get; set; } = [];
     public QuoteEstimateTotalsDto Totals { get; set; } = new();
+    public LocksmithPricingSnapshotDto? LocksmithPricing { get; set; }
     public DateTime SavedAtUtc { get; set; }
     public DateTime? SentAtUtc { get; set; }
     public string? SentBy { get; set; }
@@ -27,6 +32,7 @@ public sealed class QuoteEstimateDto
 
 public sealed class QuoteEstimateDraftInputDto
 {
+    public LocksmithQuoteInputDto? Locksmith { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public string SiteName { get; set; } = string.Empty;
     public string ServiceSummary { get; set; } = string.Empty;
@@ -81,6 +87,8 @@ public sealed class QuoteEstimateDeliveryDto
 
 public sealed class QuoteEstimateRevisionDto
 {
+    public string DocumentHash { get; set; } = string.Empty;
+    public QuoteEstimateSignatureDto? ApprovalSignature { get; set; }
     public int RevisionNumber { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public string SiteName { get; set; } = string.Empty;
@@ -93,6 +101,7 @@ public sealed class QuoteEstimateRevisionDto
     public string CommercialSummary { get; set; } = string.Empty;
     public List<QuoteEstimateLocationDto> Locations { get; set; } = [];
     public QuoteEstimateTotalsDto Totals { get; set; } = new();
+    public LocksmithPricingSnapshotDto? LocksmithPricing { get; set; }
     public DateTime SavedAtUtc { get; set; }
     public DateTime? SentAtUtc { get; set; }
     public string? SentBy { get; set; }
@@ -100,6 +109,30 @@ public sealed class QuoteEstimateRevisionDto
 
 public sealed class QuoteEstimateDecisionDto
 {
+    public string? SignerPrintedName { get; set; }
+    public bool IntentToSign { get; set; }
+    public string? ConsentVersion { get; set; }
+    public int? RevisionNumber { get; set; }
+    public string? DocumentHash { get; set; }
     public string AccessToken { get; set; } = string.Empty;
     public string? ResponseNote { get; set; }
+}
+
+public static class QuoteApprovalConsent
+{
+    public const string Version = "quote-approval-v1";
+    public const string Text = "By typing my name and selecting this checkbox, I intend to electronically sign and approve this quote revision and its total.";
+}
+
+public sealed class QuoteEstimateSignatureDto
+{
+    public string SignerPrintedName { get; set; } = string.Empty;
+    public string ConsentText { get; set; } = string.Empty;
+    public string ConsentVersion { get; set; } = string.Empty;
+    public DateTime SignedAtUtc { get; set; }
+    public int RevisionNumber { get; set; }
+    public decimal Total { get; set; }
+    public string DocumentHash { get; set; } = string.Empty;
+    public string Method { get; set; } = "typed-name";
+    public Guid QuoteRequestId { get; set; }
 }

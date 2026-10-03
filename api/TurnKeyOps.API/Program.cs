@@ -53,10 +53,15 @@ public partial class Program
                     repoLocalSecretsPath,
                     optional: true,
                     reloadOnChange: true);
+                // Explicit local overrides must win over developer secrets, including
+                // disabling outbound integrations for an isolated preview run.
+                builder.Configuration.AddEnvironmentVariables();
             }
 
             var serviceBusConnection = builder.Configuration.GetConnectionString("AzureServiceBus");
-            var hasServiceBusConnection = !string.IsNullOrWhiteSpace(serviceBusConnection);
+            var disableOutboundCommunications = (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Local")) &&
+                builder.Configuration.GetValue<bool>("TurnKeyOps:DisableOutboundCommunications");
+            var hasServiceBusConnection = !disableOutboundCommunications && !string.IsNullOrWhiteSpace(serviceBusConnection);
 
             // ----- Config & registrations -----
             builder.Services.AddAppConfigurations(builder.Configuration);
@@ -86,9 +91,12 @@ public partial class Program
             builder.Services.AddTurnKeyOpsFeatureServices();
             builder.Services.AddIBeamCommunications(builder.Configuration);
 
-            // 1) Email provider (Azure Communication Services Email)
-            builder.Services.AddIBeamAzureCommunicationsEmail(builder.Configuration);
-            builder.Services.AddIBeamCommunicationsSmsAzure(builder.Configuration);
+            // Local previews can explicitly disable outbound providers. Production
+            // validation above still requires both provider connections.
+            if (!disableOutboundCommunications && !string.IsNullOrWhiteSpace(builder.Configuration["IBeam:Communications:Email:Providers:AzureCommunications:ConnectionString"]))
+                builder.Services.AddIBeamAzureCommunicationsEmail(builder.Configuration);
+            if (!disableOutboundCommunications && !string.IsNullOrWhiteSpace(builder.Configuration["IBeam:Communications:Sms:Providers:AzureCommunications:ConnectionString"]))
+                builder.Services.AddIBeamCommunicationsSmsAzure(builder.Configuration);
 
             // IBeam Identity API: wires auth/JWT + identity services from IBeam:* configuration.
             builder.Services.AddIBeamIdentityApi(builder.Configuration);

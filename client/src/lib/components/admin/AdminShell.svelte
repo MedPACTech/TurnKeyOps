@@ -166,6 +166,7 @@
 							<p class="truncate text-xs text-white/50">{workspaceLabel}</p>
 						</div>
 						<form method="POST" action="/auth/logout">
+							<input type="hidden" name="returnTo" value={activePath} />
 							<button
 								type="submit"
 								class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white"

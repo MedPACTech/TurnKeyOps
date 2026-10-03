@@ -1,5 +1,5 @@
 export const adminModule = (pathname: string): string | null => {
- const match = pathname.match(/^\/(bdr|thinkpink)\/admin(?:\/([^/]+))?/);
+ const match = pathname.match(/^\/(bdr|thinkpink|carlzipf)\/admin(?:\/([^/]+))?/);
  if (!match) return null;
  const slug = match[2] || 'bob';
  return ({contact:'contacts',customers:'contacts',website:'settings',content:'settings'} as Record<string,string>)[slug] || slug;

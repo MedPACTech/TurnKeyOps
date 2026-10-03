@@ -117,6 +117,8 @@ public sealed class InvoiceServiceTests
 
         Assert.Null(await tenantB.Service.GetAsync(created.Id));
         await Assert.ThrowsAsync<ArgumentException>(() => tenantB.Service.RecordPaymentAsync(created.Id, Payment(50m, "cross-tenant")));
+        await Assert.ThrowsAsync<ArgumentException>(() => tenantB.Service.RecordCompletionSignatureAsync(created.Id,
+            new() { SignerPrintedName = "Foreign customer", IntentToSign = true }));
     }
 
     [Fact]
@@ -144,6 +146,66 @@ public sealed class InvoiceServiceTests
         Assert.Equal(100m, first.Single().Total);
         Assert.Equal(2, first.Single().EstimateRevisionNumber);
         fixture.Invoices.Verify(x => x.SaveAsync(It.IsAny<Invoice>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ApprovedLocksmithQuoteCreatesInvoiceAtTheApprovedTotal()
+    {
+        var quoteId = Guid.NewGuid();
+        var fixture = CreateFixture(TenantA, approved:
+        [
+            new QuoteEstimateDto
+            {
+                Id = quoteId, QuoteRequestId = quoteId, RevisionNumber = 1,
+                CustomerName = "Avery", SiteName = "Front entrance", SavedAtUtc = DateTime.UtcNow,
+                ScopeLineItems = ["Front entrance: configured lock", "Labor: 2 hours"],
+                LocksmithPricing = new()
+                {
+                    JobType = "residential", Subtotal = 280m, DiscountAmount = 28m,
+                    TaxPercent = 7.5m, TaxAmount = 18.90m, Total = 270.90m
+                },
+                Delivery = new() { Status = "approved", Email = "avery@example.com", ApprovedAtUtc = DateTime.UtcNow }
+            }
+        ]);
+
+        var invoices = await fixture.Service.SyncApprovedEstimatesAsync();
+
+        var invoice = Assert.Single(invoices);
+        Assert.Equal(252m, invoice.Subtotal);
+        Assert.Equal(0.075m, invoice.TaxRate);
+        Assert.Equal(18.90m, invoice.TaxAmount);
+        Assert.Equal(270.90m, invoice.Total);
+        Assert.Contains("Front entrance: configured lock", invoice.ScopeLineItems);
+        Assert.Single(invoice.LineItems);
+    }
+
+    [Fact]
+    public async Task CompletionSignatureIsSeparateFromPaymentAndCannotBeOverwritten()
+    {
+        var fixture = CreateFixture(TenantA);
+        var created = await fixture.Service.AddAsync(DraftInvoice(taxRate: 0m));
+        await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.RecordCompletionSignatureAsync(created.Id,
+            new() { SignerPrintedName = "Avery Customer", IntentToSign = true }));
+        var sent = await fixture.Service.SendAsync(created.Id, null);
+        await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.RecordCompletionSignatureAsync(created.Id,
+            new() { SignerPrintedName = "Avery Customer", IntentToSign = false }));
+
+        var signed = await fixture.Service.RecordCompletionSignatureAsync(created.Id,
+            new() { SignerPrintedName = "Avery Customer", IntentToSign = true, ExpectedVersion = sent.Version });
+        var repeated = await fixture.Service.RecordCompletionSignatureAsync(created.Id,
+            new() { SignerPrintedName = "Avery Customer", IntentToSign = true, ExpectedVersion = sent.Version });
+
+        Assert.Equal("Avery Customer", signed.CompletionSignature?.SignerPrintedName);
+        Assert.Equal(signed.CompletionSignature?.DocumentHash, repeated.CompletionSignature?.DocumentHash);
+        Assert.Equal(signed.Total, signed.CompletionSignature?.InvoiceTotal);
+        Assert.Equal(0m, signed.AmountPaid);
+        Assert.Contains(signed.AuditEvents, item => item.Type == "work_completion_signed");
+        Assert.Single(signed.AuditEvents, item => item.Type == "work_completion_signed");
+        var partiallyPaid = await fixture.Service.RecordPaymentAsync(created.Id, Payment(20m, "after-completion"));
+        Assert.Equal(signed.CompletionSignature?.DocumentHash, partiallyPaid.CompletionSignature?.DocumentHash);
+        Assert.Equal(20m, partiallyPaid.AmountPaid);
+        await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.RecordCompletionSignatureAsync(created.Id,
+            new() { SignerPrintedName = "Another Person", IntentToSign = true }));
     }
 
     private static InvoiceDto DraftInvoice(decimal taxRate = 0.10m) => new()

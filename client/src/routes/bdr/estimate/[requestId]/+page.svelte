@@ -50,6 +50,9 @@
 	const totalMaterials = $derived(calculatedLocations.reduce((sum, location) => sum + location.materialCost, 0));
 	const totalLabor = $derived(calculatedLocations.reduce((sum, location) => sum + location.laborCost, 0));
 	const estimatedTotal = $derived(calculatedLocations.reduce((sum, location) => sum + location.estimatedTotal, 0));
+	const signature = $derived(form?.approvalSignature ?? data.draft.approvalSignature);
+	const canSign = $derived(Boolean(data.draft.documentHash && data.draft.approvalConsentText && data.draft.approvalConsentVersion));
+	const signedTime = (value: string) => new Date(value).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'long', timeStyle: 'short' });
 	const deliveryStatus = $derived(data.draft.delivery?.status ?? 'sent');
 	const isApproved = $derived(deliveryStatus === 'approved' || form?.approved);
 	const hasRequestedChanges = $derived(deliveryStatus === 'changes-requested' || form?.changesRequested);
@@ -57,6 +60,8 @@
 
 <svelte:head>
 	<title>Estimate Review · BDR Construction</title>
+	<meta name="robots" content="noindex,nofollow" />
+	<meta name="referrer" content="no-referrer" />
 </svelte:head>
 
 <main class="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(255,116,23,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_30%),linear-gradient(180deg,#fffaf4_0%,#f8fafc_58%,#f4f7fb_100%)] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
@@ -90,6 +95,7 @@
 			<section class="rounded-lg bg-emerald-50 p-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)] ring-1 ring-emerald-200">
 				<h2 class="text-xl font-semibold text-emerald-900">Estimate approved</h2>
 				<p class="mt-2 text-sm leading-6 text-emerald-800">Thanks. BDR has this approval and will move the work into invoice and scheduling handoff.</p>
+				{#if signature}<p class="mt-3 text-sm text-emerald-900"><strong>Electronically signed by {signature.signerPrintedName}</strong><br />{signedTime(signature.signedAtUtc)} (Eastern time) · Revision {signature.revisionNumber}</p><p class="mt-2 text-sm text-emerald-800">{signature.consentText}</p>{:else}<p class="mt-2 text-sm text-emerald-800">A typed signature was not recorded for this earlier approval.</p>{/if}
 			</section>
 		{:else if hasRequestedChanges}
 			<section class="rounded-lg bg-amber-50 p-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)] ring-1 ring-amber-200">
@@ -173,12 +179,18 @@
 			<section class="rounded-lg bg-white/90 p-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
 				<h2 class="text-xl font-semibold">Approve or request changes</h2>
 				<p class="mt-2 text-sm leading-6 text-slate-600">Approving tells BDR to move this estimate into invoice and job handoff. If something is off, leave a note and the office will revise it.</p>
-				<div class="mt-5 grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
-					<form method="POST" action="?/approve">
+				<div class="mt-5 grid gap-3 sm:grid-cols-2">
+					<form method="POST" action={`?/approve&token=${encodeURIComponent(data.accessToken)}`}>
 						<input type="hidden" name="accessToken" value={data.accessToken} />
-						<button type="submit" class="w-full rounded-md bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 sm:w-auto">Approve estimate</button>
+						<input type="hidden" name="revisionNumber" value={data.draft.revisionNumber} />
+						<input type="hidden" name="documentHash" value={data.draft.documentHash ?? ''} />
+						<input type="hidden" name="consentVersion" value={data.draft.approvalConsentVersion ?? ''} />
+						<label class="block text-sm font-semibold">Your printed name<input class="mt-2 block w-full rounded border border-slate-300 p-3 font-normal" name="signerPrintedName" autocomplete="name" maxlength="200" required value={form?.signerPrintedName ?? ''} /></label>
+						<label class="my-4 flex items-start gap-3 text-sm"><input class="mt-1" type="checkbox" name="intentToSign" value="yes" required /><span>{data.draft.approvalConsentText || 'Signing details are unavailable. Please reload this estimate.'}</span></label>
+						{#if form?.approvalError}<p role="alert" class="mb-3 text-sm text-red-700">{form.approvalError}</p>{/if}
+						<button disabled={!canSign} type="submit" class="w-full rounded-md bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-50 sm:w-auto">Sign & approve estimate</button>
 					</form>
-					<form method="POST" action="?/requestChanges" class="grid gap-3">
+					<form method="POST" action={`?/requestChanges&token=${encodeURIComponent(data.accessToken)}`} class="grid gap-3">
 						<input type="hidden" name="accessToken" value={data.accessToken} />
 						<textarea name="responseNote" rows="3" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-orange-300" placeholder="What should BDR adjust?"></textarea>
 						<button type="submit" class="rounded-md bg-white px-5 py-3 text-sm font-semibold text-slate-950 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50">Request changes</button>

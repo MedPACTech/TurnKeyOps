@@ -13,11 +13,11 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
     public static string? ModuleFor(string controller) => controller switch {
         "People" or "TenantMembership" or "Invite" or "Roles" or "AdminContactAccess" => "users",
         "Contacts" or "Customers" or "JobSites" => "contacts",
-        "Jobs" => "jobs",
+        "Jobs" or "Locksmith" => "jobs",
         "Calendar" or "Weather" => "calendar",
         "QuoteRequests" or "QuoteRequestAttachments" => "requests",
         "Estimates" or "QuoteEstimates" or "AdminEstimateDefaults" => "estimates",
-        "Invoices" => "invoices",
+        "Invoices" or "LocksmithFieldInvoices" => "invoices",
         "Dashboard" => "dashboard",
         "Bob" or "BobActions" or "Chat" or "AIRealtime" => "bob",
         "AdminTenantSettings" or "TenantProfile" or "TenantOnboardingPolicy" or "ActivityLogs" => "settings",

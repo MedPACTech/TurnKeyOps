@@ -14,6 +14,8 @@ import {
 import { bdrEmployeeContacts } from '$lib/bdr-team';
 import { getExternalAdminTenantForPath } from '$lib/config/external-admin';
 import { bdrTenant, type TenantDefinition } from '$lib/config/tenants';
+import { apiRequest } from '$lib/api/client';
+import type { QuoteRequest } from '$lib/quote-requests';
 import { loadThinkPinkSettings } from '$lib/server/thinkpink-settings';
 import {
 	advanceEstimateConversation,
@@ -208,6 +210,7 @@ const buildInspectionOffer = async (
 	voice: BobVoiceId,
 	tenant: TenantDefinition
 ) => {
+	if (tenant.slug === 'carlzipf') return null;
 	if (!inspectionIntent.test(question)) return null;
 	const { requests } = await loadQuoteRequests(fetch, tenant.id);
 	const conversationText = [...conversation.messages.slice(-6).map((message) => message.content), question]
@@ -303,9 +306,9 @@ export const load = async ({ fetch, url, cookies }) => {
 	const persistence = { fetch, token };
 	const tenant = await tenantForUrl(url, fetch, token);
 	const [briefing, conversations, estimateFollowups] = await Promise.all([
-		buildBobBriefing(fetch, tenant),
+		buildBobBriefing(fetch, tenant, token),
 		ensureBobConversations(tenant.slug, persistence),
-		buildEstimateFollowups(fetch, tenant)
+		buildEstimateFollowups(fetch, tenant, token)
 	]);
 	const storedConversation =
 		conversations.find((conversation) => conversation.id === url.searchParams.get('conversation')) ??
@@ -336,9 +339,11 @@ export const load = async ({ fetch, url, cookies }) => {
 		estimateFollowups,
 		tenant,
 		bobHref: bobHref(tenant),
-		estimatesHref: `${adminBase(tenant)}/estimates`,
+		estimatesHref: `${adminBase(tenant)}/${tenant.slug === 'carlzipf' ? 'requests' : 'estimates'}`,
 		estimateLabels:
-			tenant.slug === 'thinkpink'
+			tenant.slug === 'carlzipf'
+				? { dimensions: 'Opening measurements', depth: 'Handing and hardware' }
+				: tenant.slug === 'thinkpink'
 				? { dimensions: 'Site quantities', depth: 'Terrain, access & disposal' }
 				: { dimensions: 'Measurements', depth: 'Depth' }
 	};
@@ -404,7 +409,7 @@ export const actions = {
 					);
 				}
 			}
-			const briefing = await buildBobBriefing(fetch, tenant);
+			const briefing = await buildBobBriefing(fetch, tenant, token);
 			const analysis = await analyzeWithBob({
 				fetch,
 				token,
@@ -430,7 +435,7 @@ export const actions = {
 			}
 
 			if (conversation.mode === 'estimate-followup') {
-				const followups = await buildEstimateFollowups(fetch, tenant);
+				const followups = await buildEstimateFollowups(fetch, tenant, token);
 				await appendGeneralConversationExchange(
 					conversation.id,
 					question,
@@ -462,7 +467,7 @@ export const actions = {
 
 			if (analysis.intent === 'estimate_followup') {
 				const followupConversation = await createBobConversation('estimate-followup', tenant.slug, persistence);
-				const followups = await buildEstimateFollowups(fetch, tenant);
+				const followups = await buildEstimateFollowups(fetch, tenant, token);
 				await appendBobMessage(followupConversation.id, 'user', question, undefined, undefined, tenant.slug, persistence);
 				await appendBobMessage(
 					followupConversation.id,
@@ -588,7 +593,7 @@ export const actions = {
 		const formData = await request.formData();
 		const recommendationId = formString(formData, 'recommendationId');
 		const conversationId = formString(formData, 'conversationId');
-		const briefing = await buildBobBriefing(fetch, tenant);
+		const briefing = await buildBobBriefing(fetch, tenant, cookies.get(authTokenCookie));
 		const recommendation = briefing.recommendations.find((item) => item.id === recommendationId);
 		if (!recommendation) {
 			return fail(404, {
@@ -631,7 +636,26 @@ export const actions = {
 		}
 
 		if (draft.createdRequestId) {
-			throw redirect(303, `${adminBase(tenant)}/estimates?request=${encodeURIComponent(draft.createdRequestId)}`);
+			throw redirect(303, `${adminBase(tenant)}/${tenant.slug === 'carlzipf' ? 'requests' : 'estimates'}?request=${encodeURIComponent(draft.createdRequestId)}`);
+		}
+		if (tenant.slug === 'carlzipf') {
+			const propertyType = /^residential$/i.test(draft.companyName) ? 'residential' : 'commercial';
+			const created = await apiRequest<QuoteRequest>('/api/quote-requests/field/carlzipf', {
+				method: 'POST', body: JSON.stringify({
+					companyName: propertyType === 'residential' ? '' : draft.companyName,
+					contactName: draft.contactName, email: draft.email, phone: draft.phone,
+					siteName: propertyType === 'residential' ? draft.contactName : draft.companyName, serviceAddress: draft.serviceAddress,
+					serviceType: draft.projectType, propertyType, requestedTimeline: draft.timeline,
+					priority: 'standard', attachments: [],
+					need: `${draft.scope}\n\nOpening measurements: ${draft.dimensions}\n\nHanding and hardware: ${draft.depth}\n\nNotes: ${draft.notes}`
+				})
+			}, fetch, token);
+			await apiRequest(`/api/quote-requests/${encodeURIComponent(created.id)}`, {
+				method: 'PUT', body: JSON.stringify({ ...created, status: 'qualified', assignedTo: 'Office intake',
+					nextAction: 'Verify opening measurements and hardware; prepare the server-priced quote in the field workspace.' })
+			}, fetch, token);
+			await markEstimateConversationCreated(conversation.id, created.id, tenant.slug, persistence);
+			throw redirect(303, `${adminBase(tenant)}/requests?request=${encodeURIComponent(created.id)}`);
 		}
 
 		const estimateRequest = await submitQuoteRequest(fetch, {

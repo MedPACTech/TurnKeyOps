@@ -12,7 +12,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test:session": "node --test --experimental-strip-types tests/session-policy.test.ts tests/domain-routing.test.ts tests/api-session-request.test.ts tests/module-access.test.ts",
 		"test:e2e": "playwright test",
-		"test:e2e:list": "playwright test --list"
+		"test:e2e:list": "playwright test --list",
+		"test:carlzipf": "node --test --experimental-strip-types tests/locksmith*.test.ts tests/carlzipf-admin.test.ts tests/quote-signatures.test.ts"
 	},
 	"devDependencies": {
 		"@axe-core/playwright": "^4.13.0",

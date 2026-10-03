@@ -144,7 +144,7 @@ public sealed class BobController : ApiControllerBase
             new SystemChatMessage($"{SystemPrompt}\n\n{GetVoicePrompt(request.Voice)}"),
             new UserChatMessage(
                 $"""
-                CURRENT BDR OPERATING CONTEXT
+                CURRENT TENANT OPERATING CONTEXT
                 {contextJson}
 
                 OPERATOR QUESTION

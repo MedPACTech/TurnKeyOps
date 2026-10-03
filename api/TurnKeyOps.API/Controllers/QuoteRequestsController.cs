@@ -13,6 +13,10 @@ public sealed class QuoteRequestsController : ApiControllerBase
 
     public QuoteRequestsController(IQuoteRequestService service) => _service = service;
 
+    [HttpPost("field/{tenantSlug}")]
+    public async Task<IActionResult> CreateField(string tenantSlug, [FromBody] CreateQuoteRequestDto dto, CancellationToken ct)
+        => OkResponse(await _service.CreateFieldAsync(tenantSlug, dto, ct));
+
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct) =>
         OkResponse(await _service.ListAsync(ct));

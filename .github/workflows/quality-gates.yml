@@ -125,6 +125,8 @@ jobs:
         name: Run Svelte diagnostics
       - run: npm run test:session
         name: Run authorization policy tests
+      - run: npm run test:carlzipf
+        name: Run Carl Zipf workflow tests
       - run: npm run build
         name: Build production client
 

@@ -5,6 +5,13 @@ import { updateBdrInvoiceState } from '$lib/server/bdr-invoices';
 import { addBdrScheduledJobNote } from '$lib/server/bdr-job-scheduling';
 import { listQuoteEstimates } from '$lib/server/quote-estimates';
 import { bdrTenant, type TenantDefinition } from '$lib/config/tenants';
+import { apiRequest } from '$lib/api/client';
+import type { QuoteRequest } from '$lib/quote-requests';
+
+const tenantRequests = async (fetch: typeof globalThis.fetch, tenant: TenantDefinition, token?: string | null) =>
+	tenant.slug === 'carlzipf'
+		? (await apiRequest<QuoteRequest[]>('/api/quote-requests', {}, fetch, token)).filter((request) => request.tenantId === tenant.id)
+		: (await loadQuoteRequests(fetch, tenant.id)).requests;
 
 export type BobActionKind = 'invoice-reminder' | 'quote-follow-up' | 'job-note' | 'open-record';
 
@@ -57,9 +64,10 @@ const ageInDays = (value: string | null | undefined) => {
 
 export const buildEstimateFollowups = async (
 	fetch: typeof globalThis.fetch,
-	tenant: TenantDefinition = bdrTenant
+	tenant: TenantDefinition = bdrTenant,
+	token?: string | null
 ): Promise<BobEstimateFollowup[]> => {
-	const { requests } = await loadQuoteRequests(fetch, tenant.id);
+	const requests = await tenantRequests(fetch, tenant, token);
 	return requests
 		.filter((request) =>
 			['qualified', 'inspection-scheduled', 'estimate-drafted', 'estimate-sent'].includes(request.status)
@@ -115,10 +123,11 @@ export const buildEstimateFollowups = async (
 
 export const buildBobBriefing = async (
 	fetch: typeof globalThis.fetch,
-	tenant: TenantDefinition = bdrTenant
+	tenant: TenantDefinition = bdrTenant,
+	token?: string | null
 ): Promise<BobBriefing> => {
 	if (tenant.slug !== 'bdr') {
-		const { requests } = await loadQuoteRequests(fetch, tenant.id);
+		const requests = await tenantRequests(fetch, tenant, token);
 		const activeRequests = requests.filter((request) => !['won', 'closed'].includes(request.status));
 		const newRequests = requests.filter((request) => request.status === 'new');
 		const blockedRequests = requests.filter(
@@ -126,12 +135,13 @@ export const buildBobBriefing = async (
 				request.status === 'needs-info' ||
 				Boolean(request.qualification?.missingInfoReasonCodes?.length)
 		);
+		const readyForVisit = tenant.slug === 'carlzipf' ? requests.filter((request) => ['qualified', 'contacted'].includes(request.status) && !request.siteVisitSchedule) : [];
 		const base = tenant.adminPath.replace(/\/bob$/, '');
 		const attention: BobBriefing['attention'] = [];
 		if (newRequests.length) {
 			attention.push({
 				title: `${newRequests.length} new request${newRequests.length === 1 ? '' : 's'} need first response`,
-				detail: 'Confirm the property, clearing scope, access, disposal plan, and assessment timing.',
+				detail: tenant.slug === 'carlzipf' ? 'Confirm the opening, door or lock scope, job type, and assessment timing.' : 'Confirm the property, clearing scope, access, disposal plan, and assessment timing.',
 				href: `${base}/requests`,
 				severity: 'high'
 			});
@@ -139,16 +149,21 @@ export const buildBobBriefing = async (
 		if (blockedRequests.length) {
 			attention.push({
 				title: `${blockedRequests.length} request${blockedRequests.length === 1 ? '' : 's'} are blocked`,
-				detail: 'Acreage, vegetation, access, disposal, or customer details are still missing.',
+				detail: tenant.slug === 'carlzipf' ? 'Opening dimensions, handing, hardware, or customer details are still missing.' : 'Acreage, vegetation, access, disposal, or customer details are still missing.',
 				href: `${base}/requests`,
 				severity: 'medium'
 			});
 		}
+		if (readyForVisit.length) attention.push({
+			title: `${readyForVisit.length} assessment${readyForVisit.length === 1 ? '' : 's'} need scheduling`,
+			detail: 'Choose a technician enabled for the request’s residential or commercial job type.',
+			href: `${base}/calendar`, severity: 'medium'
+		});
 		const recommendations: BobRecommendation[] = newRequests.slice(0, 3).map((request) => ({
 			id: `quote-${request.id}`,
 			kind: 'quote-follow-up',
 			title: `Prepare first response for ${request.contactName || request.customerName}`,
-			reason: request.need || request.message || 'A new land-clearing request is waiting for review.',
+			reason: request.need || request.message || `A new ${tenant.tradeLabel.toLowerCase()} request is waiting for review.`,
 			impact: 'Moves the request toward a property assessment and estimate.',
 			href: `${base}/requests?request=${encodeURIComponent(request.id)}`,
 			targetId: request.id,
@@ -159,7 +174,7 @@ export const buildBobBriefing = async (
 			generatedAtUtc: new Date().toISOString(),
 			headline: attention.length
 				? `${attention.length} operating priorities need a decision`
-				: 'The land-clearing pipeline is clear',
+				: tenant.slug === 'carlzipf' ? 'The door and lock request queue is clear' : 'The land-clearing pipeline is clear',
 			summary: `Bob reviewed ${requests.length} ${tenant.shortName} requests and the active estimate pipeline.`,
 			metrics: [
 				{ label: 'Needs attention', value: String(attention.length), detail: 'Exceptions Bob surfaced', tone: attention.length ? 'warning' : 'positive' },
@@ -178,7 +193,9 @@ export const buildBobBriefing = async (
 					scope: request.need || request.message,
 					timeline: request.requestedTimeline || request.preferredTimeline,
 					nextAction: request.nextAction,
-					missingInfo: request.qualification?.missingInfoReasonCodes ?? []
+					missingInfo: request.qualification?.missingInfoReasonCodes ?? [],
+					jobType: request.propertyType,
+					siteVisitSchedule: request.siteVisitSchedule ?? null
 				})),
 				invoices: [],
 				jobs: [],

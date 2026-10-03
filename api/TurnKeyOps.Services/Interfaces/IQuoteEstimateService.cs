@@ -4,6 +4,8 @@ namespace TurnKeyOps.Services.Interfaces;
 
 public interface IQuoteEstimateService
 {
+    Task<LocksmithQuoteContextDto> GetLocksmithContextAsync(CancellationToken ct = default);
+    Task<QuoteEstimateDto> ApproveLocksmithPricingAsync(Guid quoteRequestId, string? expectedVersion, CancellationToken ct = default);
     Task<IReadOnlyCollection<QuoteEstimateDto>> ListAsync(CancellationToken ct = default);
     Task<QuoteEstimateDto?> GetAsync(Guid quoteRequestId, CancellationToken ct = default);
     Task<QuoteEstimateDto> SaveDraftAsync(Guid quoteRequestId, QuoteEstimateDraftInputDto input, CancellationToken ct = default);
