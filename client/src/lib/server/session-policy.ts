@@ -19,7 +19,11 @@ export const isExternalAdminPath = (pathname: string) =>
 	pathname === '/bdr/admin' ||
 	pathname.startsWith('/bdr/admin/') ||
 	pathname === '/thinkpink/admin' ||
-	pathname.startsWith('/thinkpink/admin/');
+	pathname.startsWith('/thinkpink/admin/') ||
+	pathname === '/carlzipf/admin' ||
+	pathname.startsWith('/carlzipf/admin/');
+export const isTechnicianPath = (pathname: string) =>
+	pathname === '/carlzipf/tech' || pathname.startsWith('/carlzipf/tech/');
 export const isInternalAdminPath = (pathname: string) =>
 	pathname === '/turnkeyops/admin' || pathname.startsWith('/turnkeyops/admin/');
 export const isAdminPath = (pathname: string) => isExternalAdminPath(pathname) || isInternalAdminPath(pathname);
@@ -33,7 +37,7 @@ export const getSafeAdminReturnTo = (value: string | null | undefined) => {
 	try {
 		const parsed = new URL(value, 'https://turnkeyops.invalid');
 		if (parsed.origin !== 'https://turnkeyops.invalid') return '/bdr/admin/bob';
-		const allowed = ['/turnkeyops/admin', '/bdr/admin', '/thinkpink/admin', '/auth/invite'].some(
+		const allowed = ['/turnkeyops/admin', '/bdr/admin', '/thinkpink/admin', '/carlzipf/admin', '/carlzipf/tech', '/auth/invite'].some(
 			(prefix) => parsed.pathname === prefix || parsed.pathname.startsWith(`${prefix}/`)
 		);
 		if (allowed) return `${parsed.pathname}${parsed.search}`;

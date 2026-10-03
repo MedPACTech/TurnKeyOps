@@ -50,7 +50,12 @@ public sealed class RetryingOtpAuthService : IIdentityOtpAuthService
     {
         try
         {
-            return await _inner.StartOtpAsync(destination, tenantId, ct);
+            var challenge = await _inner.StartOtpAsync(destination, tenantId, ct);
+            // An explicitly enabled local bypass must yield a usable local code even
+            // when the development communications provider reports success without delivery.
+            if (_localOtpBypassEnabled)
+                return await ForceLocalBypassChallengeAsync(destination, new InvalidOperationException("Local OTP challenge was not found."), ct);
+            return challenge;
         }
         catch (Exception ex) when (_localOtpBypassEnabled && IsProviderDeliveryFailure(ex))
         {

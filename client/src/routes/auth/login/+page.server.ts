@@ -13,6 +13,7 @@ import {
 	getSafeAdminReturnTo,
 	hasInternalAdminRole,
 	inferOtpChannel,
+	isTechnicianPath,
 	legacyAdminCookieNames,
 	resolveBdrAdminRole,
 	startOtp,
@@ -25,13 +26,19 @@ const getFormString = (formData: FormData, key: string) => String(formData.get(k
 
 const getSurfaceMeta = (returnTo: string) => {
 	const isInviteAcceptance = returnTo.startsWith('/auth/invite/');
+	const isTechnician = isTechnicianPath(returnTo.split('?')[0]);
 	const surface = getAdminSurface(returnTo);
 	return {
 		surface,
 		isInviteAcceptance,
+		isTechnician,
 		label:
 			isInviteAcceptance
 				? 'Invite activation'
+				: isTechnician
+					? 'Carl Zipf Field'
+				: returnTo.startsWith('/carlzipf/admin')
+					? 'Carl Zipf Admin'
 				: surface === 'internal-admin'
 				? 'Internal Admin'
 				: returnTo.startsWith('/thinkpink/admin')
@@ -57,7 +64,7 @@ export const load = async ({ cookies, url, fetch }) => {
 		? getAdminSessionFromToken(token, returnTo)
 		: null;
 
-	if ((surfaceMeta.isInviteAcceptance && tokenIsValid) || (session && (surfaceMeta.surface === 'internal-admin' || session.role))) {
+	if (((surfaceMeta.isInviteAcceptance || surfaceMeta.isTechnician) && tokenIsValid) || (session && (surfaceMeta.surface === 'internal-admin' || session.role))) {
 		throw redirect(303, returnTo);
 	}
 
@@ -133,7 +140,7 @@ export const actions = {
 
 			const roles = extractAuthRoles(authResult, accessToken);
 			const bdrRole = resolveBdrAdminRole(roles);
-			if (!surfaceMeta.isInviteAcceptance && surfaceMeta.surface === 'external-admin' && !bdrRole) {
+			if (!surfaceMeta.isInviteAcceptance && !surfaceMeta.isTechnician && surfaceMeta.surface === 'external-admin' && !bdrRole) {
 				return fail(403, {
 					step: 'verify',
 					message: 'Your account does not have External Admin access.',

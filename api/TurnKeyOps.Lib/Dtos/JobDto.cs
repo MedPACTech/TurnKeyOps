@@ -29,6 +29,8 @@ public class JobDto
     public DateTime? ActualStart { get; set; }
     public DateTime? ActualEnd { get; set; }
     public string? Crew { get; set; }
+    public string? LocksmithJobType { get; set; }
+    public Guid? AssignedTechnicianMembershipId { get; set; }
     public decimal EstimatedTotal { get; set; }
     public decimal InvoicedTotal { get; set; }
     public decimal PaidTotal { get; set; }
@@ -94,6 +96,7 @@ public sealed class JobScheduleInputDto
     public DateTime ScheduledStart { get; set; }
     public DateTime ScheduledEnd { get; set; }
     public string Crew { get; set; } = string.Empty;
+    public Guid? AssignedTechnicianMembershipId { get; set; }
     public string? Note { get; set; }
     public string? ExpectedVersion { get; set; }
 }

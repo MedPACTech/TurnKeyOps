@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using TurnKeyOps.Lib.Dtos;
 using TurnKeyOps.Lib.Entities;
 using TurnKeyOps.Lib.Enums;
@@ -11,6 +14,7 @@ namespace TurnKeyOps.Services;
 public sealed class InvoiceService : IInvoiceService
 {
     private const decimal MoneyTolerance = 0.01m;
+    private const string CompletionConsentText = "I confirm that the work described on this invoice has been completed. I intend my typed name to record my acknowledgement of that work.";
     private static readonly TimeSpan ReminderCooldown = TimeSpan.FromHours(24);
 
     private readonly IInvoiceRepository _repo;
@@ -187,12 +191,27 @@ public sealed class InvoiceService : IInvoiceService
             }
 
             var lines = new List<InvoiceLineItemDto>();
-            if (estimate.Totals.MaterialCost > 0)
-                lines.Add(new() { Description = "Approved estimate materials", Quantity = 1m, UnitPrice = estimate.Totals.MaterialCost });
-            if (estimate.Totals.LaborCost > 0)
-                lines.Add(new() { SortOrder = lines.Count, Description = "Approved estimate labor", Quantity = 1m, UnitPrice = estimate.Totals.LaborCost });
-            if (lines.Count == 0)
-                lines.Add(new() { Description = $"Approved estimate revision {estimate.RevisionNumber}", Quantity = 1m, UnitPrice = estimate.Totals.EstimatedTotal });
+            if (estimate.LocksmithPricing is { } locksmith)
+            {
+                // The approved packet carries the authoritative material/labor/discount/tax
+                // snapshot. Keep its net taxable amount intact in the shared invoice model,
+                // which does not yet support a discount field or negative line items.
+                lines.Add(new()
+                {
+                    Description = $"Approved doors and locksmith quote revision {estimate.RevisionNumber} (after discount)",
+                    Quantity = 1m,
+                    UnitPrice = locksmith.Subtotal - locksmith.DiscountAmount
+                });
+            }
+            else
+            {
+                if (estimate.Totals.MaterialCost > 0)
+                    lines.Add(new() { Description = "Approved estimate materials", Quantity = 1m, UnitPrice = estimate.Totals.MaterialCost });
+                if (estimate.Totals.LaborCost > 0)
+                    lines.Add(new() { SortOrder = lines.Count, Description = "Approved estimate labor", Quantity = 1m, UnitPrice = estimate.Totals.LaborCost });
+                if (lines.Count == 0)
+                    lines.Add(new() { Description = $"Approved estimate revision {estimate.RevisionNumber}", Quantity = 1m, UnitPrice = estimate.Totals.EstimatedTotal });
+            }
 
             var invoice = await AddAsync(new InvoiceDto
             {
@@ -206,10 +225,12 @@ public sealed class InvoiceService : IInvoiceService
                 CustomerPhone = estimate.Delivery?.Phone,
                 ReviewUrl = estimate.Delivery?.ReviewUrl,
                 ScopeLineItems = [.. estimate.ScopeLineItems],
-                TaxRate = 0m,
+                TaxRate = estimate.LocksmithPricing?.TaxPercent / 100m ?? 0m,
                 IssueDate = DateTime.UtcNow,
                 DueDate = DateTime.UtcNow.AddDays(30),
-                Notes = $"Generated from approved estimate revision {estimate.RevisionNumber}.",
+                Notes = estimate.LocksmithPricing is null
+                    ? $"Generated from approved estimate revision {estimate.RevisionNumber}."
+                    : $"Generated from approved doors and locksmith quote revision {estimate.RevisionNumber}; see approved scope for item detail and discount.",
                 LineItems = lines
             });
             results.Add(invoice);
@@ -233,6 +254,53 @@ public sealed class InvoiceService : IInvoiceService
         entity.Status = InvoiceStatus.Sent;
         payload.SentAtUtc = now;
         payload.AuditEvents.Add(Audit("invoice_sent", "Invoice moved to the customer delivery workflow.", Actor(), now));
+        var saved = await PersistAsync(entity, payload, tenantId, ct);
+        return await HydrateAsync(saved, tenantId, ct);
+    }
+
+    public async Task<InvoiceDto> RecordCompletionSignatureAsync(
+        Guid id, InvoiceCompletionSignatureInputDto input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        if (!input.IntentToSign)
+            throw new ArgumentException("The customer must explicitly confirm their intent to sign.", nameof(input.IntentToSign));
+        var name = Clean(input.SignerPrintedName, 200);
+        if (name.Length < 2)
+            throw new ArgumentException("Enter the customer's printed name.", nameof(input.SignerPrintedName));
+
+        var tenantId = _userContext.TenantId;
+        var entity = await GetEntityAsync(tenantId, id, ct)
+            ?? throw new ArgumentException("Invoice not found.", nameof(id));
+        var payload = await _payloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
+        if (payload.CompletionSignature is { } previous)
+        {
+            if (string.Equals(previous.SignerPrintedName, name, StringComparison.OrdinalIgnoreCase))
+                return await HydrateAsync(entity, tenantId, ct);
+            throw new ArgumentException("This invoice already has a completion signature.", nameof(id));
+        }
+        ValidateVersion(entity, input.ExpectedVersion);
+        if (entity.Status is InvoiceStatus.Draft or InvoiceStatus.Void)
+            throw new ArgumentException("Work completion can only be signed on a sent, non-void invoice.", nameof(id));
+
+        var lines = await _lineItemRepo.ListAsync(RepositoryKeyHelper.ToTenantInvoicePartitionKey(tenantId, id), ct);
+        var signedDocument = JsonSerializer.Serialize(new
+        {
+            entity.Id, entity.InvoiceNumber, entity.Total, entity.TaxAmount,
+            Lines = lines.OrderBy(line => line.SortOrder).Select(line => new { line.Description, line.Quantity, line.UnitPrice, line.LineTotal }),
+            Scope = payload.ScopeLineItems
+        });
+        var now = DateTime.UtcNow;
+        payload.CompletionSignature = new InvoiceCompletionSignatureDto
+        {
+            SignerPrintedName = name,
+            ConsentText = CompletionConsentText,
+            SignedAtUtc = now,
+            RecordedByStaff = Actor(),
+            InvoiceNumber = entity.InvoiceNumber,
+            InvoiceTotal = entity.Total,
+            DocumentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signedDocument))).ToLowerInvariant()
+        };
+        payload.AuditEvents.Add(Audit("work_completion_signed", $"Work completion acknowledged by {name}.", Actor(), now));
         var saved = await PersistAsync(entity, payload, tenantId, ct);
         return await HydrateAsync(saved, tenantId, ct);
     }
@@ -381,6 +449,7 @@ public sealed class InvoiceService : IInvoiceService
         dto.Payments = [.. payload.Payments.OrderBy(item => item.OccurredAtUtc)];
         dto.Reminders = [.. payload.Reminders.OrderBy(item => item.SentAtUtc)];
         dto.AuditEvents = [.. payload.AuditEvents.OrderBy(item => item.OccurredAtUtc)];
+        dto.CompletionSignature = payload.CompletionSignature;
         dto.JobRelease = CalculateJobRelease(entity, payload);
         return dto;
     }

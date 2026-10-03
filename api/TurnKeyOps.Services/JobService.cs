@@ -1,4 +1,6 @@
 using TurnKeyOps.Lib.Dtos;
+using System.Globalization;
+using MedInsights.Repositories.Interfaces;
 using TurnKeyOps.Lib.Entities;
 using TurnKeyOps.Lib.Enums;
 using TurnKeyOps.Lib.Utils;
@@ -22,19 +24,28 @@ public sealed class JobService : IJobService
     private readonly IJobWorkflowPayloadStore _jobPayloadStore;
     private readonly IInvoiceService _invoiceService;
     private readonly IUserContext _userContext;
+    private readonly ITenantMembershipRepository _memberships;
+    private readonly ITenantSettingsRepository _settings;
+    private readonly ICalendarEventRepository _calendar;
 
     public JobService(
         IJobRepository repo,
         IEstimateWorkflowPayloadStore estimatePayloadStore,
         IJobWorkflowPayloadStore jobPayloadStore,
         IInvoiceService invoiceService,
-        IUserContext userContext)
+        IUserContext userContext,
+        ITenantMembershipRepository memberships,
+        ITenantSettingsRepository settings,
+        ICalendarEventRepository calendar)
     {
         _repo = repo;
         _estimatePayloadStore = estimatePayloadStore;
         _jobPayloadStore = jobPayloadStore;
         _invoiceService = invoiceService;
         _userContext = userContext;
+        _memberships = memberships;
+        _settings = settings;
+        _calendar = calendar;
     }
 
     private string Partition() => RepositoryKeyHelper.ToTenantPartitionKey(_userContext.TenantId);
@@ -86,8 +97,11 @@ public sealed class JobService : IJobService
         }
 
         ValidateCore(dto);
+        await ValidateLocksmithAssignmentAsync(dto.TradeType, dto.LocksmithJobType, dto.AssignedTechnicianMembershipId, dto.Status, dto.ScheduledStart, ct);
+        if (dto.TradeType == TradeType.DoorsLocksmith && dto.ScheduledStart.HasValue && string.IsNullOrWhiteSpace(dto.Crew))
+            dto.Crew = $"Technician {dto.AssignedTechnicianMembershipId!.Value.ToString("N")[..8]}";
         await EnsureReleaseEligibleAsync(dto.Status, dto.InvoiceId, ct);
-        await EnsureNoScheduleConflictAsync(dto.Id, dto.Crew, dto.ScheduledStart, dto.ScheduledEnd, ct);
+        await EnsureNoScheduleConflictAsync(dto.Id, dto.Crew, dto.AssignedTechnicianMembershipId, dto.ScheduledStart, dto.ScheduledEnd, ct);
 
         var now = DateTime.UtcNow;
         var entity = JobMapper.ToEntity(dto, Partition());
@@ -114,10 +128,13 @@ public sealed class JobService : IJobService
         var existing = await RequireEntityAsync(dto.Id, ct);
         ValidateVersion(existing, dto.Version);
         ValidateCore(dto);
+        await ValidateLocksmithAssignmentAsync(dto.TradeType, dto.LocksmithJobType, dto.AssignedTechnicianMembershipId, dto.Status, dto.ScheduledStart, ct);
+        if (dto.TradeType == TradeType.DoorsLocksmith && dto.ScheduledStart.HasValue && string.IsNullOrWhiteSpace(dto.Crew))
+            dto.Crew = $"Technician {dto.AssignedTechnicianMembershipId!.Value.ToString("N")[..8]}";
         if (existing.Status != dto.Status) ValidateTransition(existing.Status, dto.Status);
         if (!IsReleased(existing.Status) && IsReleased(dto.Status))
             await EnsureReleaseEligibleAsync(dto.Status, dto.InvoiceId, ct);
-        await EnsureNoScheduleConflictAsync(dto.Id, dto.Crew, dto.ScheduledStart, dto.ScheduledEnd, ct);
+        await EnsureNoScheduleConflictAsync(dto.Id, dto.Crew, dto.AssignedTechnicianMembershipId, dto.ScheduledStart, dto.ScheduledEnd, ct);
 
         var payload = await _jobPayloadStore.LoadAsync(existing.WorkflowPayloadBlobName, ct);
         var entity = JobMapper.ToEntity(dto, existing.PartitionKey);
@@ -140,15 +157,22 @@ public sealed class JobService : IJobService
         var start = Utc(input.ScheduledStart);
         var end = Utc(input.ScheduledEnd);
         var crew = Clean(input.Crew, 160);
+        var assignedTechnician = input.AssignedTechnicianMembershipId ?? entity.AssignedTechnicianMembershipId;
         if (start == default || end <= start) throw new ArgumentException("The schedule end must be after the start.");
-        if (string.IsNullOrWhiteSpace(crew)) throw new ArgumentException("A crew is required.", nameof(input.Crew));
+        if (entity.TradeType == TradeType.DoorsLocksmith)
+        {
+            await ValidateLocksmithAssignmentAsync(entity.TradeType, entity.LocksmithJobType, assignedTechnician, JobStatus.Scheduled, start, ct);
+            if (string.IsNullOrWhiteSpace(crew)) crew = entity.Crew ?? $"Technician {assignedTechnician!.Value.ToString("N")[..8]}";
+        }
+        else if (string.IsNullOrWhiteSpace(crew)) throw new ArgumentException("A crew is required.", nameof(input.Crew));
 
         var unchanged = entity.ScheduledStart == start && entity.ScheduledEnd == end &&
-            string.Equals(entity.Crew, crew, StringComparison.OrdinalIgnoreCase);
+            string.Equals(entity.Crew, crew, StringComparison.OrdinalIgnoreCase) &&
+            entity.AssignedTechnicianMembershipId == assignedTechnician;
         if (unchanged) return await HydrateAsync(entity, ct);
 
         await EnsureReleaseEligibleAsync(JobStatus.Scheduled, entity.InvoiceId, ct);
-        await EnsureNoScheduleConflictAsync(id, crew, start, end, ct);
+        await EnsureNoScheduleConflictAsync(id, crew, assignedTechnician, start, end, ct);
         if (entity.Status is JobStatus.Created or JobStatus.Lead or JobStatus.Estimated or JobStatus.Invoiced or JobStatus.Paid or JobStatus.OnHold)
             entity.Status = JobStatus.Scheduled;
         else if (entity.Status is JobStatus.Completed or JobStatus.Cancelled or JobStatus.Closed)
@@ -159,6 +183,7 @@ public sealed class JobService : IJobService
         entity.ScheduledStart = start;
         entity.ScheduledEnd = end;
         entity.Crew = crew;
+        entity.AssignedTechnicianMembershipId = assignedTechnician;
         payload.Planning.TargetDate = DateOnly.FromDateTime(start);
         payload.Planning.UpdatedAtUtc = now;
         payload.Planning.UpdatedBy = Actor();
@@ -177,7 +202,10 @@ public sealed class JobService : IJobService
         if (!IsReleased(entity.Status) && IsReleased(input.Status))
             await EnsureReleaseEligibleAsync(input.Status, entity.InvoiceId, ct);
         if (input.Status == JobStatus.Scheduled)
-            await EnsureNoScheduleConflictAsync(id, entity.Crew, entity.ScheduledStart, entity.ScheduledEnd, ct);
+        {
+            await ValidateLocksmithAssignmentAsync(entity.TradeType, entity.LocksmithJobType, entity.AssignedTechnicianMembershipId, JobStatus.Scheduled, entity.ScheduledStart, ct);
+            await EnsureNoScheduleConflictAsync(id, entity.Crew, entity.AssignedTechnicianMembershipId, entity.ScheduledStart, entity.ScheduledEnd, ct);
+        }
 
         var payload = await _jobPayloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
         var prior = entity.Status;
@@ -238,17 +266,60 @@ public sealed class JobService : IJobService
         if (!release.IsEligible) throw new ArgumentException(release.Reason, nameof(invoiceId));
     }
 
-    private async Task EnsureNoScheduleConflictAsync(Guid jobId, string? crew, DateTime? start, DateTime? end, CancellationToken ct)
+    private async Task ValidateLocksmithAssignmentAsync(TradeType trade, string? jobType, Guid? membershipId, JobStatus status, DateTime? scheduledStart, CancellationToken ct)
     {
-        if (start is null || end is null || string.IsNullOrWhiteSpace(crew)) return;
+        var settings = await _settings.GetAsync(Partition(), "SETTINGS|OPERATIONAL", ct);
+        var isLocksmithTenant = settings is not null && !settings.IsDeleted && LocksmithPolicy.IsConfigured(settings.ValuesJson);
+        if (trade != TradeType.DoorsLocksmith)
+        {
+            if (isLocksmithTenant)
+                throw new ArgumentException("A doors and locksmith job requires the doors and locksmith trade.", nameof(trade));
+            if (!string.IsNullOrWhiteSpace(jobType) || membershipId.HasValue)
+                throw new ArgumentException("Locksmith job type and technician assignment require the doors and locksmith trade.");
+            return;
+        }
+
+        if (jobType is not ("residential" or "commercial"))
+            throw new ArgumentException("A residential or commercial locksmith job type is required.", nameof(jobType));
+        if (!membershipId.HasValue || membershipId.Value == Guid.Empty)
+        {
+            if (scheduledStart.HasValue || status is JobStatus.Scheduled or JobStatus.InProgress)
+                throw new ArgumentException("Assign an eligible technician before scheduling a locksmith job.", nameof(membershipId));
+            return;
+        }
+
+        var member = (await _memberships.GetActiveAssignedByTenantAsync(_userContext.TenantId, ct))
+            .FirstOrDefault(item => item.Id == membershipId.Value && item.TenantId == _userContext.TenantId &&
+                !item.IsDeleted && !item.DateRemoved.HasValue &&
+                !string.Equals(item.Role, "contact", StringComparison.OrdinalIgnoreCase));
+        if (member is null)
+            throw new ArgumentException("The selected technician is not an active assigned member of this tenant.", nameof(membershipId));
+
+        if (settings is null || settings.IsDeleted || !LocksmithPolicy.CapabilitiesFor(settings.ValuesJson, member.Id).Contains(jobType))
+            throw new ArgumentException("The selected technician is not eligible for this job type.", nameof(membershipId));
+    }
+
+    private async Task EnsureNoScheduleConflictAsync(Guid jobId, string? crew, Guid? membershipId, DateTime? start, DateTime? end, CancellationToken ct)
+    {
+        if (start is null || end is null || (membershipId is null && string.IsNullOrWhiteSpace(crew))) return;
         var normalizedStart = Utc(start.Value);
         var normalizedEnd = Utc(end.Value);
         var conflict = (await _repo.ListAsync(Partition(), ct)).Any(item =>
             item.Id != jobId &&
             item.Status is JobStatus.Scheduled or JobStatus.InProgress &&
-            string.Equals(item.Crew, crew.Trim(), StringComparison.OrdinalIgnoreCase) &&
+            (membershipId.HasValue
+                ? item.AssignedTechnicianMembershipId == membershipId
+                : string.Equals(item.Crew, crew!.Trim(), StringComparison.OrdinalIgnoreCase)) &&
             item.ScheduledStart < normalizedEnd && item.ScheduledEnd > normalizedStart);
         if (conflict) throw new ArgumentException("The selected crew already has an overlapping assignment.", nameof(crew));
+        if (membershipId.HasValue)
+        {
+            var calendarConflict = (await _calendar.ListAsync(Partition(), ct)).Any(item =>
+                item.AssignedTechnicianMembershipId == membershipId &&
+                item.StartUtc < normalizedEnd && item.EndUtc > normalizedStart);
+            if (calendarConflict)
+                throw new ArgumentException("The selected technician already has an overlapping calendar assignment.", nameof(membershipId));
+        }
     }
 
     private async Task<Job?> GetEntityAsync(Guid id, CancellationToken ct)
@@ -268,7 +339,7 @@ public sealed class JobService : IJobService
         var payload = await _jobPayloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
         dto.Planning = payload.Planning;
         dto.Activity = [.. payload.Activity.OrderByDescending(item => item.OccurredAtUtc)];
-        dto.Version = entity.ETag.ToString();
+        dto.Version = VersionOf(entity);
         return dto;
     }
 
@@ -350,7 +421,8 @@ public sealed class JobService : IJobService
             dto.ScheduledStart = Utc(dto.ScheduledStart.Value);
             dto.ScheduledEnd = Utc(dto.ScheduledEnd!.Value);
             if (dto.ScheduledEnd <= dto.ScheduledStart) throw new ArgumentException("The schedule end must be after the start.");
-            if (string.IsNullOrWhiteSpace(dto.Crew)) throw new ArgumentException("A scheduled job requires a crew.", nameof(dto.Crew));
+            if (string.IsNullOrWhiteSpace(dto.Crew) && dto.TradeType != TradeType.DoorsLocksmith)
+                throw new ArgumentException("A scheduled job requires a crew.", nameof(dto.Crew));
         }
     }
 
@@ -358,8 +430,16 @@ public sealed class JobService : IJobService
     {
         if (string.IsNullOrWhiteSpace(expected))
             throw new ArgumentException("The current job version is required. Refresh before retrying.", nameof(expected));
-        if (!string.Equals(entity.ETag.ToString(), expected.Trim(), StringComparison.Ordinal))
+        if (!string.Equals(VersionOf(entity), expected.Trim(), StringComparison.Ordinal))
             throw new ArgumentException("The job changed after it was loaded. Refresh before retrying.", nameof(expected));
+    }
+
+    private static string VersionOf(Job entity)
+    {
+        var etag = entity.ETag.ToString();
+        return !string.IsNullOrWhiteSpace(etag)
+            ? etag
+            : entity.DateUpdated.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture);
     }
 
     private static void ValidateTransition(JobStatus from, JobStatus to)

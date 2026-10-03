@@ -1,4 +1,7 @@
+using MedInsights.Repositories.Interfaces;
+using Microsoft.Extensions.Options;
 using System.Net.Mail;
+using TurnKeyOps.Lib.Configurations;
 using TurnKeyOps.Lib.Dtos;
 using TurnKeyOps.Lib.Utils;
 using TurnKeyOps.Repositories.Interfaces;
@@ -30,28 +33,62 @@ public sealed class QuoteRequestService : IQuoteRequestService
     private readonly IQuoteRequestRepository _repository;
     private readonly IUserContext _userContext;
     private readonly IQuoteRequestTenantResolver _tenantResolver;
+    private readonly ITenantSettingsRepository? _settings;
+    private readonly ITenantMembershipRepository? _memberships;
+    private readonly IJobRepository? _jobs;
+    private readonly IOptions<QuoteRequestTenantOptions>? _tenantOptions;
 
     public QuoteRequestService(
         IQuoteRequestRepository repository,
         IUserContext userContext,
-        IQuoteRequestTenantResolver tenantResolver)
+        IQuoteRequestTenantResolver tenantResolver,
+        ITenantSettingsRepository? settings = null,
+        ITenantMembershipRepository? memberships = null,
+        IJobRepository? jobs = null,
+        IOptions<QuoteRequestTenantOptions>? tenantOptions = null)
     {
         _repository = repository;
         _userContext = userContext;
         _tenantResolver = tenantResolver;
+        _settings = settings;
+        _memberships = memberships;
+        _jobs = jobs;
+        _tenantOptions = tenantOptions;
+    }
+
+    private async Task<bool> CanAccessAsync(Guid id, string propertyType, CancellationToken ct)
+    {
+        var tenantId = _userContext.TenantId;
+        var settings = _settings is null ? null : await _settings.GetAsync(PartitionKey(tenantId), "SETTINGS|OPERATIONAL", ct);
+        var configuredCarlZipf = _tenantOptions?.Value.Tenants.TryGetValue("carlzipf", out var tenant) == true && tenant.TenantId == tenantId;
+        if (!configuredCarlZipf && (settings is null || settings.IsDeleted || !LocksmithPolicy.IsConfigured(settings.ValuesJson))) return true;
+        if (!_userContext.IsAuthenticated || _memberships is null) return false;
+        var member = await _memberships.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(tenantId), _userContext.UserId, ct);
+        if (member is null || member.TenantId != tenantId || member.UserId != _userContext.UserId || member.IsDeleted || member.DateRemoved.HasValue ||
+            !string.Equals(member.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase)) return false;
+        if (member.IsOwner || TenantRoleCatalog.CanManageRoles(member.Role.Trim().ToLowerInvariant())) return true;
+        if (string.Equals(member.Role, "contact", StringComparison.OrdinalIgnoreCase) || settings is null || settings.IsDeleted || _jobs is null ||
+            !LocksmithPolicy.CapabilitiesFor(settings.ValuesJson, member.Id).Contains(propertyType.ToLowerInvariant())) return false;
+        var linkedJobs = (await _jobs.ListAsync(PartitionKey(tenantId), ct)).Where(job => !job.IsDeleted && job.QuoteRequestId == id);
+        return linkedJobs.All(job => job.PartitionKey == PartitionKey(tenantId) &&
+            (string.IsNullOrWhiteSpace(job.LocksmithJobType) || string.Equals(job.LocksmithJobType, propertyType, StringComparison.OrdinalIgnoreCase)) &&
+            (!job.AssignedTechnicianMembershipId.HasValue || job.AssignedTechnicianMembershipId.Value == member.Id));
     }
 
     public async Task<IReadOnlyCollection<QuoteRequestDto>> ListAsync(CancellationToken ct = default)
     {
         var entities = await _repository.ListAsync(PartitionKey(_userContext.TenantId), ct);
-        return entities.Select(QuoteRequestMapper.ToDto).ToArray();
+        var visible = new List<QuoteRequestDto>();
+        foreach (var entity in entities)
+            if (!entity.IsDeleted && await CanAccessAsync(entity.Id, entity.PropertyType, ct)) visible.Add(QuoteRequestMapper.ToDto(entity));
+        return visible;
     }
 
     public async Task<QuoteRequestDto?> GetAsync(Guid id, CancellationToken ct = default)
     {
         if (id == Guid.Empty) throw new ArgumentException("A quote request id is required.", nameof(id));
         var entity = await _repository.GetAsync(PartitionKey(_userContext.TenantId), RowKey(id), ct);
-        return entity is null || entity.IsDeleted ? null : QuoteRequestMapper.ToDto(entity);
+        return entity is null || entity.IsDeleted || !await CanAccessAsync(id, entity.PropertyType, ct) ? null : QuoteRequestMapper.ToDto(entity);
     }
 
     public async Task<QuoteRequestDto> CreatePublicAsync(
@@ -60,6 +97,21 @@ public sealed class QuoteRequestService : IQuoteRequestService
         CancellationToken ct = default)
     {
         var tenant = _tenantResolver.Resolve(tenantSlug);
+        return await CreateForTenantAsync(tenant, dto, false, ct);
+    }
+
+    public async Task<QuoteRequestDto> CreateFieldAsync(string tenantSlug, CreateQuoteRequestDto dto, CancellationToken ct = default)
+    {
+        var tenant = _tenantResolver.Resolve(tenantSlug);
+        if (tenant.TenantId != _userContext.TenantId) throw new UnauthorizedAccessException("The source request must belong to the current tenant.");
+        await LocksmithQuotePricing.RequireContextAsync(_settings, _memberships, _userContext, dto.PropertyType, ct, allowOfficeAdmin: true);
+        if (dto.PropertyType is not ("residential" or "commercial")) throw new ArgumentException("A residential or commercial job type is required.");
+        if (string.IsNullOrWhiteSpace(dto.CompanyName)) dto.CompanyName = dto.ContactName;
+        return await CreateForTenantAsync(tenant, dto, true, ct);
+    }
+
+    private async Task<QuoteRequestDto> CreateForTenantAsync(TurnKeyOps.Lib.Configurations.QuoteRequestTenantDefinition tenant, CreateQuoteRequestDto dto, bool fieldReviewed, CancellationToken ct)
+    {
         ValidateCreate(dto);
 
         var id = dto.Id.GetValueOrDefault();
@@ -110,8 +162,8 @@ public sealed class QuoteRequestService : IQuoteRequestService
             Need = submittedPayload.Need,
             Message = submittedPayload.Need,
             Attachments = attachments,
-            Source = "public-site",
-            Status = "new",
+            Source = fieldReviewed ? "office" : "public-site",
+            Status = fieldReviewed ? "qualified" : "new",
             AssignedTo = Clean(tenant.DefaultAssignedTo),
             NextAction = Clean(tenant.DefaultNextAction),
             IntakeSummary = BuildIntakeSummary(submittedPayload),
@@ -119,7 +171,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
             SubmittedPayload = submittedPayload,
             Timeline =
             [
-                NewEvent(now, "submitted", "Customer", "Quote request submitted", payload: submittedPayload)
+                NewEvent(now, "submitted", fieldReviewed ? Actor() : "Customer", fieldReviewed ? "Field request captured and reviewed by technician" : "Quote request submitted", payload: submittedPayload)
             ],
             UpdatedAtUtc = now
         };
@@ -142,6 +194,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
 
         var entity = await _repository.GetAsync(PartitionKey(tenantId), RowKey(id), ct);
         if (entity is null || entity.IsDeleted) return null;
+        if (!await CanAccessAsync(id, entity.PropertyType, ct)) throw new ForbiddenAccessException("This request is outside your job types or assigned work.");
 
         var current = QuoteRequestMapper.ToDto(entity);
         ValidateUpdate(current, dto);

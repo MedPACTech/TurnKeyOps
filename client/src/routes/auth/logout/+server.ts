@@ -4,12 +4,18 @@ import {
 	authTokenCookie,
 	extractAccessToken,
 	getAuthApiBaseUrl,
+	getSafeAdminReturnTo,
 	getTokenSessionId,
 	legacyAdminCookieNames,
 	refreshAuthSession
 } from '$lib/server/auth-session';
 
-export const POST = async ({ cookies, fetch, url }) => {
+export const POST = async ({ cookies, fetch, url, request }) => {
+	const formData = await request.formData();
+	const requestedReturnTo = formData.get('returnTo');
+	const returnTo = getSafeAdminReturnTo(
+		typeof requestedReturnTo === 'string' ? requestedReturnTo : null
+	);
 	const accessToken = cookies.get(authTokenCookie);
 	const refreshToken = cookies.get(authRefreshTokenCookie);
 
@@ -51,5 +57,8 @@ export const POST = async ({ cookies, fetch, url }) => {
 		cookies.delete(cookieName, { ...options, path: '/turnkeyops/admin' });
 	}
 
-	return new Response(null, { status: 303, headers: { Location: '/auth/login' } });
+	return new Response(null, {
+		status: 303,
+		headers: { Location: `/auth/login?returnTo=${encodeURIComponent(returnTo)}` }
+	});
 };

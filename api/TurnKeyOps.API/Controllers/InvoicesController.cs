@@ -6,6 +6,7 @@ using TurnKeyOps.Services.Interfaces;
 namespace TurnKeyOps.API.Controllers;
 
 [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
+[TypeFilter(typeof(LocksmithInvoiceAdminFilter))]
 public class InvoicesController : ApiControllerBase
 {
     private readonly IInvoiceService _service;
@@ -44,6 +45,13 @@ public class InvoicesController : ApiControllerBase
     public async Task<IActionResult> Send(Guid id, [FromBody] InvoiceMutationInputDto input, CancellationToken ct)
     {
         var result = await _service.SendAsync(id, input.ExpectedVersion, ct);
+        return OkResponse(result);
+    }
+
+    [HttpPost("{id:guid}/completion-signature")]
+    public async Task<IActionResult> RecordCompletionSignature(Guid id, [FromBody] InvoiceCompletionSignatureInputDto input, CancellationToken ct)
+    {
+        var result = await _service.RecordCompletionSignatureAsync(id, input, ct);
         return OkResponse(result);
     }
 

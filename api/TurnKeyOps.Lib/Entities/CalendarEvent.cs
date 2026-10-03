@@ -27,6 +27,8 @@ public class CalendarEvent : IEntity, ITableEntity
     public string? JobName { get; set; }
     public Guid? JobSiteId { get; set; }
     public string? JobSiteName { get; set; }
+    public string? LocksmithJobType { get; set; }
+    public Guid? AssignedTechnicianMembershipId { get; set; }
 
     /// <summary>Hex color for calendar display.</summary>
     public string? Color { get; set; }

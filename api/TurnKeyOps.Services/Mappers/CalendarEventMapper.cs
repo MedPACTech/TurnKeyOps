@@ -22,6 +22,8 @@ public static class CalendarEventMapper
             JobName = entity.JobName,
             JobSiteId = entity.JobSiteId,
             JobSiteName = entity.JobSiteName,
+            LocksmithJobType = entity.LocksmithJobType,
+            AssignedTechnicianMembershipId = entity.AssignedTechnicianMembershipId,
             Color = entity.Color,
             Weather = entity.WeatherSummary != null ? new WeatherForecastDto
             {
@@ -53,6 +55,8 @@ public static class CalendarEventMapper
             JobName = dto.JobName,
             JobSiteId = dto.JobSiteId,
             JobSiteName = dto.JobSiteName,
+            LocksmithJobType = dto.LocksmithJobType,
+            AssignedTechnicianMembershipId = dto.AssignedTechnicianMembershipId,
             Color = dto.Color,
             DateCreated = dto.DateCreated ?? DateTime.UtcNow,
             DateUpdated = DateTime.UtcNow,

@@ -1,5 +1,5 @@
-export type TradeProfileId = 'concrete-construction' | 'land-clearing';
-export type TenantSlug = 'bdr' | 'thinkpink';
+export type TradeProfileId = 'concrete-construction' | 'land-clearing' | 'doors-locksmith';
+export type TenantSlug = 'bdr' | 'thinkpink' | 'carlzipf';
 
 export type TenantDefinition = {
 	id: string;
@@ -50,6 +50,22 @@ export const tenants: TenantDefinition[] = [
 		estimateInputs: ['Acreage', 'Vegetation density', 'Tree count and diameter', 'Terrain', 'Access', 'Disposal method', 'Restoration'],
 		jobStages: ['Intake', 'Property assessment', 'Estimate', 'Mobilization', 'Clearing', 'Disposal', 'Restoration', 'Closeout'],
 		bobContext: 'Land clearing, tree and stump removal, forestry mulching, equipment access, hauling, disposal, grading, and restoration.'
+	},
+	{
+		id: '88888888-8888-4888-8888-888888888883',
+		slug: 'carlzipf',
+		name: 'Carl Zipf Lock Shop',
+		shortName: 'Carl Zipf',
+		tradeProfile: 'doors-locksmith',
+		tradeLabel: 'Doors and locksmith services',
+		status: 'configuration',
+		publicPath: '/carlzipf/public',
+		adminPath: '/carlzipf/admin/bob',
+		accent: '#213a32',
+		services: ['Door and frame replacement', 'Lock and hardware installation', 'Repairs', 'Rekeying'],
+		estimateInputs: ['Job type', 'Named openings', 'Door and frame dimensions', 'Handing and swing', 'Hardware preparation', 'Hardware sets', 'Labor'],
+		jobStages: ['Intake', 'Assessment', 'Quote', 'Approval', 'Scheduling', 'Installation', 'Acceptance'],
+		bobContext: 'Residential and commercial door and lock work, verified opening measurements, hardware compatibility, customer pricing policies, and shared scheduling. Residential and Commercial are job types and staff capabilities, not divisions.'
 	}
 ];
 
@@ -57,3 +73,4 @@ export const getTenant = (slug: string) => tenants.find((tenant) => tenant.slug 
 export const getTenantById = (id: string) => tenants.find((tenant) => tenant.id === id);
 export const bdrTenant = tenants[0];
 export const thinkPinkTenant = tenants[1];
+export const carlZipfTenant = tenants[2];

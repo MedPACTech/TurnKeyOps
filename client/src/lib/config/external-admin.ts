@@ -48,15 +48,17 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 
 const tenantModules: Record<TenantSlug, ExternalAdminModule[]> = {
 	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'users', 'settings'],
-	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'users', 'settings']
+	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'users', 'settings'],
+	carlzipf: ['bob', 'calendar', 'requests', 'estimates', 'invoices', 'customers', 'settings', 'users']
 };
 
 const themes: Record<TenantSlug, ExternalAdminTheme> = {
 	bdr: { accent: '#f97316', accentHover: '#ea580c', accentSoft: '#fff7ed', accentBorder: '#fed7aa', accentText: '#c2410c' },
-	thinkpink: { accent: '#d40f80', accentHover: '#a50c64', accentSoft: '#fff0f7', accentBorder: '#f5b6d5', accentText: '#a50c64' }
+	thinkpink: { accent: '#d40f80', accentHover: '#a50c64', accentSoft: '#fff0f7', accentBorder: '#f5b6d5', accentText: '#a50c64' },
+	carlzipf: { accent: '#213a32', accentHover: '#365448', accentSoft: '#eef2e9', accentBorder: '#d4dbcf', accentText: '#213a32' }
 };
 
-const adminBase = (tenant: TenantDefinition) => tenant.adminPath.replace(/\/bob$/, '');
+const adminBase = (tenant: TenantDefinition) => `/${tenant.slug}/admin`;
 
 const moduleHref = (tenant: TenantDefinition, module: ExternalAdminModule) => {
 	if (tenant.slug === 'bdr' && module === 'customers') return `${adminBase(tenant)}/contact`;
@@ -93,7 +95,7 @@ export const getExternalAdminActiveNav = (config: ExternalAdminConfig, pathname:
 	config.navigation[0];
 
 export const getExternalAdminTenantForPath = (pathname: string) =>
-	(['bdr', 'thinkpink'] as TenantSlug[])
+	(['bdr', 'thinkpink', 'carlzipf'] as TenantSlug[])
 		.map((slug) => getExternalAdminConfig(slug).tenant)
 		.find((tenant) => {
 			const base = adminBase(tenant);

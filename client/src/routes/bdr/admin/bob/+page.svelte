@@ -67,8 +67,8 @@
 	const generalPrompts = $derived([
 		'Review today’s priorities',
 		'Show estimates needing follow-up',
-		'Start a new estimate',
-		...(data.tenant.slug === 'bdr' ? ['Review unpaid invoices'] : ['Review new land-clearing requests'])
+		data.tenant.slug === 'carlzipf' ? 'Start a door and lock scope request' : 'Start a new estimate',
+		...(data.tenant.slug === 'bdr' ? ['Review unpaid invoices'] : data.tenant.slug === 'carlzipf' ? ['Review new door and lock requests', 'Show visits needing a technician'] : ['Review new land-clearing requests'])
 	]);
 
 	const formatConversationTime = (value: string) =>
@@ -608,7 +608,7 @@
 						class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-solid-hover)] disabled:cursor-not-allowed disabled:bg-slate-300"
 					>
 						<FilePlus2 class="h-4 w-4" aria-hidden="true" />
-						Create internal estimate
+						{data.tenant.slug === 'carlzipf' ? 'Create scope request for field pricing' : 'Create internal estimate'}
 					</button>
 				</form>
 			{/if}

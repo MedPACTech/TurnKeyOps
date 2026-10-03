@@ -45,6 +45,8 @@ public class Job : IEntity, ITableEntity
     public DateTime? ActualStart { get; set; }
     public DateTime? ActualEnd { get; set; }
     public string? Crew { get; set; }
+    public string? LocksmithJobType { get; set; }
+    public Guid? AssignedTechnicianMembershipId { get; set; }
 
     // --- Financials ---
     public decimal EstimatedTotal { get; set; }

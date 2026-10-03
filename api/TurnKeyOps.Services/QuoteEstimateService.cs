@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Options;
+using TurnKeyOps.Lib.Configurations;
 using System.Globalization;
+using MedInsights.Repositories.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -22,6 +25,10 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
     private readonly IEstimateDefaultsService _defaults;
     private readonly IQuoteRequestTenantResolver _tenantResolver;
     private readonly IUserContext _userContext;
+    private readonly ITenantSettingsRepository? _settings;
+    private readonly ITenantMembershipRepository? _memberships;
+    private readonly IJobRepository? _jobs;
+    private readonly IOptions<QuoteRequestTenantOptions>? _tenantOptions;
 
     public QuoteEstimateService(
         IQuoteEstimateRepository repository,
@@ -29,7 +36,11 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         IAzureBlobStorageService blobStorage,
         IEstimateDefaultsService defaults,
         IQuoteRequestTenantResolver tenantResolver,
-        IUserContext userContext)
+        IUserContext userContext,
+        ITenantSettingsRepository? settings = null,
+        ITenantMembershipRepository? memberships = null,
+        IJobRepository? jobs = null,
+        IOptions<QuoteRequestTenantOptions>? tenantOptions = null)
     {
         _repository = repository;
         _quoteRequests = quoteRequests;
@@ -37,19 +48,77 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         _defaults = defaults;
         _tenantResolver = tenantResolver;
         _userContext = userContext;
+        _settings = settings;
+        _memberships = memberships;
+        _jobs = jobs;
+        _tenantOptions = tenantOptions;
+    }
+
+    private async Task<bool> CanAccessQuoteAsync(Guid quoteRequestId, CancellationToken ct)
+    {
+        var operational = _settings is null ? null : await _settings.GetAsync(Partition(_userContext.TenantId), "SETTINGS|OPERATIONAL", ct);
+        var configuredCarlZipf = _tenantOptions?.Value.Tenants.TryGetValue("carlzipf", out var tenant) == true && tenant.TenantId == _userContext.TenantId;
+        var locksmith = configuredCarlZipf || (operational is not null && !operational.IsDeleted && LocksmithPolicy.IsConfigured(operational.ValuesJson));
+        if (!locksmith) return true;
+        if (!_userContext.IsAuthenticated || _memberships is null) return false;
+        var member = await _memberships.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(_userContext.TenantId), _userContext.UserId, ct);
+        if (member is null || member.TenantId != _userContext.TenantId || member.UserId != _userContext.UserId || member.IsDeleted || member.DateRemoved.HasValue ||
+            !string.Equals(member.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase)) return false;
+        if (member.IsOwner || TenantRoleCatalog.CanManageRoles(member.Role.Trim().ToLowerInvariant())) return true;
+        if (string.Equals(member.Role, "contact", StringComparison.OrdinalIgnoreCase) || operational is null || operational.IsDeleted || _jobs is null) return false;
+        var quote = await GetQuoteAsync(_userContext.TenantId, quoteRequestId, ct);
+        if (quote is null || quote.TenantId != _userContext.TenantId || !LocksmithPolicy.CapabilitiesFor(operational.ValuesJson, member.Id).Contains(quote.PropertyType.ToLowerInvariant())) return false;
+        var linkedJobs = (await _jobs.ListAsync(Partition(_userContext.TenantId), ct)).Where(job => !job.IsDeleted && job.QuoteRequestId == quoteRequestId);
+        return linkedJobs.All(job => job.PartitionKey == Partition(_userContext.TenantId) &&
+            (string.IsNullOrWhiteSpace(job.LocksmithJobType) || string.Equals(job.LocksmithJobType, quote.PropertyType, StringComparison.OrdinalIgnoreCase)) &&
+            (!job.AssignedTechnicianMembershipId.HasValue || job.AssignedTechnicianMembershipId.Value == member.Id));
+    }
+
+    private async Task RequireQuoteAccessAsync(Guid quoteRequestId, CancellationToken ct)
+    {
+        if (!await CanAccessQuoteAsync(quoteRequestId, ct)) throw new ForbiddenAccessException("This quote is outside your job types or assigned work.");
+    }
+
+    public async Task<LocksmithQuoteContextDto> GetLocksmithContextAsync(CancellationToken ct = default)
+    {
+        var context = await LocksmithQuotePricing.RequireContextAsync(_settings, _memberships, _userContext, null, ct, allowOfficeAdmin: true);
+        return LocksmithQuotePricing.Context(context.Settings, context.Capabilities);
+    }
+
+    public async Task<QuoteEstimateDto> ApproveLocksmithPricingAsync(Guid quoteRequestId, string? expectedVersion, CancellationToken ct = default)
+    {
+        if (_memberships is null || _settings is null) throw new UnauthorizedAccessException();
+        var member = await _memberships.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(_userContext.TenantId), _userContext.UserId, ct);
+        if (member is null || member.TenantId != _userContext.TenantId || member.UserId != _userContext.UserId || member.IsDeleted || member.DateRemoved.HasValue ||
+            !string.Equals(member.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase) || (!member.IsOwner && !TenantRoleCatalog.CanManageRoles(member.Role)))
+            throw new ForbiddenAccessException("Office admin access is required for pricing approval.");
+        var entity = await GetEntityAsync(_userContext.TenantId, quoteRequestId, ct) ?? throw new ArgumentException("Estimate not found.");
+        ValidateVersion(entity, expectedVersion);
+        var packet = await LoadPayloadAsync(entity, ct);
+        if (packet.LocksmithPricing is null || packet.Status is not ("draft" or "ready-to-send")) throw new ArgumentException("Only a locksmith draft can receive office pricing approval.");
+        var settings = await _settings.GetAsync(Partition(_userContext.TenantId), "SETTINGS|OPERATIONAL", ct);
+        if (settings is null || settings.IsDeleted || LocksmithQuotePricing.PolicyVersion(settings) != packet.LocksmithPricing.PolicyVersion)
+            throw new ArgumentException("Pricing policy changed. Recalculate before office approval.");
+        packet.LocksmithPricing.OfficeApprovedAtUtc = DateTime.UtcNow;
+        packet.LocksmithPricing.OfficeApprovedBy = Actor();
+        packet.Status = "ready-to-send";
+        packet.SavedAtUtc = DateTime.UtcNow;
+        return await PersistAsync(entity, packet, _userContext.TenantId, null, null, ct);
     }
 
     public async Task<IReadOnlyCollection<QuoteEstimateDto>> ListAsync(CancellationToken ct = default)
     {
         var entities = await _repository.ListAsync(Partition(_userContext.TenantId), ct);
         var results = new List<QuoteEstimateDto>(entities.Count);
-        foreach (var entity in entities) results.Add(await LoadPayloadAsync(entity, ct));
+        foreach (var entity in entities)
+            if (await CanAccessQuoteAsync(entity.QuoteRequestId, ct)) results.Add(await LoadPayloadAsync(entity, ct));
         return results;
     }
 
     public async Task<QuoteEstimateDto?> GetAsync(Guid quoteRequestId, CancellationToken ct = default)
     {
         ValidateId(quoteRequestId);
+        await RequireQuoteAccessAsync(quoteRequestId, ct);
         var entity = await GetEntityAsync(_userContext.TenantId, quoteRequestId, ct);
         return entity is null ? null : await LoadPayloadAsync(entity, ct);
     }
@@ -63,20 +132,47 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         var tenantId = _userContext.TenantId;
         var quote = await GetQuoteAsync(tenantId, quoteRequestId, ct)
             ?? throw new ArgumentException("The source quote request was not found.", nameof(quoteRequestId));
+        await RequireQuoteAccessAsync(quoteRequestId, ct);
         EnsureQuoteTransition(quote, "estimate-drafted");
         var existing = await GetEntityAsync(tenantId, quoteRequestId, ct);
         ValidateVersion(existing, input.ExpectedVersion);
         var previous = existing is null ? null : await LoadPayloadAsync(existing, ct);
         if (previous?.Delivery?.Status == "approved")
             throw new ArgumentException("An approved estimate cannot be edited.");
+        if (previous?.Delivery is not null)
+            throw new ArgumentException("Create a new revision before editing a shared estimate.");
 
         var status = input.Status?.Trim().ToLowerInvariant();
         if (status is not ("draft" or "ready-to-send"))
             throw new ArgumentException("Draft status must be draft or ready-to-send.", nameof(input.Status));
 
-        var locations = NormalizeLocations(input.Locations);
-        var defaults = await _defaults.GetAsync();
-        var (totals, scope, assumptions) = Calculate(locations, defaults);
+        LocksmithPricingSnapshotDto? locksmithPricing = null;
+        List<QuoteEstimateLocationDto> locations;
+        QuoteEstimateTotalsDto totals;
+        List<string> scope;
+        List<string> assumptions;
+        var operational = _settings is null ? null : await _settings.GetAsync(Partition(tenantId), "SETTINGS|OPERATIONAL", ct);
+        if (input.Locksmith is not null)
+        {
+            if (!string.Equals(quote.PropertyType, input.Locksmith.JobType, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("The quote job type must match its source request.");
+            var context = await LocksmithQuotePricing.RequireContextAsync(_settings, _memberships, _userContext, input.Locksmith.JobType, ct, allowOfficeAdmin: true);
+            locksmithPricing = LocksmithQuotePricing.Calculate(context.Settings, input.Locksmith);
+            locations = [];
+            totals = new() { MaterialCost = locksmithPricing.Lines.Sum(line => line.Total), LaborCost = Math.Round(locksmithPricing.LaborHours * locksmithPricing.LaborRatePerHour, 2, MidpointRounding.AwayFromZero), EstimatedTotal = locksmithPricing.Total };
+            scope = locksmithPricing.Lines.Select(line => $"{line.OpeningName}: {line.Quantity} × {line.Name}").ToList();
+            if (locksmithPricing.LaborHours > 0) scope.Add($"Labor: {locksmithPricing.LaborHours} hour(s)");
+            assumptions = ["Prices use the saved tenant catalog and pricing policy. Technician observations require verification of product fit."];
+            if (locksmithPricing.RequiresOfficeApproval) status = "draft";
+        }
+        else
+        {
+            if (operational is not null && !operational.IsDeleted && LocksmithPolicy.IsConfigured(operational.ValuesJson))
+                throw new ArgumentException("Doors and locksmith quotes require locksmith scope and server catalog pricing.");
+            locations = NormalizeLocations(input.Locations);
+            var defaults = await _defaults.GetAsync();
+            (totals, scope, assumptions) = Calculate(locations, defaults);
+        }
         var now = DateTime.UtcNow;
         var packet = new QuoteEstimateDto
         {
@@ -91,7 +187,8 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             Notes = Clean(input.Notes, 5000),
             Assumptions = assumptions,
             Status = status,
-            CommercialSummary = $"{locations.Count} location(s) · {totals.CubicYards:F1} CY · {totals.EstimatedTotal.ToString("C", CultureInfo.GetCultureInfo("en-US"))}",
+            CommercialSummary = locksmithPricing is not null ? $"{locksmithPricing.JobType} · {locksmithPricing.Lines.Count} line(s) · {locksmithPricing.Total.ToString("C", CultureInfo.GetCultureInfo("en-US"))}" : $"{locations.Count} location(s) · {totals.CubicYards:F1} CY · {totals.EstimatedTotal.ToString("C", CultureInfo.GetCultureInfo("en-US"))}",
+            LocksmithPricing = locksmithPricing,
             Locations = locations,
             Totals = totals,
             SavedAtUtc = now,
@@ -112,6 +209,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         string? expectedVersion,
         CancellationToken ct = default)
     {
+        await RequireQuoteAccessAsync(quoteRequestId, ct);
         var tenantId = _userContext.TenantId;
         var entity = await GetEntityAsync(tenantId, quoteRequestId, ct)
             ?? throw new ArgumentException("Estimate not found.", nameof(quoteRequestId));
@@ -123,6 +221,8 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             throw new ArgumentException("Only a sent estimate or requested change can create a revision.");
 
         packet.RevisionHistory.Add(ToRevision(packet));
+        packet.DocumentHash = string.Empty;
+        packet.ApprovalSignature = null;
         packet.RevisionNumber++;
         packet.Status = "draft";
         packet.SavedAtUtc = DateTime.UtcNow;
@@ -144,11 +244,26 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         string reviewBasePath,
         CancellationToken ct = default)
     {
+        await RequireQuoteAccessAsync(quoteRequestId, ct);
         var tenantId = _userContext.TenantId;
         var entity = await GetEntityAsync(tenantId, quoteRequestId, ct)
             ?? throw new ArgumentException("Estimate not found.", nameof(quoteRequestId));
         ValidateVersion(entity, expectedVersion);
         var packet = await LoadPayloadAsync(entity, ct);
+        if (packet.LocksmithPricing is not null)
+        {
+            var current = await LocksmithQuotePricing.RequireContextAsync(_settings, _memberships, _userContext, packet.LocksmithPricing.JobType, ct, allowOfficeAdmin: true);
+            if (packet.LocksmithPricing.PolicyVersion != LocksmithQuotePricing.PolicyVersion(current.Settings))
+                throw new ArgumentException("Pricing policy changed. Recalculate the draft before sharing it.");
+            if (packet.LocksmithPricing.RequiresOfficeApproval && packet.LocksmithPricing.OfficeApprovedAtUtc is null)
+                throw new ArgumentException("Office pricing approval is required before sharing this quote.");
+        }
+        else if (_settings is not null)
+        {
+            var settings = await _settings.GetAsync(Partition(tenantId), "SETTINGS|OPERATIONAL", ct);
+            if (settings is not null && !settings.IsDeleted && LocksmithPolicy.IsConfigured(settings.ValuesJson))
+                throw new ArgumentException("Recalculate this quote with doors and locksmith pricing before sharing.");
+        }
         if (packet.Status != "ready-to-send")
             throw new ArgumentException("Move the estimate to ready-to-send before sending.");
         var quote = await GetQuoteAsync(tenantId, quoteRequestId, ct)
@@ -224,6 +339,22 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             throw new ArgumentException("A change request note is required.", nameof(decision.ResponseNote));
 
         var now = DateTime.UtcNow;
+        if (approve)
+        {
+            var signerName = Required(decision.SignerPrintedName ?? string.Empty, nameof(decision.SignerPrintedName), 200);
+            if (signerName.Any(char.IsControl)) throw new ArgumentException("Signer name cannot contain control characters.");
+            if (!decision.IntentToSign || decision.ConsentVersion != QuoteApprovalConsent.Version)
+                throw new ArgumentException("Explicit electronic-signature intent and the current consent version are required.");
+            if (decision.RevisionNumber != packet.RevisionNumber || string.IsNullOrWhiteSpace(decision.DocumentHash) ||
+                !string.Equals(decision.DocumentHash, packet.DocumentHash, StringComparison.Ordinal))
+                throw new ArgumentException("The quote revision changed. Reload and review the current document before signing.");
+            packet.ApprovalSignature = new QuoteEstimateSignatureDto
+            {
+                SignerPrintedName = signerName, ConsentText = QuoteApprovalConsent.Text, ConsentVersion = QuoteApprovalConsent.Version,
+                SignedAtUtc = now, RevisionNumber = packet.RevisionNumber, Total = packet.Totals.EstimatedTotal,
+                DocumentHash = packet.DocumentHash, Method = "typed-name", QuoteRequestId = packet.QuoteRequestId
+            };
+        }
         packet.Delivery.Status = target;
         packet.Delivery.ResponseNote = approve ? null : note;
         packet.Delivery.ApprovedAtUtc = approve ? now : null;
@@ -237,8 +368,8 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         await UpdateQuoteAsync(
             quote,
             approve ? "won" : "estimate-drafted",
-            approve ? "Customer approved the estimate. Draft invoice is ready for billing review." : $"Customer requested estimate changes: {note}",
-            approve ? "Estimate approved by customer" : "Customer requested estimate changes",
+            approve ? "Customer signed quote approval. Schedule and invoice separately when ready." : $"Customer requested estimate changes: {note}",
+            approve ? "Quote approval electronically signed by customer" : "Customer requested estimate changes",
             ct,
             note);
         return saved;
@@ -252,6 +383,9 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         DateTime? tokenExpiry,
         CancellationToken ct)
     {
+        packet.DocumentHash = ComputeDocumentHash(packet);
+        if (packet.ApprovalSignature is not null && packet.ApprovalSignature.DocumentHash != packet.DocumentHash)
+            throw new ArgumentException("Signed quote contents cannot be changed.");
         var blobName = $"{tenantId:N}/{packet.QuoteRequestId:N}/v{packet.RevisionNumber}/{Guid.NewGuid():N}.json";
         await using var content = new MemoryStream(JsonSerializer.SerializeToUtf8Bytes(packet, JsonOptions));
         await _blobStorage.UploadAsync(ContainerName, blobName, content, "application/json", new Dictionary<string, string>
@@ -280,7 +414,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         try
         {
             var saved = await _repository.SaveAsync(entity, ct);
-            packet.Version = saved.ETag.ToString();
+            packet.Version = VersionOf(saved);
             if (existing is not null && !string.IsNullOrWhiteSpace(existing.PayloadBlobName))
             {
                 try { await _blobStorage.DeleteIfExistsAsync(ContainerName, existing.PayloadBlobName, ct); }
@@ -301,7 +435,12 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         await using var stream = await _blobStorage.OpenReadAsync(ContainerName, entity.PayloadBlobName, ct);
         var packet = await JsonSerializer.DeserializeAsync<QuoteEstimateDto>(stream, JsonOptions, ct)
             ?? throw new InvalidOperationException("Estimate payload is invalid.");
-        packet.Version = entity.ETag.ToString();
+        var computedHash = ComputeDocumentHash(packet);
+        if ((!string.IsNullOrWhiteSpace(packet.DocumentHash) && packet.DocumentHash != computedHash) ||
+            (packet.ApprovalSignature is not null && packet.ApprovalSignature.DocumentHash != computedHash))
+            throw new InvalidOperationException("The stored quote document failed its integrity check.");
+        packet.DocumentHash = computedHash;
+        packet.Version = VersionOf(entity);
         return packet;
     }
 
@@ -400,6 +539,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
 
     private static QuoteEstimateRevisionDto ToRevision(QuoteEstimateDto packet) => new()
     {
+        DocumentHash = packet.DocumentHash, ApprovalSignature = packet.ApprovalSignature,
         RevisionNumber = packet.RevisionNumber, CustomerName = packet.CustomerName, SiteName = packet.SiteName,
         ServiceSummary = packet.ServiceSummary, VisitFindings = packet.VisitFindings,
         ScopeLineItems = [.. packet.ScopeLineItems], Notes = packet.Notes, Assumptions = [.. packet.Assumptions],
@@ -412,13 +552,29 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             RebarLinearFeet = item.RebarLinearFeet, MaterialCost = item.MaterialCost,
             LaborCost = item.LaborCost, EstimatedTotal = item.EstimatedTotal
         }).ToList(),
-        Totals = packet.Totals, SavedAtUtc = packet.SavedAtUtc, SentAtUtc = packet.SentAtUtc, SentBy = packet.SentBy
+        LocksmithPricing = packet.LocksmithPricing, Totals = packet.Totals, SavedAtUtc = packet.SavedAtUtc, SentAtUtc = packet.SentAtUtc, SentBy = packet.SentBy
     };
+
+    private static string ComputeDocumentHash(QuoteEstimateDto packet)
+    {
+        // Hash only the issued document, excluding workflow state, access tokens, and signature evidence.
+        var document = new
+        {
+            packet.Id, packet.QuoteRequestId, packet.RevisionNumber, packet.CustomerName, packet.SiteName,
+            packet.ServiceSummary, packet.VisitFindings, packet.ScopeLineItems, packet.Notes, packet.Assumptions,
+            packet.CommercialSummary, packet.Locations, packet.Totals, packet.LocksmithPricing,
+            packet.SentAtUtc, packet.ExpiresAtUtc
+        };
+        return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(document, JsonOptions))).ToLowerInvariant();
+    }
+
+    private static string VersionOf(QuoteEstimate entity) => !string.IsNullOrWhiteSpace(entity.ETag.ToString())
+        ? entity.ETag.ToString() : entity.DateUpdated.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture);
 
     private static void ValidateVersion(QuoteEstimate? existing, string? expected)
     {
         if (existing is null) return;
-        if (string.IsNullOrWhiteSpace(expected) || expected != existing.ETag.ToString())
+        if (string.IsNullOrWhiteSpace(expected) || expected != VersionOf(existing))
             throw new ArgumentException("The estimate changed after it was loaded. Refresh and try again.", nameof(expected));
     }
 

@@ -6,6 +6,7 @@ using TurnKeyOps.Services.Interfaces;
 namespace TurnKeyOps.API.Controllers;
 
 [AllowAnonymous]
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 [Route("api/public/quote-estimates")]
 public sealed class PublicQuoteEstimatesController : ApiControllerBase
 {
