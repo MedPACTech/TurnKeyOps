@@ -1,4 +1,5 @@
 import { fail } from '@sveltejs/kit';
+import { bdrTenant } from '$lib/config/tenants';
 import {
 	bdrEmployeeContacts,
 	getRecommendedBdrEmployeeForTask
@@ -134,7 +135,7 @@ const getWorkflowAssignee = (request: QuoteRequest, override: string) => {
 };
 
 export const load = async ({ fetch }) => {
-	const { requests, source } = await loadQuoteRequests(fetch);
+	const { requests, source } = await loadQuoteRequests(fetch, bdrTenant.id);
 	const inbox = buildQuoteRequestInbox(requests);
 
 	return {
@@ -209,7 +210,7 @@ export const actions = {
 			});
 		}
 
-		const { requests } = await loadQuoteRequests(fetch);
+		const { requests } = await loadQuoteRequests(fetch, bdrTenant.id);
 		const selectedRequest = requests.find((entry) => entry.id === id);
 
 		if (!selectedRequest) {
@@ -284,7 +285,7 @@ export const actions = {
 			});
 		}
 
-		const { requests } = await loadQuoteRequests(fetch);
+		const { requests } = await loadQuoteRequests(fetch, bdrTenant.id);
 		const selectedRequest = requests.find((entry) => entry.id === id);
 		if (!selectedRequest) {
 			return fail(404, { scheduleMessage: 'Quote request record was not found.', scheduledRequestId: id });
