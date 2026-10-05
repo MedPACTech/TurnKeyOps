@@ -498,7 +498,7 @@
                 <label class="grid gap-2">
                   <span class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-ink-500">Findings summary *</span>
                   <textarea
-                    class="input min-h-[8rem]"
+                    class="input min-h-32"
                     bind:value={outcome.findings}
                     placeholder="Summarize the visit findings, observed conditions, and the most important estimate-ready takeaways."
                   ></textarea>
@@ -533,7 +533,7 @@
                 <label class="mt-4 grid gap-2">
                   <span class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-ink-500">Measurement notes</span>
                   <textarea
-                    class="input min-h-[6rem]"
+                    class="input min-h-24"
                     bind:value={outcome.measurements.notes}
                     placeholder="Slope notes, elevation changes, access measurements, or any field caveats that estimating should retain."
                   ></textarea>
@@ -544,7 +544,7 @@
                 <label class="grid gap-2">
                   <span class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-ink-500">Scope changes *</span>
                   <textarea
-                    class="input min-h-[8rem]"
+                    class="input min-h-32"
                     bind:value={outcome.scopeChanges}
                     placeholder="Describe any changes from the planned scope. Use 'No scope change' if everything matched the original expectation."
                   ></textarea>
@@ -553,7 +553,7 @@
                 <label class="grid gap-2">
                   <span class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-ink-500">Follow-up actions *</span>
                   <textarea
-                    class="input min-h-[8rem]"
+                    class="input min-h-32"
                     bind:value={outcome.followUpActions}
                     placeholder="List the next actions for estimating, scheduling, customer follow-up, or document collection."
                   ></textarea>
@@ -574,15 +574,15 @@
                   </label>
                   <div class="grid gap-3 rounded-xl border border-ink-100 bg-white px-3 py-3">
                     <label class="flex items-center gap-3 text-sm text-ink-700">
-                      <input type="checkbox" bind:checked={outcome.structuredFields.demoRequired} class="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500" />
+                      <input type="checkbox" bind:checked={outcome.structuredFields.demoRequired} class="h-4 w-4 rounded-sm border-ink-300 text-brand-600 focus:ring-brand-500" />
                       Demo required
                     </label>
                     <label class="flex items-center gap-3 text-sm text-ink-700">
-                      <input type="checkbox" bind:checked={outcome.structuredFields.excavationRequired} class="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500" />
+                      <input type="checkbox" bind:checked={outcome.structuredFields.excavationRequired} class="h-4 w-4 rounded-sm border-ink-300 text-brand-600 focus:ring-brand-500" />
                       Excavation required
                     </label>
                     <label class="flex items-center gap-3 text-sm text-ink-700">
-                      <input type="checkbox" bind:checked={outcome.structuredFields.pumpRequired} class="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500" />
+                      <input type="checkbox" bind:checked={outcome.structuredFields.pumpRequired} class="h-4 w-4 rounded-sm border-ink-300 text-brand-600 focus:ring-brand-500" />
                       Pump required
                     </label>
                   </div>
@@ -697,7 +697,7 @@
               <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-ink-100 px-3 py-3 transition-colors hover:bg-ink-50">
                 <input
                   type="checkbox"
-                  class="mt-1 h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+                  class="mt-1 h-4 w-4 rounded-sm border-ink-300 text-brand-600 focus:ring-brand-500"
                   checked={checklist[field.key]}
                   on:change={() => toggleChecklist(field.key)}
                 />

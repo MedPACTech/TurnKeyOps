@@ -316,20 +316,20 @@
 
       <MobileActionBar>
         <div class="space-y-3">
-          <button class="btn-secondary w-full min-h-[3.25rem] rounded-2xl text-base" on:click={() => goto('/field/intake')}>
+          <button class="btn-secondary w-full min-h-13 rounded-2xl text-base" on:click={() => goto('/field/intake')}>
             Edit details
           </button>
-          <button class="btn-secondary w-full min-h-[3.25rem] rounded-2xl text-base" on:click={openEstimator}>
+          <button class="btn-secondary w-full min-h-13 rounded-2xl text-base" on:click={openEstimator}>
             Open full estimator form
           </button>
-          <button class="btn-secondary w-full min-h-[3.25rem] rounded-2xl text-base" disabled={savingDraft} on:click={saveDraft}>
+          <button class="btn-secondary w-full min-h-13 rounded-2xl text-base" disabled={savingDraft} on:click={saveDraft}>
             {savingDraft ? 'Saving draft...' : 'Save draft'}
           </button>
-          <button class="btn-primary w-full min-h-[3.25rem] rounded-2xl text-base" disabled={calculating} on:click={calculateEstimate}>
+          <button class="btn-primary w-full min-h-13 rounded-2xl text-base" disabled={calculating} on:click={calculateEstimate}>
             {calculating ? 'Calculating...' : 'Continue to pricing/calculation'}
           </button>
           <button
-            class="btn-primary w-full min-h-[3.25rem] rounded-2xl text-base disabled:cursor-not-allowed disabled:opacity-50"
+            class="btn-primary w-full min-h-13 rounded-2xl text-base disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!hasRequiredFields || submitting}
             on:click={submitEstimate}
           >

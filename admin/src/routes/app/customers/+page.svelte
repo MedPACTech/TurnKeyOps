@@ -90,7 +90,7 @@
             <tr on:click={() => openEdit(customer)}>
               <td>
                 <div class="flex items-center gap-2">
-                  <span class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  <span class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold shrink-0">
                     {initials(customer.firstName, customer.lastName)}
                   </span>
                   <span class="font-medium">{customer.firstName} {customer.lastName}</span>

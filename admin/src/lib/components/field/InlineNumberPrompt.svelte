@@ -40,7 +40,7 @@
         <span class="label mb-2">{field.label}</span>
         <div class="relative">
           <input
-            class="input min-h-[3.5rem] pr-12 text-base"
+            class="input min-h-14 pr-12 text-base"
             type="number"
             bind:value={field.value}
             step={field.step ?? '1'}
@@ -62,7 +62,7 @@
     <p class="text-sm text-red-600">Enter a value greater than zero for each field.</p>
   {/if}
 
-  <button class="btn-primary w-full min-h-[3.5rem] rounded-2xl text-base" on:click={submit}>
+  <button class="btn-primary w-full min-h-14 rounded-2xl text-base" on:click={submit}>
     {submitLabel}
   </button>
 </div>

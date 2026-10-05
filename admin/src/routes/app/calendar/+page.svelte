@@ -82,17 +82,17 @@
     <div class="flex items-center gap-2">
       <div class="flex bg-gray-100 rounded-lg p-0.5">
         <button class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors
-          {viewMode === 'week' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}"
+          {viewMode === 'week' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-700'}"
           on:click={() => { viewMode = 'week'; viewStart = startOfWeek(viewStart); viewEnd = endOfWeek(viewStart); loadEvents(); }}>
           Week
         </button>
         <button class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors
-          {viewMode === 'month' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}"
+          {viewMode === 'month' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-700'}"
           on:click={() => { viewMode = 'month'; viewStart = startOfMonth(viewStart); viewEnd = endOfMonth(viewStart); loadEvents(); }}>
           Month
         </button>
         <button class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors
-          {viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}"
+          {viewMode === 'list' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-700'}"
           on:click={() => { viewMode = 'list'; }}>
           List
         </button>
@@ -118,7 +118,7 @@
           {#each events as event}
             <button class="w-full flex items-center gap-3 py-3 px-2 hover:bg-gray-50 rounded-lg text-left transition-colors"
               on:click={() => openEvent(event)}>
-              <div class="w-1.5 h-10 rounded-full flex-shrink-0" style="background:{event.color ?? '#5b72f2'}"></div>
+              <div class="w-1.5 h-10 rounded-full shrink-0" style="background:{event.color ?? '#5b72f2'}"></div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">{event.title}</p>
                 <p class="text-xs text-gray-500">
