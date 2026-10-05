@@ -14,8 +14,8 @@
       compact
         ? 'h-14 w-auto'
         : prominent
-          ? 'h-auto w-full max-w-[22rem] sm:max-w-[28rem] lg:max-w-[34rem]'
-          : 'h-auto w-full max-w-[14rem] sm:max-w-[18rem]'
+          ? 'h-auto w-full max-w-88 sm:max-w-md lg:max-w-136'
+          : 'h-auto w-full max-w-56 sm:max-w-[18rem]'
     }`}
   />
 

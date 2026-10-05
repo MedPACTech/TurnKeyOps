@@ -204,10 +204,10 @@
     </div>
 
     <div class="flex flex-col gap-3 sm:flex-row">
-      <button class="btn-secondary min-h-[3rem] px-5" on:click={resetChanges} disabled={!hasChanges || saving || loading}>
+      <button class="btn-secondary min-h-12 px-5" on:click={resetChanges} disabled={!hasChanges || saving || loading}>
         Reset changes
       </button>
-      <button class="btn-primary min-h-[3rem] px-5" on:click={saveDefaults} disabled={!hasChanges || saving || loading || !form}>
+      <button class="btn-primary min-h-12 px-5" on:click={saveDefaults} disabled={!hasChanges || saving || loading || !form}>
         {saving ? 'Saving...' : 'Save defaults'}
       </button>
     </div>
@@ -220,14 +220,14 @@
           <div class="flex items-center gap-3">
             <div class="h-11 w-11 rounded-2xl bg-ink-100"></div>
             <div class="space-y-2">
-              <div class="h-5 w-48 rounded bg-ink-100"></div>
-              <div class="h-4 w-80 rounded bg-ink-100"></div>
+              <div class="h-5 w-48 rounded-sm bg-ink-100"></div>
+              <div class="h-4 w-80 rounded-sm bg-ink-100"></div>
             </div>
           </div>
           <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {#each Array(6) as __}
               <div class="space-y-2">
-                <div class="h-4 w-28 rounded bg-ink-100"></div>
+                <div class="h-4 w-28 rounded-sm bg-ink-100"></div>
                 <div class="h-12 rounded-2xl bg-ink-100"></div>
               </div>
             {/each}

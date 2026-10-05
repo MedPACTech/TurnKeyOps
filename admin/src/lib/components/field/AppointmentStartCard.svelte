@@ -9,7 +9,7 @@
 
 <section class="card border border-white/70">
   <div class="flex items-start gap-4">
-    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-3xl shadow-sm">
+    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-3xl shadow-xs">
       👷‍♂️
     </div>
     <div class="min-w-0">
@@ -32,7 +32,7 @@
 
   <div class="mt-6 space-y-3">
     <button
-      class="btn-primary w-full min-h-[3.5rem] justify-between rounded-2xl px-5 text-left text-base"
+      class="btn-primary w-full min-h-14 justify-between rounded-2xl px-5 text-left text-base"
       disabled={!hasAppointment || loading}
       on:click={onAppointment}
     >
@@ -47,7 +47,7 @@
     {/if}
 
     <button
-      class="btn-secondary w-full min-h-[3.5rem] justify-between rounded-2xl px-5 text-left text-base"
+      class="btn-secondary w-full min-h-14 justify-between rounded-2xl px-5 text-left text-base"
       disabled={loading}
       on:click={onCreateNew}
     >

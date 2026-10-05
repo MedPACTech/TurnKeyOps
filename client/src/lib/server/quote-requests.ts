@@ -1,4 +1,3 @@
-import { env } from '$env/dynamic/private';
 import { error } from '@sveltejs/kit';
 import {
 	buildQuoteRequestQualification,
@@ -154,7 +153,9 @@ const parseLeadMetadata = (scopeSummary: string | null | undefined): QuoteLeadMe
 
 const serializeLeadMetadata = (metadata: QuoteLeadMetadata) => `${quoteMarker}${JSON.stringify(metadata)}`;
 
-export const getQuoteRequestTenantId = () => env.TKO_API_TENANT_ID ?? bdrTenant.id;
+// Legacy BDR callers default to BDR; other tenants pass their route tenant explicitly.
+// A deployment-wide override must not hide requests saved by the public BDR route.
+export const getQuoteRequestTenantId = () => bdrTenant.id;
 
 const normalizeAttachments = (value: unknown): QuoteRequestAttachment[] => {
 	if (!Array.isArray(value)) return [];

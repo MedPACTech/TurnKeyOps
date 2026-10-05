@@ -76,35 +76,35 @@
         <div class="card mt-4 space-y-4">
           <div>
             <label class="label" for="customerName">Customer Name</label>
-            <input id="customerName" class="input min-h-[3rem]" bind:value={form.customerName} />
+            <input id="customerName" class="input min-h-12" bind:value={form.customerName} />
           </div>
 
           <div>
             <label class="label" for="customerCompany">Customer Company</label>
-            <input id="customerCompany" class="input min-h-[3rem]" bind:value={form.customerCompany} />
+            <input id="customerCompany" class="input min-h-12" bind:value={form.customerCompany} />
           </div>
 
           <div>
             <label class="label" for="projectAddress">Project / Site Address</label>
-            <textarea id="projectAddress" class="input min-h-[6rem]" bind:value={form.projectAddress}></textarea>
+            <textarea id="projectAddress" class="input min-h-24" bind:value={form.projectAddress}></textarea>
           </div>
 
           <div>
             <label class="label" for="projectName">Project Name</label>
-            <input id="projectName" class="input min-h-[3rem]" bind:value={form.projectName} />
+            <input id="projectName" class="input min-h-12" bind:value={form.projectName} />
           </div>
 
-          <button class="btn-secondary w-full min-h-[3.25rem] rounded-2xl text-base" on:click={saveEdits}>
+          <button class="btn-secondary w-full min-h-13 rounded-2xl text-base" on:click={saveEdits}>
             Save details
           </button>
         </div>
       {/if}
 
       <div class="mt-6 space-y-3">
-        <button class="btn-primary w-full min-h-[3.5rem] rounded-2xl text-base" on:click={continueToIntake}>
+        <button class="btn-primary w-full min-h-14 rounded-2xl text-base" on:click={continueToIntake}>
           Yes, continue
         </button>
-        <button class="btn-secondary w-full min-h-[3.5rem] rounded-2xl text-base" on:click={() => (editMode = !editMode)}>
+        <button class="btn-secondary w-full min-h-14 rounded-2xl text-base" on:click={() => (editMode = !editMode)}>
           {editMode ? 'Done editing' : 'Edit details'}
         </button>
       </div>

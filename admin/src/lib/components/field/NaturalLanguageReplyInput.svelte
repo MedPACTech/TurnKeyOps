@@ -24,7 +24,7 @@
   <label class="block">
     <span class="sr-only">Answer Bob in plain language</span>
     <textarea
-      class="min-h-[6rem] w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-white placeholder:text-white/45 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-300/40"
+      class="min-h-24 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-white placeholder:text-white/45 focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-300/40"
       bind:value
       rows="3"
       placeholder={placeholder}
@@ -33,7 +33,7 @@
 
   <p class="text-xs leading-5 text-white/65">{hint}</p>
 
-  <button class="btn-primary w-full min-h-[3.25rem] rounded-2xl text-base" on:click={submit}>
+  <button class="btn-primary w-full min-h-13 rounded-2xl text-base" on:click={submit}>
     {submitLabel}
   </button>
 </div>

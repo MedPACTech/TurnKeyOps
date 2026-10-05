@@ -266,10 +266,10 @@
               <div class="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                 Bob has captured the initial estimate details. Review the summary and we can build the next step from here.
               </div>
-              <button class="btn-primary w-full min-h-[3.25rem] rounded-2xl text-base" on:click={() => goto('/field/review')}>
+              <button class="btn-primary w-full min-h-13 rounded-2xl text-base" on:click={() => goto('/field/review')}>
                 Review estimate
               </button>
-              <button class="btn-secondary w-full min-h-[3.25rem] rounded-2xl text-base" on:click={() => goto('/field/confirm')}>
+              <button class="btn-secondary w-full min-h-13 rounded-2xl text-base" on:click={() => goto('/field/confirm')}>
                 Back to confirmed details
               </button>
             </div>

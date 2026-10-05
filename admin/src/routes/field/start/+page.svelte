@@ -58,9 +58,9 @@
       {#if loading}
         <div class="card border border-white/70">
           <div class="animate-pulse space-y-3">
-            <div class="h-4 w-32 rounded bg-ink-100"></div>
-            <div class="h-5 w-48 rounded bg-ink-100"></div>
-            <div class="h-4 w-full rounded bg-ink-100"></div>
+            <div class="h-4 w-32 rounded-sm bg-ink-100"></div>
+            <div class="h-5 w-48 rounded-sm bg-ink-100"></div>
+            <div class="h-4 w-full rounded-sm bg-ink-100"></div>
             <div class="grid grid-cols-1 gap-2 pt-2">
               <div class="h-16 rounded-2xl bg-ink-100"></div>
               <div class="h-16 rounded-2xl bg-ink-100"></div>
