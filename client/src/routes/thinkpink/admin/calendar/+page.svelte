@@ -1,4 +1,5 @@
 <script lang="ts">
+ import JobCalendarEvents from '$lib/components/jobs/JobCalendarEvents.svelte';
 	import { CalendarDays, Clock3, MapPin, Plus } from 'lucide-svelte';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
@@ -15,6 +16,8 @@
 		<h1 class="mt-2 text-3xl font-black text-[var(--text-strong)]">Calendar</h1>
 		<p class="mt-2 text-sm text-[var(--text-muted)]">Live property assessments and scheduled site visits for Think Pink.</p>
 	</header>
+<JobCalendarEvents events={data.operationalEvents} error={data.operationalEventsError} basePath="/thinkpink/admin/jobs"/>
+
 	<div class="grid gap-5 lg:grid-cols-[1fr_20rem]">
 		<section class="space-y-3">
 			{#each data.visits as visit}

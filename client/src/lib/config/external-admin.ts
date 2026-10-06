@@ -51,7 +51,7 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 const tenantModules: Record<TenantSlug, ExternalAdminModule[]> = {
 	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'leads', 'estimates', 'invoices', 'customers', 'users', 'settings'],
 	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'leads', 'estimates', 'invoices', 'customers', 'users', 'settings'],
-	carlzipf: ['bob', 'calendar', 'leads', 'estimates', 'invoices', 'customers', 'settings', 'users']
+	carlzipf: ['bob', 'calendar', 'jobs', 'leads', 'estimates', 'invoices', 'customers', 'settings', 'users']
 };
 
 const themes: Record<TenantSlug, ExternalAdminTheme> = {

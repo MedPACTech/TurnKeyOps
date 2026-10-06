@@ -1,4 +1,5 @@
 <script lang="ts">
+ import JobCalendarEvents from '$lib/components/jobs/JobCalendarEvents.svelte';
 	import { CalendarDays, CloudOff, Hammer, MapPin } from 'lucide-svelte';
 	import { formatCurrency } from '$lib/utils/format';
 	import type { PageProps } from './$types';
@@ -17,6 +18,8 @@
 
 <div class="space-y-5">
 	<header><p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-text)]">Live scheduling</p><h1 class="mt-2 text-2xl font-semibold text-[var(--text-strong)]">Calendar</h1><p class="mt-2 text-sm text-[var(--text-muted)]">Site visits and production jobs loaded from the durable TurnKey API.</p></header>
+<JobCalendarEvents events={data.operationalEvents} error={data.operationalEventsError} basePath="/bdr/admin/jobs"/>
+
 
 	{#if data.integrationState.errors.length}
 		<section class="rounded-lg border border-[var(--warning-text)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning-text)]" role="alert"><p class="font-semibold">Part of the live schedule is unavailable.</p><ul class="mt-2 list-disc space-y-1 pl-5">{#each data.integrationState.errors as message}<li>{message}</li>{/each}</ul><a href="/bdr/admin/calendar" class="mt-3 inline-flex font-semibold underline">Retry schedule</a></section>

@@ -4,6 +4,11 @@ namespace TurnKeyOps.Lib.Dtos;
 
 public class CalendarEventDto
 {
+    public string? JobEventType { get; set; }
+    public string EventStatus { get; set; } = "scheduled";
+    public List<Guid> MembershipIds { get; set; } = [];
+    public List<string> ResourceIds { get; set; } = [];
+    public bool CustomerVisible { get; set; }
     public Guid Id { get; set; }
     public Guid? LeadId { get; set; }
     public string Title { get; set; } = string.Empty;

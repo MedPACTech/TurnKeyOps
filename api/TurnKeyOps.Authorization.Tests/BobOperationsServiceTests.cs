@@ -212,6 +212,21 @@ public sealed class BobOperationsServiceTests
         Assert.Equal(0,provider.ExecutionCount);
     }
 
+    [Theory][InlineData("disabled")][InlineData("approval")][InlineData("auto")]
+    public async Task JobActionsUseTenantPolicyAndCannotApproveAnotherJob(string mode)
+    {
+        var settings=new Mock<ITenantSettingsRepository>();
+        settings.Setup(x=>x.GetAsync(It.IsAny<string>(),"SETTINGS|OPERATIONAL",It.IsAny<CancellationToken>(),false))
+            .ReturnsAsync(new TenantSettingsDocument{ValuesJson=JsonSerializer.Serialize(new{leads=new{aiActions=new Dictionary<string,string>{["job.schedule"]=mode}}})});
+        var provider=new TestProvider("job.schedule",BobActionRisk.Destructive,TurnKeyPermissionKeys.JobsWrite);
+        var f=new Fixture(provider,policy:new LeadConfigurationService(settings.Object));
+        var input=new ProposeBobActionDto{ToolKey=provider.ToolKey,IdempotencyKey="job-policy",Input=JsonSerializer.SerializeToElement(new{jobId=ConversationId})};
+        if(mode=="disabled"){await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Service.ProposeJobAsync(ConversationId,input));Assert.Equal(0,provider.ExecutionCount);return;}
+        var action=await f.Service.ProposeJobAsync(ConversationId,input);
+        if(mode=="auto"){Assert.Equal("completed",action.Status);Assert.Equal(1,provider.ExecutionCount);}
+        else{Assert.True(action.ConfirmationRequired);Assert.Equal(0,provider.ExecutionCount);await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.ApproveJobAsync(Guid.NewGuid(),action.Id));await f.Service.ApproveJobAsync(ConversationId,action.Id);Assert.Equal(1,provider.ExecutionCount);}
+    }
+
     private static ProposeBobActionDto Proposal(string idempotencyKey, object input) => new()
     {
         ToolKey = input.GetType().GetProperty("filter") is not null ? "conversation.read" : "conversation.archive",

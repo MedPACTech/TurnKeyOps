@@ -88,6 +88,8 @@ namespace MedInsights.API.DependencyInjection
                 .AddPermission(TurnKeyPermissionKeys.LeadsWrite, name: "Manage leads")
                 .AddPermission(TurnKeyPermissionKeys.EstimatesRead, name: "Read estimates")
                 .AddPermission(TurnKeyPermissionKeys.EstimatesWrite, name: "Manage estimates")
+                .AddPermission(TurnKeyPermissionKeys.JobsRead, name: "Read jobs")
+                .AddPermission("calendar.read", name: "Read calendar")
                 .AddPermission(TurnKeyPermissionKeys.JobsWrite, name: "Manage jobs")
                 .AddPermission(TurnKeyPermissionKeys.CalendarWrite, name: "Manage calendar")
                 .AddPermission(TurnKeyPermissionKeys.TenantRead, name: "Read tenant data")
@@ -108,6 +110,8 @@ namespace MedInsights.API.DependencyInjection
                 TurnKeyPermissionKeys.LeadsWrite,
                 TurnKeyPermissionKeys.EstimatesRead,
                 TurnKeyPermissionKeys.EstimatesWrite,
+                TurnKeyPermissionKeys.JobsRead,
+                "calendar.read",
                 TurnKeyPermissionKeys.JobsWrite,
                 TurnKeyPermissionKeys.CalendarWrite,
                 TurnKeyPermissionKeys.TenantRead,
@@ -127,6 +131,8 @@ namespace MedInsights.API.DependencyInjection
                 TurnKeyPermissionKeys.LeadsWrite,
                 TurnKeyPermissionKeys.EstimatesRead,
                 TurnKeyPermissionKeys.EstimatesWrite,
+                TurnKeyPermissionKeys.JobsRead,
+                "calendar.read",
                 TurnKeyPermissionKeys.JobsWrite,
                 TurnKeyPermissionKeys.CalendarWrite,
                 TurnKeyPermissionKeys.TenantRead,

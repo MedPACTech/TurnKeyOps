@@ -10,7 +10,7 @@ using TurnKeyOps.Services.Mappers;
 
 namespace TurnKeyOps.Services;
 
-public sealed class JobService : IJobService
+public sealed partial class JobService : IJobService
 {
     private static readonly HashSet<string> ChecklistKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -36,7 +36,8 @@ public sealed class JobService : IJobService
         IUserContext userContext,
         ITenantMembershipRepository memberships,
         ITenantSettingsRepository settings,
-        ICalendarEventRepository calendar)
+        ICalendarEventRepository calendar,
+        IJobAuthority? authority = null, JobConfigurationService? configuration = null)
     {
         _repo = repo;
         _estimatePayloadStore = estimatePayloadStore;
@@ -46,13 +47,19 @@ public sealed class JobService : IJobService
         _memberships = memberships;
         _settings = settings;
         _calendar = calendar;
+        _authority = authority; _configuration = configuration;
     }
+
+    private readonly IJobAuthority? _authority;
+    private readonly JobConfigurationService? _configuration;
+    private Task RequireAsync(bool write, CancellationToken ct) => _authority?.RequireAsync(write,ct) ?? Task.CompletedTask;
 
     private string Partition() => RepositoryKeyHelper.ToTenantPartitionKey(_userContext.TenantId);
     private static string Row(Guid id) => RepositoryKeyHelper.ToRowKey(id);
 
     public async Task<JobDto?> GetAsync(Guid id, CancellationToken ct = default)
     {
+        await RequireAsync(false,ct);
         var entity = await GetEntityAsync(id, ct);
         return entity is null ? null : await HydrateAsync(entity, ct);
     }
@@ -62,6 +69,7 @@ public sealed class JobService : IJobService
         string? continuationToken,
         CancellationToken ct = default)
     {
+        await RequireAsync(false,ct);
         pageSize = Math.Clamp(pageSize, 1, 100);
         var offset = int.TryParse(continuationToken, out var parsed) && parsed >= 0 ? parsed : 0;
         var entities = await _repo.ListAsync(Partition(), ct);
@@ -74,6 +82,7 @@ public sealed class JobService : IJobService
 
     public async Task<IEnumerable<JobDto>> GetActiveAsync(CancellationToken ct = default)
     {
+        await RequireAsync(false,ct);
         var entities = (await _repo.ListAsync(Partition(), ct))
             .Where(job => job.Status is not (JobStatus.Completed or JobStatus.Cancelled or JobStatus.Closed))
             .ToArray();
@@ -84,6 +93,7 @@ public sealed class JobService : IJobService
 
     public async Task<JobDto> AddAsync(JobDto dto, CancellationToken ct = default)
     {
+        await RequireAsync(true,ct);
         ArgumentNullException.ThrowIfNull(dto);
         dto.Id = dto.Id == Guid.Empty ? dto.InvoiceId.GetValueOrDefault(Guid.NewGuid()) : dto.Id;
         if (dto.Id == Guid.Empty) dto.Id = Guid.NewGuid();
@@ -110,6 +120,7 @@ public sealed class JobService : IJobService
         var payload = new JobWorkflowPayloadDto
         {
             AcceptedEstimate = dto.AcceptedEstimate,
+            Execution = dto.AcceptedEstimate is not null ? JobConfigurationService.Initialize(dto, _configuration is null ? new() : await _configuration.GetAsync(_userContext.TenantId,ct)) : null,
             Planning = NormalizePlanning(dto.Planning, dto, now),
             Activity =
             [
@@ -125,9 +136,11 @@ public sealed class JobService : IJobService
 
     public async Task<JobDto> UpdateAsync(JobDto dto, CancellationToken ct = default)
     {
+        await RequireAsync(true,ct);
         ArgumentNullException.ThrowIfNull(dto);
         var existing = await RequireEntityAsync(dto.Id, ct);
         ValidateVersion(existing, dto.Version);
+        await RequireLegacyAsync(existing,ct);
         ValidateCore(dto);
         await ValidateLocksmithAssignmentAsync(dto.TradeType, dto.LocksmithJobType, dto.AssignedTechnicianMembershipId, dto.Status, dto.ScheduledStart, ct);
         if (dto.TradeType == TradeType.DoorsLocksmith && dto.ScheduledStart.HasValue && string.IsNullOrWhiteSpace(dto.Crew))
@@ -152,9 +165,11 @@ public sealed class JobService : IJobService
 
     public async Task<JobDto> ScheduleAsync(Guid id, JobScheduleInputDto input, CancellationToken ct = default)
     {
+        await RequireAsync(true,ct);
         ArgumentNullException.ThrowIfNull(input);
         var entity = await RequireEntityAsync(id, ct);
         ValidateVersion(entity, input.ExpectedVersion);
+        await RequireLegacyAsync(entity,ct);
         var start = Utc(input.ScheduledStart);
         var end = Utc(input.ScheduledEnd);
         var crew = Clean(input.Crew, 160);
@@ -195,9 +210,11 @@ public sealed class JobService : IJobService
 
     public async Task<JobDto> UpdateStatusAsync(Guid id, JobStatusInputDto input, CancellationToken ct = default)
     {
+        await RequireAsync(true,ct);
         ArgumentNullException.ThrowIfNull(input);
         var entity = await RequireEntityAsync(id, ct);
         ValidateVersion(entity, input.ExpectedVersion);
+        await RequireLegacyAsync(entity,ct);
         if (entity.Status == input.Status) return await HydrateAsync(entity, ct);
         ValidateTransition(entity.Status, input.Status);
         if (!IsReleased(entity.Status) && IsReleased(input.Status))
@@ -221,9 +238,11 @@ public sealed class JobService : IJobService
 
     public async Task<JobDto> UpdatePlanningAsync(Guid id, JobPlanningInputDto input, CancellationToken ct = default)
     {
+        await RequireAsync(true,ct);
         ArgumentNullException.ThrowIfNull(input);
         var entity = await RequireEntityAsync(id, ct);
         ValidateVersion(entity, input.ExpectedVersion);
+        await RequireLegacyAsync(entity,ct);
         var payload = await _jobPayloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
         var now = DateTime.UtcNow;
         payload.Planning = NormalizePlanning(input.Planning, JobMapper.ToDto(entity), now);
@@ -234,6 +253,7 @@ public sealed class JobService : IJobService
 
     public async Task<JobDto> AddNoteAsync(Guid id, JobNoteInputDto input, CancellationToken ct = default)
     {
+        await RequireAsync(true,ct);
         ArgumentNullException.ThrowIfNull(input);
         var entity = await RequireEntityAsync(id, ct);
         ValidateVersion(entity, input.ExpectedVersion);
@@ -249,13 +269,21 @@ public sealed class JobService : IJobService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        await RequireAsync(true,ct);
         var entity = await GetEntityAsync(id, ct);
         if (entity is null) return;
+        await RequireLegacyAsync(entity,ct);
         if (entity.Status is JobStatus.InProgress or JobStatus.Completed or JobStatus.Closed)
             throw new ArgumentException("An active or completed job cannot be deleted.");
         entity.IsDeleted = true;
         entity.DateUpdated = DateTime.UtcNow;
         await _repo.SaveAsync(entity, ct);
+    }
+
+    private async Task RequireLegacyAsync(Job entity,CancellationToken ct)
+    {
+        if ((await _jobPayloadStore.LoadAsync(entity.WorkflowPayloadBlobName,ct)).Execution is not null)
+            throw new ArgumentException("Use the Job execution workspace for this job.");
     }
 
     private async Task EnsureReleaseEligibleAsync(JobStatus status, Guid? invoiceId, CancellationToken ct)
@@ -273,8 +301,6 @@ public sealed class JobService : IJobService
         var isLocksmithTenant = settings is not null && !settings.IsDeleted && LocksmithPolicy.IsConfigured(settings.ValuesJson);
         if (trade != TradeType.DoorsLocksmith)
         {
-            if (isLocksmithTenant)
-                throw new ArgumentException("A doors and locksmith job requires the doors and locksmith trade.", nameof(trade));
             if (!string.IsNullOrWhiteSpace(jobType) || membershipId.HasValue)
                 throw new ArgumentException("Locksmith job type and technician assignment require the doors and locksmith trade.");
             return;
@@ -327,7 +353,7 @@ public sealed class JobService : IJobService
     {
         if (id == Guid.Empty) return null;
         var entity = await _repo.GetAsync(Partition(), Row(id), ct);
-        return entity is null || entity.IsDeleted ? null : entity;
+        return entity is null || entity.IsDeleted || entity.PartitionKey != Partition() ? null : entity;
     }
 
     private async Task<Job> RequireEntityAsync(Guid id, CancellationToken ct) =>
@@ -339,6 +365,7 @@ public sealed class JobService : IJobService
         dto.EstimateSnapshot = await _estimatePayloadStore.LoadJobEstimateSnapshotAsync(entity.EstimateSnapshotBlobName, entity.EstimateSnapshotJson, ct);
         var payload = await _jobPayloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
         dto.AcceptedEstimate = payload.AcceptedEstimate;
+        dto.Execution = payload.Execution;
         dto.Planning = payload.Planning;
         dto.Activity = [.. payload.Activity.OrderByDescending(item => item.OccurredAtUtc)];
         dto.Version = VersionOf(entity);
@@ -348,13 +375,14 @@ public sealed class JobService : IJobService
     private async Task<Job> PersistAsync(Job entity, JobWorkflowPayloadDto payload, CancellationToken ct)
     {
         var oldBlob = entity.WorkflowPayloadBlobName;
+        if(payload.Execution is not null)payload.PreviousVersionBlobName=oldBlob;
         var newBlob = await _jobPayloadStore.SaveAsync(_userContext.TenantId, entity.Id, payload, ct);
         entity.WorkflowPayloadBlobName = newBlob;
         entity.DateUpdated = DateTime.UtcNow;
         try
         {
             var saved = await _repo.SaveAsync(entity, ct);
-            if (!string.IsNullOrWhiteSpace(oldBlob) && oldBlob != newBlob)
+            if (payload.Execution is null && !string.IsNullOrWhiteSpace(oldBlob) && oldBlob != newBlob)
             {
                 try { await _jobPayloadStore.DeleteIfExistsAsync(oldBlob, ct); }
                 catch { }

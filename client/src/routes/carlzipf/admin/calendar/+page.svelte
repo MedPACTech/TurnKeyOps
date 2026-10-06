@@ -1,4 +1,5 @@
 <script lang="ts">
+ import JobCalendarEvents from '$lib/components/jobs/JobCalendarEvents.svelte';
 	import { page } from '$app/state';
 	import { enhance } from '$app/forms';
 	import type { PageProps } from './$types';
@@ -17,6 +18,8 @@
 <svelte:head><title>Calendar · Carl Zipf</title></svelte:head>
 <div class="mx-auto max-w-6xl space-y-6 pb-10">
 	<header><p class="text-sm font-semibold text-[var(--accent-text)]">Carl Zipf Lock Shop</p><h1 class="mt-2 text-3xl font-bold">Calendar</h1><p class="mt-2 text-sm text-[var(--text-muted)]">One assessment schedule for residential and commercial work. Technician choices follow their assigned job types.</p></header>
+<JobCalendarEvents events={data.operationalEvents} error={data.operationalEventsError} basePath="/carlzipf/admin/jobs"/>
+
 	{#if data.loadError}<p role="alert" class="rounded-xl border border-[var(--critical-text)] bg-[var(--critical-soft)] p-4 text-sm text-[var(--critical-text)]">{data.loadError} <a class="underline" href="/carlzipf/admin/calendar">Retry</a></p>{/if}
 	{#if form?.error}<p role="alert" class="rounded-xl border border-[var(--critical-text)] bg-[var(--critical-soft)] p-4 text-sm text-[var(--critical-text)]">{form.error}</p>{/if}
 	{#if form?.message}<p role="status" class="rounded-xl border border-[var(--positive-text)] bg-[var(--positive-soft)] p-4 text-sm text-[var(--positive-text)]">{form.message}</p>{/if}

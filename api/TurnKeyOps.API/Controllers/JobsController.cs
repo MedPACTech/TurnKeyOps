@@ -36,6 +36,7 @@ public class JobsController : ApiControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] JobDto dto, CancellationToken ct)
     {
+        if(dto.AcceptedEstimate is not null || dto.Execution is not null || dto.LeadId.HasValue) return BadRequest("Use the accepted Estimate handoff or Job workspace.");
         var result = await _service.AddAsync(dto, ct);
         return CreatedResponse(nameof(Get), new { id = result.Id }, result);
     }

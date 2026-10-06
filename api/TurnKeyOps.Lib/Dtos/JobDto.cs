@@ -4,6 +4,7 @@ namespace TurnKeyOps.Lib.Dtos;
 
 public class JobDto
 {
+    public JobExecutionDto? Execution { get; set; }
     public AcceptedEstimateDto? AcceptedEstimate { get; set; }
     public Guid Id { get; set; }
     public Guid? LeadId { get; set; }
@@ -89,6 +90,8 @@ public sealed class JobActivityDto
 
 public sealed class JobWorkflowPayloadDto
 {
+    public string? PreviousVersionBlobName { get; set; }
+    public JobExecutionDto? Execution { get; set; }
     public AcceptedEstimateDto? AcceptedEstimate { get; set; }
     public JobPlanningDto Planning { get; set; } = new();
     public List<JobActivityDto> Activity { get; set; } = [];

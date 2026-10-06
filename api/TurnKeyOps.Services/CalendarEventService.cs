@@ -16,6 +16,8 @@ public class CalendarEventService : ICalendarEventService
     private readonly ITenantMembershipRepository _memberships;
     private readonly ITenantSettingsRepository _settings;
     private readonly IJobRepository _jobs;
+    private readonly IJobAuthority? _jobAuthority;
+    private readonly IJobWorkflowPayloadStore? _jobPayloads;
 
     public CalendarEventService(
         ICalendarEventRepository repo,
@@ -23,7 +25,7 @@ public class CalendarEventService : ICalendarEventService
         IUserContext userContext,
         ITenantMembershipRepository memberships,
         ITenantSettingsRepository settings,
-        IJobRepository jobs)
+        IJobRepository jobs, IJobAuthority? jobAuthority = null, IJobWorkflowPayloadStore? jobPayloads = null)
     {
         _repo = repo;
         _weatherService = weatherService;
@@ -31,6 +33,7 @@ public class CalendarEventService : ICalendarEventService
         _memberships = memberships;
         _settings = settings;
         _jobs = jobs;
+        _jobAuthority = jobAuthority;_jobPayloads=jobPayloads;
     }
 
     private string PartitionKeyForTenant() => RepositoryKeyHelper.ToTenantPartitionKey(_userContext.TenantId);
@@ -71,6 +74,7 @@ public class CalendarEventService : ICalendarEventService
 
     public async Task<CalendarEventDto> AddAsync(CalendarEventDto dto)
     {
+        if(dto.JobEventType is not null)throw new ArgumentException("Use the Job workspace for Job events.");
         await ValidateScheduleAsync(dto);
         dto.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
         var entity = CalendarEventMapper.ToEntity(dto, PartitionKeyForTenant());
@@ -84,8 +88,10 @@ public class CalendarEventService : ICalendarEventService
         var existing = await _repo.GetAsync(partitionKey, RepositoryKeyHelper.ToRowKey(dto.Id));
         if (existing is null || existing.IsDeleted || existing.PartitionKey != partitionKey)
             throw new ArgumentException("Calendar event not found", nameof(dto.Id));
+        if(existing.JobEventType is not null || dto.JobEventType is not null)throw new ArgumentException("Use the Job workspace for Job events.");
         await ValidateScheduleAsync(dto);
         var entity = CalendarEventMapper.ToEntity(dto, existing.PartitionKey);
+        entity.ETag = existing.ETag;
         entity.DateCreated = existing.DateCreated;
         await _repo.SaveAsync(entity);
         return CalendarEventMapper.ToDto(entity);
@@ -96,6 +102,7 @@ public class CalendarEventService : ICalendarEventService
         var partitionKey = PartitionKeyForTenant();
         var entity = await _repo.GetAsync(partitionKey, RepositoryKeyHelper.ToRowKey(id));
         if (entity is null || entity.IsDeleted || entity.PartitionKey != partitionKey) return;
+        if(entity.JobEventType is not null)throw new ArgumentException("Cancel Job events in the Job workspace.");
         entity.IsDeleted = true;
         entity.DateUpdated = DateTime.UtcNow;
         await _repo.SaveAsync(entity);
@@ -103,6 +110,14 @@ public class CalendarEventService : ICalendarEventService
 
     private async Task ValidateScheduleAsync(CalendarEventDto dto)
     {
+        if(dto.MembershipIds.Count>0||dto.ResourceIds.Count>0)throw new ArgumentException("Manage operational resource assignments in the Job workspace.");
+        if(dto.JobId is Guid jobId)
+        {
+            if(_jobAuthority is not null)await _jobAuthority.RequireAsync(true);
+            var job=await _jobs.GetAsync(PartitionKeyForTenant(),RepositoryKeyHelper.ToRowKey(jobId));
+            if(job is null||job.IsDeleted||job.PartitionKey!=PartitionKeyForTenant())throw new ArgumentException("Job not found.");
+            if(_jobPayloads is not null&&(await _jobPayloads.LoadAsync(job.WorkflowPayloadBlobName)).Execution is not null)throw new ArgumentException("Manage this Job's events in its execution workspace.");
+        }
         if (dto.EndUtc <= dto.StartUtc)
             throw new ArgumentException("The calendar end must be after the start.", nameof(dto.EndUtc));
 

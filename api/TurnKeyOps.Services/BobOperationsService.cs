@@ -29,6 +29,7 @@ public sealed class BobOperationsService : IBobOperationsService
     private readonly IBobContextMinimizer _minimizer;
     private readonly BobOperationsOptions _options;
     private readonly LeadConfigurationService? _leadConfiguration;
+    private readonly JobConfigurationService? _jobConfiguration;
 
     public BobOperationsService(
         IBobActionRepository repository,
@@ -39,7 +40,7 @@ public sealed class BobOperationsService : IBobOperationsService
         IAuditService audit,
         IBobContextMinimizer minimizer,
         IOptions<BobOperationsOptions> options,
-        LeadConfigurationService? leadConfiguration = null)
+        LeadConfigurationService? leadConfiguration = null, JobConfigurationService? jobConfiguration = null)
     {
         _repository = repository;
         _chatRepository = chatRepository;
@@ -50,6 +51,7 @@ public sealed class BobOperationsService : IBobOperationsService
         _minimizer = minimizer;
         _options = options.Value;
         _leadConfiguration = leadConfiguration;
+        _jobConfiguration = jobConfiguration;
     }
 
     public async Task<BobActionDto> ApproveLeadAsync(Guid leadId, Guid actionId, CancellationToken ct = default)
@@ -110,6 +112,36 @@ public sealed class BobOperationsService : IBobOperationsService
                 StateJson = JsonSerializer.Serialize(new { estimateId }), DateChatCreated = DateTime.UtcNow, DateChatUpdated = DateTime.UtcNow
             }, ct);
         return await ProposeAsync(estimateId, input, ct);
+    }
+
+    public async Task<BobActionDto> ApproveJobAsync(Guid jobId, Guid actionId, CancellationToken ct = default)
+    {
+        var action = await RequireActionAsync(actionId, ct);
+        if (action.ConversationId != jobId || !action.ToolKey.StartsWith("job.", StringComparison.Ordinal))
+            throw new ArgumentException("Action belongs to another Job.");
+        await ApproveAsync(actionId, ct);
+        return await ExecuteAsync(actionId, ct);
+    }
+
+    public async Task<BobActionDto> ProposeJobAsync(Guid jobId, ProposeBobActionDto input, CancellationToken ct = default)
+    {
+        EnsureEnabled();
+        if (jobId == Guid.Empty || !input.ToolKey.StartsWith("job.", StringComparison.Ordinal) ||
+            !input.Input.TryGetProperty("jobId", out var inputId) || inputId.GetGuid() != jobId)
+            throw new ArgumentException("The action must target this Job.");
+        var provider = GetProvider(input.ToolKey);
+        await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
+        await PolicyRequiresApprovalAsync(provider, ct);
+        var partition = PartitionKey();
+        var row = MedInsights.Lib.EntityKeyPolicy.Row(jobId);
+        var conversation = await _chatRepository.GetAsync(partition, row, ct);
+        if (conversation is null)
+            await _chatRepository.SaveAsync(new MedInsights.Lib.Entities.Chat {
+                Id = jobId, TenantId = _userContext.TenantId, ActorUserId = _userContext.UserId,
+                PartitionKey = partition, RowKey = row, Title = "Job workspace", Mode = "job",
+                StateJson = JsonSerializer.Serialize(new { jobId }), DateChatCreated = DateTime.UtcNow, DateChatUpdated = DateTime.UtcNow
+            }, ct);
+        return await ProposeAsync(jobId, input, ct);
     }
 
     public async Task<BobActionDto> ProposeAsync(
@@ -266,7 +298,8 @@ public sealed class BobOperationsService : IBobOperationsService
         if (_leadConfiguration is null) return RequiresConfirmation(provider.Risk);
         var config = await _leadConfiguration.GetAsync(_userContext.TenantId, ct);
         var mode = config.AiActions.GetValueOrDefault(provider.ToolKey, provider.Risk == BobActionRisk.Read ? "read" : "approval");
-        if (mode is "disabled" or "recommend" || mode == "draft" && provider.ToolKey is not ("lead.draft" or "estimate.extract"))
+        if(provider.ToolKey.StartsWith("job.")&&_jobConfiguration is not null)mode=(await _jobConfiguration.GetAsync(_userContext.TenantId,ct)).AiActions.GetValueOrDefault(provider.ToolKey,mode);
+        if (mode is "disabled" or "recommend" || mode == "draft" && provider.ToolKey is not ("lead.draft" or "estimate.extract" or "job.change"))
             throw new InvalidOperationException("Tenant policy does not allow this action to execute.");
         if (mode == "read" && provider.Risk != BobActionRisk.Read)
             throw new InvalidOperationException("Read-only policy cannot execute a mutation.");

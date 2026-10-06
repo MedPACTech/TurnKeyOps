@@ -309,12 +309,13 @@ public sealed partial class LeadService(
         if (existing is not null && (existing.LeadId != id || existing.IsDeleted)) throw new InvalidOperationException("Job identity is already in use.");
         var job = await jobService.AddAsync(new JobDto {
             Id = id, LeadId = id, Name = entity.Data.Title, CustomerId = entity.Data.CustomerId.Value,
+            JobSiteId = packet.Document?.SiteId, EstimateId = packet.Id,
             CustomerName = entity.Data.ContactName, ContactName = entity.Data.ContactName, ContactEmail = entity.Data.Email,
             ContactPhone = entity.Data.Phone, ProjectAddress = entity.Data.SiteAddress, QuoteRequestId = entity.Data.IntakeRequestId,
             EstimatedTotal = packet.AcceptedTotal, RequiredDepositPercent = packet.Document?.DepositPercent ?? 0, Status = Lib.Enums.JobStatus.Created,
             Description = packet.Document?.Scope ?? packet.ServiceSummary,
             AcceptedEstimate = new() { EstimateId=packet.Id,LeadId=id,Revision=packet.RevisionNumber,DocumentHash=packet.DocumentHash,
-                Document=QuoteEstimateService.CustomerProjection(packet).Document,Signature=packet.ApprovalSignature,
+                Document=QuoteEstimateService.CustomerProjection(packet,false).Document,Signature=packet.ApprovalSignature,
                 SelectedOptions=QuoteEstimateService.CustomerProjection(packet).Pricing?.Options.Where(x=>packet.AcceptedOptionIds.Contains(x.Id)).ToList()??[],
                 Source=entity.Data.Source,Referral=entity.Data.ReferralName,SalesOwnerProfileId=entity.Data.OwnerProfileId,SalesOwnerMembershipId=entity.Data.OwnerMembershipId },
             TradeType = entity.Data.TradeProfile switch { "concrete" => Lib.Enums.TradeType.Concrete, "framing" => Lib.Enums.TradeType.Framing, "doors-locks" => Lib.Enums.TradeType.DoorsLocksmith, _ => Lib.Enums.TradeType.General },

@@ -118,7 +118,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Install metadata contains no account data. Browsers can fetch manifests without
 	// cookies; treating those requests as failed sessions also cleared the user's cookies.
 	const publicManifest = ['GET', 'HEAD'].includes(event.request.method) &&
-		/^\/(bdr|carlzipf|thinkpink)\/admin\/(leads|estimates)\/manifest\.webmanifest$/.test(authPathname);
+		/^\/(bdr|carlzipf|thinkpink)\/admin\/(leads|estimates|jobs)\/manifest\.webmanifest$/.test(authPathname);
 	if (publicManifest || !isAdminPath(authPathname)) {
 		return withSecurityHeaders(await resolve(event), event.url.protocol === 'https:');
 	}

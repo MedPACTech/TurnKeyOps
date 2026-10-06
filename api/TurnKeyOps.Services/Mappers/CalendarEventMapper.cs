@@ -13,6 +13,7 @@ public static class CalendarEventMapper
         {
             Id = id,
             LeadId = entity.LeadId,
+            JobEventType=entity.JobEventType, EventStatus=entity.EventStatus, MembershipIds=entity.MembershipIds,ResourceIds=entity.ResourceIds,CustomerVisible=entity.CustomerVisible,
             Title = entity.Title,
             Description = entity.Description,
             EventType = entity.EventType,
@@ -45,6 +46,7 @@ public static class CalendarEventMapper
         {
             Id = dto.Id,
             LeadId = dto.LeadId,
+            JobEventType=dto.JobEventType, EventStatus=dto.EventStatus, MembershipIds=dto.MembershipIds,ResourceIds=dto.ResourceIds,CustomerVisible=dto.CustomerVisible,
             PartitionKey = partitionKey,
             RowKey = RepositoryKeyHelper.ToRowKey(dto.Id),
             Title = dto.Title,

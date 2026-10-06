@@ -39,8 +39,9 @@ public sealed class JobWorkflowServiceTests
         });
         var fixture = CreateFixture(tenantId, members: [member], settingsJson: settingsJson);
         var untyped = ScheduledJob(Guid.NewGuid(), "Crew A", 8, 12);
-        var tradeError = await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.AddAsync(untyped));
-        Assert.Contains("doors and locksmith trade", tradeError.Message);
+        untyped.InvoiceId = Guid.NewGuid();
+        var multiTradeJob = await fixture.Service.AddAsync(untyped);
+        Assert.Equal(TradeType.Concrete, multiTradeJob.TradeType);
         var job = ScheduledJob(Guid.NewGuid(), string.Empty, 8, 12);
         job.TradeType = TradeType.DoorsLocksmith;
         job.LocksmithJobType = "residential";

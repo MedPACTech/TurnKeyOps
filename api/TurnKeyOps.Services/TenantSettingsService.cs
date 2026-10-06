@@ -82,9 +82,14 @@ public sealed class TenantSettingsService : ITenantSettingsService
 
         if(kind==TenantSettingKinds.Operational && (_estimateAuthority is null || !await _estimateAuthority.CanApproveAsync(ct)))
         {
+            if(input.Values.TryGetProperty("jobs",out _))throw new MedInsights.Lib.ForbiddenAccessException("Owner access is required to change Job execution policy.");
             if(input.Values.TryGetProperty("estimates",out _))throw new MedInsights.Lib.ForbiddenAccessException("Owner access is required to change estimate pricing policy.");
             // Other settings editors do not receive or overwrite the private pricing section.
             using var prior=JsonDocument.Parse(existing?.ValuesJson??"{}");
+            if(prior.RootElement.TryGetProperty("jobs",out var jobPolicy))
+            {
+                var values=System.Text.Json.Nodes.JsonNode.Parse(input.Values.GetRawText())!.AsObject();values["jobs"]=System.Text.Json.Nodes.JsonNode.Parse(jobPolicy.GetRawText());input.Values=JsonSerializer.SerializeToElement(values);
+            }
             if(prior.RootElement.TryGetProperty("estimates",out var pricing))
             {
                 var values=System.Text.Json.Nodes.JsonNode.Parse(input.Values.GetRawText())!.AsObject();
@@ -137,9 +142,9 @@ public sealed class TenantSettingsService : ITenantSettingsService
 
     private async Task<TenantSettingsDocumentDto> ProtectEstimateSettingsAsync(TenantSettingsDocumentDto dto,CancellationToken ct)
     {
-        if(dto.Values.ValueKind==JsonValueKind.Object && dto.Values.TryGetProperty("estimates",out _) && (_estimateAuthority is null || !await _estimateAuthority.CanApproveAsync(ct)))
+        if(dto.Values.ValueKind==JsonValueKind.Object && (dto.Values.TryGetProperty("estimates",out _) || dto.Values.TryGetProperty("jobs",out _)) && (_estimateAuthority is null || !await _estimateAuthority.CanApproveAsync(ct)))
         {
-            var values=System.Text.Json.Nodes.JsonNode.Parse(dto.Values.GetRawText())!.AsObject();values.Remove("estimates");dto.Values=JsonSerializer.SerializeToElement(values);
+            var values=System.Text.Json.Nodes.JsonNode.Parse(dto.Values.GetRawText())!.AsObject();values.Remove("estimates");values.Remove("jobs");dto.Values=JsonSerializer.SerializeToElement(values);
         }
         return dto;
     }
@@ -189,6 +194,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         if (string.Equals(kind, TenantSettingKinds.Operational, StringComparison.Ordinal))
         {
             ValidateOperationalValues(input.Values);
+            if (input.Values.TryGetProperty("jobs", out var jobs)) JobConfigurationService.Validate(jobs.Deserialize<JobConfigurationDto>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? new());
             if (input.Values.TryGetProperty("leads", out var leads)) LeadConfigurationService.Validate(leads);
             if (input.Values.TryGetProperty("estimates", out var estimates)) EstimatePricingEngine.Validate(estimates.Deserialize<EstimatePricingPolicyDto>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? new());
             if (input.Values.TryGetProperty("locksmith", out var locksmith)) LocksmithPolicy.Validate(locksmith);

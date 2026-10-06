@@ -229,6 +229,14 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IInvoiceWebhookService, InvoiceWebhookService>();
         services.AddScoped<IJobWorkflowPayloadStore, JobWorkflowPayloadStore>();
         services.AddScoped<IJobService, JobService>();
+        services.AddScoped<IJobAuthority, JobAuthority>();
+        services.AddScoped<JobConfigurationService>();
+        services.AddScoped<JobExecutionService>();
+        services.AddScoped<TurnKeyOps.Repositories.IJobNotificationStore,TurnKeyOps.Repositories.JobNotificationStore>();
+        services.AddScoped<JobNotificationDispatcher>();
+        services.AddScoped<JobDeliveryService>();
+        foreach(var tool in new[]{"job.summarize","job.structure","job.readiness","job.recommend","job.schedule","job.task","job.change","job.material","job.activity","job.transition","job.notify"})
+            services.AddScoped<IBobActionProvider>(sp=>new BobJobActionProvider(sp.GetRequiredService<JobExecutionService>(),sp.GetRequiredService<JobDeliveryService>(),tool));
         services.AddScoped<IJobSiteService, JobSiteService>();
         services.AddScoped<IWeatherService, WeatherService>();
         services.AddScoped<ITurnKeyChatService, TurnKeyChatService>();

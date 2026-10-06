@@ -1,3 +1,5 @@
+import {loadJobCalendar} from '$lib/server/job-calendar';
+import type {RequestEvent} from '@sveltejs/kit';
 import { buildQuoteRequestQualification } from '$lib/quote-requests';
 import { authTokenCookie } from '$lib/server/auth-session';
 import { loadBdrBillingSettings } from '$lib/server/bdr-billing-settings';
@@ -10,7 +12,7 @@ const failure = (label: string, result: PromiseSettledResult<unknown>) =>
 		? `${label}: ${result.reason instanceof Error ? result.reason.message : 'unavailable'}`
 		: null;
 
-export const load = async ({ fetch, url, cookies }) => {
+const loadLegacy = async ({ fetch, url, cookies }: RequestEvent) => {
 	const scheduleRequestId = url.searchParams.get('scheduleRequest')?.trim() ?? '';
 	const [requestResult, billingResult, invoiceResult, jobResult] = await Promise.allSettled([
 		loadQuoteRequests(fetch),
@@ -44,3 +46,5 @@ export const load = async ({ fetch, url, cookies }) => {
 		}
 	};
 };
+
+export const load=async(event: RequestEvent)=>({...await loadLegacy(event),...await loadJobCalendar(event)});
