@@ -17,13 +17,13 @@
 <svelte:head><title>People & access</title></svelte:head>
 <section class="people">
  <header><div><p class="eyebrow">Company directory</p><h1>People & access</h1><p>One person, linked business profiles, and a separate choice of app access.</p></div>
- {#if canWrite}<button onclick={()=>open()}>Add user</button>{/if}</header>
+ {#if canWrite}<button class="btn-primary" onclick={()=>open()}>Add user</button>{/if}</header>
  {#if form?.error}<p class="notice error" role="alert">{form.error}</p>{/if}
  {#if form?.message}<p class="notice" role="status">{form.message}</p>{/if}
  {#if form?.inviteUrl}<div class="notice">Share this activation link with the person: <a href={form.inviteUrl}>{form.inviteUrl}</a></div>{/if}
  <div class="filters"><label>Search<input type="search" bind:value={query} placeholder="Name, email, or phone" /></label><label>Profile<select bind:value={filter}><option value="all">All active users</option><option value="employee">Employees</option><option value="customer">Customers</option><option value="vendor">Vendors</option><option value="archived">Archived</option></select></label></div>
  <div class="workspace"><div class="directory">
- {#each visible as person (person.id)}<button class:selected={selectedId===person.id} class="person" onclick={()=>open(person)}>
+ {#each visible as person (person.id)}<button class:selected={selectedId===person.id} class="person" aria-pressed={selectedId===person.id} onclick={()=>open(person)}>
   <strong>{`${person.firstName} ${person.lastName}`.trim() || person.contactEmail || person.contactPhone || 'Unnamed user'}</strong>
   <span>{person.profileTypes.join(' · ') || 'No business profile yet'}</span><span>{person.isOwner ? 'Owner' : person.role || 'No app access'}</span>
  </button>{:else}<p class="empty">No users match this view.</p>{/each}
@@ -45,17 +45,17 @@
  {#if selected?.isOwner}<p>Owners retain full company access.</p><input type="hidden" name="permissionMode" value="default"/>
  {:else}<label>Permission policy<select name="permissionMode" bind:value={permissionMode}><option value="default">Use role defaults</option><option value="custom">Custom module permissions</option></select></label>
  {#if permissionMode==='custom'}<div class="permissions">{#each modules as module}<label>{module}<select name={`module:${module}`} value={selected?.modulePermissions?.includes(`${module}.write`) ? 'write' : selected?.modulePermissions?.includes(`${module}.read`) ? 'read':'none'}><option value="none">No access</option><option value="read">View</option><option value="write">View and manage</option></select></label>{/each}</div><p class="help">Permissions stay within the access role. Dashboard requires visibility into all operational modules; Bob requires management access to them.</p>{/if}{/if}
- <button type="submit">{pending ? 'Saving…':'Save user'}</button></fieldset></form>
+ <button class="btn-primary" type="submit">{pending ? 'Saving…':'Save user'}</button></fieldset></form>
  {#if selected && canWrite}
- {#if !selected.isActive}<form method="POST" action="?/restorePerson" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><input type="hidden" name="version" value={selected.version}/><button disabled={pending}>Restore user</button></form>
+ {#if !selected.isActive}<form method="POST" action="?/restorePerson" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><input type="hidden" name="version" value={selected.version}/><button class="btn-secondary" disabled={pending}>Restore user</button></form>
  {:else}
- {#if selected.membershipId && !selected.isOwner}<form method="POST" action="?/updatePersonRole" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><h3>Access role</h3><label>Role<select name="role" value={selected.role}><option value="contact">Contact</option>{#if selected.profileTypes.includes('employee')}<option value="staff">Staff</option><option value="member">Member</option><option value="admin">Admin</option><option value="owner">Owner — full company access</option>{/if}</select></label><button disabled={pending}>Save access role</button><p class="help">Only company owners can change access roles.</p></form>{/if}
- {#if !selected.membershipId}<form method="POST" action="?/invitePerson" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><h3>Invite to the app</h3><label>Access role<select name="role"><option value="contact">Contact</option>{#if selected.profileTypes.includes('employee')}<option value="staff">Staff</option><option value="admin">Admin</option>{/if}</select></label><button disabled={pending}>Create invitation</button></form>{/if}
+ {#if selected.membershipId && !selected.isOwner}<form method="POST" action="?/updatePersonRole" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><h3>Access role</h3><label>Role<select name="role" value={selected.role}><option value="contact">Contact</option>{#if selected.profileTypes.includes('employee')}<option value="staff">Staff</option><option value="member">Member</option><option value="admin">Admin</option><option value="owner">Owner — full company access</option>{/if}</select></label><button class="btn-secondary" disabled={pending}>Save access role</button><p class="help">Only company owners can change access roles.</p></form>{/if}
+ {#if !selected.membershipId}<form method="POST" action="?/invitePerson" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><h3>Invite to the app</h3><label>Access role<select name="role"><option value="contact">Contact</option>{#if selected.profileTypes.includes('employee')}<option value="staff">Staff</option><option value="admin">Admin</option>{/if}</select></label><button class="btn-secondary" disabled={pending}>Create invitation</button></form>{/if}
  {#if canDelete}
  <section class="removal"><h3>Remove company access</h3><p class="help">Deletes this user from this company, including owner access. Business history is retained.</p>
- {#if confirmDelete}<form method="POST" action="?/deletePerson" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><input type="hidden" name="version" value={selected.version}/><p>Delete {`${selected.firstName} ${selected.lastName}`.trim() || 'this user'} from this company?</p><div class="delete-actions"><button class="danger" disabled={pending}>Confirm delete</button><button type="button" class="secondary" onclick={()=>confirmDelete=false}>Cancel</button></div></form>
- {:else}<button class="danger" onclick={()=>confirmDelete=true}>Delete user</button>{/if}</section>
- {:else if !selected.isOwner}<form method="POST" action="?/archivePerson" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><input type="hidden" name="version" value={selected.version}/><p class="help">Archiving removes this company's access and keeps the record for recovery.</p><button class="danger" disabled={pending}>Archive user</button></form>{/if}
+ {#if confirmDelete}<form method="POST" action="?/deletePerson" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><input type="hidden" name="version" value={selected.version}/><p>Delete {`${selected.firstName} ${selected.lastName}`.trim() || 'this user'} from this company?</p><div class="delete-actions"><button class="danger btn-danger" disabled={pending}>Confirm delete</button><button type="button" class="secondary btn-secondary" onclick={()=>confirmDelete=false}>Cancel</button></div></form>
+ {:else}<button class="danger btn-danger" onclick={()=>confirmDelete=true}>Delete user</button>{/if}</section>
+ {:else if !selected.isOwner}<form method="POST" action="?/archivePerson" use:enhance={submit}><input type="hidden" name="id" value={selected.id}/><input type="hidden" name="version" value={selected.version}/><p class="help">Archiving removes this company's access and keeps the record for recovery.</p><button class="danger btn-danger" disabled={pending}>Archive user</button></form>{/if}
  {/if}{/if}
  {/key}
  {:else}<p class="empty">Select a person to edit their profiles and access.</p>{/if}

@@ -16,7 +16,7 @@
 </script>
 <svelte:head><title>Contacts</title></svelte:head>
 <section class="contacts">
- <header><div><h1>Contacts</h1><p>Customer and vendor relationships, addresses, notes, and linked work.</p></div>{#if canWrite}<a class="primary" href="?new=1">Add contact</a>{/if}</header>
+ <header><div><h1>Contacts</h1><p>Customer and vendor relationships, addresses, notes, and linked work.</p></div>{#if canWrite}<a class="primary btn-primary" href="?new=1">Add contact</a>{/if}</header>
  {#if form?.error}<p class="notice error" role="alert">{form.error}</p>{:else if contactSaved}<p class="notice" role="status">Contact saved.</p>{/if}
  <div class="toolbar"><label>Search contacts<input type="search" bind:value={query} placeholder="Name, company, email, or phone"/></label><label>Relationship<select bind:value={filter}><option value="all">All contacts</option><option value="customer">Customers</option><option value="vendor">Vendors</option></select></label></div>
  <div class="workspace"><nav class="directory" aria-label="Contact directory">
@@ -37,7 +37,7 @@
  <label>Notes<textarea name="notes" rows="5" maxlength="4000" value={creating?'':selected?.notes??''}></textarea></label>
  <label>Linked customer record<select name="customerId" value={creating?'':selected?.customerId??''}><option value="">No linked customer</option>{#each customerLinks as customer}<option value={customer.id}>{customer.name||customer.companyName||'Unnamed customer'}</option>{/each}</select></label>
  <p class="help">Link an existing customer record to see their jobs and invoices here.</p>
- {#if canWrite}<button class="primary" disabled={pending}>{pending?'Saving…':'Save contact'}</button>{/if}
+ {#if canWrite}<button class="primary btn-primary" disabled={pending}>{pending?'Saving…':'Save contact'}</button>{/if}
  </fieldset></form>
  {#if !creating&&selected}
  <section class="work"><h3>Linked work</h3>
