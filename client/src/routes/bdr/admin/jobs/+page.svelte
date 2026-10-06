@@ -199,16 +199,16 @@
 		{ value: 'needs-reschedule', label: 'Needs new time' }
 	];
 	const confirmationMeta: Record<ConfirmationStatus, { label: string; chipClass: string }> = {
-		pending: { label: 'Customer pending', chipClass: 'border-amber-200 bg-amber-50 text-amber-700' },
-		confirmed: { label: 'Customer confirmed', chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-		'needs-reschedule': { label: 'Needs new time', chipClass: 'border-rose-200 bg-rose-50 text-rose-700' }
+		pending: { label: 'Customer pending', chipClass: 'border-[var(--warning-text)] bg-[var(--warning-soft)] text-[var(--warning-text)]' },
+		confirmed: { label: 'Customer confirmed', chipClass: 'border-[var(--positive-text)] bg-[var(--positive-soft)] text-[var(--positive-text)]' },
+		'needs-reschedule': { label: 'Needs new time', chipClass: 'border-[var(--critical-text)] bg-[var(--critical-soft)] text-[var(--critical-text)]' }
 	};
 	const orderStatusMeta: Record<OrderStatus, { label: string; chipClass: string }> = {
-		'not-started': { label: 'Not started', chipClass: 'border-slate-200 bg-slate-100 text-slate-700' },
-		requested: { label: 'Requested', chipClass: 'border-sky-200 bg-sky-50 text-sky-700' },
-		ordered: { label: 'Ordered', chipClass: 'border-violet-200 bg-violet-50 text-violet-700' },
-		confirmed: { label: 'Confirmed', chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-		delivered: { label: 'Delivered', chipClass: 'border-slate-300 bg-white text-slate-700' }
+		'not-started': { label: 'Not started', chipClass: 'border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-strong)]' },
+		requested: { label: 'Requested', chipClass: 'border-[var(--info-text)] bg-[var(--info-soft)] text-[var(--info-text)]' },
+		ordered: { label: 'Ordered', chipClass: 'border-violet-200 bg-[var(--teal-soft)] text-violet-700' },
+		confirmed: { label: 'Confirmed', chipClass: 'border-[var(--positive-text)] bg-[var(--positive-soft)] text-[var(--positive-text)]' },
+		delivered: { label: 'Delivered', chipClass: 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-strong)]' }
 	};
 	const checklistItems: { key: ChecklistKey; label: string }[] = [
 		{ key: 'customer-confirmed', label: 'Customer approved window' },
@@ -225,27 +225,27 @@
 	const statusMeta: Record<JobStatus, { label: string; chipClass: string; icon: typeof CalendarClock }> = {
 		scheduled: {
 			label: 'Scheduled',
-			chipClass: 'border-sky-200 bg-sky-50 text-sky-700',
+			chipClass: 'border-[var(--info-text)] bg-[var(--info-soft)] text-[var(--info-text)]',
 			icon: CalendarClock
 		},
 		'in-progress': {
 			label: 'In progress',
-			chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+			chipClass: 'border-[var(--positive-text)] bg-[var(--positive-soft)] text-[var(--positive-text)]',
 			icon: PlayCircle
 		},
 		'on-hold': {
 			label: 'On hold',
-			chipClass: 'border-amber-200 bg-amber-50 text-amber-700',
+			chipClass: 'border-[var(--warning-text)] bg-[var(--warning-soft)] text-[var(--warning-text)]',
 			icon: PauseCircle
 		},
 		completed: {
 			label: 'Completed',
-			chipClass: 'border-slate-200 bg-slate-100 text-slate-700',
+			chipClass: 'border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-strong)]',
 			icon: CheckCircle2
 		},
 		cancelled: {
 			label: 'Cancelled',
-			chipClass: 'border-rose-200 bg-rose-50 text-rose-700',
+			chipClass: 'border-[var(--critical-text)] bg-[var(--critical-soft)] text-[var(--critical-text)]',
 			icon: XCircle
 		}
 	};
@@ -299,11 +299,11 @@
 	);
 	const activeValue = $derived(activeJobs.reduce((sum, job) => sum + job.amount, 0));
 	const metrics = $derived([
-		{ label: 'Active jobs', value: String(activeJobs.length), icon: '🏗️' },
-		{ label: 'Customer confirmed', value: String(customerConfirmedJobs.length), icon: '✓' },
-		{ label: 'Pour ready', value: String(pourReadyJobs.length), icon: '✓' },
-		{ label: 'On hold', value: String(heldJobs.length), icon: '!' },
-		{ label: 'Active value', value: formatCurrency(activeValue), icon: '💵' }
+		{ label: 'Active jobs', value: String(activeJobs.length), icon: 'jobs' },
+		{ label: 'Customer confirmed', value: String(customerConfirmedJobs.length), icon: 'check' },
+		{ label: 'Pour ready', value: String(pourReadyJobs.length), icon: 'check' },
+		{ label: 'On hold', value: String(heldJobs.length), icon: 'warning' },
+		{ label: 'Active value', value: formatCurrency(activeValue), icon: 'money' }
 	]);
 
 	$effect(() => {
@@ -402,7 +402,7 @@
 {#snippet workSurface()}
 	<div class="space-y-4">
 	<section class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-			<aside class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+			<aside class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 				<div class="flex flex-col gap-3">
 					<div>
 						<p class="text-base font-semibold text-[var(--text-strong)]">Production queue</p>
@@ -411,19 +411,19 @@
 					<div class="flex gap-2">
 						<button
 							type="button"
-							class="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-solid-hover)] disabled:cursor-not-allowed disabled:bg-slate-300"
+							class="admin-primary inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md bg-[var(--cta)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[var(--cta-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-elevated)]"
 							disabled={!scheduleReadyJobs.length}
 							onclick={() => (createJobDrawerOpen = true)}
 						>
 							<Hammer class="h-4 w-4" aria-hidden="true" />
 							Create job
 							{#if scheduleReadyJobs.length}
-								<span class="rounded-full bg-white/20 px-1.5 py-0.5 text-xs">{scheduleReadyJobs.length}</span>
+								<span class="rounded-full bg-[var(--teal-soft)] px-1.5 py-0.5 text-[var(--teal-text)] text-xs">{scheduleReadyJobs.length}</span>
 							{/if}
 						</button>
 						<a
 							href="/bdr/admin/calendar"
-							class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--shell-border)] bg-white text-[var(--text-base)] transition hover:bg-[var(--shell-panel-strong)]"
+							class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--surface)] text-[var(--text-base)] transition hover:bg-[var(--shell-panel-strong)]"
 							aria-label="Open calendar"
 							title="Open calendar"
 						>
@@ -432,7 +432,7 @@
 					</div>
 				</div>
 
-			<label class="mt-4 flex items-center gap-2 rounded-md border border-[var(--shell-border)] bg-white px-3 py-2">
+			<label class="mt-4 flex items-center gap-2 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2">
 				<Search class="h-4 w-4 text-[var(--text-muted)]" aria-hidden="true" />
 				<span class="sr-only">Search jobs</span>
 				<input
@@ -448,13 +448,14 @@
 						type="button"
 						class={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition ${
 							activeFilter === filter.value
-								? 'bg-[var(--accent-solid)] text-white'
-								: 'bg-[var(--shell-panel-strong)] text-[var(--text-muted)] hover:bg-white'
+								? 'bg-[var(--accent-solid)] text-[var(--accent-solid-text)]'
+								: 'bg-[var(--shell-panel-strong)] text-[var(--text-muted)] hover:bg-[var(--surface)]'
 						}`}
+						aria-pressed={activeFilter === filter.value}
 						onclick={() => (activeFilter = filter.value)}
 					>
 						<span>{filter.label}</span>
-						<span class="rounded-full bg-white/25 px-1.5 py-0.5">{filter.count}</span>
+						<span class="rounded-full bg-[var(--teal-soft)] px-1.5 py-0.5 text-[var(--teal-text)]">{filter.count}</span>
 					</button>
 				{/each}
 			</div>
@@ -467,8 +468,8 @@
 							type="button"
 							class={`w-full rounded-lg border p-3 text-left transition ${
 								selectedJob?.id === job.id
-									? 'border-[var(--accent-solid)] bg-orange-50 shadow-sm'
-									: 'border-[var(--shell-border)] bg-white hover:border-slate-300 hover:bg-[var(--shell-panel-strong)]'
+									? 'border-[var(--accent-solid)] bg-[var(--teal-soft)] shadow-sm'
+									: 'border-[var(--shell-border)] bg-[var(--surface)] hover:border-[var(--border)] hover:bg-[var(--shell-panel-strong)]'
 							}`}
 							onclick={() => (selectedJobId = job.id)}
 						>
@@ -497,7 +498,7 @@
 						</button>
 					{/each}
 				{:else}
-					<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-white p-4 text-sm leading-6 text-[var(--text-muted)]">
+					<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-[var(--surface)] p-4 text-sm leading-6 text-[var(--text-muted)]">
 						No jobs match the current filter.
 					</div>
 				{/if}
@@ -507,12 +508,12 @@
 		{#if selectedJob}
 			<section class="space-y-4">
 				{#if actionMessage}
-					<div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+					<div class="rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm font-semibold text-[var(--positive-text)]">
 						{actionMessage}
 					</div>
 				{/if}
 
-				<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+				<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 					<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 						<div class="min-w-0">
 							<div class="flex flex-wrap items-center gap-2">
@@ -536,23 +537,23 @@
 					</div>
 
 					<div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-						<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
-							<CalendarClock class="h-4 w-4 text-sky-700" aria-hidden="true" />
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
+							<CalendarClock class="h-4 w-4 text-[var(--info-text)]" aria-hidden="true" />
 							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatDate(selectedJob.scheduledDate)}</p>
 							<p class="mt-1 text-xs text-[var(--text-muted)]">{formatTime(selectedJob.windowStart)} - {formatTime(selectedJob.windowEnd)}</p>
 						</div>
-						<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
-							<Hammer class="h-4 w-4 text-emerald-700" aria-hidden="true" />
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
+							<Hammer class="h-4 w-4 text-[var(--positive-text)]" aria-hidden="true" />
 							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedJob.crew}</p>
 							<p class="mt-1 text-xs text-[var(--text-muted)]">Assigned crew</p>
 						</div>
-						<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
-							<MapPin class="h-4 w-4 text-amber-700" aria-hidden="true" />
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
+							<MapPin class="h-4 w-4 text-[var(--warning-text)]" aria-hidden="true" />
 							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedJob.customerName}</p>
 							<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">{selectedJob.serviceAddress}</p>
 						</div>
-						<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
-							<CircleDollarSign class="h-4 w-4 text-slate-700" aria-hidden="true" />
+						<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
+							<CircleDollarSign class="h-4 w-4 text-[var(--text-strong)]" aria-hidden="true" />
 							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatCurrency(selectedJob.amountPaidAtScheduling)}</p>
 							<p class="mt-1 text-xs text-[var(--text-muted)]">Collected at release</p>
 						</div>
@@ -561,10 +562,10 @@
 
 				<div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
 					<div class="space-y-4">
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 								<div class="flex items-center gap-2">
-									<ClipboardCheck class="h-5 w-5 text-emerald-700" aria-hidden="true" />
+									<ClipboardCheck class="h-5 w-5 text-[var(--positive-text)]" aria-hidden="true" />
 									<h3 class="text-base font-semibold text-[var(--text-strong)]">Job planning</h3>
 								</div>
 								<span class="rounded-full bg-[var(--shell-panel-strong)] px-2.5 py-1 text-xs font-semibold text-[var(--text-muted)]">
@@ -581,7 +582,7 @@
 											<UserCheck class="h-3.5 w-3.5" aria-hidden="true" />
 											Customer confirmation
 										</span>
-										<select name="customerConfirmationStatus" bind:value={customerConfirmationStatus} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]">
+										<select name="customerConfirmationStatus" bind:value={customerConfirmationStatus} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]">
 											{#each confirmationStatusOptions as option}
 												<option value={option.value}>{option.label}</option>
 											{/each}
@@ -589,43 +590,43 @@
 									</label>
 									<label class="space-y-1">
 										<span class="text-xs font-semibold text-[var(--text-muted)]">Target job date</span>
-										<input name="targetDate" type="date" bind:value={targetDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+										<input name="targetDate" type="date" bind:value={targetDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 									</label>
 									<label class="space-y-1">
 										<span class="text-xs font-semibold text-[var(--text-muted)]">Customer note</span>
-										<input name="customerConfirmationNote" bind:value={customerConfirmationNote} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+										<input name="customerConfirmationNote" bind:value={customerConfirmationNote} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 									</label>
 									<label class="space-y-1">
 										<span class="text-xs font-semibold text-[var(--text-muted)]">Access / staging</span>
-										<input name="accessNotes" bind:value={accessNotes} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+										<input name="accessNotes" bind:value={accessNotes} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 									</label>
 								</div>
 
 								<div class="grid gap-3 md:grid-cols-3">
 									<label class="space-y-1">
 										<span class="text-xs font-semibold text-[var(--text-muted)]">Prep date</span>
-										<input name="prepDate" type="date" bind:value={prepDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+										<input name="prepDate" type="date" bind:value={prepDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 									</label>
 									<label class="space-y-1">
 										<span class="text-xs font-semibold text-[var(--text-muted)]">Pour date</span>
-										<input name="pourDate" type="date" bind:value={pourDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+										<input name="pourDate" type="date" bind:value={pourDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 									</label>
 									<label class="space-y-1">
 										<span class="text-xs font-semibold text-[var(--text-muted)]">Cleanup date</span>
-										<input name="cleanupDate" type="date" bind:value={cleanupDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+										<input name="cleanupDate" type="date" bind:value={cleanupDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 									</label>
 								</div>
 
 								<div class="grid gap-3 xl:grid-cols-2">
-									<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
+									<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
 										<div class="flex items-center gap-2">
-											<Package class="h-4 w-4 text-amber-700" aria-hidden="true" />
+											<Package class="h-4 w-4 text-[var(--warning-text)]" aria-hidden="true" />
 											<p class="text-sm font-semibold text-[var(--text-strong)]">Rock / gravel</p>
 										</div>
 										<div class="mt-3 grid gap-2 md:grid-cols-2">
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Status</span>
-												<select name="baseMaterialStatus" bind:value={baseMaterialStatus} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]">
+												<select name="baseMaterialStatus" bind:value={baseMaterialStatus} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]">
 													{#each orderStatusOptions as option}
 														<option value={option.value}>{option.label}</option>
 													{/each}
@@ -633,28 +634,28 @@
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Supplier</span>
-												<input name="baseMaterialSupplier" bind:value={baseMaterialSupplier} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="baseMaterialSupplier" bind:value={baseMaterialSupplier} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Delivery date</span>
-												<input name="baseMaterialDeliveryDate" type="date" bind:value={baseMaterialDeliveryDate} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="baseMaterialDeliveryDate" type="date" bind:value={baseMaterialDeliveryDate} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Delivery window</span>
-												<input name="baseMaterialDeliveryWindow" bind:value={baseMaterialDeliveryWindow} placeholder="7-9 AM" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="baseMaterialDeliveryWindow" bind:value={baseMaterialDeliveryWindow} placeholder="7-9 AM" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 										</div>
 									</div>
 
-									<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
+									<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
 										<div class="flex items-center gap-2">
-											<Wrench class="h-4 w-4 text-sky-700" aria-hidden="true" />
+											<Wrench class="h-4 w-4 text-[var(--info-text)]" aria-hidden="true" />
 											<p class="text-sm font-semibold text-[var(--text-strong)]">Equipment</p>
 										</div>
 										<div class="mt-3 grid gap-2 md:grid-cols-2">
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Status</span>
-												<select name="equipmentStatus" bind:value={equipmentStatus} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]">
+												<select name="equipmentStatus" bind:value={equipmentStatus} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]">
 													{#each orderStatusOptions as option}
 														<option value={option.value}>{option.label}</option>
 													{/each}
@@ -662,28 +663,28 @@
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Vendor</span>
-												<input name="equipmentVendor" bind:value={equipmentVendor} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="equipmentVendor" bind:value={equipmentVendor} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Delivery date</span>
-												<input name="equipmentDeliveryDate" type="date" bind:value={equipmentDeliveryDate} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="equipmentDeliveryDate" type="date" bind:value={equipmentDeliveryDate} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Delivery window</span>
-												<input name="equipmentDeliveryWindow" bind:value={equipmentDeliveryWindow} placeholder="Before prep" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="equipmentDeliveryWindow" bind:value={equipmentDeliveryWindow} placeholder="Before prep" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 										</div>
 									</div>
 
-									<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
+									<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
 										<div class="flex items-center gap-2">
-											<Truck class="h-4 w-4 text-emerald-700" aria-hidden="true" />
+											<Truck class="h-4 w-4 text-[var(--positive-text)]" aria-hidden="true" />
 											<p class="text-sm font-semibold text-[var(--text-strong)]">Concrete</p>
 										</div>
 										<div class="mt-3 grid gap-2 md:grid-cols-2">
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Status</span>
-												<select name="concreteStatus" bind:value={concreteStatus} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]">
+												<select name="concreteStatus" bind:value={concreteStatus} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]">
 													{#each orderStatusOptions as option}
 														<option value={option.value}>{option.label}</option>
 													{/each}
@@ -691,23 +692,23 @@
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Supplier</span>
-												<input name="concreteSupplier" bind:value={concreteSupplier} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="concreteSupplier" bind:value={concreteSupplier} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Truck date</span>
-												<input name="concreteDeliveryDate" type="date" bind:value={concreteDeliveryDate} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="concreteDeliveryDate" type="date" bind:value={concreteDeliveryDate} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Truck window</span>
-												<input name="concreteDeliveryWindow" bind:value={concreteDeliveryWindow} placeholder="10-11 AM" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="concreteDeliveryWindow" bind:value={concreteDeliveryWindow} placeholder="10-11 AM" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Yards</span>
-												<input name="concreteYards" inputmode="decimal" bind:value={concreteYards} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="concreteYards" inputmode="decimal" bind:value={concreteYards} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Mix</span>
-												<input name="concreteMix" bind:value={concreteMix} placeholder="4000 PSI broom" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="concreteMix" bind:value={concreteMix} placeholder="4000 PSI broom" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="flex items-center gap-2 md:col-span-2">
 												<input name="pumpNeeded" type="checkbox" bind:checked={concretePumpNeeded} class="h-4 w-4 rounded border-[var(--shell-border)]" />
@@ -716,7 +717,7 @@
 										</div>
 									</div>
 
-									<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
+									<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
 										<div class="flex items-center gap-2">
 											<Hammer class="h-4 w-4 text-violet-700" aria-hidden="true" />
 											<p class="text-sm font-semibold text-[var(--text-strong)]">Reinforcement</p>
@@ -724,7 +725,7 @@
 										<div class="mt-3 grid gap-2 md:grid-cols-2">
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Status</span>
-												<select name="reinforcementStatus" bind:value={reinforcementStatus} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]">
+												<select name="reinforcementStatus" bind:value={reinforcementStatus} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]">
 													{#each orderStatusOptions as option}
 														<option value={option.value}>{option.label}</option>
 													{/each}
@@ -732,17 +733,17 @@
 											</label>
 											<label class="space-y-1">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Supplier</span>
-												<input name="reinforcementSupplier" bind:value={reinforcementSupplier} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+												<input name="reinforcementSupplier" bind:value={reinforcementSupplier} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 											</label>
 											<label class="space-y-1 md:col-span-2">
 												<span class="text-xs font-semibold text-[var(--text-muted)]">Material notes</span>
-												<textarea name="materialNotes" bind:value={materialNotes} class="min-h-20 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6 text-[var(--text-strong)]"></textarea>
+												<textarea name="materialNotes" bind:value={materialNotes} class="min-h-20 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6 text-[var(--text-strong)]"></textarea>
 											</label>
 										</div>
 									</div>
 								</div>
 
-								<div class="rounded-lg border border-[var(--shell-border)] bg-white p-3">
+								<div class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
 									<p class="text-sm font-semibold text-[var(--text-strong)]">Concrete checklist</p>
 									<div class="mt-3 grid gap-2 md:grid-cols-2">
 										{#each checklistItems as item}
@@ -761,21 +762,21 @@
 									</div>
 								</div>
 
-								<button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--accent-solid-hover)]">
+								<button type="submit" class="admin-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--cta-hover)]">
 									<ClipboardCheck class="h-4 w-4" aria-hidden="true" />
 									Save job plan
 								</button>
 							</form>
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex items-center gap-2">
 								<ClipboardList class="h-5 w-5 text-[var(--accent-solid)]" aria-hidden="true" />
 								<h3 class="text-base font-semibold text-[var(--text-strong)]">Run controls</h3>
 							</div>
 							<textarea
 								bind:value={statusNote}
-								class="mt-4 min-h-20 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6 text-[var(--text-strong)] outline-none transition focus:border-[var(--accent-solid)]"
+								class="mt-4 min-h-20 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6 text-[var(--text-strong)] outline-none transition focus:border-[var(--accent-solid)]"
 								placeholder="Optional status note for crew, weather, access, or customer context"
 							></textarea>
 							<div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -818,35 +819,35 @@
 							</div>
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex items-center gap-2">
-								<RefreshCcw class="h-5 w-5 text-sky-700" aria-hidden="true" />
+								<RefreshCcw class="h-5 w-5 text-[var(--info-text)]" aria-hidden="true" />
 								<h3 class="text-base font-semibold text-[var(--text-strong)]">Schedule and crew</h3>
 							</div>
 							<form method="POST" action="?/rescheduleJob" class="mt-4 grid gap-3 md:grid-cols-2">
 								<input type="hidden" name="jobId" value={selectedJob.id} />
 								<label class="space-y-1">
 									<span class="text-xs font-semibold text-[var(--text-muted)]">Production date</span>
-									<input name="scheduledDate" type="date" bind:value={scheduleDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+									<input name="scheduledDate" type="date" bind:value={scheduleDate} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 								</label>
 								<label class="space-y-1">
 									<span class="text-xs font-semibold text-[var(--text-muted)]">Crew</span>
-									<input name="crew" bind:value={scheduleCrew} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+									<input name="crew" bind:value={scheduleCrew} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 								</label>
 								<label class="space-y-1">
 									<span class="text-xs font-semibold text-[var(--text-muted)]">Window start</span>
-									<input name="windowStart" type="time" bind:value={scheduleWindowStart} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+									<input name="windowStart" type="time" bind:value={scheduleWindowStart} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 								</label>
 								<label class="space-y-1">
 									<span class="text-xs font-semibold text-[var(--text-muted)]">Window end</span>
-									<input name="windowEnd" type="time" bind:value={scheduleWindowEnd} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+									<input name="windowEnd" type="time" bind:value={scheduleWindowEnd} class="h-11 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 								</label>
 								<label class="space-y-1 md:col-span-2">
 									<span class="text-xs font-semibold text-[var(--text-muted)]">Schedule note</span>
-									<textarea name="scheduleNote" bind:value={scheduleNote} class="min-h-20 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6 text-[var(--text-strong)]"></textarea>
+									<textarea name="scheduleNote" bind:value={scheduleNote} class="min-h-20 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6 text-[var(--text-strong)]"></textarea>
 								</label>
 								<div class="md:col-span-2">
-									<button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--accent-solid-hover)]">
+									<button type="submit" class="admin-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--cta-hover)]">
 										<RefreshCcw class="h-4 w-4" aria-hidden="true" />
 										Update schedule
 									</button>
@@ -856,9 +857,9 @@
 					</div>
 
 					<aside class="space-y-4">
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex items-center gap-2">
-								<ClipboardCheck class="h-4 w-4 text-emerald-700" aria-hidden="true" />
+								<ClipboardCheck class="h-4 w-4 text-[var(--positive-text)]" aria-hidden="true" />
 								<h3 class="text-base font-semibold text-[var(--text-strong)]">Plan health</h3>
 							</div>
 							<div class="mt-4 space-y-2">
@@ -887,7 +888,7 @@
 									</span>
 								</div>
 							</div>
-							<div class="mt-4 rounded-lg border border-[var(--shell-border)] bg-white p-3">
+							<div class="mt-4 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-3">
 								<p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Planning progress</p>
 								<div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--shell-panel-strong)]">
 									<div class="h-full rounded-full bg-[var(--accent-solid)]" style={`width: ${checklistProgressPercent(selectedJob)}%`}></div>
@@ -898,7 +899,7 @@
 							</div>
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex items-center gap-2">
 								<Phone class="h-4 w-4 text-[var(--accent-solid)]" aria-hidden="true" />
 								<h3 class="text-base font-semibold text-[var(--text-strong)]">Customer contact</h3>
@@ -914,9 +915,9 @@
 							</p>
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex items-center gap-2">
-								<StickyNote class="h-4 w-4 text-amber-700" aria-hidden="true" />
+								<StickyNote class="h-4 w-4 text-[var(--warning-text)]" aria-hidden="true" />
 								<h3 class="text-base font-semibold text-[var(--text-strong)]">Job notes</h3>
 							</div>
 							{#if selectedJob.notes}
@@ -927,17 +928,17 @@
 								<textarea
 									name="jobNote"
 									bind:value={jobNote}
-									class="min-h-24 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6 text-[var(--text-strong)]"
+									class="min-h-24 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6 text-[var(--text-strong)]"
 									placeholder="Add a production note"
 								></textarea>
-								<button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
+								<button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
 									<StickyNote class="h-4 w-4" aria-hidden="true" />
 									Save note
 								</button>
 							</form>
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<h3 class="text-base font-semibold text-[var(--text-strong)]">Activity</h3>
 							<div class="mt-4 space-y-3">
 								{#each selectedJob.activity.slice(0, 6) as item}
@@ -955,7 +956,7 @@
 				</div>
 			</section>
 		{:else}
-			<section class="rounded-lg border border-dashed border-[var(--shell-border)] bg-white/90 p-8 text-center shadow-[var(--shell-shadow)]">
+			<section class="rounded-lg border border-dashed border-[var(--shell-border)] bg-[var(--surface)] p-8 text-center shadow-[var(--shell-shadow)]">
 				<Hammer class="mx-auto h-10 w-10 text-[var(--text-muted)]" aria-hidden="true" />
 				<h2 class="mt-3 text-xl font-semibold text-[var(--text-strong)]">No production jobs yet</h2>
 				<p class="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)]">
@@ -965,14 +966,14 @@
 					{#if scheduleReadyJobs.length}
 						<button
 							type="button"
-							class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--accent-solid-hover)]"
+							class="admin-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--cta-hover)]"
 							onclick={() => (createJobDrawerOpen = true)}
 						>
 							<Hammer class="h-4 w-4" aria-hidden="true" />
 							Create job
 						</button>
 					{/if}
-					<a href="/bdr/admin/invoices" class="inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--shell-border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
+					<a href="/bdr/admin/invoices" class="inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:bg-[var(--shell-panel-strong)]">
 						Open invoices
 					</a>
 				</div>
@@ -984,19 +985,19 @@
 
 {#snippet createJobDrawer()}
 	<div class="space-y-4">
-		<div class="rounded-lg border border-sky-100 bg-sky-50 p-4 text-sky-900">
+		<div class="rounded-lg border border-[var(--info-text)] bg-[var(--info-soft)] p-4 text-[var(--info-text)]">
 			<div class="flex items-center gap-2">
 				<ClipboardCheck class="h-4 w-4" aria-hidden="true" />
 				<p class="text-sm font-semibold">Invoice release</p>
 			</div>
-			<p class="mt-2 text-sm leading-6 text-sky-800">
+			<p class="mt-2 text-sm leading-6 text-[var(--info-text)]">
 				Create the job after confirming the invoice cleared the deposit gate, then finish schedule and weather planning in the job workspace.
 			</p>
 			<div class="mt-3 flex flex-wrap gap-2">
-				<a href="/bdr/admin/invoices" class="inline-flex min-h-9 items-center justify-center rounded-md border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-100">
+				<a href="/bdr/admin/invoices" class="inline-flex min-h-9 items-center justify-center rounded-md border border-[var(--info-text)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--info-text)] transition hover:bg-[var(--info-soft)]">
 					Open invoices
 				</a>
-				<a href="/bdr/admin/calendar" class="inline-flex min-h-9 items-center justify-center rounded-md border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-100">
+				<a href="/bdr/admin/calendar" class="inline-flex min-h-9 items-center justify-center rounded-md border border-[var(--info-text)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--info-text)] transition hover:bg-[var(--info-soft)]">
 					Calendar / weather
 				</a>
 			</div>
@@ -1005,7 +1006,7 @@
 		{#if scheduleReadyJobs.length}
 			<div class="space-y-3">
 				{#each scheduleReadyJobs as readyJob}
-					<form method="POST" action="?/scheduleReadyJob" class="rounded-lg border border-[var(--shell-border)] bg-white p-4">
+					<form method="POST" action="?/scheduleReadyJob" class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] p-4">
 						<input type="hidden" name="invoiceId" value={readyJob.invoiceId} />
 						<div class="flex items-start justify-between gap-3">
 							<div class="min-w-0">
@@ -1015,33 +1016,33 @@
 								</p>
 								<p class="mt-2 text-xs leading-5 text-[var(--text-muted)]">{readyJob.serviceSummary}</p>
 							</div>
-							<span class="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+							<span class="shrink-0 rounded-full border border-[var(--positive-text)] bg-[var(--positive-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--positive-text)]">
 								{formatCurrency(readyJob.amount)}
 							</span>
 						</div>
 						<div class="mt-4 grid gap-3 sm:grid-cols-2">
 							<label class="space-y-1">
 								<span class="text-xs font-semibold text-[var(--text-muted)]">Target date</span>
-								<input name="scheduledDate" type="date" value={tomorrowInput} min={todayInput} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+								<input name="scheduledDate" type="date" value={tomorrowInput} min={todayInput} class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 							</label>
 							<label class="space-y-1">
 								<span class="text-xs font-semibold text-[var(--text-muted)]">Crew</span>
-								<input name="crew" value="Production crew" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+								<input name="crew" value="Production crew" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 							</label>
 							<label class="space-y-1">
 								<span class="text-xs font-semibold text-[var(--text-muted)]">Window start</span>
-								<input name="windowStart" type="time" value="08:00" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+								<input name="windowStart" type="time" value="08:00" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 							</label>
 							<label class="space-y-1">
 								<span class="text-xs font-semibold text-[var(--text-muted)]">Window end</span>
-								<input name="windowEnd" type="time" value="12:00" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" />
+								<input name="windowEnd" type="time" value="12:00" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" />
 							</label>
 							<label class="space-y-1 sm:col-span-2">
 								<span class="text-xs font-semibold text-[var(--text-muted)]">Release note</span>
-								<input name="scheduleNotes" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)]" placeholder="Customer, access, or schedule context" />
+								<input name="scheduleNotes" class="h-10 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)]" placeholder="Customer, access, or schedule context" />
 							</label>
 						</div>
-						<button type="submit" class="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-solid-hover)]">
+						<button type="submit" class="admin-primary mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[var(--cta)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[var(--cta-hover)]">
 							<Hammer class="h-4 w-4" aria-hidden="true" />
 							Create job
 						</button>
@@ -1049,7 +1050,7 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-white p-5 text-sm leading-6 text-[var(--text-muted)]">
+			<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-[var(--surface)] p-5 text-sm leading-6 text-[var(--text-muted)]">
 				No invoices are ready to release into production yet.
 			</div>
 		{/if}

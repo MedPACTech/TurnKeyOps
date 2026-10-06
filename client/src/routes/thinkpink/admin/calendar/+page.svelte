@@ -18,7 +18,7 @@
 	<div class="grid gap-5 lg:grid-cols-[1fr_20rem]">
 		<section class="space-y-3">
 			{#each data.visits as visit}
-				<article class="rounded-xl bg-white p-5 shadow-[var(--shell-shadow)]">
+				<article class="rounded-xl bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 					<div class="flex gap-4">
 						<div class="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)]"><CalendarDays class="h-5 w-5" /></div>
 						<div class="min-w-0 flex-1">
@@ -33,10 +33,10 @@
 					</div>
 				</article>
 			{:else}
-				<div class="rounded-xl border border-dashed border-[var(--shell-border)] bg-white p-10 text-center text-sm text-[var(--text-muted)]">No property assessments are scheduled yet.</div>
+				<div class="rounded-xl border border-dashed border-[var(--shell-border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--text-muted)]">No property assessments are scheduled yet.</div>
 			{/each}
 		</section>
-		<aside class="rounded-xl bg-white p-5 shadow-[var(--shell-shadow)]">
+		<aside class="rounded-xl bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 			<h2 class="font-bold text-[var(--text-strong)]">Ready to schedule</h2>
 			<p class="mt-1 text-sm text-[var(--text-muted)]">Qualified requests without a property assessment.</p>
 			<div class="mt-4 space-y-3">
@@ -47,7 +47,7 @@
 					</a>
 				{:else}<p class="text-sm text-[var(--text-muted)]">Nothing waiting.</p>{/each}
 			</div>
-			<a href="/thinkpink/admin/requests" class="mt-5 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--accent-text)] px-4 text-sm font-bold text-white"><Plus class="h-4 w-4" />Open requests</a>
+			<a href="/thinkpink/admin/requests" class="admin-primary mt-5 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--cta)] px-4 text-sm font-bold text-white"><Plus class="h-4 w-4" />Open requests</a>
 		</aside>
 	</div>
 </div>

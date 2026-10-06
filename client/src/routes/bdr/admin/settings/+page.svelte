@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AdminIcon from '$lib/components/admin/AdminIcon.svelte';
 	import AdminContextRail from '$lib/components/admin/AdminContextRail.svelte';
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import { updateEstimateDefaults } from '$lib/api/estimate-defaults';
@@ -30,7 +31,7 @@
 		{
 			title: 'Concrete Pricing Defaults',
 			subtitle: 'Base concrete and material charges inherited by new estimates.',
-			icon: '🪨',
+			icon: 'layers',
 			fields: [
 				{ key: 'concreteCostPerYard', label: 'Concrete Cost Per Yard', prefix: '$' },
 				{ key: 'minimumLoadFee', label: 'Minimum Load Fee', prefix: '$' },
@@ -47,7 +48,7 @@
 		{
 			title: 'Site Prep Defaults',
 			subtitle: 'Prep assumptions for demolition, excavation, grading, and access.',
-			icon: '🚧',
+			icon: 'jobs',
 			fields: [
 				{ key: 'demoCostRate', label: 'Demo Cost / Rate', prefix: '$' },
 				{ key: 'excavationCostRate', label: 'Excavation Cost / Rate', prefix: '$' },
@@ -64,7 +65,7 @@
 		{
 			title: 'Reinforcement Defaults',
 			subtitle: 'Reusable reinforcement pricing assumptions.',
-			icon: '🧱',
+			icon: 'layers',
 			fields: [
 				{ key: 'rebarCostPerFoot', label: 'Rebar Cost Per Foot', prefix: '$' },
 				{ key: 'meshCost', label: 'Mesh Cost', prefix: '$' },
@@ -76,7 +77,7 @@
 		{
 			title: 'Formwork Defaults',
 			subtitle: 'Default form material, complexity, and labor assumptions.',
-			icon: '🪵',
+			icon: 'wood',
 			fields: [
 				{ key: 'formMaterialCost', label: 'Form Material Cost', prefix: '$' },
 				{ key: 'formComplexitySimpleMultiplier', label: 'Simple Complexity Multiplier', step: '0.05' },
@@ -88,7 +89,7 @@
 		{
 			title: 'Finish Defaults',
 			subtitle: 'Surface finish and add-on pricing defaults.',
-			icon: '✨',
+			icon: 'bob',
 			fields: [
 				{ key: 'sawCutCost', label: 'Saw Cut Cost', prefix: '$' },
 				{ key: 'jointMaterialCost', label: 'Joint Material Cost', prefix: '$' },
@@ -101,7 +102,7 @@
 		{
 			title: 'Labor Defaults',
 			subtitle: 'Crew assumptions and task-hour defaults used by new estimates.',
-			icon: '👷',
+			icon: 'jobs',
 			fields: [
 				{ key: 'laborRatePerHour', label: 'Labor Rate Per Hour', prefix: '$' },
 				{ key: 'overtimeMultiplier', label: 'Overtime Multiplier', step: '0.05' },
@@ -117,7 +118,7 @@
 		{
 			title: 'Equipment Defaults',
 			subtitle: 'Reusable equipment charges loaded into estimate calculations.',
-			icon: '🚚',
+			icon: 'truck',
 			fields: [
 				{ key: 'skidSteerCost', label: 'Skid Steer Cost', prefix: '$' },
 				{ key: 'excavatorCost', label: 'Excavator Cost', prefix: '$' },
@@ -133,7 +134,7 @@
 		{
 			title: 'Margin Defaults',
 			subtitle: 'Overhead, margin, and risk settings for estimate rollups.',
-			icon: '📈',
+			icon: 'dashboard',
 			fields: [
 				{ key: 'overheadPercent', label: 'Overhead Percent', suffix: '%' },
 				{ key: 'contingencyPercent', label: 'Contingency Percent', suffix: '%' },
@@ -232,10 +233,10 @@
 
 	{#snippet work()}
 		<form method="POST" action="?/saveBillingSettings" class="mb-5 space-y-5">
-			<section class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+			<section class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 					<div class="flex items-start gap-4">
-						<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl">💳</div>
+						<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl"><AdminIcon name="invoices" /></div>
 						<div>
 							<p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">Billing Workflow</p>
 							<h2 class="mt-2 text-xl font-semibold text-[var(--text-strong)]">Deposit gate for scheduling</h2>
@@ -247,7 +248,7 @@
 					<div class="flex flex-col gap-3 sm:flex-row">
 						<button
 							type="button"
-							class="min-h-11 rounded-lg bg-white px-4 text-sm font-semibold text-[var(--text-strong)] shadow-[var(--shell-shadow)] transition disabled:opacity-50"
+							class="min-h-11 rounded-lg bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--text-strong)] shadow-[var(--shell-shadow)] transition disabled:opacity-50"
 							disabled={!billingHasChanges}
 							onclick={resetBillingSettings}
 						>
@@ -255,7 +256,7 @@
 						</button>
 						<button
 							type="submit"
-							class="min-h-11 rounded-lg bg-[var(--accent-text)] px-4 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
+							class="admin-primary min-h-11 rounded-lg bg-[var(--cta)] px-4 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
 							disabled={!billingHasChanges}
 						>
 							Save billing
@@ -267,7 +268,7 @@
 					<span class="mb-2 block text-sm font-medium text-[var(--text-base)]">Required deposit before scheduling</span>
 					<span class="relative block">
 						<input
-							class="min-h-12 w-full rounded-lg border border-[var(--shell-border)] bg-white px-4 pr-14 text-sm text-[var(--text-base)] shadow-sm outline-none transition focus:border-[var(--accent-border)] focus:ring-2 focus:ring-[var(--accent-border)]/30"
+							class="min-h-12 w-full rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-4 pr-14 text-sm text-[var(--text-base)] shadow-sm outline-none transition focus:border-[var(--accent-border)] focus:ring-2 focus:ring-[var(--accent-border)]/30"
 							type="number"
 							name="depositPercentRequired"
 							min="0"
@@ -297,7 +298,7 @@
 				<div class="flex flex-col gap-3 sm:flex-row">
 					<button
 						type="button"
-						class="min-h-12 rounded-lg bg-white px-5 text-sm font-semibold text-[var(--text-strong)] shadow-[var(--shell-shadow)] transition disabled:opacity-50"
+						class="min-h-12 rounded-lg bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--text-strong)] shadow-[var(--shell-shadow)] transition disabled:opacity-50"
 						disabled={!hasChanges}
 						onclick={resetChanges}
 					>
@@ -305,7 +306,7 @@
 					</button>
 					<button
 						type="submit"
-						class="min-h-12 rounded-lg bg-[var(--accent-text)] px-5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
+						class="admin-primary min-h-12 rounded-lg bg-[var(--cta)] px-5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
 						disabled={!hasChanges || defaultsSaving}
 					>
 						{defaultsSaving ? 'Saving…' : 'Save defaults'}
@@ -313,15 +314,15 @@
 				</div>
 			</div>
 			{#if defaultsError}
-				<p class="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{defaultsError}</p>
+				<p class="rounded-lg bg-[var(--critical-soft)] px-4 py-3 text-sm font-medium text-[var(--critical-text)]">{defaultsError}</p>
 			{:else if defaultsMessage}
-				<p class="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{defaultsMessage}</p>
+				<p class="rounded-lg bg-[var(--positive-soft)] px-4 py-3 text-sm font-medium text-[var(--positive-text)]">{defaultsMessage}</p>
 			{/if}
 
 			<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-				<section class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+				<section class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 					<div class="flex items-start gap-4">
-						<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl">🏢</div>
+						<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl"><AdminIcon name="building" /></div>
 						<div>
 							<h3 class="text-lg font-semibold text-[var(--text-strong)]">Admin-Controlled Defaults</h3>
 							<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">
@@ -331,7 +332,7 @@
 					</div>
 				</section>
 
-				<aside class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+				<aside class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 					<p class="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[var(--accent-text)]">At a glance</p>
 					<div class="mt-4 space-y-3 text-sm">
 						{#each metrics as metric}
@@ -346,10 +347,10 @@
 
 			<div class="space-y-4">
 				{#each sections as section}
-					<section class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+					<section class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 						<div class="flex items-start gap-4">
 							<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-2xl">
-								{section.icon}
+								<AdminIcon name={section.icon} />
 							</div>
 							<div>
 								<h3 class="text-lg font-semibold text-[var(--text-strong)]">{section.title}</h3>
@@ -368,7 +369,7 @@
 											</span>
 										{/if}
 										<input
-											class={`min-h-12 w-full rounded-lg border border-[var(--shell-border)] bg-white px-4 text-sm text-[var(--text-base)] shadow-sm outline-none transition focus:border-[var(--accent-border)] focus:ring-2 focus:ring-[var(--accent-border)]/30 ${field.prefix ? 'pl-8' : ''} ${field.suffix ? 'pr-14' : ''}`}
+											class={`min-h-12 w-full rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-4 text-sm text-[var(--text-base)] shadow-sm outline-none transition focus:border-[var(--accent-border)] focus:ring-2 focus:ring-[var(--accent-border)]/30 ${field.prefix ? 'pl-8' : ''} ${field.suffix ? 'pr-14' : ''}`}
 											type="number"
 											name={field.key}
 											min={field.min ?? 0}

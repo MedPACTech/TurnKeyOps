@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AdminIcon from '$lib/components/admin/AdminIcon.svelte';
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import { quoteRequestStatusMeta, type QuoteRequest, type QuoteRequestStatus } from '$lib/quote-requests';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
@@ -376,7 +377,7 @@
 					bind:value={quoteSearch}
 					type="search"
 					placeholder="Search quotes"
-					class="h-11 rounded-lg border border-[var(--shell-border)] bg-white/85 px-3 text-sm text-[var(--text-strong)] outline-none transition focus:border-[var(--accent-border)]"
+					class="h-11 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none transition focus:border-[var(--accent-border)]"
 				/>
 			</label>
 
@@ -384,7 +385,8 @@
 				{#each quoteQueueFilters as filter}
 					<button
 						type="button"
-						class={`rounded-full px-3 py-2 text-xs font-semibold transition ${quoteQueueFilter === filter.value ? 'bg-[var(--accent-solid)] text-white shadow-sm' : 'bg-white/85 text-[var(--text-muted)] shadow-sm hover:bg-white'}`}
+						class={`rounded-full px-3 py-2 text-xs font-semibold transition ${quoteQueueFilter === filter.value ? 'bg-[var(--accent-solid)] text-[var(--accent-solid-text)] shadow-sm' : 'bg-[var(--surface)] text-[var(--text-muted)] shadow-sm hover:bg-[var(--surface)]'}`}
+						aria-pressed={quoteQueueFilter === filter.value}
 						onclick={() => (quoteQueueFilter = filter.value)}
 					>
 						{filter.label} · {filter.count}
@@ -396,7 +398,7 @@
 				{#each visibleRequests as request}
 					<button
 						type="button"
-						class={`w-full rounded-lg px-3 py-3 text-left shadow-sm transition ${selectedRequest?.id === request.id ? 'bg-[#fff4ea] ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-white/80 hover:bg-white'}`}
+						class={`w-full rounded-lg px-3 py-3 text-left shadow-sm transition ${selectedRequest?.id === request.id ? 'bg-[var(--teal-soft)] ring-1 ring-[var(--teal-border)]' : 'bg-[var(--surface)] hover:bg-[var(--surface)]'}`}
 						onclick={() => (selectedRequestId = request.id)}
 					>
 						<div class="flex items-start justify-between gap-3">
@@ -404,7 +406,7 @@
 								<p class="text-sm font-semibold text-[var(--text-strong)]">{request.customerName}</p>
 								<p class="mt-1 text-xs text-[var(--text-muted)]">{request.siteName}</p>
 							</div>
-							<span class="rounded-full bg-white/80 px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-[var(--accent-text)]">
+							<span class="rounded-full bg-[var(--surface)] px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-[var(--accent-text)]">
 								{isWonRequest(request) ? 'Won' : quoteRequestStatusMeta[request.status].label}
 							</span>
 						</div>
@@ -412,7 +414,7 @@
 					</button>
 				{/each}
 			{:else}
-				<div class="rounded-lg bg-white/80 px-4 py-5 text-sm text-[var(--text-muted)] shadow-sm">
+				<div class="rounded-lg bg-[var(--surface)] px-4 py-5 text-sm text-[var(--text-muted)] shadow-sm">
 					No quote requests match this view.
 				</div>
 			{/if}
@@ -432,7 +434,7 @@
 				<input type="hidden" name="assumptions" value={assumptions} />
 				<input type="hidden" name="locations" value={serializedLocations} />
 
-				<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+				<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div>
 							<p class="text-sm font-semibold text-[var(--text-strong)]">{selectedRequest.customerName}</p>
@@ -440,29 +442,29 @@
 							<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">{selectedRequest.serviceType} · {selectedRequest.siteName}</p>
 						</div>
 						<div class="flex flex-wrap gap-2">
-							<a href="/bdr/admin/requests" class="rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">Quote</a>
-							<a href="/bdr/admin/invoices" class="rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">Invoice</a>
+							<a href="/bdr/admin/requests" class="rounded-md bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">Quote</a>
+							<a href="/bdr/admin/invoices" class="rounded-md bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">Invoice</a>
 						</div>
 					</div>
 
 					{#if form?.draftSaved && form.savedRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Estimate draft saved.</p>
+						<p class="mt-4 rounded-md bg-[var(--positive-soft)] px-3 py-2 text-sm font-semibold text-[var(--positive-text)]">Estimate draft saved.</p>
 					{:else if form?.draftSent && form.savedRequestId === selectedRequest.id}
-						<div class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+						<div class="mt-4 rounded-md bg-[var(--positive-soft)] px-3 py-2 text-sm text-[var(--positive-text)]">
 							<p class="font-semibold">Estimate link created. The quote request is waiting on customer approval.</p>
 							{#if form.reviewUrl}
 								<a class="mt-1 inline-flex font-semibold underline" href={form.reviewUrl}>Open customer review</a>
 							{/if}
 						</div>
 					{:else if form?.draftMessage && form.savedRequestId === selectedRequest.id}
-						<p class="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">{form.draftMessage}</p>
+						<p class="mt-4 rounded-md bg-[var(--warning-soft)] px-3 py-2 text-sm font-semibold text-[var(--warning-text)]">{form.draftMessage}</p>
 					{/if}
 				</div>
 
-				<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+				<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 						<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<div class="flex items-center gap-3">
-								<span class="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-xl shadow-sm">📍</span>
+								<span class="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--surface)] text-xl shadow-sm"><AdminIcon name="location" /></span>
 								<div>
 									<h3 class="text-xl font-semibold text-[var(--text-strong)]">Locations</h3>
 									<p class="mt-1 text-sm text-[var(--text-muted)]">{selectedRequest.siteName}</p>
@@ -470,7 +472,7 @@
 							</div>
 							<button
 								type="button"
-								class="rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+								class="admin-primary rounded-md bg-[var(--cta)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
 								onclick={() => openLocationDrawer()}
 							>
 								+ Add Location
@@ -488,25 +490,25 @@
 													{location.lengthFeet} ft x {location.widthFeet} ft x {location.depthInches} in · {location.numberOfPours} pour{location.numberOfPours === 1 ? '' : 's'}
 												</p>
 											</div>
-											<div class="flex items-baseline justify-between gap-4 rounded-md bg-white/80 px-3 py-2">
+											<div class="flex items-baseline justify-between gap-4 rounded-md bg-[var(--surface)] px-3 py-2">
 												<p class="text-sm text-[var(--text-muted)]">Location total</p>
 												<p class="text-xl font-semibold text-[var(--text-strong)]">{formatCurrency(location.estimatedTotal)}</p>
 											</div>
 										</div>
 										<div class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-											<div class="flex items-baseline justify-between gap-3 rounded-md bg-white/80 px-3 py-2">
+											<div class="flex items-baseline justify-between gap-3 rounded-md bg-[var(--surface)] px-3 py-2">
 												<p class="text-xs text-[var(--text-muted)]">Area</p>
 												<p class="font-semibold text-[var(--text-strong)]">{location.squareFeet.toFixed(0)} sqft</p>
 											</div>
-											<div class="flex items-baseline justify-between gap-3 rounded-md bg-white/80 px-3 py-2">
+											<div class="flex items-baseline justify-between gap-3 rounded-md bg-[var(--surface)] px-3 py-2">
 												<p class="text-xs text-[var(--text-muted)]">Cubic Yards</p>
 												<p class="font-semibold text-[var(--text-strong)]">{location.cubicYards.toFixed(1)} CY</p>
 											</div>
-											<div class="flex items-baseline justify-between gap-3 rounded-md bg-white/80 px-3 py-2">
+											<div class="flex items-baseline justify-between gap-3 rounded-md bg-[var(--surface)] px-3 py-2">
 												<p class="text-xs text-[var(--text-muted)]">Forms</p>
 												<p class="font-semibold text-[var(--text-strong)]">{location.formLinearFeet.toFixed(0)} LF</p>
 											</div>
-											<div class="flex items-baseline justify-between gap-3 rounded-md bg-white/80 px-3 py-2">
+											<div class="flex items-baseline justify-between gap-3 rounded-md bg-[var(--surface)] px-3 py-2">
 												<p class="text-xs text-[var(--text-muted)]">Rebar</p>
 												<p class="font-semibold text-[var(--text-strong)]">{location.rebarLinearFeet.toFixed(0)} LF</p>
 											</div>
@@ -514,14 +516,14 @@
 										<div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
 											<button
 												type="button"
-												class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel)]"
+												class="rounded-md bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel)]"
 												onclick={() => openLocationDrawer(location)}
 											>
 												Edit
 											</button>
 											<button
 												type="button"
-												class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-[var(--accent-text)] shadow-sm transition hover:bg-[var(--shell-panel)]"
+												class="rounded-md bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--accent-text)] shadow-sm transition hover:bg-[var(--shell-panel)]"
 												onclick={() => removeLocation(location.id)}
 											>
 												Remove
@@ -539,29 +541,29 @@
 				</div>
 
 				<div class="grid gap-4">
-						<div class="rounded-lg bg-emerald-50 p-5 shadow-[var(--shell-shadow)] ring-1 ring-emerald-200">
-							<h3 class="text-xl font-semibold text-emerald-900">Results</h3>
+						<div class="rounded-lg bg-[var(--positive-soft)] p-5 shadow-[var(--shell-shadow)] ring-1 ring-[var(--positive-text)]">
+							<h3 class="text-xl font-semibold text-[var(--positive-text)]">Results</h3>
 							<div class="mt-5 grid gap-2">
 								{#each results.slice(0, 7) as result}
-									<div class="flex items-baseline justify-between gap-4 rounded-md bg-white/55 px-3 py-2">
-										<p class="text-sm text-slate-600">{result.label}</p>
-										<p class="text-right text-lg font-semibold text-slate-950">{result.value}</p>
+									<div class="flex items-baseline justify-between gap-4 rounded-md bg-[var(--surface)] px-3 py-2">
+										<p class="text-sm text-[var(--text-muted)]">{result.label}</p>
+										<p class="text-right text-lg font-semibold text-[var(--text-strong)]">{result.value}</p>
 									</div>
 								{/each}
 							</div>
-							<div class="mt-5 border-t border-emerald-300 pt-4">
+							<div class="mt-5 border-t border-[var(--positive-text)] pt-4">
 								<div class="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-									<p class="text-lg text-slate-700">Estimated Total</p>
-									<p class="text-3xl font-semibold text-emerald-800">{formatCurrency(estimatedTotal)}</p>
+									<p class="text-lg text-[var(--text-strong)]">Estimated Total</p>
+									<p class="text-3xl font-semibold text-[var(--positive-text)]">{formatCurrency(estimatedTotal)}</p>
 								</div>
 							</div>
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<h3 class="text-base font-semibold text-[var(--text-strong)]">Estimate state</h3>
 							<label class="mt-4 grid gap-2">
 								<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Status</span>
-								<select bind:value={draftStatus} name="draftStatus" class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none">
+								<select bind:value={draftStatus} name="draftStatus" class="h-12 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none">
 									<option value="draft">Draft</option>
 									<option value="ready-to-send">Ready to Send</option>
 									<option value="sent" disabled>Sent</option>
@@ -569,7 +571,7 @@
 							</label>
 							<label class="mt-4 grid gap-2">
 								<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Notes</span>
-								<textarea bind:value={notes} name="notes" rows="5" class="rounded-lg border border-[var(--shell-border)] bg-white px-3 py-3 text-sm text-[var(--text-base)] outline-none"></textarea>
+								<textarea bind:value={notes} name="notes" rows="5" class="rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-3 text-sm text-[var(--text-base)] outline-none"></textarea>
 							</label>
 							<div class="mt-4 space-y-2 text-sm text-[var(--text-muted)]">
 								<p>Quote: {quoteRequestStatusMeta[selectedRequest.status].label}</p>
@@ -582,13 +584,13 @@
 							</div>
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 								<div>
 									<h3 class="text-base font-semibold text-[var(--text-strong)]">Customer review</h3>
 									<p class="mt-1 text-sm text-[var(--text-muted)]">Approval happens from the customer-facing estimate packet.</p>
 								</div>
-								<span class="w-fit rounded-full bg-[#fff4ea] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
+								<span class="w-fit rounded-full bg-[var(--teal-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">
 									{customerReviewStatus}
 								</span>
 							</div>
@@ -607,26 +609,26 @@
 									<p class="rounded-md bg-[var(--shell-panel-strong)] px-3 py-2 text-[var(--text-base)]">{selectedDraft.delivery.responseNote}</p>
 								{/if}
 							</div>
-							<a href={customerReviewUrl} class="mt-4 inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)] sm:w-auto">
+							<a href={customerReviewUrl} class="mt-4 inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)] sm:w-auto">
 								Preview customer packet
 							</a>
 							<button
 								type="button"
-								class="mt-2 inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)] sm:ml-2 sm:mt-4 sm:w-auto"
+								class="mt-2 inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)] sm:ml-2 sm:mt-4 sm:w-auto"
 								onclick={copyCustomerReviewLink}
 							>
 								{copiedCustomerLink === customerReviewUrl ? 'Link copied' : 'Copy customer link'}
 							</button>
 							<button
 								type="button"
-								class="mt-2 inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm sm:ml-2 sm:mt-4 sm:w-auto"
+								class="mt-2 inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm sm:ml-2 sm:mt-4 sm:w-auto"
 								disabled
 							>
 								Email unavailable
 							</button>
 							<button
 								type="button"
-								class="mt-2 inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm sm:ml-2 sm:mt-4 sm:w-auto"
+								class="mt-2 inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm sm:ml-2 sm:mt-4 sm:w-auto"
 								disabled
 							>
 								SMS unavailable
@@ -637,7 +639,7 @@
 				<div class="grid gap-3 sm:flex sm:flex-wrap">
 						<button
 							type="submit"
-							class="rounded-md bg-[var(--accent-solid)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+							class={draftStatus === 'ready-to-send' ? 'btn-secondary' : 'btn-primary'}
 							disabled={!hasLocations}
 						>
 							Save estimate
@@ -645,7 +647,7 @@
 						<button
 							type="submit"
 							formaction="?/sendDraft"
-							class="rounded-md bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+							class={draftStatus === 'ready-to-send' ? 'btn-primary' : 'btn-secondary'}
 							disabled={!hasLocations || draftStatus !== 'ready-to-send'}
 						>
 							Send estimate
@@ -653,7 +655,7 @@
 						<button
 							type="submit"
 							formaction="?/createRevision"
-							class="rounded-md bg-white px-5 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+							class="rounded-md bg-[var(--surface)] px-5 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)] disabled:cursor-not-allowed disabled:opacity-50"
 							disabled={!selectedDraft}
 						>
 							Create revision
@@ -661,7 +663,7 @@
 				</div>
 			</form>
 		{:else}
-			<div class="rounded-lg bg-white/90 p-8 text-center shadow-[var(--shell-shadow)]">
+			<div class="rounded-lg bg-[var(--surface)] p-8 text-center shadow-[var(--shell-shadow)]">
 				<h2 class="text-xl font-semibold text-[var(--text-strong)]">No quote request selected</h2>
 				<p class="mt-2 text-sm text-[var(--text-muted)]">Move a quote request into the estimate lane before creating pricing.</p>
 			</div>
@@ -672,7 +674,7 @@
 		<div class="space-y-4">
 			<label class="grid gap-2">
 				<span class="text-sm font-semibold text-[var(--text-base)]">Location</span>
-				<select bind:value={locationName} class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]">
+				<select bind:value={locationName} class="h-12 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]">
 					{#each locationOptions as option}
 						<option value={option}>{option}</option>
 					{/each}
@@ -682,35 +684,35 @@
 			<div class="grid gap-4">
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Length (ft)</span>
-					<input bind:value={locationLengthFeet} type="number" step="0.1" min="0" class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
+					<input bind:value={locationLengthFeet} type="number" step="0.1" min="0" class="h-12 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
 				</label>
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Width (ft)</span>
-					<input bind:value={locationWidthFeet} type="number" step="0.1" min="0" class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
+					<input bind:value={locationWidthFeet} type="number" step="0.1" min="0" class="h-12 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
 				</label>
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Depth (inches)</span>
-					<input bind:value={locationDepthInches} type="number" step="0.5" min="0" class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
+					<input bind:value={locationDepthInches} type="number" step="0.5" min="0" class="h-12 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
 				</label>
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]">Waste %</span>
-					<input bind:value={locationWastePercent} type="number" step="1" min="0" class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
+					<input bind:value={locationWastePercent} type="number" step="1" min="0" class="h-12 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
 				</label>
 				<label class="grid gap-2">
 					<span class="text-sm font-semibold text-[var(--text-base)]"># of Pours</span>
-					<input bind:value={locationNumberOfPours} type="number" step="1" min="1" class="h-12 rounded-lg border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
+					<input bind:value={locationNumberOfPours} type="number" step="1" min="1" class="h-12 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]" />
 				</label>
 			</div>
 
-			<div class="rounded-lg bg-emerald-50 p-4 ring-1 ring-emerald-200">
+			<div class="rounded-lg bg-[var(--positive-soft)] p-4 ring-1 ring-[var(--positive-text)]">
 				<div class="grid gap-2 text-sm">
 					<div class="flex items-baseline justify-between gap-3">
-						<p class="text-slate-600">Cubic Yards</p>
-						<p class="text-lg font-semibold text-slate-950">{drawerPreview.cubicYards.toFixed(1)} CY</p>
+						<p class="text-[var(--text-muted)]">Cubic Yards</p>
+						<p class="text-lg font-semibold text-[var(--text-strong)]">{drawerPreview.cubicYards.toFixed(1)} CY</p>
 					</div>
 					<div class="flex items-baseline justify-between gap-3">
-						<p class="text-slate-600">Estimate</p>
-						<p class="text-lg font-semibold text-emerald-800">{formatCurrency(drawerPreview.estimatedTotal)}</p>
+						<p class="text-[var(--text-muted)]">Estimate</p>
+						<p class="text-lg font-semibold text-[var(--positive-text)]">{formatCurrency(drawerPreview.estimatedTotal)}</p>
 					</div>
 				</div>
 			</div>
@@ -718,14 +720,14 @@
 			<div class="flex flex-col gap-2 sm:flex-row">
 				<button
 					type="button"
-					class="rounded-md bg-[var(--accent-solid)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+					class="admin-primary rounded-md bg-[var(--cta)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
 					onclick={saveLocation}
 				>
 					{editingLocationId ? 'Save Location' : 'Add Location'}
 				</button>
 				<button
 					type="button"
-					class="rounded-md bg-white px-5 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]"
+					class="rounded-md bg-[var(--surface)] px-5 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]"
 					onclick={() => (locationDrawerOpen = false)}
 				>
 					Cancel

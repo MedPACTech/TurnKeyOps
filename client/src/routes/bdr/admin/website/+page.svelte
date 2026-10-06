@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AdminIcon from '$lib/components/admin/AdminIcon.svelte';
 	import AdminContextRail from '$lib/components/admin/AdminContextRail.svelte';
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import ContentEditorCard, {
@@ -706,7 +707,7 @@
 			{#each websiteSections as section}
 				<button
 					type="button"
-					class={`w-full rounded-lg border px-3 py-3 text-left transition ${selectedSection.id === section.id ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+					class={`w-full rounded-lg border px-3 py-3 text-left transition ${selectedSection.id === section.id ? 'border-transparent bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]' : 'border-transparent bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'}`}
 					onclick={() => selectSection(section)}
 				>
 					<div class="flex items-start justify-between gap-3">
@@ -727,14 +728,14 @@
 
 	{#snippet work()}
 		<div class="space-y-4">
-			<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+			<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 				<div class="flex items-start justify-between gap-3">
 					<div>
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Bob content assist</p>
 						<p class="mt-1 text-sm font-semibold text-[var(--text-strong)]">{selectedSection.label}</p>
 					</div>
 					<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg text-[var(--accent-text)] shadow-sm">
-						✨
+						<AdminIcon name="bob" />
 					</span>
 				</div>
 				<div class="mt-3 grid gap-2 md:grid-cols-3">
@@ -750,7 +751,7 @@
 				</div>
 			</div>
 
-			<div id="content-preview" class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+			<div id="content-preview" class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div>
 						<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section preview</p>
@@ -773,7 +774,7 @@
 						{#each selectedSection.areas as area}
 							<button
 								type="button"
-								class={`rounded-lg border p-4 text-left transition ${selectedArea.id === area.id ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+								class={`rounded-lg border p-4 text-left transition ${selectedArea.id === area.id ? 'border-transparent bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]' : 'border-transparent bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'}`}
 								onclick={() => {
 									selectedAreaId = area.id;
 									if (area.id === 'services-items') {
@@ -815,57 +816,57 @@
 						</div>
 
 						{#if form?.savedSectionId === 'navigation' && form?.savedMessage}
-							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							<div class="mt-4 rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 								{form.savedMessage}
 							</div>
 						{/if}
 
 						{#if form?.savedSectionId === 'navigation' && form?.message}
-							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+							<div class="mt-4 rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm text-[var(--critical-text)]">
 								{form.message}
 							</div>
 						{/if}
 
 						<form method="POST" action="?/updateNavigation" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Brand and utility</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Brand name</span>
-										<input name="brandName" value={content.navigation.brandName} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="brandName" value={content.navigation.brandName} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Announcement</span>
-										<input name="announcement" value={content.navigation.announcement} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="announcement" value={content.navigation.announcement} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Logo asset key</span>
-											<input name="logoAssetKey" value={content.navigation.logoAssetKey} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="logoAssetKey" value={content.navigation.logoAssetKey} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Favicon asset key</span>
-											<input name="faviconAssetKey" value={content.navigation.faviconAssetKey} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="faviconAssetKey" value={content.navigation.faviconAssetKey} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 									</div>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Primary CTA label</span>
-											<input name="primaryCtaLabel" value={content.navigation.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="primaryCtaLabel" value={content.navigation.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Primary CTA target</span>
-											<input name="primaryCtaHref" value={content.navigation.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="primaryCtaHref" value={content.navigation.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 									</div>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Phone number</span>
-											<input name="phoneNumber" value={content.navigation.phoneNumber} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="phoneNumber" value={content.navigation.phoneNumber} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Header layout</span>
-											<select name="layout" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<select name="layout" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 												<option value="logo-left" selected={content.navigation.layout === 'logo-left'}>Logo left</option>
 												<option value="centered" selected={content.navigation.layout === 'centered'}>Centered</option>
 												<option value="right-aligned" selected={content.navigation.layout === 'right-aligned'}>Right-aligned</option>
@@ -875,21 +876,21 @@
 									<div class="grid gap-3 md:grid-cols-3">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Show phone button</span>
-											<select name="showPhoneButton" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<select name="showPhoneButton" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 												<option value="true" selected={content.navigation.showPhoneButton}>Yes</option>
 												<option value="false" selected={!content.navigation.showPhoneButton}>No</option>
 											</select>
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Show theme control</span>
-											<select name="showThemeControl" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<select name="showThemeControl" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 												<option value="true" selected={content.navigation.showThemeControl}>Yes</option>
 												<option value="false" selected={!content.navigation.showThemeControl}>No</option>
 											</select>
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Sticky header</span>
-											<select name="stickyHeader" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<select name="stickyHeader" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 												<option value="true" selected={content.navigation.stickyHeader}>Enabled</option>
 												<option value="false" selected={!content.navigation.stickyHeader}>Disabled</option>
 											</select>
@@ -898,13 +899,13 @@
 								</div>
 							</section>
 
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Navigation links</p>
 								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">One link per line using `Label|href|openInNewTab`. Reorder lines to change sort order and remove a line to delete it.</p>
 								<textarea
 									name="navigationLinks"
 									rows="10"
-									class="mt-3 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+									class="mt-3 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6"
 								>{content.navigation.links.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
 
 								<div class="mt-4 rounded-md bg-[var(--shell-panel-strong)] p-3">
@@ -919,7 +920,7 @@
 								<div class="mt-4 flex justify-end">
 									<button
 										type="submit"
-										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+										class="admin-primary rounded-lg bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save navigation
 									</button>
@@ -945,41 +946,41 @@
 						</div>
 
 						{#if form?.savedSectionId === 'hero' && form?.savedMessage}
-							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							<div class="mt-4 rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 								{form.savedMessage}
 							</div>
 						{/if}
 
 						{#if form?.savedSectionId === 'hero' && form?.message}
-							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+							<div class="mt-4 rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm text-[var(--critical-text)]">
 								{form.message}
 							</div>
 						{/if}
 
 						<form method="POST" action="?/updateHero" class="mt-5 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Copy and CTA behavior</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
-										<input name="eyebrow" value={content.hero.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="eyebrow" value={content.hero.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Headline</span>
-										<textarea name="headline" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.hero.headline}</textarea>
+										<textarea name="headline" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.hero.headline}</textarea>
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Subheadline</span>
-										<textarea name="subheadline" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.hero.subheadline}</textarea>
+										<textarea name="subheadline" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.hero.subheadline}</textarea>
 									</label>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Primary CTA label</span>
-											<input name="primaryCtaLabel" value={content.hero.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="primaryCtaLabel" value={content.hero.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Primary CTA type</span>
-											<select name="primaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<select name="primaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 												<option value="anchor" selected={content.hero.primaryCtaType === 'anchor'}>Anchor</option>
 												<option value="link" selected={content.hero.primaryCtaType === 'link'}>Link</option>
 												<option value="phone" selected={content.hero.primaryCtaType === 'phone'}>Phone</option>
@@ -988,16 +989,16 @@
 									</div>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Primary CTA target</span>
-										<input name="primaryCtaHref" value={content.hero.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="primaryCtaHref" value={content.hero.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Secondary CTA label</span>
-											<input name="secondaryCtaLabel" value={content.hero.secondaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="secondaryCtaLabel" value={content.hero.secondaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Secondary CTA type</span>
-											<select name="secondaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<select name="secondaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 												<option value="anchor" selected={content.hero.secondaryCtaType === 'anchor'}>Anchor</option>
 												<option value="link" selected={content.hero.secondaryCtaType === 'link'}>Link</option>
 												<option value="phone" selected={content.hero.secondaryCtaType === 'phone'}>Phone</option>
@@ -1006,17 +1007,17 @@
 									</div>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Secondary CTA target</span>
-										<input name="secondaryCtaHref" value={content.hero.secondaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="secondaryCtaHref" value={content.hero.secondaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 								</div>
 							</section>
 
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Media and trust badge mapping</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Hero image asset</span>
-										<select name="heroImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+										<select name="heroImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 											{#each heroImageAssets as asset}
 												<option value={asset.key} selected={content.hero.heroImageAssetKey === asset.key}>{asset.name} · {asset.key}</option>
 											{/each}
@@ -1024,11 +1025,11 @@
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Hero image alt text</span>
-										<input name="heroImageAltText" value={content.hero.heroImageAltText} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="heroImageAltText" value={content.hero.heroImageAltText} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Background image asset</span>
-										<select name="backgroundImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+										<select name="backgroundImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 											<option value="" selected={!content.hero.backgroundImageAssetKey}>None</option>
 											{#each heroImageAssets as asset}
 												<option value={asset.key} selected={content.hero.backgroundImageAssetKey === asset.key}>{asset.name} · {asset.key}</option>
@@ -1037,7 +1038,7 @@
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Background texture / overlay asset</span>
-										<select name="backgroundTextureAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+										<select name="backgroundTextureAssetKey" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 											<option value="" selected={!content.hero.backgroundTextureAssetKey}>None</option>
 											{#each textureAssets as asset}
 												<option value={asset.key} selected={content.hero.backgroundTextureAssetKey === asset.key}>{asset.name} · {asset.key}</option>
@@ -1046,14 +1047,14 @@
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Trust badge eyebrow</span>
-										<input name="trustBadgeEyebrow" value={content.hero.trustBadgeEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="trustBadgeEyebrow" value={content.hero.trustBadgeEyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Trust badges</span>
 										<textarea
 											name="trustBadges"
 											rows="7"
-											class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+											class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6"
 										>{content.hero.trustBadges.map((badge) => `${badge.iconAssetKey}|${badge.title}|${badge.description}`).join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One badge per line: `iconAssetKey|title|description`. Line order controls display order.</span>
 									</label>
@@ -1062,7 +1063,7 @@
 										<textarea
 											name="mediaByContractorType"
 											rows="7"
-											class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+											class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6"
 										>{content.hero.mediaByContractorType.map((override) => `${override.contractorType}|${override.heroImageAssetKey}|${override.backgroundImageAssetKey ?? ''}|${override.backgroundTextureAssetKey ?? ''}|${override.heroImageAltText ?? ''}`).join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One override per line: `contractorType|heroImageAssetKey|backgroundImageAssetKey|backgroundTextureAssetKey|heroImageAltText`.</span>
 									</label>
@@ -1090,7 +1091,7 @@
 								<div class="mt-4 flex justify-end">
 									<button
 										type="submit"
-										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+										class="admin-primary rounded-lg bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save hero
 									</button>
@@ -1116,28 +1117,28 @@
 						</div>
 
 						{#if form?.savedSectionId === 'footer' && form?.savedMessage}
-							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							<div class="mt-4 rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 								{form.savedMessage}
 							</div>
 						{/if}
 
 						{#if form?.savedSectionId === 'footer' && form?.message}
-							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+							<div class="mt-4 rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm text-[var(--critical-text)]">
 								{form.message}
 							</div>
 						{/if}
 
 						<form method="POST" action="?/updateFooter" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Brand and contact columns</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Footer eyebrow</span>
-										<input name="footerEyebrow" value={content.footer.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerEyebrow" value={content.footer.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Logo asset</span>
-										<select name="footerLogoAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+										<select name="footerLogoAssetKey" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 											{#each footerLogoAssets as asset}
 												<option value={asset.key} selected={content.footer.logoAssetKey === asset.key}>{asset.name} · {asset.key}</option>
 											{/each}
@@ -1145,75 +1146,75 @@
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Brand name</span>
-										<input name="footerBrandName" value={content.footer.brandName} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerBrandName" value={content.footer.brandName} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Company description</span>
-										<textarea name="footerBody" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.footer.body}</textarea>
+										<textarea name="footerBody" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.footer.body}</textarea>
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Service-area text</span>
-										<input name="footerServiceAreaText" value={content.footer.serviceAreaText} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerServiceAreaText" value={content.footer.serviceAreaText} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Phone</span>
-											<input name="footerPhone" value={content.footer.phone} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="footerPhone" value={content.footer.phone} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Email</span>
-											<input name="footerEmail" value={content.footer.email} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="footerEmail" value={content.footer.email} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 									</div>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Address</span>
-										<input name="footerAddress" value={content.footer.address} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerAddress" value={content.footer.address} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Contact column label</span>
-										<input name="footerContactEyebrow" value={content.footer.contactEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerContactEyebrow" value={content.footer.contactEyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 								</div>
 							</section>
 
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Link groups, social icons, and legal row</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Navigation group label</span>
-										<input name="footerNavigationEyebrow" value={content.footer.navigationEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerNavigationEyebrow" value={content.footer.navigationEyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Navigation links</span>
-										<textarea name="footerNavigationLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.footer.navigationLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
+										<textarea name="footerNavigationLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.footer.navigationLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One per line: `Label|href|openInNewTab`.</span>
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Services group label</span>
-										<input name="footerServicesEyebrow" value={content.footer.servicesEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerServicesEyebrow" value={content.footer.servicesEyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Service links</span>
-										<textarea name="footerServicesLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.footer.servicesLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
+										<textarea name="footerServicesLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.footer.servicesLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One per line: `Label|href|openInNewTab`.</span>
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Social links</span>
-										<textarea name="footerSocialLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.footer.socialLinks.map((link) => `${link.platform}|${link.url}|${link.iconAssetKey}`).join('\n')}</textarea>
+										<textarea name="footerSocialLinks" rows="5" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.footer.socialLinks.map((link) => `${link.platform}|${link.url}|${link.iconAssetKey}`).join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One per line: `platform|url|iconAssetKey`.</span>
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Legal group label</span>
-										<input name="footerLegalEyebrow" value={content.postFooter.legalLinksEyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerLegalEyebrow" value={content.postFooter.legalLinksEyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Legal links</span>
-										<textarea name="footerLegalLinks" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.postFooter.legalLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
+										<textarea name="footerLegalLinks" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.postFooter.legalLinks.map((link) => `${link.label}|${link.href}|${link.openInNewTab ? 'true' : 'false'}`).join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One per line: `Label|href|openInNewTab`.</span>
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Copyright text</span>
-										<input name="footerCopyright" value={content.postFooter.copyright} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="footerCopyright" value={content.postFooter.copyright} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 								</div>
 
@@ -1235,7 +1236,7 @@
 								<div class="mt-4 flex justify-end">
 									<button
 										type="submit"
-										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+										class="admin-primary rounded-lg bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save footer
 									</button>
@@ -1261,43 +1262,43 @@
 						</div>
 
 						{#if form?.savedSectionId === 'process' && form?.savedMessage}
-							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							<div class="mt-4 rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 								{form.savedMessage}
 							</div>
 						{/if}
 
 						{#if form?.savedSectionId === 'process' && form?.message}
-							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+							<div class="mt-4 rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm text-[var(--critical-text)]">
 								{form.message}
 							</div>
 						{/if}
 
 						<form method="POST" action="?/updateProcessSection" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section copy</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
-										<input name="processEyebrow" value={content.process.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="processEyebrow" value={content.process.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Heading</span>
-										<input name="processTitle" value={content.process.title} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="processTitle" value={content.process.title} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Description</span>
-										<textarea name="processDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.process.description}</textarea>
+										<textarea name="processDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.process.description}</textarea>
 									</label>
 								</div>
 							</section>
 
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Timeline steps</p>
 								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">One step per line using `stepNumber|title|description|iconAssetKey|timeframe`.</p>
 								<textarea
 									name="processSteps"
 									rows="10"
-									class="mt-3 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+									class="mt-3 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6"
 								>{content.process.steps.map((step) => `${step.step}|${step.title}|${step.copy}|${step.iconAssetKey}|${step.timeframe ?? ''}`).join('\n')}</textarea>
 
 								<div class="mt-4 grid gap-3 md:grid-cols-2">
@@ -1318,7 +1319,7 @@
 								<div class="mt-4 flex justify-end">
 									<button
 										type="submit"
-										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+										class="admin-primary rounded-lg bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save process
 									</button>
@@ -1344,51 +1345,51 @@
 						</div>
 
 						{#if form?.savedSectionId === 'cta-banner' && form?.savedMessage}
-							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							<div class="mt-4 rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 								{form.savedMessage}
 							</div>
 						{/if}
 
 						{#if form?.savedSectionId === 'cta-banner' && form?.message}
-							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+							<div class="mt-4 rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm text-[var(--critical-text)]">
 								{form.message}
 							</div>
 						{/if}
 
 						<form method="POST" action="?/updateCtaBanner" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Copy and CTAs</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
-										<input name="ctaBannerEyebrow" value={content.ctaBanner.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="ctaBannerEyebrow" value={content.ctaBanner.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Heading</span>
-										<input name="ctaBannerTitle" value={content.ctaBanner.title} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="ctaBannerTitle" value={content.ctaBanner.title} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Description</span>
-										<textarea name="ctaBannerDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.ctaBanner.description}</textarea>
+										<textarea name="ctaBannerDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.ctaBanner.description}</textarea>
 									</label>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Primary CTA label</span>
-											<input name="ctaBannerPrimaryCtaLabel" value={content.ctaBanner.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="ctaBannerPrimaryCtaLabel" value={content.ctaBanner.primaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Primary CTA target</span>
-											<input name="ctaBannerPrimaryCtaHref" value={content.ctaBanner.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="ctaBannerPrimaryCtaHref" value={content.ctaBanner.primaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 									</div>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Secondary CTA label</span>
-											<input name="ctaBannerSecondaryCtaLabel" value={content.ctaBanner.secondaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="ctaBannerSecondaryCtaLabel" value={content.ctaBanner.secondaryCtaLabel} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Secondary CTA type</span>
-											<select name="ctaBannerSecondaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+											<select name="ctaBannerSecondaryCtaType" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 												<option value="anchor" selected={content.ctaBanner.secondaryCtaType === 'anchor'}>Anchor</option>
 												<option value="link" selected={content.ctaBanner.secondaryCtaType === 'link'}>Link</option>
 												<option value="phone" selected={content.ctaBanner.secondaryCtaType === 'phone'}>Phone</option>
@@ -1397,17 +1398,17 @@
 									</div>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Secondary CTA value</span>
-										<input name="ctaBannerSecondaryCtaHref" value={content.ctaBanner.secondaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="ctaBannerSecondaryCtaHref" value={content.ctaBanner.secondaryCtaHref} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 								</div>
 							</section>
 
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Background image and overlay</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Background image asset</span>
-										<select name="ctaBannerBackgroundImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm">
+										<select name="ctaBannerBackgroundImageAssetKey" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm">
 											{#each heroImageAssets as asset}
 												<option value={asset.key} selected={content.ctaBanner.backgroundImageAssetKey === asset.key}>{asset.name} · {asset.key}</option>
 											{/each}
@@ -1415,11 +1416,11 @@
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Background image alt text</span>
-										<input name="ctaBannerBackgroundImageAltText" value={content.ctaBanner.backgroundImageAltText} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="ctaBannerBackgroundImageAltText" value={content.ctaBanner.backgroundImageAltText} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Overlay opacity (0 to 1)</span>
-										<input name="ctaBannerOverlayOpacity" value={String(content.ctaBanner.overlayOpacity)} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="ctaBannerOverlayOpacity" value={String(content.ctaBanner.overlayOpacity)} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 								</div>
 
@@ -1435,7 +1436,7 @@
 								<div class="mt-4 flex justify-end">
 									<button
 										type="submit"
-										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+										class="admin-primary rounded-lg bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save CTA banner
 									</button>
@@ -1461,74 +1462,74 @@
 						</div>
 
 						{#if form?.savedSectionId === 'quote-form' && form?.savedMessage}
-							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							<div class="mt-4 rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 								{form.savedMessage}
 							</div>
 						{/if}
 
 						{#if form?.savedSectionId === 'quote-form' && form?.message}
-							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+							<div class="mt-4 rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm text-[var(--critical-text)]">
 								{form.message}
 							</div>
 						{/if}
 
 						<form method="POST" action="?/updateQuoteForm" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section copy and routing</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
-										<input name="quoteFormEyebrow" value={content.quoteForm.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="quoteFormEyebrow" value={content.quoteForm.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Heading</span>
-										<input name="quoteFormTitle" value={content.quoteForm.title} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="quoteFormTitle" value={content.quoteForm.title} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Description</span>
-										<textarea name="quoteFormDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.description}</textarea>
+										<textarea name="quoteFormDescription" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.quoteForm.description}</textarea>
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Privacy reassurance</span>
-										<textarea name="quoteFormPrivacyReassurance" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.privacyReassurance}</textarea>
+										<textarea name="quoteFormPrivacyReassurance" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.quoteForm.privacyReassurance}</textarea>
 									</label>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Submit button label</span>
-											<input name="quoteFormSubmitButtonLabel" value={content.quoteForm.submitButtonLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="quoteFormSubmitButtonLabel" value={content.quoteForm.submitButtonLabel} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Queue destination</span>
-											<input name="quoteFormQueueDestination" value={content.quoteForm.queueDestination} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="quoteFormQueueDestination" value={content.quoteForm.queueDestination} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 									</div>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Success message</span>
-										<textarea name="quoteFormSuccessMessage" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.successMessage}</textarea>
+										<textarea name="quoteFormSuccessMessage" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.quoteForm.successMessage}</textarea>
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Notification recipients</span>
-										<textarea name="quoteFormNotificationRecipients" rows="3" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.notificationRecipients.join('\n')}</textarea>
+										<textarea name="quoteFormNotificationRecipients" rows="3" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.quoteForm.notificationRecipients.join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One recipient per line. This controls routing metadata for the request intake path.</span>
 									</label>
 								</div>
 							</section>
 
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Benefit bullets and fields</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Benefit bullets</span>
-										<textarea name="quoteFormBenefits" rows="6" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.quoteForm.benefits.map((benefit) => `${benefit.iconAssetKey}|${benefit.text}`).join('\n')}</textarea>
+										<textarea name="quoteFormBenefits" rows="6" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.quoteForm.benefits.map((benefit) => `${benefit.iconAssetKey}|${benefit.text}`).join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One benefit per line: `iconAssetKey|text`.</span>
 									</label>
-									<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-white/60 p-3 text-xs leading-6 text-[var(--text-muted)]">
+									<div class="rounded-lg border border-dashed border-[var(--shell-border)] bg-[var(--surface)] p-3 text-xs leading-6 text-[var(--text-muted)]">
 										<p class="font-semibold text-[var(--text-strong)]">Available icon asset keys</p>
 										<p class="mt-1">{quoteFormIconAssets.map((asset) => asset.key).join(', ')}</p>
 									</div>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Configured form fields</span>
-										<textarea name="quoteFormFields" rows="8" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 font-mono text-xs leading-6">{content.quoteForm.fields.map((field) => `${field.key}|${field.label}|${field.type}|${field.placeholder ?? ''}|${field.required ? 'true' : 'false'}|${field.options?.join(',') ?? ''}`).join('\n')}</textarea>
+										<textarea name="quoteFormFields" rows="8" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs leading-6">{content.quoteForm.fields.map((field) => `${field.key}|${field.label}|${field.type}|${field.placeholder ?? ''}|${field.required ? 'true' : 'false'}|${field.options?.join(',') ?? ''}`).join('\n')}</textarea>
 										<span class="text-xs leading-5 text-[var(--text-muted)]">One field per line: `key|label|type|placeholder|required|option1,option2`. Supported keys: `companyName`, `contactName`, `email`, `phone`, `siteName`, `serviceAddress`, `serviceType`, `propertyType`, `requestedTimeline`, `priority`, `need`, `attachments`. Supported types: `text`, `email`, `tel`, `textarea`, `select`, `file`.</span>
 									</label>
 								</div>
@@ -1536,7 +1537,7 @@
 								<div class="mt-5 flex justify-end">
 									<button
 										type="submit"
-										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+										class="admin-primary rounded-lg bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save quote form
 									</button>
@@ -1562,27 +1563,27 @@
 						</div>
 
 						{#if form?.savedMessage}
-							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							<div class="mt-4 rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 								{form.savedMessage}
 							</div>
 						{/if}
 
 						{#if form?.message}
-							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+							<div class="mt-4 rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm text-[var(--critical-text)]">
 								{form.message}
 							</div>
 						{/if}
 
 						<div class="mt-5 grid gap-4 xl:grid-cols-2">
 							{#each contractorPresets as preset}
-								<form method="POST" action="?/applyContractorPreset" class="rounded-lg bg-white/80 p-4 shadow-sm">
+								<form method="POST" action="?/applyContractorPreset" class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 									<input type="hidden" name="presetId" value={preset.id} />
 									<div class="flex items-start justify-between gap-3">
 										<div>
 											<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{preset.contractorType}</p>
 											<h5 class="mt-1 text-lg font-semibold text-[var(--text-strong)]">{preset.label}</h5>
 										</div>
-										<span class={`rounded-full px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] ${preset.id === content.activeContractorPresetId ? 'bg-[#fff4ea] text-[var(--accent-text)] ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-[var(--shell-panel-strong)] text-[var(--text-muted)]'}`}>
+										<span class={`rounded-full px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] ${preset.id === content.activeContractorPresetId ? 'bg-[var(--teal-soft)] text-[var(--accent-text)] ring-1 ring-[var(--teal-border)]' : 'bg-[var(--shell-panel-strong)] text-[var(--text-muted)]'}`}>
 											{preset.id === content.activeContractorPresetId ? 'Active' : 'Ready'}
 										</span>
 									</div>
@@ -1608,7 +1609,7 @@
 									<div class="mt-4 flex justify-end">
 										<button
 											type="submit"
-											class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+											class="admin-primary rounded-lg bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 										>
 											Apply preset
 										</button>
@@ -1635,53 +1636,53 @@
 						</div>
 
 						{#if form?.savedSectionId === 'services' && form?.savedMessage}
-							<div class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+							<div class="mt-4 rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 								{form.savedMessage}
 							</div>
 						{/if}
 
 						{#if form?.savedSectionId === 'services' && form?.message}
-							<div class="mt-4 rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+							<div class="mt-4 rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm text-[var(--critical-text)]">
 								{form.message}
 							</div>
 						{/if}
 
 						<form method="POST" action="?/updateServicesSection" class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Section copy and CTA</p>
 								<div class="mt-3 grid gap-3">
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Eyebrow</span>
-										<input name="servicesEyebrow" value={content.services.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="servicesEyebrow" value={content.services.eyebrow} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Heading</span>
-										<input name="servicesTitle" value={content.services.title} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+										<input name="servicesTitle" value={content.services.title} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 									</label>
 									<label class="grid gap-1 text-sm text-[var(--text-base)]">
 										<span class="font-semibold text-[var(--text-strong)]">Description</span>
-										<textarea name="servicesCopy" rows="4" class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6">{content.services.copy}</textarea>
+										<textarea name="servicesCopy" rows="4" class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6">{content.services.copy}</textarea>
 									</label>
 									<div class="grid gap-3 md:grid-cols-2">
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Section CTA label</span>
-											<input name="servicesCtaLabel" value={content.services.ctaLabel} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="servicesCtaLabel" value={content.services.ctaLabel} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 										<label class="grid gap-1 text-sm text-[var(--text-base)]">
 											<span class="font-semibold text-[var(--text-strong)]">Section CTA target</span>
-											<input name="servicesCtaHref" value={content.services.ctaHref} class="rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm" />
+											<input name="servicesCtaHref" value={content.services.ctaHref} class="rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm" />
 										</label>
 									</div>
 								</div>
 							</section>
 
-							<section class="rounded-lg bg-white/80 p-4 shadow-sm">
+							<section class="rounded-lg bg-[var(--surface)] p-4 shadow-sm">
 								<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Service cards</p>
 								<p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">One card per line using `name|slug|description|iconAssetKey|imageAssetKey|detailPageUrl|featured|sortOrder`.</p>
 								<textarea
 									name="serviceCards"
 									rows="12"
-									class="mt-3 w-full rounded-md border border-[var(--shell-border)] bg-white px-3 py-2 text-sm leading-6"
+									class="mt-3 w-full rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 py-2 text-sm leading-6"
 								>{(serviceCategories.length
 									? serviceCategories
 									: serviceItems.map((item, index) => ({
@@ -1714,7 +1715,7 @@
 								<div class="mt-4 flex justify-end">
 									<button
 										type="submit"
-										class="rounded-lg bg-[var(--accent-text)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+										class="admin-primary rounded-lg bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
 									>
 										Save services
 									</button>
