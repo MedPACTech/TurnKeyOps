@@ -9,6 +9,7 @@ namespace TurnKeyOps.API.Controllers;
 [AllowAnonymous]
 [EnableRateLimiting("public-quote-intake")]
 [Route("api/public/quote-requests")]
+[Route("api/public/leads")]
 public sealed class PublicQuoteRequestsController : ApiControllerBase
 {
     private const long MaxAttachmentRequestBytes = 50 * 1024 * 1024;

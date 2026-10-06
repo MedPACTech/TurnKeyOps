@@ -126,6 +126,7 @@
 		return requests.filter((request) => {
 			const qualification = buildQuoteRequestQualification(request);
 			const haystack = [
+				request.id,
 				quoteRequestStatusMeta[request.status].label,
 				request.companyName,
 				request.contactName,
@@ -586,6 +587,7 @@
 									</div>
 									<p class="mt-1 truncate text-xs leading-5 text-[var(--text-muted)]">{request.siteName}</p>
 									<p class="truncate text-xs leading-5 text-[var(--text-muted)]">{request.serviceType}</p>
+									<p class="text-xs leading-5 text-[var(--text-muted)]">Reference {request.id.slice(0, 8).toUpperCase()}</p>
 									<div class="mt-3 flex flex-wrap gap-2">
 										<span class="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-text)]">
 											{quoteRequestStatusMeta[request.status].label}

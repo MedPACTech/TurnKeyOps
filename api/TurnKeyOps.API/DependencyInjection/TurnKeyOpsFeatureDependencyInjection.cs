@@ -40,6 +40,13 @@ public static class TurnKeyOpsFeatureDependencyInjection
             o.EnableIdLocator = true;
         });
 
+        services.AddAzureEntityMapping<Lead>(o =>
+        {
+            o.TableName = "Leads";
+            o.WriteKey = (_, e) => new AzureEntityKey { PartitionKey = e.PartitionKey, RowKey = e.RowKey };
+            o.EnableIdLocator = false;
+        });
+
         services.AddAzureEntityMapping<QuoteRequest>(o =>
         {
             o.TableName = "QuoteRequests";
@@ -149,6 +156,8 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IBaseRepositoryAsync<Customer>>(sp => sp.GetRequiredService<ICustomerRepository>());
 
+        services.AddScoped<ILeadRepository, LeadRepository>();
+        services.AddScoped<IBaseRepositoryAsync<Lead>>(sp => sp.GetRequiredService<ILeadRepository>());
         services.AddScoped<IQuoteRequestRepository, QuoteRequestRepository>();
         services.AddScoped<IBaseRepositoryAsync<QuoteRequest>>(sp => sp.GetRequiredService<IQuoteRequestRepository>());
 
@@ -196,6 +205,11 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<ICalendarEventService, CalendarEventService>();
         services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<IQuoteRequestTenantResolver, QuoteRequestTenantResolver>();
+        services.AddScoped<LeadService>();
+        services.AddScoped<LeadActivityStore>();
+        services.AddScoped<LeadWorkflowEvents>();
+        services.AddScoped<LeadIntakeBridge>();
+        services.AddScoped<LeadConfigurationService>();
         services.AddScoped<IQuoteRequestService, QuoteRequestService>();
         services.AddScoped<IQuoteRequestAttachmentService, QuoteRequestAttachmentService>();
         services.AddScoped<IQuoteEstimateService, QuoteEstimateService>();
@@ -215,6 +229,8 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<ITurnKeyChatService, TurnKeyChatService>();
         services.AddScoped<IBobContextMinimizer, BobContextMinimizer>();
         services.AddScoped<IBobOperationsService, BobOperationsService>();
+        foreach (var tool in new[] { "lead.summarize", "lead.assign", "lead.stage", "lead.task", "lead.estimate", "lead.draft", "lead.send", "lead.schedule" })
+            services.AddScoped<IBobActionProvider>(sp => new BobLeadActionProvider(sp.GetRequiredService<LeadService>(), tool));
         services.AddScoped<IBobActionProvider, BobConversationReadProvider>();
         services.AddScoped<IBobActionProvider, BobConversationArchiveProvider>();
 

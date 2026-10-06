@@ -20,6 +20,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
     internal const string ContainerName = "quote-estimate-packets";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IQuoteEstimateRepository _repository;
+    private readonly LeadWorkflowEvents? _leadEvents;
     private readonly IQuoteRequestRepository _quoteRequests;
     private readonly IAzureBlobStorageService _blobStorage;
     private readonly IEstimateDefaultsService _defaults;
@@ -40,9 +41,11 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         ITenantSettingsRepository? settings = null,
         ITenantMembershipRepository? memberships = null,
         IJobRepository? jobs = null,
-        IOptions<QuoteRequestTenantOptions>? tenantOptions = null)
+        IOptions<QuoteRequestTenantOptions>? tenantOptions = null,
+        LeadWorkflowEvents? leadEvents = null)
     {
         _repository = repository;
+        _leadEvents = leadEvents;
         _quoteRequests = quoteRequests;
         _blobStorage = blobStorage;
         _defaults = defaults;
@@ -123,6 +126,23 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         return entity is null ? null : await LoadPayloadAsync(entity, ct);
     }
 
+    public async Task<QuoteEstimateDto> PrepareFromLeadAsync(LeadDto lead, Guid requestId, CancellationToken ct = default)
+    {
+        if (lead.TenantId != _userContext.TenantId || lead.IntakeRequestId != requestId || !lead.CustomerId.HasValue)
+            throw new ArgumentException("A linked tenant Lead and customer are required.");
+        var quote = await GetQuoteAsync(_userContext.TenantId, requestId, ct) ?? throw new ArgumentException("Intake not found.");
+        await RequireQuoteAccessAsync(requestId, ct);
+        var existing = await GetEntityAsync(_userContext.TenantId, requestId, ct);
+        if (existing is not null) return await LoadPayloadAsync(existing, ct);
+        var packet = new QuoteEstimateDto { Id = requestId, QuoteRequestId = requestId, LeadId = lead.Id, CustomerId = lead.CustomerId,
+            CustomerName = lead.ContactName, SiteName = lead.SiteAddress, ServiceSummary = lead.RequestedWork,
+            Status = "draft", SavedAtUtc = DateTime.UtcNow, Notes = "Prepared from Lead; scope and pricing require estimator review.",
+            CommercialSummary = "Not priced yet", ScopeLineItems = [lead.RequestedWork] };
+        var saved = await PersistAsync(null, packet, _userContext.TenantId, null, null, ct);
+        await UpdateQuoteAsync(quote, "estimate-drafted", "Complete estimate scope and pricing.", "Estimate prepared from Lead", ct);
+        return saved;
+    }
+
     public async Task<QuoteEstimateDto> SaveDraftAsync(
         Guid quoteRequestId,
         QuoteEstimateDraftInputDto input,
@@ -179,6 +199,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             Id = existing?.Id ?? quoteRequestId,
             QuoteRequestId = quoteRequestId,
             RevisionNumber = previous?.RevisionNumber ?? 1,
+            LeadId = previous?.LeadId, CustomerId = previous?.CustomerId,
             CustomerName = Required(input.CustomerName, nameof(input.CustomerName), 200),
             SiteName = Required(input.SiteName, nameof(input.SiteName), 300),
             ServiceSummary = Clean(input.ServiceSummary, 2000),
@@ -470,6 +491,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         updated.DateCreated = quoteEntity.DateCreated;
         updated.ETag = quoteEntity.ETag;
         await _quoteRequests.SaveAsync(updated, ct);
+        if (_leadEvents is not null && label != "Estimate prepared from Lead") await _leadEvents.FromEstimateAsync(quoteEntity.TenantId, quoteEntity.Id, status, label, ct);
     }
 
     private static (QuoteEstimateTotalsDto Totals, List<string> Scope, List<string> Assumptions) Calculate(

@@ -5,6 +5,7 @@ namespace TurnKeyOps.Lib.Dtos;
 public class CalendarEventDto
 {
     public Guid Id { get; set; }
+    public Guid? LeadId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public CalendarEventType EventType { get; set; }

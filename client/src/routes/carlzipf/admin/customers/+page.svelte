@@ -25,7 +25,7 @@
   </section>
   {#if !data.loadError}<section class="rounded-xl border bg-white p-6">
    <h2 class="text-xl font-bold">{editing ? 'Edit customer' : 'New customer'}</h2>
-   {#if data.draft && !editing}<p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Details copied from a request for your review. Check for an existing customer before saving. This creates a customer record; it does not link the request or create a job.</p>{/if}
+   {#if data.draft && !editing}<p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Details copied from a lead for your review. Check for an existing customer before saving. This creates a customer record; it does not link the lead or create a job.</p>{/if}
    {#if page.url.searchParams.has('customer') && !selected}<p role="alert" class="mt-3 text-sm text-red-800">That customer is not available in this workspace.</p>{/if}
    {#key selected?.id ?? page.url.searchParams.get('fromRequest') ?? 'new'}<form method="POST" action={`?/save${selected ? `&customer=${selected.id}` : ''}`} class="mt-5 grid gap-4 sm:grid-cols-2" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); saving = false; }; }}>
     <input type="hidden" name="id" value={selected?.id ?? ''} /><input type="hidden" name="dateUpdated" value={selected?.dateUpdated ?? ''} />

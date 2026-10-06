@@ -37,7 +37,7 @@
 	{activePath}
 	{activeNav}
 	initialBobVoice={data.bobVoice}
-	navItems={config.navigation}
+	navItems={data.role === 'estimator-crew-lite' ? config.navigation.filter(item => item.slug === 'leads') : config.navigation}
 	tenantName={config.tenant.name}
 	workspaceLabel={config.workspaceLabel}
 	workspaceSummary={config.workspaceSummary}

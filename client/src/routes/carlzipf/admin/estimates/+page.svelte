@@ -37,7 +37,7 @@
 					</form>{/key}
 				{/if}
 				<IssuedQuoteLink estimate={selected} />
-				<a class="mt-5 block text-sm underline" href={`/carlzipf/admin/requests?request=${selected.quoteRequestId}`}>View source request and photos</a>
+				<a class="mt-5 block text-sm underline" href={`/carlzipf/admin/requests?request=${selected.quoteRequestId}`}>View lead and photos</a>
 			</section>
 		{:else}<div class="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">{data.selectedId ? 'This estimate is not available. Select another estimate.' : 'Select an estimate to review its scope and pricing.'}</div>{/if}
 	</div>

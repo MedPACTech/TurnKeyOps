@@ -13,6 +13,7 @@ public static class EstimateMapper
         return new EstimateDto
         {
             Id = id,
+            LeadId = entity.LeadId,
             EstimateNumber = entity.EstimateNumber,
             Status = entity.Status,
             TradeType = entity.TradeType,
@@ -62,6 +63,7 @@ public static class EstimateMapper
         return new Estimate
         {
             Id = dto.Id,
+            LeadId = dto.LeadId,
             PartitionKey = partitionKey,
             RowKey = RepositoryKeyHelper.ToRowKey(dto.Id),
             EstimateNumber = dto.EstimateNumber,

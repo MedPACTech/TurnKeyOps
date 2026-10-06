@@ -13,6 +13,7 @@ public static class JobMapper
         return new JobDto
         {
             Id = id,
+            LeadId = entity.LeadId,
             Name = entity.Name,
             Description = entity.Description,
             TradeType = entity.TradeType,
@@ -55,6 +56,7 @@ public static class JobMapper
         return new Job
         {
             Id = dto.Id,
+            LeadId = dto.LeadId,
             PartitionKey = partitionKey,
             RowKey = RepositoryKeyHelper.ToRowKey(dto.Id),
             Name = dto.Name,

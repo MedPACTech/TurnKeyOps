@@ -1,4 +1,6 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleFetch } from '@sveltejs/kit';
+import { getTurnKeyApiBaseUrl } from '$lib/server/turnkey-api';
+import { withApiSession } from '$lib/server/api-session';
 import { env } from '$env/dynamic/private';
 import {
 	authRefreshTokenCookie,
@@ -16,6 +18,13 @@ import {
 import { resolveProductionPathname, resolveProductionRedirect } from '$lib/config/domains';
 import { getExternalAdminTenantForPath } from '$lib/config/external-admin';
 import { getTenantById } from '$lib/config/tenants';
+
+export const handleFetch: HandleFetch = ({ event, request, fetch }) =>
+	fetch(withApiSession(
+		request,
+		getTurnKeyApiBaseUrl(),
+		event.locals.adminSession ? event.cookies.get(authTokenCookie) : undefined
+	));
 
 const withSecurityHeaders = (response: Response, isHttps: boolean) => {
 	response.headers.set('X-Content-Type-Options', 'nosniff');
