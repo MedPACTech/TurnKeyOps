@@ -197,6 +197,21 @@ public sealed class BobOperationsServiceTests
         Assert.Equal(0, provider.ExecutionCount);
     }
 
+    [Theory]
+    [InlineData("disabled",true)] [InlineData("auto",false)]
+    public async Task EstimateIssueRequiresApprovalEvenWhenAutoAndObeysDisabledPolicy(string mode,bool disabled)
+    {
+        var settings=new Mock<ITenantSettingsRepository>();
+        settings.Setup(x=>x.GetAsync(It.IsAny<string>(),"SETTINGS|OPERATIONAL",It.IsAny<CancellationToken>(),false))
+            .ReturnsAsync(new TenantSettingsDocument{ValuesJson=JsonSerializer.Serialize(new{leads=new{aiActions=new Dictionary<string,string>{["estimate.issue"]=mode}}})});
+        var provider=new TestProvider("estimate.issue",BobActionRisk.CustomerFacing,TurnKeyPermissionKeys.EstimatesWrite);
+        var fixture=new Fixture(provider,policy:new LeadConfigurationService(settings.Object));
+        var input=new ProposeBobActionDto{ToolKey=provider.ToolKey,IdempotencyKey="estimate-policy",Input=JsonSerializer.SerializeToElement(new{estimateId=ConversationId})};
+        if(disabled)await Assert.ThrowsAsync<InvalidOperationException>(()=>fixture.Service.ProposeEstimateAsync(ConversationId,input));
+        else {var proposed=await fixture.Service.ProposeEstimateAsync(ConversationId,input);Assert.True(proposed.ConfirmationRequired);Assert.Equal("proposed",proposed.Status);}
+        Assert.Equal(0,provider.ExecutionCount);
+    }
+
     private static ProposeBobActionDto Proposal(string idempotencyKey, object input) => new()
     {
         ToolKey = input.GetType().GetProperty("filter") is not null ? "conversation.read" : "conversation.archive",

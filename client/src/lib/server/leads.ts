@@ -27,11 +27,16 @@ export const loadLeads = async (event: RequestEvent) => {
 };
 const string = (form:FormData, key:string) => String(form.get(key) ?? '').trim();
 const nullable = (form:FormData, key:string) => string(form,key) || null;
+const assignment = (form:FormData) => {
+ const value = string(form,'assignedAssociate');
+ return {ownerProfileId:value.startsWith('profile:') ? value.slice(8) : null,
+  ownerMembershipId:value.startsWith('member:') ? value.slice(7) : null};
+};
 const editable = (form:FormData) => ({
  title:string(form,'title'), customerId:nullable(form,'customerId'), contactName:string(form,'contactName'), companyName:string(form,'companyName'),
  email:string(form,'email'), phone:string(form,'phone'), siteAddress:string(form,'siteAddress'), requestedWork:string(form,'requestedWork'),
  source:string(form,'source') || 'Manual', tradeProfile:string(form,'tradeProfile') || 'general', service:string(form,'service'), propertyType:string(form,'propertyType'),
- ownerMembershipId:nullable(form,'ownerMembershipId'), estimatedValue:string(form,'estimatedValue') ? Number(string(form,'estimatedValue')) : null,
+ ...assignment(form), estimatedValue:string(form,'estimatedValue') ? Number(string(form,'estimatedValue')) : null,
  referralName:string(form,'referralName'), referralContactId:nullable(form,'referralContactId'), nextAction:string(form,'nextAction'),
  followUpAtUtc:nullable(form,'followUpAtUtc'),
  qualification:Object.fromEntries([...form.entries()].filter(([key])=>key.startsWith('q.')).map(([key,value])=>[key.slice(2),String(value)]))
@@ -52,9 +57,9 @@ export const leadActions = {
     return {success:true,message:result.status==='completed'?'Bob applied the assignment rules.':'Bob’s assignment is ready for your approval.',bobActionId:result.status==='completed'?null:result.id};
    }
    if (action === 'bob-approve') {await leadApi(event,`leads/${id}/bob/${string(form,'bobActionId')}/approve`,{});return {success:true,message:'Bob completed the approved action.'};}
-   if (action === 'update'  || action === 'link' || action === 'qualify') {
+   if (action === 'associate' || action === 'update'  || action === 'link' || action === 'qualify') {
     const current = await leadApi<Lead>(event,`leads/${id}`);
-    await leadApi(event,`leads/${id}`,{...current,...(action === 'update' ? editable(form) : action === 'link' ? {customerId:string(form,'customerId')} : {requestedWork:string(form,'requestedWork') || current.requestedWork,siteAddress:string(form,'siteAddress') || current.siteAddress,email:string(form,'email') || current.email,qualification:{...current.qualification,...editable(form).qualification}}),expectedVersion},'PUT');
+    await leadApi(event,`leads/${id}`,{...current,...(action === 'associate' ? assignment(form) : action === 'update' ? editable(form) : action === 'link' ? {customerId:string(form,'customerId')} : {requestedWork:string(form,'requestedWork') || current.requestedWork,siteAddress:string(form,'siteAddress') || current.siteAddress,email:string(form,'email') || current.email,qualification:{...current.qualification,...editable(form).qualification}}),expectedVersion},'PUT');
    } else if (action === 'stage') await leadApi(event,`leads/${id}/stage`,{stage:string(form,'stage'),reason:string(form,'reason'),expectedVersion});
    else if (action === 'note') await leadApi(event,`leads/${id}/activity`,{text:string(form,'text'),type:string(form,'type') || 'note',expectedVersion});
    else if (['assign','estimate','job','customer'].includes(action)) await leadApi(event,`leads/${id}/${action}`,{expectedVersion});

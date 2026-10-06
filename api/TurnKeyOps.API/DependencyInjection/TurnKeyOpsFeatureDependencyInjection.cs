@@ -212,7 +212,12 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<LeadConfigurationService>();
         services.AddScoped<IQuoteRequestService, QuoteRequestService>();
         services.AddScoped<IQuoteRequestAttachmentService, QuoteRequestAttachmentService>();
-        services.AddScoped<IQuoteEstimateService, QuoteEstimateService>();
+        services.AddScoped<IEstimateAuthority, EstimateAuthority>();
+        services.AddScoped<EstimateDeliveryService>();
+        foreach(var tool in new[]{"estimate.summarize","estimate.extract","estimate.price","estimate.revise","estimate.issue","estimate.remind"})
+            services.AddScoped<IBobActionProvider>(sp => new BobEstimateActionProvider(sp.GetRequiredService<QuoteEstimateService>(),sp.GetRequiredService<EstimateDeliveryService>(),tool));
+        services.AddScoped<QuoteEstimateService>();
+        services.AddScoped<IQuoteEstimateService>(sp => sp.GetRequiredService<QuoteEstimateService>());
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IEstimateWorkflowPayloadStore, EstimateWorkflowPayloadStore>();
         services.AddScoped<IEstimateService, EstimateService>();

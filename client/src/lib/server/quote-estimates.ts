@@ -3,6 +3,7 @@ import { getTurnKeyApiBaseUrl, getTurnKeyApiHeaders, unwrapTurnKeyApiEnvelope } 
 
 export type QuoteEstimateLocation = { id: string; name: string; lengthFeet: number; widthFeet: number; depthInches: number; wastePercent: number; numberOfPours: number; squareFeet?: number; cubicYards?: number; formLinearFeet?: number; rebarLinearFeet?: number; materialCost?: number; laborCost?: number; estimatedTotal?: number };
 export type QuoteEstimate = {
+ locksmithPricing?: {jobType:string;subtotal:number;discountAmount:number;discountPercent:number;taxAmount:number;taxPercent:number;total:number;laborHours:number;laborRatePerHour:number;lines:{name:string;openingName:string;quantity:number;unitPrice:number;total:number}[];openings:{id:string;name:string;service:string;handing:string;notes:string;commercialNotes:string}[]};
 	approvalConsentText: string; approvalConsentVersion: string; documentHash: string; approvalSignature?: QuoteApprovalSignature | null;
 	id: string; quoteRequestId: string; revisionNumber: number; customerName: string; siteName: string;
 	serviceSummary: string; visitFindings: string; scopeLineItems: string[]; notes: string; assumptions: string[];

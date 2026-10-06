@@ -17,7 +17,7 @@ export const actions = { save: async (event:RequestEvent) => {
    wonReasons:String(form.get('wonReasons')).split('\n').map(s=>s.trim()).filter(Boolean),lostReasons:String(form.get('lostReasons')).split('\n').map(s=>s.trim()).filter(Boolean),
    referralRequired:form.get('referralRequired')==='on',assignmentMode:String(form.get('assignmentMode')),
    requiredFields:JSON.parse(String(form.get('requiredFields'))),assignmentRules:JSON.parse(String(form.get('assignmentRules'))),
-   aiActions:Object.fromEntries(['lead.summarize','lead.assign','lead.stage','lead.task','lead.estimate','lead.draft','lead.send','lead.schedule'].map(key=>[key,String(form.get(key))]))};
+   aiActions:Object.fromEntries(['lead.summarize','lead.assign','lead.stage','lead.task','lead.estimate','lead.draft','lead.send','lead.schedule','estimate.summarize','estimate.extract','estimate.price','estimate.revise','estimate.issue','estimate.remind'].map(key=>[key,String(form.get(key))]))};
   await leadApi(event,'leads/configuration',{expectedVersion:String(form.get('version')),configuration:config},'PUT');
   return {success:true,message:'Lead workflow settings saved.'};
  } catch(e) {return fail(400,{success:false,message:(e as {body?:{message?:string}}).body?.message || 'Settings could not be saved. Check the configuration and refresh if someone else edited it.'});}

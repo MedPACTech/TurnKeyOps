@@ -34,6 +34,7 @@ public class LeadInput
     public string PropertyType { get; set; } = "";
     public string Source { get; set; } = "Manual";
     public Guid? OwnerMembershipId { get; set; }
+    public Guid? OwnerProfileId { get; set; }
     public decimal? EstimatedValue { get; set; }
     public Guid? ReferralContactId { get; set; }
     public string ReferralName { get; set; } = "";
@@ -121,7 +122,7 @@ public sealed class LeadAssignmentRuleDto
 }
 public sealed record LeadMemberDto(Guid Id, string Name);
 public sealed record LeadWorkspaceDto(IReadOnlyList<LeadDto> Leads, LeadConfigurationDto Configuration,
-    IReadOnlyList<LeadMemberDto> Members, bool CanWrite, bool CanConfigure);
+    IReadOnlyList<LeadMemberDto> Members, bool CanWrite, bool CanConfigure, IReadOnlyList<LeadMemberDto>? Associates = null);
 public sealed class LeadScheduleDto
 {
     public DateTime StartUtc { get; set; }

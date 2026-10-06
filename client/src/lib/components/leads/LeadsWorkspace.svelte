@@ -1,15 +1,28 @@
 <script lang="ts">
+ import PersonAvatar from '$lib/components/people/PersonAvatar.svelte';
  import { onMount } from 'svelte';
  import { enhance } from '$app/forms';
  import { goto } from '$app/navigation';
- import { ArrowLeft, ArrowRight, Plus, Phone, MapPin, Sparkles, CheckCircle, Clock, Paperclip } from 'lucide-svelte';
+ import { House, Building2, ArrowLeft, ArrowRight, Plus, Phone, MapPin, Sparkles, CheckCircle, Clock, Paperclip } from 'lucide-svelte';
  import { leadStages, leadSources, queueFor, stageLabel, type LeadWorkspace, type Lead, type Duplicate } from '$lib/leads';
  let {data, form}: {data:{workspace:LeadWorkspace; selected:Lead|null; duplicates:Duplicate[]; intake:{attachments:{id:string;fileName:string}[];timeline:{id:string;label:string;occurredAtUtc:string}[]}|null; basePath:string}; form?:{success?:boolean;message?:string;createdId?:string;bobActionId?:string|null}|null} = $props();
  let ready = $state(false); onMount(()=>{ready=true; if ('serviceWorker' in navigator) navigator.serviceWorker.register('/leads-service-worker.js',{scope:data.basePath}).catch(()=>{});});
- let view = $state('Queue'); let query = $state(''); let creating = $state(false); let busy = $state(false);
+ let view = $state('Queue'); let query = $state('');
+ let propertyFilter = $state('all'); let sortBy = $state('updated'); let creating = $state(false); let busy = $state(false);
  let creationId = $state(''); let stage = $state('QUALIFYING'); let start = $state(''); let end = $state('');
  const lead = $derived(data.selected); const config = $derived(data.workspace.configuration); const canWrite = $derived(data.workspace.canWrite);
- const filtered = $derived(data.workspace.leads.filter(l => `${l.title} ${l.contactName} ${l.siteAddress}`.toLowerCase().includes(query.toLowerCase())));
+ const propertyType = (item:Lead) => item.propertyType?.trim().toLowerCase() || '';
+ const filtered = $derived.by(() => {
+  const matches = data.workspace.leads.filter(l => `${l.title} ${l.contactName} ${l.companyName} ${l.siteAddress}`.toLowerCase().includes(query.trim().toLowerCase()) &&
+   (propertyFilter === 'all' || (propertyFilter === 'unknown' ? !['residential','commercial'].includes(propertyType(l)) : propertyType(l) === propertyFilter)));
+  const followUp = (item:Lead) => item.followUpAtUtc && Number.isFinite(Date.parse(item.followUpAtUtc)) ? Date.parse(item.followUpAtUtc) : Number.MAX_SAFE_INTEGER;
+  const propertyRank = (item:Lead) => propertyType(item) === sortBy ? 0 : ['residential','commercial'].includes(propertyType(item)) ? 1 : 2;
+  return matches.sort((a,b) => {
+   const order = sortBy === 'name' ? a.title.localeCompare(b.title) : sortBy === 'value' ? (b.estimatedValue ?? -1) - (a.estimatedValue ?? -1) :
+    sortBy === 'followup' ? followUp(a) - followUp(b) : ['residential','commercial'].includes(sortBy) ? propertyRank(a) - propertyRank(b) : Date.parse(b.updatedAtUtc) - Date.parse(a.updatedAtUtc);
+   return order || a.title.localeCompare(b.title);
+  });
+ });
  const groups = $derived(view === 'Pipeline' ? leadStages.map(s=>({name:stageLabel(s,config),items:filtered.filter(l=>l.stage===s)})) : ['Needs response','Ready to qualify','Discovery / site visit','Ready to estimate','Waiting on customer','Follow up','Won','Lost'].map(name=>({name,items:filtered.filter(l=>queueFor(l.stage)===name)})));
  const money = (value:number|null) => value == null ? '' : new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(value);
  const date = (value:string) => new Date(value).toLocaleString();
@@ -18,15 +31,19 @@
  const nextStage = (current:string) => ({NEW:'QUALIFYING',NEEDS_RESPONSE:'QUALIFYING',QUALIFYING:'QUALIFIED',QUALIFIED:'DISCOVERY',DISCOVERY:'READY_TO_ESTIMATE',ESTIMATING:'PROPOSAL',PROPOSAL:'FOLLOW_UP',FOLLOW_UP:'WON',LOST:'QUALIFYING'}[current] ?? 'QUALIFYING');
  $effect(()=>{if(lead) stage=nextStage(lead.stage);});
 </script>
-<svelte:head><link rel="manifest" href={`${data.basePath}/manifest.webmanifest`}/><title>{lead ? lead.title : 'Leads'} · TurnKeyOps</title></svelte:head>
+<svelte:head><link rel="manifest" crossorigin="use-credentials" href={`${data.basePath}/manifest.webmanifest`}/><title>{lead ? lead.title : 'Leads'} · TurnKeyOps</title></svelte:head>
 <div class="leads mx-auto max-w-7xl space-y-6 p-4 sm:p-7" aria-busy={busy}>
  {#if form?.message}<p class="notice" role={form.success ? 'status':'alert'}>{form.message}</p>{/if}
  {#if lead}
   <a class="inline-flex items-center gap-2" href={data.basePath}><ArrowLeft size={18}/> All leads</a>
   <header class="flex flex-wrap items-start justify-between gap-4">
-   <div class="min-w-0"><p class="eyebrow">{lead.stageLabel} · {lead.source}</p><h1 class="break-words text-2xl font-semibold sm:text-3xl">{lead.title}</h1><p class="mt-2">{lead.contactName} {lead.companyName ? `· ${lead.companyName}`:''}</p><p class="muted mt-1">{lead.ownerName} {lead.estimatedValue != null ? `· ${money(lead.estimatedValue)}`:''}</p></div>
+   <div class="min-w-0"><p class="eyebrow">{lead.stageLabel} · {lead.source}</p><h1 class="break-words text-2xl font-semibold sm:text-3xl">{lead.title}</h1><p class="mt-2">{lead.contactName} {lead.companyName ? `· ${lead.companyName}`:''}</p><p class="muted mt-2 flex items-center gap-2">{@render owner(lead)} {lead.estimatedValue != null ? `· ${money(lead.estimatedValue)}`:''}</p></div>
    {#if lead.phone}<a class="secondary" href={`tel:${lead.phone.replace(/[^+\d]/g,'')}`}><Phone size={18}/> Call customer</a>{/if}
   </header>
+  {#if canWrite}<form method="POST" action="?/save" use:enhance={submit} class="panel flex flex-wrap items-end gap-3">
+   {@render identity()}<input type="hidden" name="action" value="associate"/>
+   <div class="min-w-0 flex-1">{@render assignee(lead)}</div><button class="secondary" disabled={busy}>Save assignment</button>
+  </form>{/if}
   <ol class="progress flex flex-wrap gap-2" aria-label="Lead lifecycle">
    {#each ['Intake','Qualification','Discovery','Estimate','Decision','Job'] as name,i}<li class:current={(lead.jobId ? 5 : ['WON','LOST','PROPOSAL','FOLLOW_UP'].includes(lead.stage) ? 4 : ['READY_TO_ESTIMATE','ESTIMATING'].includes(lead.stage) ? 3 : lead.stage === 'DISCOVERY' ? 2 : ['QUALIFYING','QUALIFIED'].includes(lead.stage) ? 1 : 0) === i}>{i+1}. {name}</li>{/each}
   </ol>
@@ -69,27 +86,51 @@
   <header class="flex flex-wrap items-center justify-between gap-4"><div><p class="eyebrow">Lead to won</p><h1 class="text-3xl font-semibold">What needs to happen next?</h1><p class="muted mt-2">Move each opportunity forward, one useful action at a time.</p></div>{#if canWrite}<button class="primary" disabled={!ready} onclick={()=>{creating=!creating;creationId=crypto.randomUUID();}} aria-expanded={creating}><Plus size={18}/> New lead</button>{/if}</header>
   {#if creating}<section class="panel"><h2 class="mb-4 text-xl font-semibold">Capture an opportunity</h2><form method="POST" action="?/save" use:enhance={submit} class="space-y-4"><input type="hidden" name="action" value="create"/><input type="hidden" name="creationId" value={creationId}/><div class="grid gap-4 sm:grid-cols-2"><label class="sm:col-span-2">Opportunity name<input name="title" required maxlength="200" placeholder="Parking lot repair at Main Street"/></label><label>Customer / contact name<input name="contactName" required/></label><label>Phone<input name="phone" type="tel"/></label><label>Email<input name="email" type="email"/></label><label>Trade<select name="tradeProfile" value={config.defaultTradeProfile}>{#each config.tradeProfiles as trade}<option value={trade}>{trade}</option>{/each}</select></label><label>Source<select name="source"><option>Manual</option>{#each leadSources.filter(s=>s!=='Manual') as source}<option>{source}</option>{/each}</select></label><label>Referred by (when applicable)<input name="referralName"/></label><label class="sm:col-span-2">Requested work<textarea name="requestedWork" rows="3" placeholder="Describe the work. You can dictate with your device keyboard."></textarea></label></div><details><summary>Site, value & customer record</summary><div class="mt-3 grid gap-4 sm:grid-cols-2"><label>Job site<input name="siteAddress"/></label><label>Approximate value<input type="number" name="estimatedValue" min="0" step="0.01"/></label><label>Company<input name="companyName"/></label><label>Existing customer ID (optional)<input name="customerId"/></label></div><label class="mt-3 flex items-center gap-2"><input type="checkbox" name="createCustomer"/> Create a new customer record (review possible matches after saving)</label></details><button class="primary" disabled={busy}>Create lead</button></form></section>{/if}
   <div class="flex flex-wrap items-end justify-between gap-4"><div class="flex gap-2" role="group" aria-label="Lead view">{#each ['Queue','Pipeline','List'] as item}<button class="secondary" class:active={view===item} aria-pressed={view===item} disabled={!ready} onclick={()=>view=item}>{item}</button>{/each}</div><label class="min-w-0">Find an opportunity<input type="search" bind:value={query} placeholder="Name, customer or location"/></label></div>
+  <div class="panel space-y-3">
+   <div class="flex flex-wrap items-end justify-between gap-4">
+    <div role="group" aria-label="Filter by property type" class="flex flex-wrap gap-2">
+     {#each [{value:'all',label:'All work'},{value:'residential',label:'Residential'},{value:'commercial',label:'Commercial'},{value:'unknown',label:'Not specified'}] as filter}
+      <button type="button" class="secondary" class:active={propertyFilter===filter.value} aria-pressed={propertyFilter===filter.value} disabled={!ready} onclick={()=>propertyFilter=filter.value}>
+       {#if filter.value==='residential'}<House size={18} aria-hidden="true"/>{:else if filter.value==='commercial'}<Building2 size={18} aria-hidden="true"/>{/if}{filter.label}
+      </button>
+     {/each}
+    </div>
+    <label>Sort leads<select bind:value={sortBy} disabled={!ready}><option value="updated">Recently updated</option><option value="followup">Next follow-up</option><option value="value">Highest value</option><option value="name">Name A–Z</option><option value="residential">Residential first</option><option value="commercial">Commercial first</option></select></label>
+   </div>
+   <div class="flex flex-wrap items-center justify-between gap-3"><p class="muted text-sm" role="status">{filtered.length} of {data.workspace.leads.length} leads{view!=='List'?' · Sorted within each group':''}</p>{#if propertyFilter!=='all'||query||sortBy!=='updated'}<button type="button" class="secondary" onclick={()=>{propertyFilter='all';query='';sortBy='updated';}}>Reset filters & sort</button>{/if}</div>
+  </div>
   {#if !data.workspace.leads.length}<section class="panel py-12 text-center"><h2 class="text-xl font-semibold">Your next opportunity starts here</h2><p class="muted mt-2">New website intake appears automatically. Capture a phone call or referral with New lead.</p>{#if canWrite}<form method="POST" action="?/save" use:enhance={submit} class="mt-5"><input type="hidden" name="action" value="reconcile"/><button class="secondary" disabled={busy}>Bring existing Requests into Leads</button></form>{/if}</section>
-  {:else if !filtered.length}<p role="status">No leads match this search.</p>
-  {:else if view==='List'}<div class="panel overflow-x-auto"><table class="w-full text-left"><caption class="sr-only">All opportunities</caption><thead><tr><th>Opportunity</th><th>Stage</th><th>Owner</th><th>Next action</th></tr></thead><tbody>{#each filtered as item}<tr><td><a class="inline-flex min-h-11 items-center underline" href={`${data.basePath}/${item.id}`}>{item.title}</a></td><td>{item.stageLabel}</td><td>{item.ownerName}</td><td>{item.nextAction}</td></tr>{/each}</tbody></table></div>
-  {:else}<div class={view==='Pipeline'?'grid gap-5 md:grid-cols-2 xl:grid-cols-3':'space-y-7'}>{#each groups.filter(g=>g.items.length) as group}<section><h2 class="mb-3 text-lg font-semibold">{group.name} <span class="muted">{group.items.length}</span></h2><div class={view==='Queue'?'grid gap-3 md:grid-cols-2 xl:grid-cols-3':'space-y-3'}>{#each group.items as item}<article class="panel flex flex-col gap-3"><div><p class="eyebrow">{item.tradeProfile} · {item.source}</p><h3 class="break-words text-lg font-semibold">{item.title}</h3><p class="muted">{item.contactName}</p></div>{#if item.siteAddress}<p class="flex items-start gap-2 text-sm"><MapPin size={16}/>{item.siteAddress}</p>{/if}<p class="muted text-sm">{item.ownerName} {item.estimatedValue!=null?`· ${money(item.estimatedValue)}`:''}</p><p class="muted text-sm">Updated {date(item.updatedAtUtc)}</p>{#if item.missingRequired.length}<p class="text-sm">{item.missingRequired.length} qualification items missing</p>{/if}<a class="primary mt-auto" href={`${data.basePath}/${item.id}`}>{item.nextAction}<ArrowRight size={17}/></a></article>{/each}</div></section>{/each}</div>{/if}
+  {:else if !filtered.length}<p role="status">No leads match these filters. Try another property type or clear the search.</p>
+  {:else if view==='List'}<div class="panel overflow-x-auto"><table class="w-full text-left"><caption class="sr-only">All opportunities</caption><thead><tr><th>Opportunity</th><th>Stage</th><th>Associate</th><th>Next action</th></tr></thead><tbody>{#each filtered as item}<tr><td><a class="inline-flex min-h-11 items-center underline" href={`${data.basePath}/${item.id}`}>{item.title}</a></td><td>{item.stageLabel}</td><td><span class="flex items-center gap-2">{@render owner(item)}</span></td><td>{item.nextAction}</td></tr>{/each}</tbody></table></div>
+  {:else}<div class={view==='Pipeline'?'grid gap-5 md:grid-cols-2 xl:grid-cols-3':'space-y-7'}>{#each groups.filter(g=>g.items.length) as group}<section><h2 class="mb-3 text-lg font-semibold">{group.name} <span class="muted">{group.items.length}</span></h2><div class={view==='Queue'?'grid gap-3 md:grid-cols-2 xl:grid-cols-3':'space-y-3'}>{#each group.items as item}<article class="panel flex flex-col gap-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><h3 class="break-words text-lg font-semibold">{item.title}</h3></div>{#if item.propertyType?.toLowerCase()==='residential'}<span class="property-type" role="img" aria-label="Residential lead" title="Residential"><House size={24} aria-hidden="true"/></span>{:else if item.propertyType?.toLowerCase()==='commercial'}<span class="property-type" role="img" aria-label="Commercial lead" title="Commercial"><Building2 size={24} aria-hidden="true"/></span>{/if}</div><p class="muted text-sm flex flex-wrap items-center gap-2">{@render owner(item)} {item.estimatedValue!=null?`· ${money(item.estimatedValue)}`:''}</p><p class="muted text-sm">Updated {date(item.updatedAtUtc)}</p>{#if item.missingRequired.length}<p class="text-sm">{item.missingRequired.length} qualification items missing</p>{/if}<a class="primary mt-auto" href={`${data.basePath}/${item.id}`}>{item.nextAction}<ArrowRight size={17}/></a></article>{/each}</div></section>{/each}</div>{/if}
   {#if canWrite && data.workspace.leads.length}<details class="panel"><summary>Historical intake</summary><p class="muted my-3">Link retained Requests without overwriting existing Leads.</p><form method="POST" action="?/save" use:enhance={submit}><input type="hidden" name="action" value="reconcile"/><button class="secondary" disabled={busy}>Reconcile existing Requests</button></form></details>{/if}
   {#if data.workspace.canConfigure}<a class="inline-flex min-h-11 items-center underline" href={`${data.basePath}/settings`}>Lead workflow settings</a>{/if}
  {/if}
 </div>
 {#snippet identity()}{#if lead}<input type="hidden" name="id" value={lead.id}/><input type="hidden" name="expectedVersion" value={lead.version}/>{/if}{/snippet}
 {#snippet activities(items:Lead['activity'])}<ol class="space-y-4">{#each items as item}<li><p class="whitespace-pre-wrap break-words text-sm">{item.text}</p><p class="muted mt-1 text-xs">{item.actor} · {date(item.occurredAtUtc)}</p></li>{/each}</ol>{/snippet}
+{#snippet owner(item:Lead)}<PersonAvatar name={item.ownerName} identity={item.ownerProfileId || item.ownerMembershipId || ''} assigned={!!(item.ownerProfileId || item.ownerMembershipId)}/><span>{item.ownerName}</span>{/snippet}
+{#snippet assignee(item:Lead)}
+ <label>Assigned associate<select name="assignedAssociate" disabled={!ready || busy} value={item.ownerProfileId ? `profile:${item.ownerProfileId}` : item.ownerMembershipId ? `member:${item.ownerMembershipId}` : ''}>
+  <option value="">Unassigned</option>
+  {#each data.workspace.associates ?? [] as person}<option value={`profile:${person.id}`}>{person.name}</option>{/each}
+  {#each data.workspace.members as member}<option value={`member:${member.id}`}>{member.name} (app member)</option>{/each}
+  {#if item.ownerProfileId && !(data.workspace.associates ?? []).some(p=>p.id===item.ownerProfileId)}<option value={`profile:${item.ownerProfileId}`}>Unavailable associate — reassign when ready</option>{/if}
+  {#if item.ownerMembershipId && !data.workspace.members.some(p=>p.id===item.ownerMembershipId)}<option value={`member:${item.ownerMembershipId}`}>Unavailable associate — reassign when ready</option>{/if}
+ </select></label>
+{/snippet}
 {#snippet fields(item:Lead)}
  <fieldset disabled={!canWrite} class="grid gap-4 sm:grid-cols-2">
   <label>Opportunity name<input name="title" value={item.title} required maxlength="200"/></label><label>Contact name<input name="contactName" value={item.contactName}/></label><label>Company<input name="companyName" value={item.companyName}/></label><label>Customer ID<input name="customerId" value={item.customerId??''}/></label>
   <label>Email<input type="email" name="email" value={item.email}/></label><label>Phone<input type="tel" name="phone" value={item.phone}/></label><label class="sm:col-span-2">Job site<input name="siteAddress" value={item.siteAddress}/></label><label class="sm:col-span-2">Requested work<textarea name="requestedWork" rows="3" value={item.requestedWork}></textarea></label>
   <label>Trade<select name="tradeProfile" value={item.tradeProfile}>{#each config.tradeProfiles as trade}<option value={trade}>{trade}</option>{/each}</select></label><label>Service<input name="service" value={item.service}/></label><label>Property type<select name="propertyType" value={item.propertyType}><option value="">Not known</option><option value="residential">Residential</option><option value="commercial">Commercial</option></select></label><label>Source<select name="source" value={item.source}>{#each leadSources as source}<option>{source}</option>{/each}</select></label>
-  <label>Primary owner<select name="ownerMembershipId" value={item.ownerMembershipId??''}><option value="">Unassigned</option>{#each data.workspace.members as member}<option value={member.id}>{member.name}</option>{/each}</select></label><label>Approximate value<input name="estimatedValue" type="number" min="0" step="0.01" value={item.estimatedValue??''}/></label><label>Referral name<input name="referralName" value={item.referralName}/></label><label>Referral contact ID<input name="referralContactId" value={item.referralContactId??''}/></label><label class="sm:col-span-2">Next action<input name="nextAction" value={item.nextAction}/></label><label>Follow-up (UTC)<input name="followUpAtUtc" value={item.followUpAtUtc??''} placeholder="2026-10-15T15:00:00Z"/></label>
+  {@render assignee(item)}<label>Approximate value<input name="estimatedValue" type="number" min="0" step="0.01" value={item.estimatedValue??''}/></label><label>Referral name<input name="referralName" value={item.referralName}/></label><label>Referral contact ID<input name="referralContactId" value={item.referralContactId??''}/></label><label class="sm:col-span-2">Next action<input name="nextAction" value={item.nextAction}/></label><label>Follow-up (UTC)<input name="followUpAtUtc" value={item.followUpAtUtc??''} placeholder="2026-10-15T15:00:00Z"/></label>
  </fieldset>
 {/snippet}
 <style>
  .leads{color:var(--text-strong,#111827);--lead-surface:var(--shell-card,#fff);--lead-muted:var(--text-base,#374151)}
  .panel{padding:1.25rem;border:1px solid var(--shell-border,#d1d5db);border-radius:.75rem;background:var(--lead-surface)}
+ .property-type{display:inline-flex;flex-shrink:0;align-items:center;justify-content:center;width:36px;height:36px;border-radius:.5rem;background:var(--surface-elevated,var(--lead-surface));color:var(--lead-muted)}
  .eyebrow{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--lead-muted);margin-bottom:.4rem;font-weight:600}
  .muted{color:var(--lead-muted)}
  .primary,.secondary{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:44px;padding:.65rem 1rem;border-radius:.5rem;font-size:.9rem;font-weight:600;cursor:pointer}

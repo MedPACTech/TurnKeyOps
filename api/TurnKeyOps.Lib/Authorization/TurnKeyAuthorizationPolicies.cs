@@ -38,6 +38,7 @@ public static class TurnKeyPermissionKeys
 {
     public const string LeadsRead = "leads.read";
     public const string LeadsWrite = "leads.write";
+    public const string EstimatesRead = "estimates.read";
     public const string EstimatesWrite = "estimates.write";
     public const string JobsWrite = "jobs.write";
     public const string CalendarWrite = "calendar.write";

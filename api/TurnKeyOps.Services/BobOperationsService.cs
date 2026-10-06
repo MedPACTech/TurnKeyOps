@@ -82,6 +82,36 @@ public sealed class BobOperationsService : IBobOperationsService
         return await ProposeAsync(leadId, input, ct);
     }
 
+    public async Task<BobActionDto> ApproveEstimateAsync(Guid estimateId, Guid actionId, CancellationToken ct = default)
+    {
+        var action = await RequireActionAsync(actionId, ct);
+        if (action.ConversationId != estimateId || !action.ToolKey.StartsWith("estimate.", StringComparison.Ordinal))
+            throw new ArgumentException("Action belongs to another Estimate.");
+        await ApproveAsync(actionId, ct);
+        return await ExecuteAsync(actionId, ct);
+    }
+
+    public async Task<BobActionDto> ProposeEstimateAsync(Guid estimateId, ProposeBobActionDto input, CancellationToken ct = default)
+    {
+        EnsureEnabled();
+        if (estimateId == Guid.Empty || !input.ToolKey.StartsWith("estimate.", StringComparison.Ordinal) ||
+            !input.Input.TryGetProperty("estimateId", out var inputId) || inputId.GetGuid() != estimateId)
+            throw new ArgumentException("The action must target this Estimate.");
+        var provider = GetProvider(input.ToolKey);
+        await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
+        await PolicyRequiresApprovalAsync(provider, ct);
+        var partition = PartitionKey();
+        var row = MedInsights.Lib.EntityKeyPolicy.Row(estimateId);
+        var conversation = await _chatRepository.GetAsync(partition, row, ct);
+        if (conversation is null)
+            await _chatRepository.SaveAsync(new MedInsights.Lib.Entities.Chat {
+                Id = estimateId, TenantId = _userContext.TenantId, ActorUserId = _userContext.UserId,
+                PartitionKey = partition, RowKey = row, Title = "Estimate workspace", Mode = "estimate",
+                StateJson = JsonSerializer.Serialize(new { estimateId }), DateChatCreated = DateTime.UtcNow, DateChatUpdated = DateTime.UtcNow
+            }, ct);
+        return await ProposeAsync(estimateId, input, ct);
+    }
+
     public async Task<BobActionDto> ProposeAsync(
         Guid conversationId,
         ProposeBobActionDto input,
@@ -236,12 +266,12 @@ public sealed class BobOperationsService : IBobOperationsService
         if (_leadConfiguration is null) return RequiresConfirmation(provider.Risk);
         var config = await _leadConfiguration.GetAsync(_userContext.TenantId, ct);
         var mode = config.AiActions.GetValueOrDefault(provider.ToolKey, provider.Risk == BobActionRisk.Read ? "read" : "approval");
-        if (mode is "disabled" or "recommend" || mode == "draft" && provider.ToolKey != "lead.draft")
+        if (mode is "disabled" or "recommend" || mode == "draft" && provider.ToolKey is not ("lead.draft" or "estimate.extract"))
             throw new InvalidOperationException("Tenant policy does not allow this action to execute.");
         if (mode == "read" && provider.Risk != BobActionRisk.Read)
             throw new InvalidOperationException("Read-only policy cannot execute a mutation.");
         // Financial outcomes remain approved until a deterministic outcome guardrail is configured.
-        if (provider.ToolKey == "lead.stage") return true;
+        if (provider.ToolKey is "lead.stage" or "estimate.issue") return true;
         return mode == "approval" || (mode != "auto" && mode != "draft" && provider.Risk != BobActionRisk.Read);
     }
 

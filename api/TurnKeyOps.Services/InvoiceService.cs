@@ -210,7 +210,7 @@ public sealed class InvoiceService : IInvoiceService
                 if (estimate.Totals.LaborCost > 0)
                     lines.Add(new() { SortOrder = lines.Count, Description = "Approved estimate labor", Quantity = 1m, UnitPrice = estimate.Totals.LaborCost });
                 if (lines.Count == 0)
-                    lines.Add(new() { Description = $"Approved estimate revision {estimate.RevisionNumber}", Quantity = 1m, UnitPrice = estimate.Totals.EstimatedTotal });
+                    lines.Add(new() { Description = $"Approved estimate revision {estimate.RevisionNumber}", Quantity = 1m, UnitPrice = estimate.AcceptedTotal });
             }
 
             var invoice = await AddAsync(new InvoiceDto

@@ -20,7 +20,7 @@ public sealed partial class LeadService(
     IQuoteEstimateService quoteEstimates, IJobService jobService,
     IQuoteRequestAttachmentService attachments,
     IBeam.Communications.Abstractions.IEmailService email, IBeam.Communications.Abstractions.ISmsService sms,
-    ITenantCommunicationProfileResolver communicationProfiles, LeadActivityStore activityStore)
+    ITenantCommunicationProfileResolver communicationProfiles, LeadActivityStore activityStore, MedInsights.Services.UserModuleAccessService? moduleAccess = null, IManagedProfileStore? profiles = null)
 {
     public static readonly string[] Sources = ["Website", "Referral", "Phone", "Manual", "Existing Customer", "Walk-in", "Other"];
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -57,13 +57,25 @@ public sealed partial class LeadService(
         .Where(x => x.TenantId == user.TenantId && !x.IsDeleted && !x.DateRemoved.HasValue && x.MembershipStatus == "Active" && x.Role != "contact")
         .Select(x => new LeadMemberDto(x.Id, x.InvitedEmail ?? x.InvitedPhone ?? x.UserId.ToString())).ToArray();
 
-    private static LeadDto Decorate(LeadDto lead, LeadConfigurationDto config, IReadOnlyList<LeadMemberDto> members)
+    private async Task<IReadOnlyList<LeadMemberDto>> AssociatesAsync(CancellationToken ct)
+    {
+        var result = new List<LeadMemberDto>();
+        if (profiles is not null)
+            await foreach (var p in profiles.ListAsync(Partition, ct))
+                if (p.PartitionKey == Partition && p.IsActive && !p.IsDeleted && p.ProfileTypes.Contains("employee"))
+                    result.Add(new(p.Id, string.Join(" ", new[] { p.FirstName, p.LastName }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim() is { Length: > 0 } name ? name : p.ContactEmail ?? "Unnamed associate"));
+        return result.OrderBy(x => x.Name).ToArray();
+    }
+
+    private static LeadDto Decorate(LeadDto lead, LeadConfigurationDto config, IReadOnlyList<LeadMemberDto> members, IReadOnlyList<LeadMemberDto> associates)
     {
         var copy = JsonSerializer.Deserialize<LeadDto>(JsonSerializer.Serialize(lead, Json), Json)!;
         copy.StageLabel = config.StageLabels.GetValueOrDefault(copy.Stage, copy.Stage.Replace('_', ' ').ToLowerInvariant());
         copy.Fields = LeadConfigurationService.Fields(copy, config).ToList();
         copy.MissingRequired = copy.Fields.Where(x => x.Required && string.IsNullOrWhiteSpace(x.Value)).Select(x => x.Label).ToList();
-        copy.OwnerName = members.FirstOrDefault(x => x.Id == copy.OwnerMembershipId)?.Name ?? "Unassigned";
+        copy.OwnerName = copy.OwnerProfileId.HasValue
+            ? associates.FirstOrDefault(x => x.Id == copy.OwnerProfileId)?.Name ?? "Unavailable associate"
+            : members.FirstOrDefault(x => x.Id == copy.OwnerMembershipId)?.Name ?? (copy.OwnerMembershipId.HasValue ? "Unavailable associate" : "Unassigned");
         if (string.IsNullOrWhiteSpace(copy.NextAction)) copy.NextAction = LeadStages.NextAction(copy.Stage);
         copy.BobSummary = copy.MissingRequired.Count > 0
             ? $"Before qualification, ask for {string.Join(", ", copy.MissingRequired)}. Next: {copy.NextAction}."
@@ -75,15 +87,16 @@ public sealed partial class LeadService(
         await RequireAsync(false, ct);
         var config = await configuration.GetAsync(user.TenantId, ct);
         var members = await MembersAsync(ct);
-        return new((await AllAsync(ct)).Select(x => Decorate(x.Data, config, members)).ToArray(), config, members,
+        var associates = await AssociatesAsync(ct);
+        return new((await AllAsync(ct)).Select(x => Decorate(x.Data, config, members, associates)).ToArray(), config, members,
             await access.HasPermissionAsync(TurnKeyPermissionKeys.LeadsWrite, ct),
-            await access.HasPermissionAsync(TurnKeyPermissionKeys.TenantSettingsManage, ct));
+            await access.HasPermissionAsync(TurnKeyPermissionKeys.TenantSettingsManage, ct), associates);
     }
     public async Task<LeadDto?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await RequireAsync(false, ct);
         var lead = await FindAsync(id, ct);
-        return lead is null ? null : Decorate(lead.Data, await configuration.GetAsync(user.TenantId, ct), await MembersAsync(ct));
+        return lead is null ? null : Decorate(lead.Data, await configuration.GetAsync(user.TenantId, ct), await MembersAsync(ct), await AssociatesAsync(ct));
     }
     public async Task<int> ReconcileAsync(CancellationToken ct = default)
     {
@@ -131,14 +144,22 @@ public sealed partial class LeadService(
     public async Task<LeadDto> UpdateAsync(Guid id, UpdateLeadDto input, CancellationToken ct = default)
     {
         var entity = await EditableAsync(id, input.ExpectedVersion, ct);
-        await ValidateAsync(input, ct);
+        await ValidateAsync(input, ct, entity.Data.OwnerProfileId != input.OwnerProfileId || entity.Data.OwnerMembershipId != input.OwnerMembershipId);
         // Copy only editable business fields; lifecycle, relationships to downstream work and audit are server-owned.
         var priorOwner = entity.Data.OwnerMembershipId;
+        var priorProfile = entity.Data.OwnerProfileId;
         foreach (var property in typeof(LeadInput).GetProperties()) property.SetValue(entity.Data, property.GetValue(input));
-        return await SaveAsync(entity, priorOwner == input.OwnerMembershipId ? "updated" : "assignment",
-            priorOwner == input.OwnerMembershipId ? "Lead details / qualification updated" : $"Primary owner changed from {priorOwner} to {input.OwnerMembershipId}.", ct);
+        var assignmentChanged = priorOwner != input.OwnerMembershipId || priorProfile != input.OwnerProfileId;
+        var summary = "Lead details / qualification updated";
+        if (assignmentChanged)
+        {
+            var assignees = input.OwnerProfileId.HasValue ? await AssociatesAsync(ct) : await MembersAsync(ct);
+            var selected = assignees.FirstOrDefault(x => x.Id == (input.OwnerProfileId ?? input.OwnerMembershipId));
+            summary = selected is null ? "Associate assignment removed" : $"Assigned to {selected.Name}";
+        }
+        return await SaveAsync(entity, assignmentChanged ? "assignment" : "updated", summary, ct);
     }
-    private async Task ValidateAsync(LeadInput input, CancellationToken ct)
+    private async Task ValidateAsync(LeadInput input, CancellationToken ct, bool validateAssignment = true)
     {
         if (string.IsNullOrWhiteSpace(input.Title) || input.Title.Length > 200) throw new ArgumentException("A lead name of 1–200 characters is required.");
         if (!Sources.Contains(input.Source)) throw new ArgumentException("Choose a valid lead source.");
@@ -158,7 +179,11 @@ public sealed partial class LeadService(
             var customer = await customers.GetAsync(Partition, RepositoryKeyHelper.ToRowKey(customerId!.Value), ct);
             if (customer is null || customer.IsDeleted || customer.PartitionKey != Partition) throw new ArgumentException("Linked contact was not found in this tenant.");
         }
-        if (input.OwnerMembershipId.HasValue && !(await MembersAsync(ct)).Any(x => x.Id == input.OwnerMembershipId))
+        if (input.OwnerMembershipId.HasValue && input.OwnerProfileId.HasValue)
+            throw new ArgumentException("Choose one assigned associate.");
+        if (validateAssignment && input.OwnerProfileId.HasValue && !(await AssociatesAsync(ct)).Any(x => x.Id == input.OwnerProfileId))
+            throw new ArgumentException("Choose an active employee profile in this company.");
+        if (validateAssignment && input.OwnerMembershipId.HasValue && !(await MembersAsync(ct)).Any(x => x.Id == input.OwnerMembershipId))
             throw new ArgumentException("The lead owner must be an active employee in this tenant.");
     }
     public async Task<LeadDto> StageAsync(Guid id, LeadStageDto input, CancellationToken ct = default)
@@ -255,6 +280,7 @@ public sealed partial class LeadService(
             .ThenBy(x => config.AssignmentMode == "round-robin" ? all.Where(l => l.Data.OwnerMembershipId == x.MembershipId).Select(l => l.Data.UpdatedAtUtc).DefaultIfEmpty(DateTime.MinValue).Max() : DateTime.MinValue)
             .ThenBy(x => x.MembershipId).First();
         entity.Data.OwnerMembershipId = chosen.MembershipId;
+        entity.Data.OwnerProfileId = null;
         return await SaveAsync(entity, "assignment", $"Assigned to {members.First(x => x.Id == chosen.MembershipId).Name}: matching trade/service/type/source/territory rule; policy {config.AssignmentMode}, priority {chosen.Priority}.", ct);
     }
     public async Task<LeadDto> EstimateAsync(Guid id, string version, CancellationToken ct = default)
@@ -274,6 +300,7 @@ public sealed partial class LeadService(
         var entity = await EditableAsync(id, version, ct);
         await access.RequirePermissionAsync(TurnKeyPermissionKeys.EstimatesWrite, ct);
         await access.RequirePermissionAsync(TurnKeyPermissionKeys.JobsWrite, ct);
+        if(moduleAccess is not null && !UserModulePermissions.Allows(await moduleAccess.GetAsync(ct),"jobs",true))throw new MedInsights.Lib.ForbiddenAccessException("Jobs write permission is required for handoff.");
         if (entity.Data.Stage != "WON" || !entity.Data.IntakeRequestId.HasValue || !entity.Data.CustomerId.HasValue)
             throw new ArgumentException("Mark the lead won, link its customer and obtain estimate approval first.");
         var packet = await quoteEstimates.GetAsync(entity.Data.IntakeRequestId.Value, ct);
@@ -284,7 +311,12 @@ public sealed partial class LeadService(
             Id = id, LeadId = id, Name = entity.Data.Title, CustomerId = entity.Data.CustomerId.Value,
             CustomerName = entity.Data.ContactName, ContactName = entity.Data.ContactName, ContactEmail = entity.Data.Email,
             ContactPhone = entity.Data.Phone, ProjectAddress = entity.Data.SiteAddress, QuoteRequestId = entity.Data.IntakeRequestId,
-            EstimatedTotal = packet.Totals.EstimatedTotal, Status = Lib.Enums.JobStatus.Created,
+            EstimatedTotal = packet.AcceptedTotal, RequiredDepositPercent = packet.Document?.DepositPercent ?? 0, Status = Lib.Enums.JobStatus.Created,
+            Description = packet.Document?.Scope ?? packet.ServiceSummary,
+            AcceptedEstimate = new() { EstimateId=packet.Id,LeadId=id,Revision=packet.RevisionNumber,DocumentHash=packet.DocumentHash,
+                Document=QuoteEstimateService.CustomerProjection(packet).Document,Signature=packet.ApprovalSignature,
+                SelectedOptions=QuoteEstimateService.CustomerProjection(packet).Pricing?.Options.Where(x=>packet.AcceptedOptionIds.Contains(x.Id)).ToList()??[],
+                Source=entity.Data.Source,Referral=entity.Data.ReferralName,SalesOwnerProfileId=entity.Data.OwnerProfileId,SalesOwnerMembershipId=entity.Data.OwnerMembershipId },
             TradeType = entity.Data.TradeProfile switch { "concrete" => Lib.Enums.TradeType.Concrete, "framing" => Lib.Enums.TradeType.Framing, "doors-locks" => Lib.Enums.TradeType.DoorsLocksmith, _ => Lib.Enums.TradeType.General },
             LocksmithJobType = entity.Data.TradeProfile == "doors-locks" ? entity.Data.PropertyType : null,
             Notes = $"Lead {id}; approved estimate revision {packet.RevisionNumber}; source {entity.Data.Source}; referral {entity.Data.ReferralName}. Sales activity and commitments remain on the linked Lead."
@@ -330,7 +362,7 @@ public sealed partial class LeadService(
         entity.Data.Version = Guid.NewGuid().ToString("N");
         var saved = await activityStore.CommitAsync(entity, type == "created", ct);
         await AuditAsync(entity.Id, type, text, ct);
-        return Decorate(saved.Data, await configuration.GetAsync(user.TenantId, ct), await MembersAsync(ct));
+        return Decorate(saved.Data, await configuration.GetAsync(user.TenantId, ct), await MembersAsync(ct), await AssociatesAsync(ct));
     }
     private Task AuditAsync(Guid id, string type, string text, CancellationToken ct) => audit.RecordAsync(new RecordAuditEventRequestDto {
         TenantId = user.TenantId, UserId = user.UserId, Category = "lead", TargetType = "lead", TargetId = id.ToString(), Action = type,

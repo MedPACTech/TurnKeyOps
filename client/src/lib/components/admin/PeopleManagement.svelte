@@ -1,4 +1,5 @@
 <script lang="ts">
+ import PersonAvatar from '$lib/components/people/PersonAvatar.svelte';
  import { page } from '$app/state';
  import { enhance } from '$app/forms';
  import type { Person } from '$lib/server/people';
@@ -24,7 +25,7 @@
  <div class="filters"><label>Search<input type="search" bind:value={query} placeholder="Name, email, or phone" /></label><label>Profile<select bind:value={filter}><option value="all">All active users</option><option value="employee">Employees</option><option value="customer">Customers</option><option value="vendor">Vendors</option><option value="archived">Archived</option></select></label></div>
  <div class="workspace"><div class="directory">
  {#each visible as person (person.id)}<button class:selected={selectedId===person.id} class="person" aria-pressed={selectedId===person.id} onclick={()=>open(person)}>
-  <strong>{`${person.firstName} ${person.lastName}`.trim() || person.contactEmail || person.contactPhone || 'Unnamed user'}</strong>
+  <div class="person-heading"><PersonAvatar name={`${person.firstName} ${person.lastName}`} identity={person.id}/><strong>{`${person.firstName} ${person.lastName}`.trim() || person.contactEmail || person.contactPhone || 'Unnamed user'}</strong></div>
   <span>{person.profileTypes.join(' · ') || 'No business profile yet'}</span><span>{person.isOwner ? 'Owner' : person.role || 'No app access'}</span>
  </button>{:else}<p class="empty">No users match this view.</p>{/each}
  </div><div class="editor">
@@ -62,5 +63,6 @@
  </div></div>
 </section>
 <style>
+ .person-heading{display:flex;align-items:center;gap:.75rem}
  .people{max-width:1200px;margin:auto;color:var(--text-strong)}header,.filters{display:flex;gap:1.5rem;justify-content:space-between;align-items:center;margin-bottom:1.5rem}h1{font-size:1.8rem;font-weight:750}h2{font-size:1.3rem;font-weight:700;margin-bottom:1rem}h3{font-weight:700;margin:1.5rem 0 .75rem}.eyebrow{text-transform:uppercase;font-size:.7rem;letter-spacing:.15em}p,.help{color:var(--text-muted)}.help{font-size:.8rem;margin:.5rem 0 1rem}.filters>label:first-child{flex:1;max-width:420px}.workspace{display:grid;align-items:start;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:1.5rem}.directory{overflow:hidden;align-self:start}.directory,.editor{background:var(--surface);border:1px solid var(--border);border-radius:12px}.editor{padding:1.5rem;min-width:0}.removal{border-top:1px solid var(--border);margin-top:1.5rem}.delete-actions{display:flex;gap:.75rem;flex-wrap:wrap}.secondary{background:var(--surface);color:var(--text-base)}.person{display:flex;flex-direction:column;gap:.3rem;width:100%;text-align:left;border:0;border-bottom:1px solid var(--border);border-radius:0;background:var(--surface);color:inherit;padding:1rem}.person span{font-size:.8rem;color:var(--text-muted)}.person.selected span{color:var(--text-base)}.person.selected{background:var(--teal-soft)}.person:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-3px}.fields,.permissions{display:grid;grid-template-columns:1fr 1fr;gap:1rem}label{display:flex;flex-direction:column;gap:.4rem;font-size:.85rem;margin-bottom:.8rem}input,select{border:1px solid var(--input-border);border-radius:6px;padding:.65rem;min-width:0;background:var(--surface);color:var(--text-strong)}button{border:1px solid var(--input-border);border-radius:6px;padding:.65rem 1rem;background:var(--cta);color:var(--cta-text);font-weight:600}button:disabled,fieldset:disabled{opacity:.6}fieldset{border:0;padding:0;min-width:0}.profiles{display:flex;flex-wrap:wrap;gap:1rem;margin:1rem 0}.profiles label{flex-direction:row;align-items:center;text-transform:capitalize}.permissions label{text-transform:capitalize}.notice{background:var(--positive-soft);padding:1rem;margin-bottom:1rem;border-radius:8px;overflow-wrap:anywhere}.error{background:var(--critical-soft);color:var(--critical-text)}.empty{padding:1.5rem}.danger{background:var(--surface);color:var(--critical-text);margin-top:.5rem}a{text-decoration:underline}@media(max-width:760px){.workspace,.fields,.permissions{grid-template-columns:1fr}.filters,header{align-items:stretch;flex-direction:column}.directory{max-height:280px;overflow:auto}}
 </style>

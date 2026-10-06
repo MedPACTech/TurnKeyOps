@@ -109,6 +109,7 @@ public sealed class JobService : IJobService
         entity.DateUpdated = now;
         var payload = new JobWorkflowPayloadDto
         {
+            AcceptedEstimate = dto.AcceptedEstimate,
             Planning = NormalizePlanning(dto.Planning, dto, now),
             Activity =
             [
@@ -337,6 +338,7 @@ public sealed class JobService : IJobService
         var dto = JobMapper.ToDto(entity);
         dto.EstimateSnapshot = await _estimatePayloadStore.LoadJobEstimateSnapshotAsync(entity.EstimateSnapshotBlobName, entity.EstimateSnapshotJson, ct);
         var payload = await _jobPayloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
+        dto.AcceptedEstimate = payload.AcceptedEstimate;
         dto.Planning = payload.Planning;
         dto.Activity = [.. payload.Activity.OrderByDescending(item => item.OccurredAtUtc)];
         dto.Version = VersionOf(entity);

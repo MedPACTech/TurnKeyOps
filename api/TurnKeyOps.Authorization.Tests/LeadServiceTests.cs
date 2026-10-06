@@ -150,17 +150,67 @@ public sealed class LeadServiceTests
         Assert.Equal(lead.Id, saved!.LeadId);
     }
 
+    [Fact] public async Task AcceptedOptionsAndSignatureCarryIntoJobWithoutPrivateCosts()
+    {
+        var f=new Fixture();var entity=Entity(Guid.NewGuid());entity.Data.Stage="WON";entity.Data.CustomerId=Guid.NewGuid();entity.Data.IntakeRequestId=entity.Id;entity.Data.Source="Referral";entity.Data.ReferralName="Partner";f.Store[entity.Id]=entity;
+        var packet=new QuoteEstimateDto{Id=entity.Id,LeadId=entity.Id,RevisionNumber=3,DocumentHash="exact-hash",Delivery=new(){Status="approved"},Document=new(){Scope="Sold scope",DepositPercent=20},AcceptedOptionIds=["base"],ApprovalSignature=new(){Total=216,RevisionNumber=3,DocumentHash="exact-hash",SignerPrintedName="Customer"},Pricing=new(){Options=[new(){Id="base",Total=216,Cost=50},new(){Id="not-selected",Total=100,Cost=20}]}};
+        f.Estimates.Setup(x=>x.GetAsync(entity.Id,It.IsAny<CancellationToken>())).ReturnsAsync(packet);
+        JobDto? saved=null;f.Jobs.Setup(x=>x.AddAsync(It.IsAny<JobDto>(),It.IsAny<CancellationToken>())).ReturnsAsync((JobDto job,CancellationToken ct)=>{saved=job;return job;});
+        var lead=await f.Service.ConvertAsync(entity.Id,"v1");Assert.Equal(entity.Id,lead.JobId);Assert.Equal(216,saved!.EstimatedTotal);Assert.Equal("Sold scope",saved.Description);Assert.Equal(20,saved.RequiredDepositPercent);
+        var accepted=saved.AcceptedEstimate!;Assert.Equal("exact-hash",accepted.DocumentHash);Assert.Equal(3,accepted.Revision);Assert.Equal("Customer",accepted.Signature!.SignerPrintedName);Assert.Equal("Partner",accepted.Referral);Assert.Null(Assert.Single(accepted.SelectedOptions).Cost);
+    }
+
+    [Fact] public async Task EmployeeProfilesCanOwnLeadsWithoutAppAccessAndAssignmentIsAudited()
+    {
+        var f = new Fixture(); var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(), PartitionKey=Pk, FirstName="Jordan", LastName="Ellis", IsActive=true, ProfileTypes=["employee"] };
+        f.People.Add(profile);
+        var lead = await f.Service.CreateAsync(Input());
+        var update = JsonSerializer.Deserialize<UpdateLeadDto>(JsonSerializer.Serialize(lead))!;
+        update.OwnerProfileId=profile.Id; update.ExpectedVersion=lead.Version;
+        var assigned = await f.Service.UpdateAsync(lead.Id,update);
+        Assert.Equal("Jordan Ellis",assigned.OwnerName); Assert.Null(assigned.OwnerMembershipId);
+        Assert.Equal("assignment",assigned.Activity.Last().Type);
+        Assert.Equal("Assigned to Jordan Ellis",assigned.Activity.Last().Text);
+        Assert.Single((await f.Service.WorkspaceAsync()).Associates!);
+        update.ExpectedVersion=lead.Version;
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Service.UpdateAsync(lead.Id,update));
+        update.ExpectedVersion=assigned.Version; update.OwnerProfileId=null;
+        Assert.Equal("Unassigned",(await f.Service.UpdateAsync(lead.Id,update)).OwnerName);
+    }
+    [Theory] [InlineData("foreign")] [InlineData("archived")] [InlineData("deleted")] [InlineData("customer")]
+    public async Task IneligibleProfilesCannotBeAssigned(string reason)
+    {
+        var f = new Fixture(); var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(), PartitionKey=reason=="foreign" ? "another-tenant" : Pk, IsActive=reason!="archived", IsDeleted=reason=="deleted", ProfileTypes=[reason=="customer" ? "customer" : "employee"] };
+        f.People.Add(profile);
+        Assert.Empty((await f.Service.WorkspaceAsync()).Associates!);
+        var input=Input();input.OwnerProfileId=profile.Id;
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.CreateAsync(input));
+        Assert.Empty(f.Store);
+    }
+    [Fact] public async Task ArchivedAssigneeIsRetainedWhileEditingOtherLeadDetails()
+    {
+        var f = new Fixture();var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(),PartitionKey=Pk,FirstName="Jordan",IsActive=true,ProfileTypes=["employee"] };f.People.Add(profile);
+        var input=Input();input.OwnerProfileId=profile.Id;var lead=await f.Service.CreateAsync(input);
+        profile.IsActive=false;
+        var update=JsonSerializer.Deserialize<UpdateLeadDto>(JsonSerializer.Serialize(lead))!;update.ExpectedVersion=lead.Version;update.Title="Updated scope";
+        var saved=await f.Service.UpdateAsync(lead.Id,update);
+        Assert.Equal(profile.Id,saved.OwnerProfileId);Assert.Equal("Unavailable associate",saved.OwnerName);
+    }
+
     private static CreateLeadDto Input()=>new(){Title="Test opportunity",ContactName="Test contact",Email="lead@example.invalid",SiteAddress="Test site",RequestedWork="Repair scope"};
     private static Lead Entity(Guid id)=>new(){Id=id,PartitionKey=Pk,RowKey=RepositoryKeyHelper.ToRowKey(id),Data=new(){Id=id,TenantId=Tenant,Title="Test opportunity",Email="lead@example.invalid",SiteAddress="Test site",RequestedWork="Repair scope",Version="v1"}};
     private sealed class User:IUserContext {public bool IsAuthenticated=>true;public Guid TenantId=>Tenant;public Guid UserId=>Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");public AppTimeZone Timezone=>AppTimeZone.Utc;public string FirstName=>"Test";public string LastName=>"User";}
     private sealed class Fixture
     {
         public Dictionary<Guid,Lead> Store {get;}=[];
+        public List<MedInsights.Lib.Entities.UserProfile> People {get;}=[];
+        private async IAsyncEnumerable<MedInsights.Lib.Entities.UserProfile> ReadPeople() { await Task.CompletedTask; foreach(var p in People) yield return p; }
         public int MaxTableBytes {get;private set;}
         public Mock<ILeadRepository> Repository {get;}=new();
         public Mock<ICustomerRepository> Customers {get;}=new();
         public Mock<IRoleAccessService> Access {get;}=new();
         public Mock<IQuoteEstimateService> Estimates {get;}=new();
+        public Mock<IJobService> Jobs {get;}=new();
         public Mock<ICalendarEventService> Calendar {get;}=new();
         public LeadConfigurationDto Config {get;set;}=new();
         public LeadIntakeBridge Bridge {get;}
@@ -181,7 +231,9 @@ public sealed class LeadServiceTests
             blobs.Setup(x => x.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string,string>>(), It.IsAny<CancellationToken>()))
                 .Returns((string container, string name, Stream stream, string type, IReadOnlyDictionary<string,string> metadata, CancellationToken ct) => { using var memory = new MemoryStream(); stream.CopyTo(memory); blobContents[name] = memory.ToArray(); return Task.CompletedTask; });
             blobs.Setup(x => x.OpenReadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((string container, string name, CancellationToken ct) => (Stream)new MemoryStream(blobContents[name]));
-            Service=new(Repository.Object,Mock.Of<IQuoteRequestRepository>(),Customers.Object,members.Object,Mock.Of<IJobRepository>(),new User(),Access.Object,Mock.Of<IAuditService>(),configuration,Bridge,Calendar.Object,Estimates.Object,Mock.Of<IJobService>(),Mock.Of<IQuoteRequestAttachmentService>(),Mock.Of<IBeam.Communications.Abstractions.IEmailService>(),Mock.Of<IBeam.Communications.Abstractions.ISmsService>(),Mock.Of<ITenantCommunicationProfileResolver>(),new LeadActivityStore(blobs.Object,Repository.Object));
+            var profiles = new Mock<IManagedProfileStore>();
+            profiles.Setup(x=>x.ListAsync(Pk,It.IsAny<CancellationToken>())).Returns(()=>ReadPeople());
+            Service=new(Repository.Object,Mock.Of<IQuoteRequestRepository>(),Customers.Object,members.Object,Mock.Of<IJobRepository>(),new User(),Access.Object,Mock.Of<IAuditService>(),configuration,Bridge,Calendar.Object,Estimates.Object,Jobs.Object,Mock.Of<IQuoteRequestAttachmentService>(),Mock.Of<IBeam.Communications.Abstractions.IEmailService>(),Mock.Of<IBeam.Communications.Abstractions.ISmsService>(),Mock.Of<ITenantCommunicationProfileResolver>(),new LeadActivityStore(blobs.Object,Repository.Object), profiles:profiles.Object);
         }
     }
 }

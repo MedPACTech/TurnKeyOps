@@ -39,3 +39,17 @@ test('PWA recovers offline without caching customer records',async({page,context
  await expect(page.getByRole('heading')).toContainText('offline');
  await context.setOffline(false);
 });
+
+test('Assign, reassign and unassign an associate with matching card avatars',async({page})=>{
+ await page.goto('/bdr/admin/leads/11111111-2222-4333-8444-555555555555');
+ const assignment=page.locator('form').filter({has:page.getByRole('button',{name:'Save assignment',exact:true})});
+ for(const [id,name,initials] of [['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Jordan Ellis','JE'],['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Morgan Chen','MC'],['','Unassigned','—']]){
+  await assignment.getByLabel('Assigned associate').selectOption(id ? `profile:${id}` : '');
+  await assignment.getByRole('button',{name:'Save assignment',exact:true}).click();
+  await expect(page.locator('.leads header')).toContainText(name);
+  await page.getByRole('link',{name:'All leads',exact:true}).click();
+  const card=page.locator('.leads article').first();
+  await expect(card).toContainText(name);await expect(card.locator('.avatar')).toHaveText(initials);
+  await card.getByRole('link',{name:'Respond to the customer',exact:true}).click();
+ }
+});
