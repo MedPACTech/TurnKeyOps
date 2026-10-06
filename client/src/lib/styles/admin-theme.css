@@ -1,0 +1,78 @@
+/* External Admin only. Public sites and the platform console keep their own theme. */
+.admin-theme {
+  color-scheme: light;
+  --app-bg: #F6F7F5; --surface: #FCFCFB; --surface-elevated: #EEF1F0; --surface-subtle: #F1F3F1;
+  --text-strong: #161A1D; --text-base: #374047; --text-muted: #5F6872; --text-subtle: #8A939C;
+  --border: #DDE2E0; --border-strong: #C8CFCC; --input-border: #78847F;
+  --teal: #0F766E; --teal-hover: #0B5D56; --teal-soft: #E3F2EE; --teal-border: #B9DDD5; --teal-text: #0B5D56;
+  --cta: #B45309; --cta-hover: #9A3412; --cta-pressed: #7C2D12; --cta-text: #FFFFFF;
+  --positive: #2F9E68; --warning: #D89B2B; --critical: #D95C5C; --info: #4D7FA8;
+  --positive-text: #226A48; --positive-soft: #E7F3EC;
+  --warning-text: #79510B; --warning-soft: #FBF0D9;
+  --critical-text: #A52C36; --critical-soft: #FBEAEB;
+  --info-text: #325F82; --info-soft: #E8F0F7;
+  --focus-ring: #0F766E; --nav-bg: #EEF1F0; --nav-text: #374047; --nav-hover: #E3F2EE;
+  --nav-active-bg: #D7ECE7; --nav-active-text: #0B5D56;
+  --shell-shadow: 0 1px 3px rgb(22 26 29 / .05);
+  --dialog-shadow: 0 16px 48px rgb(0 0 0 / .18);
+  --input-bg: var(--surface); --input-text: var(--text-strong);
+  /* Compatibility aliases for existing modules. Selection and intelligence stay teal. */
+  --shell-border: var(--border); --shell-border-strong: var(--input-border); --nav-divider: var(--border);
+  --muted: var(--text-muted); --accent-soft: var(--teal-soft); --accent-border: var(--teal-border);
+  --accent-text: var(--teal-text); --accent-solid: var(--teal); --accent-solid-hover: var(--teal-hover);
+  --accent-solid-text: #FFFFFF; --brand-solid: var(--teal); --brand-solid-hover: var(--teal-hover);
+  --topbar-bg: var(--surface); --rail-bg: var(--surface); --pane-bg: var(--surface); --canvas-bg: var(--app-bg);
+  --module-bg: var(--surface); --shell-card: var(--surface); --shell-panel: var(--surface);
+  --shell-panel-strong: var(--surface-subtle); --drawer-bg: var(--surface); --drawer-card-bg: var(--surface-elevated);
+  background: var(--app-bg); color: var(--text-base);
+}
+.admin-theme[data-theme='dark'] {
+  color-scheme: dark;
+  --app-bg: #111617; --surface: #181F20; --surface-elevated: #222A2C; --surface-subtle: #1C2425;
+  --text-strong: #F4F6F5; --text-base: #D6DDDA; --text-muted: #AAB5B1; --text-subtle: #87938F;
+  --border: #303A3B; --border-strong: #435051; --input-border: #82938D;
+  --teal: #32A58F; --teal-hover: #46B79F; --teal-soft: #173A35; --teal-border: #28554D; --teal-text: #72CDB8;
+  --positive: #57B985; --warning: #E3B04B; --critical: #E07878; --info: #73A0C4;
+  --positive-text: #8AD4AC; --positive-soft: #193C2C; --warning-text: #F0CB7F; --warning-soft: #3B301D;
+  --critical-text: #FFA5AA; --critical-soft: #41262A; --info-text: #AACCE8; --info-soft: #203544;
+  --focus-ring: #54BBA6; --nav-bg: #181F20; --nav-text: #D6DDDA; --nav-hover: #222E2D;
+  --nav-active-bg: #173A35; --nav-active-text: #8BD7C5; --accent-solid-text: #111617;
+  --shell-shadow: 0 1px 3px rgb(0 0 0 / .16); --dialog-shadow: 0 16px 48px rgb(0 0 0 / .4);
+}
+.admin-theme ::selection { background: var(--teal-soft); color: var(--teal-text); }
+.admin-theme :is(a,button,input,select,textarea,summary,[tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring); outline-offset: 3px;
+}
+.admin-theme :is(input,select,textarea) { accent-color: var(--teal); }
+.admin-theme :is(input,textarea)::placeholder { color: var(--text-muted); opacity: 1; }
+.admin-theme :is(.btn-primary,.btn-secondary,.btn-danger,.btn-ghost,.btn-icon) {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem; min-height:44px;
+  border-radius:6px; font-size:.875rem; font-weight:600; padding:.625rem 1rem; cursor:pointer;
+}
+.admin-theme .btn-primary { background:var(--cta); color:var(--cta-text); border:1px solid transparent; }
+.admin-theme .btn-primary:hover { background:var(--cta-hover); }
+.admin-theme .btn-primary:active { background:var(--cta-pressed); }
+.admin-theme .btn-secondary { background:var(--surface); color:var(--text-base); border:1px solid var(--input-border); }
+.admin-theme :is(.btn-secondary,.btn-ghost,.btn-icon):hover { background:var(--surface-elevated); color:var(--text-strong); }
+.admin-theme :is(.btn-ghost,.btn-icon) { background:transparent; color:var(--text-muted); border:1px solid transparent; }
+.admin-theme .btn-icon { width:44px; padding:.5rem; flex-shrink:0; }
+.admin-theme .btn-danger { background:var(--critical-soft); color:var(--critical-text); border:1px solid var(--critical-text); }
+.admin-theme button:disabled { cursor:not-allowed; opacity:.55; }
+.admin-theme .input { background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-border); min-height:44px; box-shadow:none; }
+.admin-theme .label { color:var(--text-base); }
+.admin-theme .card { background:var(--surface); border-color:var(--border); box-shadow:var(--shell-shadow); }
+.admin-theme :is(.badge-green,.notice-positive) { background:var(--positive-soft); color:var(--positive-text); }
+.admin-theme :is(.badge-yellow,.notice-warning) { background:var(--warning-soft); color:var(--warning-text); }
+.admin-theme :is(.badge-red,.notice-critical) { background:var(--critical-soft); color:var(--critical-text); }
+.admin-theme :is(.badge-blue,.notice-info) { background:var(--info-soft); color:var(--info-text); }
+.admin-theme .badge-gray { background:var(--surface-elevated); color:var(--text-base); }
+.admin-theme .admin-tab { min-height:44px; padding:.625rem .875rem; border-radius:6px; color:var(--text-muted); }
+.admin-theme .admin-tab[aria-selected='true'] { background:var(--teal-soft); color:var(--teal-text); }
+.admin-theme dialog { color:var(--text-base); background:var(--surface); border-color:var(--border); box-shadow:var(--dialog-shadow); }
+.admin-theme dialog::backdrop { background:rgb(0 0 0 / .45); }
+@media (max-width: 1023px) {
+  .admin-theme :is(button, input:not([type='checkbox']):not([type='radio']), select, summary) { min-height:44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-theme, .admin-theme * { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
