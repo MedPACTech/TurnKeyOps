@@ -31,8 +31,8 @@ public sealed class AuthWorkspacesTests
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) }, "test")) } }
         };
         var result = await controller.Select(new(tenantId), default);
-        if (allowed) Assert.IsType<OkObjectResult>(result); else Assert.IsType<ForbidResult>(result);
+        if (allowed) Assert.IsType<OkObjectResult>(result); else Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
         selection.Verify(s => s.SelectTenantAsync(It.Is<TenantSelectionRequest>(r => r.UserId == userId && r.TenantId == tenantId && !r.SetAsDefault), It.IsAny<CancellationToken>()), allowed ? Times.Once() : Times.Never());
-        Assert.IsType<ForbidResult>(await controller.Select(new(Guid.NewGuid()), default));
+        Assert.Equal(403, Assert.IsType<ObjectResult>(await controller.Select(new(Guid.NewGuid()), default)).StatusCode);
     }
 }

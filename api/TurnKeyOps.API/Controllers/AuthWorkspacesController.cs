@@ -32,7 +32,7 @@ public sealed class AuthWorkspacesController(ITenantMembershipRepository members
         if (UserId is not { } userId) return Unauthorized();
         var items = await memberships.GetByUserIdAsync(userId, ct);
         if (!items.Any(m => m.UserId == userId && m.TenantId == request.TenantId && UserModulePermissions.IsActive(m)))
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden, new { code = "workspace_membership_required", message = "Your account does not have an active membership in this workspace. Ask a workspace administrator to add your account before requesting a new sign-in code." });
         // The identity provider independently checks membership and issues a fresh tenant session.
         var token = await selection.SelectTenantAsync(new TenantSelectionRequest(userId, request.TenantId, false), ct);
         return Ok(token);

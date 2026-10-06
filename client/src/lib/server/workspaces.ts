@@ -11,8 +11,13 @@ export async function workspaceRequest(fetch: typeof globalThis.fetch, token: st
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         ...(tenantId ? { body: JSON.stringify({ tenantId }) } : {})
     });
-    if (!response.ok) throw new Error('Unable to access this workspace. Check your membership or sign in again.');
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        if (response.status === 403 && payload.code === 'workspace_membership_required')
+            throw new Error('Your account has no active membership in this workspace. An administrator must add your access before you request a new sign-in code.');
+        if (response.status === 401) throw new Error('Your sign-in session expired. Request a new verification code.');
+        throw new Error('Unable to load workspace access. Please try again later.');
+    }
     if (payload.success === false) throw new Error('Workspace access denied.');
     return payload.data ?? payload;
 }
