@@ -6,7 +6,7 @@ export type Person = { id: string; firstName: string; lastName: string; contactE
  profileTypes: string[]; companyName?: string; title?: string; team?: string; customerId?: string;
  modulePermissions: string[] | null; effectivePermissions: string[]; role?: string; membershipId?: string;
  isOwner: boolean; isActive: boolean; version: string };
-export const modules = ['dashboard','bob','calendar','jobs','requests','estimates','invoices','contacts','users','settings','billing'];
+export const modules = ['dashboard','bob','calendar','jobs','leads','requests','estimates','invoices','contacts','users','settings','billing'];
 export async function peopleRequest<T>(event: Pick<RequestEvent, 'fetch' | 'cookies'>, path: string, init?: RequestInit): Promise<T> {
  const token = event.cookies.get(authTokenCookie);
  if (!token) throw error(401, 'Sign in to continue.');

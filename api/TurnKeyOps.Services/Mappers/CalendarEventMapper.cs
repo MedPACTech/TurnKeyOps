@@ -12,6 +12,7 @@ public static class CalendarEventMapper
         return new CalendarEventDto
         {
             Id = id,
+            LeadId = entity.LeadId,
             Title = entity.Title,
             Description = entity.Description,
             EventType = entity.EventType,
@@ -43,6 +44,7 @@ public static class CalendarEventMapper
         return new CalendarEvent
         {
             Id = dto.Id,
+            LeadId = dto.LeadId,
             PartitionKey = partitionKey,
             RowKey = RepositoryKeyHelper.ToRowKey(dto.Id),
             Title = dto.Title,

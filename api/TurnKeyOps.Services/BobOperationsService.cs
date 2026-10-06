@@ -28,6 +28,7 @@ public sealed class BobOperationsService : IBobOperationsService
     private readonly IAuditService _audit;
     private readonly IBobContextMinimizer _minimizer;
     private readonly BobOperationsOptions _options;
+    private readonly LeadConfigurationService? _leadConfiguration;
 
     public BobOperationsService(
         IBobActionRepository repository,
@@ -37,7 +38,8 @@ public sealed class BobOperationsService : IBobOperationsService
         IRoleAccessService roleAccess,
         IAuditService audit,
         IBobContextMinimizer minimizer,
-        IOptions<BobOperationsOptions> options)
+        IOptions<BobOperationsOptions> options,
+        LeadConfigurationService? leadConfiguration = null)
     {
         _repository = repository;
         _chatRepository = chatRepository;
@@ -47,6 +49,37 @@ public sealed class BobOperationsService : IBobOperationsService
         _audit = audit;
         _minimizer = minimizer;
         _options = options.Value;
+        _leadConfiguration = leadConfiguration;
+    }
+
+    public async Task<BobActionDto> ApproveLeadAsync(Guid leadId, Guid actionId, CancellationToken ct = default)
+    {
+        var action = await RequireActionAsync(actionId, ct);
+        if (action.ConversationId != leadId || !action.ToolKey.StartsWith("lead.", StringComparison.Ordinal))
+            throw new ArgumentException("Action belongs to another Lead.");
+        await ApproveAsync(actionId, ct);
+        return await ExecuteAsync(actionId, ct);
+    }
+
+    public async Task<BobActionDto> ProposeLeadAsync(Guid leadId, ProposeBobActionDto input, CancellationToken ct = default)
+    {
+        EnsureEnabled();
+        if (leadId == Guid.Empty || !input.ToolKey.StartsWith("lead.", StringComparison.Ordinal) ||
+            !input.Input.TryGetProperty("leadId", out var inputId) || inputId.GetGuid() != leadId)
+            throw new ArgumentException("The action must target this Lead.");
+        var provider = GetProvider(input.ToolKey);
+        await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
+        await PolicyRequiresApprovalAsync(provider, ct);
+        var partition = PartitionKey();
+        var row = MedInsights.Lib.EntityKeyPolicy.Row(leadId);
+        var conversation = await _chatRepository.GetAsync(partition, row, ct);
+        if (conversation is null)
+            await _chatRepository.SaveAsync(new MedInsights.Lib.Entities.Chat {
+                Id = leadId, TenantId = _userContext.TenantId, ActorUserId = _userContext.UserId,
+                PartitionKey = partition, RowKey = row, Title = "Lead workspace", Mode = "lead",
+                StateJson = JsonSerializer.Serialize(new { leadId }), DateChatCreated = DateTime.UtcNow, DateChatUpdated = DateTime.UtcNow
+            }, ct);
+        return await ProposeAsync(leadId, input, ct);
     }
 
     public async Task<BobActionDto> ProposeAsync(
@@ -78,7 +111,7 @@ public sealed class BobOperationsService : IBobOperationsService
 
         var now = DateTime.UtcNow;
         var actionId = Guid.NewGuid();
-        var confirmationRequired = RequiresConfirmation(provider.Risk);
+        var confirmationRequired = await PolicyRequiresApprovalAsync(provider, ct);
         var minimizedInput = _minimizer.Minimize(
             input.Input.ValueKind == JsonValueKind.Undefined ? new { } : input.Input,
             _options.MaxStoredInputCharacters);
@@ -162,6 +195,9 @@ public sealed class BobOperationsService : IBobOperationsService
         IBobActionProvider provider,
         CancellationToken ct)
     {
+        await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
+        if (await PolicyRequiresApprovalAsync(provider, ct) && !entity.ApprovedAtUtc.HasValue)
+            throw new InvalidOperationException("Tenant policy requires approval for this action.");
         entity.Status = Executing;
         entity.UpdatedAtUtc = DateTime.UtcNow;
         entity.FailureCode = string.Empty;
@@ -193,6 +229,20 @@ public sealed class BobOperationsService : IBobOperationsService
             await AuditAsync(entity, "failed", ct);
             throw;
         }
+    }
+
+    private async Task<bool> PolicyRequiresApprovalAsync(IBobActionProvider provider, CancellationToken ct)
+    {
+        if (_leadConfiguration is null) return RequiresConfirmation(provider.Risk);
+        var config = await _leadConfiguration.GetAsync(_userContext.TenantId, ct);
+        var mode = config.AiActions.GetValueOrDefault(provider.ToolKey, provider.Risk == BobActionRisk.Read ? "read" : "approval");
+        if (mode is "disabled" or "recommend" || mode == "draft" && provider.ToolKey != "lead.draft")
+            throw new InvalidOperationException("Tenant policy does not allow this action to execute.");
+        if (mode == "read" && provider.Risk != BobActionRisk.Read)
+            throw new InvalidOperationException("Read-only policy cannot execute a mutation.");
+        // Financial outcomes remain approved until a deterministic outcome guardrail is configured.
+        if (provider.ToolKey == "lead.stage") return true;
+        return mode == "approval" || (mode != "auto" && mode != "draft" && provider.Risk != BobActionRisk.Read);
     }
 
     private IBobActionProvider GetProvider(string toolKey) =>

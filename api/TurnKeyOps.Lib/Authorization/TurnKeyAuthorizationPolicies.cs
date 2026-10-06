@@ -36,6 +36,11 @@ public static class TurnKeyAuthorizationRoles
 
 public static class TurnKeyPermissionKeys
 {
+    public const string LeadsRead = "leads.read";
+    public const string LeadsWrite = "leads.write";
+    public const string EstimatesWrite = "estimates.write";
+    public const string JobsWrite = "jobs.write";
+    public const string CalendarWrite = "calendar.write";
     public const string TenantRead = "tenant.read";
     public const string TenantManage = "tenant.manage";
     public const string OperationsRead = "operations.read";

@@ -47,7 +47,7 @@ public sealed class BobOperationsServiceTests
         Assert.DoesNotContain("123 Main Street", stored.InputJson);
         fixture.RoleAccess.Verify(
             service => service.RequirePermissionAsync(TurnKeyPermissionKeys.OperationsRead, It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Exactly(2));
         fixture.Audit.Verify(
             service => service.RecordAsync(
                 It.Is<RecordAuditEventRequestDto>(audit => audit.Category == "bob_action"),
@@ -168,6 +168,35 @@ public sealed class BobOperationsServiceTests
         Assert.False(BobOperationsService.RequiresConfirmation(BobActionRisk.Read));
     }
 
+    [Fact]
+    public async Task TenantPolicyRevocationBlocksAnApprovedActionAtExecution()
+    {
+        var config = new LeadConfigurationDto { AiActions = new() { ["conversation.archive"] = "approval" } };
+        var settings = new Mock<ITenantSettingsRepository>();
+        settings.Setup(x => x.GetAsync(It.IsAny<string>(), "SETTINGS|OPERATIONAL", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(() => new TenantSettingsDocument { ValuesJson = JsonSerializer.Serialize(new { leads = config }, new JsonSerializerOptions(JsonSerializerDefaults.Web)) });
+        var provider = new TestProvider("conversation.archive", BobActionRisk.Destructive, TurnKeyPermissionKeys.OperationsManage);
+        var fixture = new Fixture(provider, policy: new LeadConfigurationService(settings.Object));
+        var proposed = await fixture.Service.ProposeAsync(ConversationId, Proposal("policy-revoke", new { }));
+        await fixture.Service.ApproveAsync(proposed.Id);
+        config.AiActions["conversation.archive"] = "disabled";
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.ExecuteAsync(proposed.Id));
+        Assert.Equal(0, provider.ExecutionCount);
+    }
+
+    [Fact]
+    public async Task AutoPolicyDoesNotGrantUserPermission()
+    {
+        var settings = new Mock<ITenantSettingsRepository>();
+        settings.Setup(x => x.GetAsync(It.IsAny<string>(), "SETTINGS|OPERATIONAL", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(new TenantSettingsDocument { ValuesJson = "{\"leads\":{\"aiActions\":{\"conversation.archive\":\"auto\"}}}" });
+        var provider = new TestProvider("conversation.archive", BobActionRisk.Destructive, TurnKeyPermissionKeys.OperationsManage);
+        var fixture = new Fixture(provider, policy: new LeadConfigurationService(settings.Object));
+        fixture.RoleAccess.Setup(x => x.RequirePermissionAsync(TurnKeyPermissionKeys.OperationsManage, It.IsAny<CancellationToken>())).ThrowsAsync(new ForbiddenAccessException("Denied"));
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => fixture.Service.ProposeAsync(ConversationId, Proposal("policy-deny", new { })));
+        Assert.Equal(0, provider.ExecutionCount);
+    }
+
     private static ProposeBobActionDto Proposal(string idempotencyKey, object input) => new()
     {
         ToolKey = input.GetType().GetProperty("filter") is not null ? "conversation.read" : "conversation.archive",
@@ -187,7 +216,8 @@ public sealed class BobOperationsServiceTests
         public Fixture(
             IBobActionProvider provider,
             Guid? tenantId = null,
-            bool writeActionsEnabled = true)
+            bool writeActionsEnabled = true,
+            LeadConfigurationService? policy = null)
         {
             Repository
                 .Setup(repository => repository.SaveAsync(It.IsAny<BobActionRecord>(), It.IsAny<CancellationToken>()))
@@ -242,7 +272,7 @@ public sealed class BobOperationsServiceTests
                     Enabled = true,
                     WriteActionsEnabled = writeActionsEnabled,
                     MaxStoredInputCharacters = 2_000
-                }));
+                }), policy);
         }
     }
 

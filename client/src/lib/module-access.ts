@@ -11,7 +11,7 @@ export const hasModuleAccess = (permissions: string[], module: string, write = f
 };
 
 export const firstAllowedAdminPage = (permissions: string[]): string | null => {
- for (const module of ['bob','dashboard','jobs','calendar','requests','estimates','invoices','contacts','users','settings']) {
+ for (const module of ['bob','dashboard','leads','jobs','calendar','requests','estimates','invoices','contacts','users','settings']) {
   if (hasModuleAccess(permissions,module)) return module === 'contacts' ? 'customers' : module;
  }
  return null;

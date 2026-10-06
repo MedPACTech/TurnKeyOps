@@ -5,6 +5,7 @@ namespace TurnKeyOps.Lib.Dtos;
 public class EstimateDto
 {
     public Guid Id { get; set; }
+    public Guid? LeadId { get; set; }
     public string EstimateNumber { get; set; } = string.Empty;
     public EstimateStatus Status { get; set; }
     public TradeType TradeType { get; set; }

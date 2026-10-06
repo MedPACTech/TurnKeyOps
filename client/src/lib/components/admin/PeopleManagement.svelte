@@ -3,7 +3,7 @@
  import { enhance } from '$app/forms';
  import type { Person } from '$lib/server/people';
  let { people, customerLinks = [], form, canWrite = false, canDelete = false }: { people: Person[]; customerLinks?: {id:string;name:string;companyName?:string}[]; form?: {message?: string; error?: string; inviteUrl?: string; savedId?: string} | null; canWrite?: boolean; canDelete?: boolean } = $props();
- const modules = ['dashboard','bob','calendar','jobs','requests','estimates','invoices','contacts','users','settings','billing'];
+ const modules = ['dashboard','bob','calendar','jobs','leads','requests','estimates','invoices','contacts','users','settings','billing'];
  let filter = $state('all'); let query = $state(''); let selectedId = $state<string | null>(null);
  let confirmDelete = $state(false); let creating = $state(false); let pending = $state(false); let permissionMode = $state('default');
  let lastRequestedId = $state<string|null>(null);

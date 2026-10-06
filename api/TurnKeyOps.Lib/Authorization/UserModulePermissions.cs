@@ -4,8 +4,8 @@ namespace MedInsights.Lib.Authorization;
 
 public static class UserModulePermissions
 {
-    public static readonly string[] Modules = ["dashboard", "bob", "calendar", "jobs", "requests", "estimates", "invoices", "contacts", "users", "settings", "billing"];
-    public static readonly string[] Operations = ["calendar", "jobs", "requests", "estimates", "invoices", "contacts"];
+    public static readonly string[] Modules = ["dashboard", "bob", "calendar", "jobs", "leads", "requests", "estimates", "invoices", "contacts", "users", "settings", "billing"];
+    public static readonly string[] Operations = ["calendar", "jobs", "leads", "requests", "estimates", "invoices", "contacts"];
     public static bool IsActive(TenantMembership? membership) => membership is not null && !membership.IsDeleted
         && membership.DateRemoved is null && string.Equals(membership.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase);
     public static string[] Resolve(TenantMembership? membership, UserProfile? profile)

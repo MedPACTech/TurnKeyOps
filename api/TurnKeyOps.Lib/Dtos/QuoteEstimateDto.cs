@@ -7,6 +7,8 @@ public sealed class QuoteEstimateDto
     public string ApprovalConsentVersion => QuoteApprovalConsent.Version;
     public QuoteEstimateSignatureDto? ApprovalSignature { get; set; }
     public Guid Id { get; set; }
+    public Guid? LeadId { get; set; }
+    public Guid? CustomerId { get; set; }
     public Guid QuoteRequestId { get; set; }
     public int RevisionNumber { get; set; } = 1;
     public string CustomerName { get; set; } = string.Empty;

@@ -33,6 +33,7 @@ public sealed class QuoteRequest : IEntity, ITableEntity
     public string IntakeSummary { get; set; } = string.Empty;
     public string AttachmentsJson { get; set; } = "[]";
     public string QualificationJson { get; set; } = "{}";
+    public string AttributionJson { get; set; } = "{}";
     public string SubmittedPayloadJson { get; set; } = "{}";
     public string TimelineJson { get; set; } = "[]";
     public string? SiteVisitScheduleJson { get; set; }

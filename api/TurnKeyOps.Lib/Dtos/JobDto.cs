@@ -5,6 +5,7 @@ namespace TurnKeyOps.Lib.Dtos;
 public class JobDto
 {
     public Guid Id { get; set; }
+    public Guid? LeadId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public TradeType TradeType { get; set; }

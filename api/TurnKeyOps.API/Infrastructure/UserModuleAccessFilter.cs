@@ -16,6 +16,7 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
         "Jobs" or "Locksmith" => "jobs",
         "Calendar" or "Weather" => "calendar",
         "QuoteRequests" or "QuoteRequestAttachments" => "requests",
+        "Leads" => "leads",
         "Estimates" or "QuoteEstimates" or "AdminEstimateDefaults" => "estimates",
         "Invoices" or "LocksmithFieldInvoices" => "invoices",
         "Dashboard" => "dashboard",

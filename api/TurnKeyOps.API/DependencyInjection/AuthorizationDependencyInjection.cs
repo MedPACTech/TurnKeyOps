@@ -84,6 +84,11 @@ namespace MedInsights.API.DependencyInjection
         private static void RegisterTurnKeyPermissions(PermissionRegistrationBuilder builder)
         {
             builder
+                .AddPermission(TurnKeyPermissionKeys.LeadsRead, name: "Read leads")
+                .AddPermission(TurnKeyPermissionKeys.LeadsWrite, name: "Manage leads")
+                .AddPermission(TurnKeyPermissionKeys.EstimatesWrite, name: "Manage estimates")
+                .AddPermission(TurnKeyPermissionKeys.JobsWrite, name: "Manage jobs")
+                .AddPermission(TurnKeyPermissionKeys.CalendarWrite, name: "Manage calendar")
                 .AddPermission(TurnKeyPermissionKeys.TenantRead, name: "Read tenant data")
                 .AddPermission(TurnKeyPermissionKeys.TenantManage, name: "Manage tenant settings")
                 .AddPermission(TurnKeyPermissionKeys.OperationsRead, name: "Read operations")
@@ -98,6 +103,11 @@ namespace MedInsights.API.DependencyInjection
                 .AddPermission(TurnKeyPermissionKeys.MembershipOwnerGrant, name: "Grant tenant ownership");
 
             builder.MapRole(TenantRoleCatalog.Owner,
+                TurnKeyPermissionKeys.LeadsRead,
+                TurnKeyPermissionKeys.LeadsWrite,
+                TurnKeyPermissionKeys.EstimatesWrite,
+                TurnKeyPermissionKeys.JobsWrite,
+                TurnKeyPermissionKeys.CalendarWrite,
                 TurnKeyPermissionKeys.TenantRead,
                 TurnKeyPermissionKeys.TenantManage,
                 TurnKeyPermissionKeys.OperationsRead,
@@ -111,6 +121,11 @@ namespace MedInsights.API.DependencyInjection
                 TurnKeyPermissionKeys.MembershipManage,
                 TurnKeyPermissionKeys.MembershipOwnerGrant);
             builder.MapRole(TenantRoleCatalog.Admin,
+                TurnKeyPermissionKeys.LeadsRead,
+                TurnKeyPermissionKeys.LeadsWrite,
+                TurnKeyPermissionKeys.EstimatesWrite,
+                TurnKeyPermissionKeys.JobsWrite,
+                TurnKeyPermissionKeys.CalendarWrite,
                 TurnKeyPermissionKeys.TenantRead,
                 TurnKeyPermissionKeys.TenantManage,
                 TurnKeyPermissionKeys.OperationsRead,

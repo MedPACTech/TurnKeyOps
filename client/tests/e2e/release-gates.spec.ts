@@ -62,7 +62,7 @@ test('anonymous and cross-tenant authorization paths fail closed', async ({ page
 	await page.goto('/thinkpink/admin/dashboard');
 	await expect(page).toHaveURL(/\/auth\/login\?returnTo=%2Fthinkpink%2Fadmin%2Fdashboard/);
 
-	const apiResponse = await request.get('http://127.0.0.1:5188/api/quote-requests');
+	const apiResponse = await request.get(`${process.env.PLAYWRIGHT_API_URL || 'http://127.0.0.1:5188'}/api/quote-requests`);
 	expect(apiResponse.status()).toBe(401);
 
 	const crossSiteMutation = await request.post('/bdr/public?/submitQuoteRequest', {

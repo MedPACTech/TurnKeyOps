@@ -167,6 +167,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         if (string.Equals(kind, TenantSettingKinds.Operational, StringComparison.Ordinal))
         {
             ValidateOperationalValues(input.Values);
+            if (input.Values.TryGetProperty("leads", out var leads)) LeadConfigurationService.Validate(leads);
             if (input.Values.TryGetProperty("locksmith", out var locksmith)) LocksmithPolicy.Validate(locksmith);
         }
     }

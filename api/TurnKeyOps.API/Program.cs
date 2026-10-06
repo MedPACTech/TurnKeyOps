@@ -325,7 +325,22 @@ public partial class Program
 
         
 
-            app.MapControllers();
+            var controllers = app.MapControllers();
+            // The packaged identity endpoints are protected by the API's fallback policy.
+            // Permit the three entry points required for local OTP sign-in in development only.
+            if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Local"))
+            {
+                var localAuthPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "api/auth/startotp", "api/auth/completeotp", "api/auth/refresh"
+                };
+                controllers.Add(endpoint =>
+                {
+                    if (endpoint is RouteEndpointBuilder route &&
+                        localAuthPaths.Contains(route.RoutePattern.RawText?.Trim('/') ?? string.Empty))
+                        endpoint.Metadata.Add(new AllowAnonymousAttribute());
+                });
+            }
             app.Run();
         }
         catch (OptionsValidationException ex)
