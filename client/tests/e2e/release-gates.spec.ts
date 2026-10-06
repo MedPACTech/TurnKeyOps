@@ -90,14 +90,14 @@ test('OTP forms send once while pending and recover after delivery failure', asy
 	let sends = 0;
 	let release!: () => void;
 	const gate = new Promise<void>((resolve) => { release = resolve; });
-	await page.route('**/auth/login?*/request', async (route) => {
+	await page.route('**/auth/login?*/request*', async (route) => {
 		sends++;
 		await gate;
 		await route.fulfill({ status: 200, contentType: 'application/json',
 			body: JSON.stringify({ type: 'failure', status: 400, data: '[{"step":1,"message":2,"identifier":3},"request","Test provider unavailable","6145550100"]' }) });
 	});
 	await page.getByLabel('Work email or mobile number').fill('6145550100');
-	await page.locator('form[action="?/request"]').evaluate((form: HTMLFormElement) => {
+	await page.locator('form[action^="?/request"]').evaluate((form: HTMLFormElement) => {
 		form.requestSubmit(); form.requestSubmit();
 	});
 	await expect.poll(() => sends).toBe(1);
@@ -115,7 +115,7 @@ test('OTP resend is single-flight and refreshing the page does not resend', asyn
 	let sends = 0;
 	let release!: () => void;
 	const gate = new Promise<void>((resolve) => { release = resolve; });
-	await page.route('**/auth/login?*/request', async (route) => {
+	await page.route('**/auth/login?*/request*', async (route) => {
 		sends++;
 		if (sends > 1) await gate;
 		await route.fulfill({ status: 200, contentType: 'application/json',
@@ -125,7 +125,7 @@ test('OTP resend is single-flight and refreshing the page does not resend', asyn
 	await page.getByLabel('Work email or mobile number').fill('6145550100');
 	await page.getByRole('button', { name: 'Send code', exact: true }).click();
 	await expect(page.getByLabel('Verification code')).toBeVisible();
-	await page.locator('form[action="?/request"]').evaluate((form: HTMLFormElement) => {
+	await page.locator('form[action^="?/request"]').evaluate((form: HTMLFormElement) => {
 		form.requestSubmit(); form.requestSubmit();
 	});
 	await expect.poll(() => sends).toBe(2);
