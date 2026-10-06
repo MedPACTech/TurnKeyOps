@@ -76,3 +76,12 @@
 @media (prefers-reduced-motion: reduce) {
   .admin-theme, .admin-theme * { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
 }
+/* Existing route controls share the same accessible defaults. */
+@layer base { .admin-theme *, .admin-theme ::before, .admin-theme ::after { border-color:var(--border); } }
+.admin-theme :is(input:not([type='checkbox']):not([type='radio']),select,textarea) { background-color:var(--input-bg); color:var(--input-text); border-color:var(--input-border); }
+.admin-theme .admin-selected { background:var(--teal-soft); color:var(--teal-text); }
+.admin-theme .admin-primary { display:inline-flex; align-items:center; justify-content:center; min-height:44px; background:var(--cta); color:var(--cta-text); }
+.admin-theme .admin-primary:hover { background:var(--cta-hover); }
+.admin-theme .admin-primary:active { background:var(--cta-pressed); }
+
+@media (max-width:1023px) { .admin-theme button[aria-label] { min-width:44px; } }

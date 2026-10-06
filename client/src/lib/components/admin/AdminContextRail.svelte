@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AdminIcon from '$lib/components/admin/AdminIcon.svelte';
 	type AdminContextTab = {
 		id: 'defaults' | 'website';
 		label: string;
@@ -14,14 +15,14 @@
 			id: 'defaults',
 			label: 'Defaults',
 			href: '/bdr/admin/settings',
-			icon: '⚙️',
+			icon: 'settings',
 			detail: 'Estimate constants and admin-controlled rules'
 		},
 		{
 			id: 'website',
 			label: 'Website',
 			href: '/bdr/admin/website',
-			icon: '🌐',
+			icon: 'content',
 			detail: 'Public-site content, assets, and quote flow'
 		}
 	];
@@ -34,12 +35,12 @@
 			aria-current={active === tab.id ? 'page' : undefined}
 			class={`group flex items-start gap-3 rounded-lg border px-3 py-3 text-left transition ${
 				active === tab.id
-					? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]'
-					: 'border-transparent bg-white/80 shadow-sm hover:bg-white'
+					? 'border-transparent bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]'
+					: 'border-transparent bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'
 			}`}
 		>
-			<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-lg shadow-sm">
-				{tab.icon}
+			<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] text-lg shadow-sm">
+				<AdminIcon name={tab.icon} />
 			</span>
 			<span class="min-w-0">
 				<span class="block text-sm font-semibold text-[var(--text-strong)]">{tab.label}</span>

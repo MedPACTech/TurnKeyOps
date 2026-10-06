@@ -3,13 +3,20 @@
   import { X } from 'lucide-svelte';
   let { title, close, children, side = 'right', width = '36rem' }: { title: string; close: () => void; children: Snippet; side?: 'left' | 'right'; width?: string } = $props();
   let dialog: HTMLDialogElement;
+  function trapFocus(event: KeyboardEvent) {
+    if (event.key !== 'Tab') return;
+    const targets = Array.from(dialog.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]')).filter((node) => node.getClientRects().length > 0);
+    const first = targets[0]; const last = targets.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
   onMount(() => {
     const previous = document.activeElement as HTMLElement | null;
     dialog.showModal();
     return () => { dialog.close(); if (previous?.isConnected) previous.focus(); };
   });
 </script>
-<dialog bind:this={dialog} aria-label={title} oncancel={(event) => { event.preventDefault(); close(); }} onclick={(event) => { if(event.target === dialog) { const rect=dialog.getBoundingClientRect(); if(event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) close(); } }} class:left={side === 'left'} style:width={`min(100%, ${width})`}>
+<dialog bind:this={dialog} onkeydown={trapFocus} aria-label={title} oncancel={(event) => { event.preventDefault(); close(); }} onclick={(event) => { if(event.target === dialog) { const rect=dialog.getBoundingClientRect(); if(event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) close(); } }} class:left={side === 'left'} style:width={`min(100%, ${width})`}>
   <div class="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--border)] px-5 py-4">
     <h2 class="text-lg font-semibold text-[var(--text-strong)]">{title}</h2>
     <button type="button" class="btn-icon" aria-label={`Close ${title.toLowerCase()}`} onclick={close}><X size={20} aria-hidden="true" /></button>
