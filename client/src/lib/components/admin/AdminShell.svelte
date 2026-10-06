@@ -170,7 +170,7 @@
           <blockquote class="mt-3 border-l-2 border-[var(--teal-border)] pl-3 text-sm italic leading-6 text-[var(--text-muted)]">“{selectedBobVoice.preview}”</blockquote>
         </section>
         <section class="border-t border-[var(--border)] pt-5"><h3 class="font-semibold text-[var(--text-strong)]">Workspace</h3><p class="mt-2 text-sm leading-6 text-[var(--text-muted)]">{workspaceSummary}</p><a href={publicHref} class="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--teal-text)] hover:underline">View public site</a></section>
-        <form method="POST" action="/auth/logout"><input type="hidden" name="returnTo" value={activePath} /><button type="submit" class="btn-secondary w-full"><LogOut size={18} aria-hidden="true" />Sign out</button></form>
+        <a href="/auth/workspaces" class="btn-secondary">Switch workspace</a><form method="POST" action="/auth/logout"><input type="hidden" name="returnTo" value={activePath} /><button type="submit" class="btn-secondary w-full"><LogOut size={18} aria-hidden="true" />Sign out</button></form>
       </div>
     </AdminDrawer>
   {/if}

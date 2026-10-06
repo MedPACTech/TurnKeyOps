@@ -67,7 +67,7 @@ const productionDomainByHostname = new Map(
 export const getProductionDomain = (hostname: string) =>
 	productionDomainByHostname.get(hostname.toLowerCase()) ?? null;
 
-const applicationRoutePrefixes = ['/turnkeyops/', '/thinkpink/', '/bdr/', '/auth/'];
+const applicationRoutePrefixes = ['/carlzipf/', '/turnkeyops/', '/thinkpink/', '/bdr/', '/auth/'];
 const assetRoutePrefixes = ['/_app/', '/clientFiles/'];
 
 export const shouldBypassDomainReroute = (pathname: string) =>

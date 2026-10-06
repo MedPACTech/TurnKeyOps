@@ -13,9 +13,20 @@ http.createServer(async(req,res)=>{
  if(url.pathname==='/health') return send('OK');
  if(url.pathname==='/reset'){people=[{...owner},{...otherOwner}];return send('OK');}
  if(url.pathname.startsWith('/api/public/tenant-settings/'))return send({values:{},version:null});
+ if(url.pathname==='/api/auth/startotp') return send({challengeId:'fixture-multi',channel:'email'});
+ if(url.pathname==='/api/auth/completeotp') return send({requiresTenantSelection:true,preTenantToken:`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify({sub:'11111111-1111-1111-1111-111111111111',pt:1,exp:Math.floor(Date.now()/1000)+600})).toString('base64url')}.fixture`});
  if(!req.headers.authorization?.startsWith('Bearer ')) return send(null,401);
  if(url.pathname==='/api/auth/session') return send({valid:true});
  const claims=JSON.parse(Buffer.from(req.headers.authorization.split('.')[1],'base64url').toString());
+ if(url.pathname==='/api/auth/workspaces') {
+  const ids=['7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b','88888888-8888-4888-8888-888888888883'];
+  if(req.method==='GET') return send(ids.map(tenantId=>({tenantId})));
+  let raw=''; for await(const chunk of req) raw+=chunk;
+  const {tenantId}=JSON.parse(raw);
+  if(!ids.includes(tenantId)) return send(null,403);
+  const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify({...claims,tid:tenantId,role:['owner'],exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.fixture`;
+  return send({accessToken:token,refreshToken:'new-workspace-refresh'});
+ }
  if(url.pathname==='/api/people/capabilities')return send({canDeleteUsers:claims.role.includes('owner')});
  if(url.pathname==='/api/my-module-access'){
   return send(claims.fixtureContacts ? ['contacts.read','contacts.write'] : claims.fixtureRestricted ? ['users.read'] : modules.flatMap(m=>[m+'.read',m+'.write']));
