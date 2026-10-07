@@ -6,6 +6,8 @@ export type ExternalAdminModule =
 	| 'dashboard'
 	| 'calendar'
 	| 'jobs'
+	| 'inventory'
+	| 'purchasing'
 	| 'requests'
 	| 'leads'
 	| 'estimates'
@@ -39,6 +41,8 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 	dashboard: { slug: 'dashboard', label: 'Dashboard', summary: 'Pipeline, schedule, workload, and cash visibility', contextLabel: 'Admin', focusLabel: 'Control room', canvasLabel: 'Operating canvas', section: 'overview' },
 	calendar: { slug: 'calendar', label: 'Calendar', summary: 'Appointments, site visits, production dates, and crew availability', contextLabel: 'Operations', focusLabel: 'Scheduling desk', canvasLabel: 'Dispatch canvas', section: 'operations' },
 	jobs: { slug: 'jobs', label: 'Jobs', summary: 'Active work, field status, holds, and completion controls', contextLabel: 'Production Ops', focusLabel: 'Run desk', canvasLabel: 'Job canvas', section: 'operations' },
+	inventory: { slug: 'inventory', label: 'Inventory', summary: 'Job materials, availability and stock movements', contextLabel: 'Supply', focusLabel: 'Material readiness', canvasLabel: 'Inventory workspace', section: 'operations' },
+	purchasing: { slug: 'purchasing', label: 'Purchasing', summary: 'Source, order and receive Job supplies', contextLabel: 'Supply', focusLabel: 'Buying desk', canvasLabel: 'Purchasing workspace', section: 'operations' },
 	leads: { slug: 'leads', label: 'Leads', summary: 'Opportunities, next actions and lead-to-won workflow', contextLabel: 'Leads', focusLabel: 'Next actions', canvasLabel: 'Lead workspace', section: 'customers' },
 	requests: { slug: 'requests', label: 'Requests', summary: 'Public-site intake, triage, follow-up, and conversion', contextLabel: 'Intake Ops', focusLabel: 'Request inbox', canvasLabel: 'Message canvas', section: 'customers' },
 	estimates: { slug: 'estimates', label: 'Estimates', summary: 'Estimate preparation, approval, deposits, and contract status', contextLabel: 'Sales Ops', focusLabel: 'Pipeline lane', canvasLabel: 'Estimate canvas', section: 'revenue' },
@@ -49,9 +53,9 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 };
 
 const tenantModules: Record<TenantSlug, ExternalAdminModule[]> = {
-	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'leads', 'estimates', 'invoices', 'customers', 'users', 'settings'],
-	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'leads', 'estimates', 'invoices', 'customers', 'users', 'settings'],
-	carlzipf: ['bob', 'calendar', 'jobs', 'leads', 'estimates', 'invoices', 'customers', 'settings', 'users']
+	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'customers', 'users', 'settings'],
+	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'customers', 'users', 'settings'],
+	carlzipf: ['bob', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'customers', 'settings', 'users']
 };
 
 const themes: Record<TenantSlug, ExternalAdminTheme> = {

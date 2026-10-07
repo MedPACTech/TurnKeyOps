@@ -150,6 +150,13 @@ public sealed class JobExecutionTests
         f.Events[0].EventStatus="cancelled";
         Assert.Null((await f.Service.WorkspaceAsync(f.Job.Id)).Job.ScheduledStart);
     }
+    [Fact]public async Task VendorDeliveryUsesCalendarWithoutCrewAndDoesNotScheduleJobWork()
+    {
+        var f=new Fixture();var start=DateTime.UtcNow.AddDays(1);
+        var result=await f.Service.ScheduleAsync(f.Job.Id,new(){ExpectedVersion=f.Job.ETag.ToString(),Title="Material delivery",Type="delivery",StartUtc=start,EndUtc=start.AddHours(1)});
+        var delivery=Assert.Single(result.Events);Assert.Equal("delivery",delivery.JobEventType);Assert.Null(delivery.AssignedTechnicianMembershipId);Assert.Null(result.Job.ScheduledStart);
+        f.Job.Status=JobStatus.ReadyToSchedule;await Assert.ThrowsAsync<ArgumentException>(()=>f.Command("transition",state:"SCHEDULED"));
+    }
     private sealed class Fixture
     {
         public readonly Guid Tenant=Guid.NewGuid();public string Partition=>TurnKeyOps.Lib.Utils.RepositoryKeyHelper.ToTenantPartitionKey(Tenant);

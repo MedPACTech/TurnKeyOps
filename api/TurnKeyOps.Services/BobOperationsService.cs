@@ -30,6 +30,7 @@ public sealed class BobOperationsService : IBobOperationsService
     private readonly BobOperationsOptions _options;
     private readonly LeadConfigurationService? _leadConfiguration;
     private readonly JobConfigurationService? _jobConfiguration;
+    private readonly ISupplyStore? _supplyStore;
 
     public BobOperationsService(
         IBobActionRepository repository,
@@ -40,7 +41,7 @@ public sealed class BobOperationsService : IBobOperationsService
         IAuditService audit,
         IBobContextMinimizer minimizer,
         IOptions<BobOperationsOptions> options,
-        LeadConfigurationService? leadConfiguration = null, JobConfigurationService? jobConfiguration = null)
+        LeadConfigurationService? leadConfiguration = null, JobConfigurationService? jobConfiguration = null, ISupplyStore? supplyStore = null)
     {
         _repository = repository;
         _chatRepository = chatRepository;
@@ -52,6 +53,7 @@ public sealed class BobOperationsService : IBobOperationsService
         _options = options.Value;
         _leadConfiguration = leadConfiguration;
         _jobConfiguration = jobConfiguration;
+        _supplyStore = supplyStore;
     }
 
     public async Task<BobActionDto> ApproveLeadAsync(Guid leadId, Guid actionId, CancellationToken ct = default)
@@ -142,6 +144,36 @@ public sealed class BobOperationsService : IBobOperationsService
                 StateJson = JsonSerializer.Serialize(new { jobId }), DateChatCreated = DateTime.UtcNow, DateChatUpdated = DateTime.UtcNow
             }, ct);
         return await ProposeAsync(jobId, input, ct);
+    }
+
+    public async Task<BobActionDto> ApproveSupplyAsync(Guid supplyId, Guid actionId, CancellationToken ct = default)
+    {
+        var action = await RequireActionAsync(actionId, ct);
+        if (action.ConversationId != supplyId || !action.ToolKey.StartsWith("supply.", StringComparison.Ordinal))
+            throw new ArgumentException("Action belongs to another supply workspace.");
+        await ApproveAsync(actionId, ct);
+        return await ExecuteAsync(actionId, ct);
+    }
+
+    public async Task<BobActionDto> ProposeSupplyAsync(Guid supplyId, ProposeBobActionDto input, CancellationToken ct = default)
+    {
+        EnsureEnabled();
+        if (supplyId == Guid.Empty || !input.ToolKey.StartsWith("supply.", StringComparison.Ordinal) ||
+            !input.Input.TryGetProperty("supplyId", out var inputId) || inputId.GetGuid() != supplyId)
+            throw new ArgumentException("The action must target this supply workspace.");
+        var provider = GetProvider(input.ToolKey);
+        await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
+        await PolicyRequiresApprovalAsync(provider, ct);
+        var partition = PartitionKey();
+        var row = MedInsights.Lib.EntityKeyPolicy.Row(supplyId);
+        var conversation = await _chatRepository.GetAsync(partition, row, ct);
+        if (conversation is null)
+            await _chatRepository.SaveAsync(new MedInsights.Lib.Entities.Chat {
+                Id = supplyId, TenantId = _userContext.TenantId, ActorUserId = _userContext.UserId,
+                PartitionKey = partition, RowKey = row, Title = "Supply workspace", Mode = "supply",
+                StateJson = JsonSerializer.Serialize(new { supplyId }), DateChatCreated = DateTime.UtcNow, DateChatUpdated = DateTime.UtcNow
+            }, ct);
+        return await ProposeAsync(supplyId, input, ct);
     }
 
     public async Task<BobActionDto> ProposeAsync(
@@ -295,11 +327,11 @@ public sealed class BobOperationsService : IBobOperationsService
 
     private async Task<bool> PolicyRequiresApprovalAsync(IBobActionProvider provider, CancellationToken ct)
     {
-        if (_leadConfiguration is null) return RequiresConfirmation(provider.Risk);
-        var config = await _leadConfiguration.GetAsync(_userContext.TenantId, ct);
-        var mode = config.AiActions.GetValueOrDefault(provider.ToolKey, provider.Risk == BobActionRisk.Read ? "read" : "approval");
+        var mode=provider.Risk==BobActionRisk.Read?"read":"approval";
+        if(_leadConfiguration is not null)mode=(await _leadConfiguration.GetAsync(_userContext.TenantId,ct)).AiActions.GetValueOrDefault(provider.ToolKey,mode);
         if(provider.ToolKey.StartsWith("job.")&&_jobConfiguration is not null)mode=(await _jobConfiguration.GetAsync(_userContext.TenantId,ct)).AiActions.GetValueOrDefault(provider.ToolKey,mode);
-        if (mode is "disabled" or "recommend" || mode == "draft" && provider.ToolKey is not ("lead.draft" or "estimate.extract" or "job.change"))
+        if(provider.ToolKey.StartsWith("supply.")&&_supplyStore is not null)mode=(await _supplyStore.ReadAsync(_userContext.TenantId,ct)).Policy.AiActions.GetValueOrDefault(provider.ToolKey,mode);
+        if (mode is "disabled" or "recommend" || mode == "draft" && provider.ToolKey is not ("lead.draft" or "estimate.extract" or "job.change" or "supply.draft-order"))
             throw new InvalidOperationException("Tenant policy does not allow this action to execute.");
         if (mode == "read" && provider.Risk != BobActionRisk.Read)
             throw new InvalidOperationException("Read-only policy cannot execute a mutation.");

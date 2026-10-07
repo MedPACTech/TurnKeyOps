@@ -84,6 +84,10 @@ namespace MedInsights.API.DependencyInjection
         private static void RegisterTurnKeyPermissions(PermissionRegistrationBuilder builder)
         {
             builder
+                .AddPermission("inventory.read", name: "Read inventory")
+                .AddPermission("inventory.write", name: "Manage inventory")
+                .AddPermission("purchasing.read", name: "Read purchasing and costs")
+                .AddPermission("purchasing.write", name: "Manage purchasing")
                 .AddPermission(TurnKeyPermissionKeys.LeadsRead, name: "Read leads")
                 .AddPermission(TurnKeyPermissionKeys.LeadsWrite, name: "Manage leads")
                 .AddPermission(TurnKeyPermissionKeys.EstimatesRead, name: "Read estimates")
@@ -106,6 +110,7 @@ namespace MedInsights.API.DependencyInjection
                 .AddPermission(TurnKeyPermissionKeys.MembershipOwnerGrant, name: "Grant tenant ownership");
 
             builder.MapRole(TenantRoleCatalog.Owner,
+                "inventory.read", "inventory.write", "purchasing.read", "purchasing.write",
                 TurnKeyPermissionKeys.LeadsRead,
                 TurnKeyPermissionKeys.LeadsWrite,
                 TurnKeyPermissionKeys.EstimatesRead,
@@ -127,6 +132,7 @@ namespace MedInsights.API.DependencyInjection
                 TurnKeyPermissionKeys.MembershipManage,
                 TurnKeyPermissionKeys.MembershipOwnerGrant);
             builder.MapRole(TenantRoleCatalog.Admin,
+                "inventory.read", "inventory.write", "purchasing.read", "purchasing.write",
                 TurnKeyPermissionKeys.LeadsRead,
                 TurnKeyPermissionKeys.LeadsWrite,
                 TurnKeyPermissionKeys.EstimatesRead,

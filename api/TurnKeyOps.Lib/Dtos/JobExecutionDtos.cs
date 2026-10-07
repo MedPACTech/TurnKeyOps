@@ -4,6 +4,9 @@ namespace TurnKeyOps.Lib.Dtos;
 // Universal execution data lives in the existing Job workflow payload. Trade fields are schema-bound.
 public sealed class JobExecutionDto
 {
+    [System.Text.Json.Serialization.JsonIgnore] public List<string> SupplyBlockers { get; set; } = [];
+    [System.Text.Json.Serialization.JsonIgnore] public Dictionary<Guid,string> SupplyRequirementStatuses { get; set; } = [];
+    [System.Text.Json.Serialization.JsonIgnore] public HashSet<Guid> SupplyRequirementIds { get; set; } = [];
     public int SchemaVersion { get; set; } = 1;
     public string Origin { get; set; } = "Manual";
     public string? SourceSystem { get; set; }

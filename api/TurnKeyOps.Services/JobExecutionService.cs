@@ -15,7 +15,7 @@ namespace TurnKeyOps.Services;
 public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadStore payloads,IJobService legacy,
     IJobAuthority authority,JobConfigurationService configuration,IUserContext user,ICalendarEventRepository calendar,
     ITenantMembershipRepository memberships,ICustomerRepository customers,IJobSiteRepository sites,
-    IAzureBlobStorageService blobs,IQuoteEstimateService estimates, IUserProfileRepository profiles)
+    IAzureBlobStorageService blobs,IQuoteEstimateService estimates, IUserProfileRepository profiles, ISupplyJobReadiness? supplyReadiness = null)
 {
     private string Partition=>RepositoryKeyHelper.ToTenantPartitionKey(user.TenantId);
     private string Actor=>user.UserId.ToString("D");
@@ -26,7 +26,9 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
         var job=await jobs.GetAsync(Partition,RepositoryKeyHelper.ToRowKey(id),ct);
         if(job is null||job.IsDeleted||job.PartitionKey!=Partition)throw new KeyNotFoundException("Job not found.");
         if(write&&(string.IsNullOrWhiteSpace(version)||version!=Version(job)))throw new InvalidOperationException("The job changed. Refresh before saving.");
-        return (job,await payloads.LoadAsync(job.WorkflowPayloadBlobName,ct));
+        var payload=await payloads.LoadAsync(job.WorkflowPayloadBlobName,ct);
+        if(supplyReadiness is not null)await supplyReadiness.ApplyAsync(job.Id,payload.Execution,ct);
+        return (job,payload);
     }
     private async Task Save(Job job,JobWorkflowPayloadDto payload,string type,string text,CancellationToken ct)
     {
@@ -54,7 +56,7 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
         var scheduled=await calendar.ListAsync(Partition,ct);
         foreach(var j in await jobs.ListAsync(Partition,ct)){
             if(j.PartitionKey!=Partition||j.IsDeleted)continue;
-            var p=await payloads.LoadAsync(j.WorkflowPayloadBlobName,ct);var state=JobExecutionRules.State(j.Status);
+            var p=await payloads.LoadAsync(j.WorkflowPayloadBlobName,ct);if(supplyReadiness is not null)await supplyReadiness.ApplyAsync(j.Id,p.Execution,ct);var state=JobExecutionRules.State(j.Status);
             if(p.Execution is not null) ApplyCalendarSummary(j, scheduled);
             result.Add(new {j.Id,j.Name,j.CustomerId,j.CustomerName,j.JobSiteId,j.JobSiteName,j.ScheduledStart,j.ScheduledEnd,j.Crew,
                 state,stateLabel=p.Execution?.Profile.StateLabels.GetValueOrDefault(state),trade=p.Execution?.TradeProfile??JobExecutionRules.Trade(j.TradeType),
@@ -68,7 +70,7 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
     }
     private static void ApplyCalendarSummary(Job job, IEnumerable<CalendarEvent> events)
     {
-        var active=events.Where(e=>e.PartitionKey==job.PartitionKey&&e.JobId==job.Id&&!e.IsDeleted&&e.EventStatus!="cancelled").OrderBy(e=>e.StartUtc).ToList();
+        var active=events.Where(e=>e.PartitionKey==job.PartitionKey&&e.JobId==job.Id&&!e.IsDeleted&&e.EventStatus!="cancelled"&&e.JobEventType!="delivery").OrderBy(e=>e.StartUtc).ToList();
         job.ScheduledStart=active.Count==0?null:active.Min(e=>e.StartUtc);
         job.ScheduledEnd=active.Count==0?null:active.Max(e=>e.EndUtc);
         job.AssignedTechnicianMembershipId=active.FirstOrDefault()?.AssignedTechnicianMembershipId;
@@ -87,6 +89,7 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
         if(j.JobSiteId is Guid siteId){var site=await sites.GetAsync(Partition,RepositoryKeyHelper.ToRowKey(siteId),ct);if(site is not null&&!site.IsDeleted&&site.PartitionKey==Partition){dto.JobSiteName=site.Name;dto.ProjectAddress=string.Join(", ",new[]{site.Address,site.City,site.State,site.Zip}.Where(x=>!string.IsNullOrWhiteSpace(x)));}}
         if(j.CustomerId!=Guid.Empty){var c=await customers.GetAsync(Partition,RepositoryKeyHelper.ToRowKey(j.CustomerId),ct);if(c is not null&&!c.IsDeleted&&c.PartitionKey==Partition){dto.CustomerName=$"{c.FirstName} {c.LastName}".Trim();dto.ContactEmail=c.Email;dto.ContactPhone=c.Phone;}}
         var state=JobExecutionRules.State(j.Status);var x=p.Execution;
+        if(x is not null&&dto.Execution is not null)foreach(var requirement in dto.Execution.Requirements)if(x.SupplyRequirementStatuses.TryGetValue(requirement.Id,out var supplyStatus))requirement.Status=$"Supply: {supplyStatus.Replace('_',' ') }";
         var allEvents=(await calendar.ListAsync(Partition,ct)).Where(e=>e.PartitionKey==Partition&&!e.IsDeleted).ToList();var conflicts=EventConflicts(allEvents,id);
         if(x is not null){ApplyCalendarSummary(j,allEvents);dto.ScheduledStart=j.ScheduledStart;dto.ScheduledEnd=j.ScheduledEnd;dto.AssignedTechnicianMembershipId=j.AssignedTechnicianMembershipId;}
         return new(dto,state,x?.Profile.StateLabels.GetValueOrDefault(state)??state.Replace('_',' '),JobExecutionRules.NextAction(state),
@@ -127,7 +130,7 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
                 var events=await calendar.ListAsync(Partition,ct);
                 if(input.State is "SCHEDULED" or "READY_TO_START" or "IN_PROGRESS"){var collisions=EventConflicts(events,id);if(collisions.Count>0)throw new ArgumentException(string.Join("; ",collisions));}
                 if(JobExecutionRules.State(j.Status) is "CLOSED" or "CANCELLED"&&!await authority.IsOwnerAsync(ct))throw new MedInsights.Lib.ForbiddenAccessException("An owner must reopen a closed or cancelled job.");
-                JobExecutionRules.Transition(dto,input.State,input.Text,events.Any(e=>e.JobId==id&&!e.IsDeleted&&e.EventStatus=="scheduled"));
+                JobExecutionRules.Transition(dto,input.State,input.Text,events.Any(e=>e.JobId==id&&!e.IsDeleted&&e.EventStatus=="scheduled"&&e.JobEventType!="delivery"));
                 var prior=JobExecutionRules.State(j.Status);j.Status=dto.Status;
                 if(j.Status==JobStatus.InProgress)j.ActualStart??=now;
                 if(j.Status==JobStatus.Completed)j.ActualEnd=now;
@@ -160,6 +163,7 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
                 t.Id=Guid.NewGuid();t.CompletedAtUtc=null;t.CompletedBy=null;t.TemplateSource="job";t.Title=Text(t.Title,300);x.Tasks.Add(t);audit=$"Task created: {t.Title}";break;
             case "requirement":
                 var r=input.Requirement??throw new ArgumentException("Requirement required.");
+                if(input.ItemId.HasValue&&supplyReadiness is not null&&await supplyReadiness.IsManagedAsync(id,input.ItemId.Value,ct))throw new ArgumentException("This requirement is managed by Inventory. Record a new requirement for a scope change.");
                 if(r.Kind is not ("material" or "equipment")||r.Quantity<=0||r.Quantity>1000000||string.IsNullOrWhiteSpace(r.Description)||r.Status is not ("Needed" or "Ordered" or "Confirmed" or "Available" or "Delivered" or "Consumed" or "Returned" or "Cancelled"))throw new ArgumentException("Invalid material/equipment requirement.");
                 var old=x.Requirements.FindIndex(v=>v.Id==input.ItemId);r.Id=old<0?Guid.NewGuid():x.Requirements[old].Id;
                 if(old<0)x.Requirements.Add(r);else x.Requirements[old]=r;audit=$"{r.Kind}: {Text(r.Description,300)} — {r.Status}";break;
@@ -219,9 +223,9 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
         if(j.Status is JobStatus.Completed or JobStatus.Closed or JobStatus.Cancelled)throw new ArgumentException("Reopen before scheduling.");
         if(input.StartUtc.Kind!=DateTimeKind.Utc||input.EndUtc.Kind!=DateTimeKind.Utc||input.EndUtc<=input.StartUtc)throw new ArgumentException("Provide a valid UTC schedule window.");
         if(input.Status is not ("scheduled" or "completed" or "cancelled"))throw new ArgumentException("Invalid event status.");
-        if(string.IsNullOrWhiteSpace(input.Title)||input.MembershipIds.Count==0)throw new ArgumentException("Event title and assigned people are required.");
+        if(string.IsNullOrWhiteSpace(input.Title)||input.MembershipIds.Count==0&&input.Type!="delivery")throw new ArgumentException("Event title and assigned people are required.");
         var blockers=JobExecutionRules.Blockers(x,"schedule");if(input.Status=="scheduled"&&blockers.Count>0)throw new ArgumentException(string.Join("; ",blockers));
-        if(input.Status=="scheduled")await ValidateMembers(input.MembershipIds,x.Profile.RequiredSkills,ct);
+        if(input.Status=="scheduled")await ValidateMembers(input.MembershipIds,input.Type=="delivery"?[]:x.Profile.RequiredSkills,ct);
         var all=await calendar.ListAsync(Partition,ct);
         var existing=input.Id==Guid.Empty?null:all.SingleOrDefault(e=>e.Id==input.Id&&e.JobId==id);
         if(input.Id!=Guid.Empty&&existing is null)throw new ArgumentException("Job event not found.");
@@ -232,7 +236,7 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
             if((await jobs.ListAsync(Partition,ct)).Any(other=>other.Id!=id&&other.Status is JobStatus.Scheduled or JobStatus.InProgress&&other.ScheduledStart<input.EndUtc&&other.ScheduledEnd>input.StartUtc&&other.AssignedTechnicianMembershipId.HasValue&&input.MembershipIds.Contains(other.AssignedTechnicianMembershipId.Value)))throw new ArgumentException("Technician has an overlapping legacy job assignment.");
         }
         var e=existing??new CalendarEvent{Id=eid,PartitionKey=Partition,RowKey=RepositoryKeyHelper.ToRowKey(eid),JobId=id,JobName=j.Name,JobSiteId=j.JobSiteId,JobSiteName=j.JobSiteName,EventType=CalendarEventType.Other};
-        e.Title=Text(input.Title,300);e.JobEventType=Text(input.Type,80);e.StartUtc=input.StartUtc;e.EndUtc=input.EndUtc;e.MembershipIds=input.MembershipIds.Distinct().ToList();e.AssignedTechnicianMembershipId=e.MembershipIds.First();e.ResourceIds=input.ResourceIds.Distinct().ToList();e.CustomerVisible=input.CustomerVisible;e.EventStatus=input.Status;e.Description=Text(input.Notes);e.DateUpdated=DateTime.UtcNow;
+        e.Title=Text(input.Title,300);e.JobEventType=Text(input.Type,80);e.StartUtc=input.StartUtc;e.EndUtc=input.EndUtc;e.MembershipIds=input.MembershipIds.Distinct().ToList();e.AssignedTechnicianMembershipId=e.MembershipIds.Count==0?null:e.MembershipIds.First();e.EventType=input.Type=="delivery"?CalendarEventType.Delivery:CalendarEventType.Other;e.ResourceIds=input.ResourceIds.Distinct().ToList();e.CustomerVisible=input.CustomerVisible;e.EventStatus=input.Status;e.Description=Text(input.Notes);e.DateUpdated=DateTime.UtcNow;
         // Calendar is authoritative. Record intent first so a transport/storage failure never looks like a confirmed schedule.
         await Save(j,p,"job.schedule-requested",$"Event {eid}: {e.Title}, {e.StartUtc:O} to {e.EndUtc:O}; {e.EventStatus}. Awaiting Calendar confirmation.",ct);
         await calendar.SaveAsync(e,ct);

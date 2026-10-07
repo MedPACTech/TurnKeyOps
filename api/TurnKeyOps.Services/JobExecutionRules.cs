@@ -36,7 +36,8 @@ public static class JobExecutionRules
         var results=x.Issues.Where(i=>i.ResolvedAtUtc is null&&i.Severity is "blocker" or "critical").Select(i=>$"{i.Type}: {i.Description}").ToList();
         results.AddRange(x.Tasks.Where(t=>t.Required&&t.CompletedAtUtc is null&&(stage=="complete"||t.Stage=="schedule"||stage=="start"&&t.Stage=="start")).Select(t=>$"Complete: {t.Title}"));
         results.AddRange(x.Profile.RequiredFields.Where(k=>!x.TradeData.TryGetValue(k,out var v)||string.IsNullOrWhiteSpace(v)).Select(k=>$"Confirm {x.Profile.Fields.GetValueOrDefault(k,k)}"));
-        if(stage!="schedule")results.AddRange(x.Requirements.Where(r=>r.Status is not ("Available" or "Delivered" or "Consumed" or "Returned" or "Cancelled")).Select(r=>$"{r.Kind}: {r.Description} is {r.Status}"));
+        if(stage!="schedule")results.AddRange(x.SupplyBlockers);
+        if(stage!="schedule")results.AddRange(x.Requirements.Where(r=>!x.SupplyRequirementIds.Contains(r.Id)&&r.Status is not ("Available" or "Delivered" or "Consumed" or "Returned" or "Cancelled")).Select(r=>$"{r.Kind}: {r.Description} is {r.Status}"));
         results.AddRange(x.Changes.Where(c=>c.Status is not ("IMPLEMENTED" or "DECLINED" or "CANCELLED")).Select(c=>$"Resolve change: {c.Description} ({c.Status})"));
         if(stage=="complete"&&x.Evidence.Count(e=>e.Purpose=="completion"&&e.ContentType.StartsWith("image/"))<x.Profile.CompletionPhotos)results.Add($"Capture {x.Profile.CompletionPhotos} completion photos");
         return results;

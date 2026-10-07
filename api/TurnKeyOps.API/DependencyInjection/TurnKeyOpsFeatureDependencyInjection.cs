@@ -232,6 +232,14 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<IJobAuthority, JobAuthority>();
         services.AddScoped<JobConfigurationService>();
         services.AddScoped<JobExecutionService>();
+        services.AddScoped<ISupplyStore,SupplyStore>();
+        services.AddScoped<ISupplyAuthority,SupplyAuthority>();
+        services.AddScoped<ISupplyJobReadiness,SupplyJobReadiness>();
+        services.AddScoped<SupplyService>();
+        services.AddScoped<SupplyFileService>();
+        services.AddScoped<SupplyOrderDelivery>();
+        foreach(var tool in new[]{"supply.availability","supply.shortages","supply.sources","supply.purchasing","supply.reserve","supply.request","supply.draft-order","supply.send"})
+            services.AddScoped<IBobActionProvider>(sp=>new BobSupplyActionProvider(sp.GetRequiredService<SupplyService>(),tool,sp.GetRequiredService<SupplyOrderDelivery>()));
         services.AddScoped<TurnKeyOps.Repositories.IJobNotificationStore,TurnKeyOps.Repositories.JobNotificationStore>();
         services.AddScoped<JobNotificationDispatcher>();
         services.AddScoped<JobDeliveryService>();
