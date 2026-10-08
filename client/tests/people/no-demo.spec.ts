@@ -18,7 +18,8 @@ test('platform overview and health show configuration and unavailable telemetry 
 test('an empty estimate API stays empty instead of supplying sample estimates',async({page,context})=>{
  await signIn(context,'owner');
  await page.goto('/bdr/admin/estimates');
- await expect(page.getByText('Sent estimates',{exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'No estimates yet',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Move the next proposal forward',exact:true})).toBeVisible();
  await expect(page.getByText('Ridgeway Residence',{exact:false})).toHaveCount(0);
  await expect(page.getByText('EST-24031',{exact:false})).toHaveCount(0);
  await expect(page.getByText('Existing estimates',{exact:true})).toHaveCount(0);

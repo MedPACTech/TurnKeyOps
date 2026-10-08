@@ -1,4 +1,6 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { loginDestination, tenantForPath, tenantLoginUrl } from '$lib/server/tenant-auth';
+import { selectWorkspace, pendingTokenCookie, tokenTenantId } from '$lib/server/workspaces';
+import { fail, redirect, isRedirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import {
 	authTokenCookie,
@@ -10,7 +12,6 @@ import {
 	getAdminSessionFromToken,
 	getAdminSurface,
 	getDefaultAdminReturnTo,
-	getSafeAdminReturnTo,
 	hasInternalAdminRole,
 	inferOtpChannel,
 	isTechnicianPath,
@@ -33,7 +34,7 @@ const getSurfaceMeta = (returnTo: string) => {
 		isInviteAcceptance,
 		isTechnician,
 		label:
-			isInviteAcceptance
+			returnTo === '/auth/workspaces' ? 'TurnKeyOps' : isInviteAcceptance
 				? 'Invite activation'
 				: isTechnician
 					? 'Carl Zipf Field'
@@ -55,8 +56,9 @@ const getReturnedOtpState = (challengeId: string, identifier: string) => ({
 	devCode: null
 });
 
-export const load = async ({ cookies, url, fetch }) => {
-	const returnTo = getSafeAdminReturnTo(url.searchParams.get('returnTo'));
+export const load = async ({ cookies, url, fetch, params }) => {
+	const returnTo = loginDestination((params as { tenant?: string }).tenant, url.searchParams.get('returnTo'));
+	if (!(params as { tenant?: string }).tenant && tenantForPath(returnTo)) redirect(303, tenantLoginUrl(returnTo));
 	const surfaceMeta = getSurfaceMeta(returnTo);
 	const token = cookies.get(authTokenCookie);
 	const tokenIsValid = await validateAdminAccessToken(fetch, token);
@@ -64,6 +66,8 @@ export const load = async ({ cookies, url, fetch }) => {
 		? getAdminSessionFromToken(token, returnTo)
 		: null;
 
+	if (tokenIsValid && returnTo === '/auth/workspaces') redirect(303, returnTo);
+	if (tokenIsValid && tenantForPath(returnTo)?.id !== tokenTenantId(token) && tenantForPath(returnTo)) redirect(303, `/auth/workspaces?returnTo=${encodeURIComponent(returnTo)}`);
 	if (((surfaceMeta.isInviteAcceptance || surfaceMeta.isTechnician) && tokenIsValid) || (session && (surfaceMeta.surface === 'internal-admin' || session.role))) {
 		throw redirect(303, returnTo);
 	}
@@ -75,10 +79,10 @@ export const load = async ({ cookies, url, fetch }) => {
 };
 
 export const actions = {
-	request: async ({ request, fetch }) => {
+	request: async ({ request, fetch, params }) => {
 		const formData = await request.formData();
 		const identifier = getFormString(formData, 'identifier');
-		const returnTo = getSafeAdminReturnTo(getFormString(formData, 'returnTo'));
+		const returnTo = loginDestination((params as { tenant?: string }).tenant, getFormString(formData, 'returnTo') || null);
 		const surfaceMeta = getSurfaceMeta(returnTo);
 		const channel = inferOtpChannel(identifier);
 
@@ -93,7 +97,7 @@ export const actions = {
 		}
 
 		try {
-			const otpState = await startOtp(fetch, identifier);
+			const otpState = await startOtp(fetch, identifier, tenantForPath(returnTo)?.id);
 			return {
 				step: 'verify',
 				identifier,
@@ -102,6 +106,7 @@ export const actions = {
 				...surfaceMeta
 			};
 		} catch (cause) {
+			if (isRedirect(cause)) throw cause;
 			return fail(502, {
 				step: 'request',
 				message: cause instanceof Error ? cause.message : 'Unable to send verification code.',
@@ -111,12 +116,12 @@ export const actions = {
 			});
 		}
 	},
-	verify: async ({ request, cookies, fetch, url }) => {
+	verify: async ({ request, cookies, fetch, url, params }) => {
 		const formData = await request.formData();
 		const identifier = getFormString(formData, 'identifier');
 		const code = getFormString(formData, 'code');
 		const challengeId = getFormString(formData, 'challengeId');
-		const returnTo = getSafeAdminReturnTo(getFormString(formData, 'returnTo'));
+		const returnTo = loginDestination((params as { tenant?: string }).tenant, getFormString(formData, 'returnTo') || null);
 		const surfaceMeta = getSurfaceMeta(returnTo);
 
 		if (!identifier || !code) {
@@ -130,10 +135,18 @@ export const actions = {
 			});
 		}
 
-		let verifiedReturnTo = returnTo;
+		const verifiedReturnTo = returnTo;
 		try {
-			const authResult = await completeOtp(fetch, identifier, code, challengeId);
-			const accessToken = extractAccessToken(authResult);
+			let authResult = await completeOtp(fetch, identifier, code, challengeId);
+			let accessToken = extractAccessToken(authResult);
+            const preToken = typeof authResult.preTenantToken === 'string' ? authResult.preTenantToken : null;
+            if (tenantForPath(returnTo) && (accessToken || preToken)) {
+                authResult = await selectWorkspace(fetch, (accessToken || preToken)!, tenantForPath(returnTo)!.id);
+                accessToken = extractAccessToken(authResult);
+            } else if (preToken || (returnTo === '/auth/workspaces' && accessToken)) {
+                cookies.set(pendingTokenCookie, (preToken || accessToken)!, { path: '/', httpOnly: true, sameSite: 'strict', secure: env.NODE_ENV === 'production' || url.protocol === 'https:', maxAge: 600 });
+                redirect(303, '/auth/workspaces');
+            }
 			if (!accessToken) {
 				throw new Error('Authentication completed but no access token was returned.');
 			}
@@ -161,6 +174,8 @@ export const actions = {
 				});
 			}
 
+			cookies.delete(pendingTokenCookie, { path: '/' });
+			cookies.delete(authRefreshTokenCookie, { path: '/' });
 			const secureCookie = env.NODE_ENV === 'production' || url.protocol === 'https:';
 
 			cookies.set(authTokenCookie, accessToken, {
@@ -191,6 +206,7 @@ export const actions = {
 				});
 			}
 		} catch (cause) {
+			if (isRedirect(cause)) throw cause;
 			return fail(401, {
 				step: 'verify',
 				message: cause instanceof Error ? cause.message : 'Verification failed.',

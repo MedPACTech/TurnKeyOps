@@ -94,6 +94,7 @@ public class EstimateService : IEstimateService
         ApplyFinancials(dto);
 
         var entity = EstimateMapper.ToEntity(dto, existing.PartitionKey);
+        entity.LeadId = existing.LeadId;
         entity.DateCreated = existing.DateCreated;
         await PersistEstimateArtifactsAsync(entity, dto);
         await _repo.SaveAsync(entity);
@@ -358,13 +359,19 @@ public class EstimateService : IEstimateService
     public async Task<JobDto> ConvertToJobAsync(Guid id)
     {
         var (existing, estimate) = await LoadEstimateForWorkflow(id);
+        if (estimate.ConvertedJobId.HasValue)
+        {
+            var linked = await _jobRepo.GetAsync(PartitionKeyForTenant(), RepositoryKeyHelper.ToRowKey(estimate.ConvertedJobId.Value));
+            if (linked is not null && !linked.IsDeleted && linked.EstimateId == id) return JobMapper.ToDto(linked);
+            throw new InvalidOperationException("The converted job is unavailable.");
+        }
         EnsureStatus(estimate.Status, EstimateStatus.Awarded);
 
         estimate.CalculationSnapshot ??= await CalculateAsync(estimate.StructuredInput ?? new StructuredEstimateInputDto());
 
         var job = new JobDto
         {
-            Id = Guid.NewGuid(),
+            Id = estimate.LeadId ?? Guid.NewGuid(),
             Name = !string.IsNullOrWhiteSpace(estimate.ProjectName)
                 ? estimate.ProjectName!
                 : !string.IsNullOrWhiteSpace(estimate.CustomerName)
@@ -373,6 +380,7 @@ public class EstimateService : IEstimateService
             Description = $"Converted from estimate {estimate.EstimateNumber}",
             TradeType = estimate.TradeType,
             Status = JobStatus.Created,
+            LeadId = estimate.LeadId,
             CustomerId = estimate.CustomerId,
             CustomerName = estimate.CustomerName,
             EstimateId = estimate.Id,

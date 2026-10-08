@@ -5,6 +5,7 @@ namespace MedInsights.Repositories.Interfaces
 {
     public interface IChatMessageRepository : IBaseRepositoryAsync<ChatMessage>
     {
+        Task<ChatMessage> AppendCustomerMessageAsync(ChatMessage message, CancellationToken ct = default);
         Task<List<ChatMessage>> GetMessagesByChatAsync(string partitionKey, Guid chatId, int limit, CancellationToken ct = default);
         Task DeleteMessagesByChatAsync(string partitionKey, Guid chatId, CancellationToken ct = default);
     }

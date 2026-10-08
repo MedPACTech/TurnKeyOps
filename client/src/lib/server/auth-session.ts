@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { tenantLoginUrl } from './tenant-auth';
 import { extractTokenRoles } from './session-policy';
 export {
 	getAdminSessionFromToken,
@@ -132,7 +133,7 @@ export const inferOtpChannel = (identifier: string): OtpChannel | null => {
 
 export const buildLoginRedirect = (url: URL) => {
 	const returnTo = `${url.pathname}${url.search}`;
-	return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
+	return tenantLoginUrl(returnTo);
 };
 
 const isEnvelope = <T>(value: unknown): value is ApiEnvelope<T> =>
@@ -179,7 +180,7 @@ export const postAuthApi = async <T>(
 	return unwrapApiPayload<T>(payload);
 };
 
-export const startOtp = async (fetch: typeof globalThis.fetch, identifier: string) => {
+export const startOtp = async (fetch: typeof globalThis.fetch, identifier: string, tenantId?: string) => {
 	const channel = inferOtpChannel(identifier);
 	if (!channel) {
 		throw new Error('Enter a valid email address or mobile number.');
@@ -187,7 +188,8 @@ export const startOtp = async (fetch: typeof globalThis.fetch, identifier: strin
 
 	const result = await postAuthApi<StartOtpResponse>(fetch, '/auth/startotp', {
 		destination: normalizeOtpDestination(identifier, channel),
-		preferredChannel: channel
+		preferredChannel: channel,
+		tenantId
 	});
 
 	return {

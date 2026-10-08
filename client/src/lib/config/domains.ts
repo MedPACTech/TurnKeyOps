@@ -4,7 +4,8 @@ export type ProductionSurface =
 	| 'thinkpink-public'
 	| 'thinkpink-admin'
 	| 'bdr-public'
-	| 'bdr-admin';
+	| 'bdr-admin'
+	| 'carlzipf-public';
 
 export type ProductionDomain = {
 	hostname: string;
@@ -13,6 +14,8 @@ export type ProductionDomain = {
 };
 
 export const productionDomains: ProductionDomain[] = [
+ { hostname: 'carlzipflockshop.com', surface: 'carlzipf-public', routePrefix: '/carlzipf/public' },
+ { hostname: 'www.carlzipflockshop.com', surface: 'carlzipf-public', routePrefix: '/carlzipf/public' },
 	{
 		hostname: 'turnkeyops.ai',
 		surface: 'turnkeyops-public',
@@ -67,7 +70,7 @@ const productionDomainByHostname = new Map(
 export const getProductionDomain = (hostname: string) =>
 	productionDomainByHostname.get(hostname.toLowerCase()) ?? null;
 
-const applicationRoutePrefixes = ['/turnkeyops/', '/thinkpink/', '/bdr/', '/auth/'];
+const applicationRoutePrefixes = ['/carlzipf/', '/turnkeyops/', '/thinkpink/', '/bdr/', '/auth/'];
 const assetRoutePrefixes = ['/_app/', '/clientFiles/'];
 
 export const shouldBypassDomainReroute = (pathname: string) =>
@@ -97,10 +100,20 @@ export const productionRedirects: Record<string, string> = {
 	'www.turnkeyops.ai': 'turnkeyops.ai',
 	'bdr.construction': 'bdrconcrete.com',
 	'www.bdr.construction': 'bdrconcrete.com',
-	'www.bdrconcrete.com': 'bdrconcrete.com'
+	'www.bdrconcrete.com': 'bdrconcrete.com',
+ 'www.carlzipflockshop.com': 'carlzipflockshop.com'
 };
 
 export const resolveProductionRedirect = (url: URL): string | null => {
+ if (getProductionDomain(url.hostname)?.surface === 'carlzipf-public' && /^\/carlzipf\/public(?:\/|$)/.test(url.pathname)) {
+  const canonical = new URL(url);
+  canonical.protocol = 'https:';
+  canonical.hostname = 'carlzipflockshop.com';
+  canonical.port = '';
+  canonical.pathname = url.pathname.replace('/carlzipf/public', '') || '/';
+  return canonical.href;
+ }
+
 	const hostname = Object.hasOwn(productionRedirects, url.hostname.toLowerCase())
 		? productionRedirects[url.hostname.toLowerCase()]
 		: undefined;

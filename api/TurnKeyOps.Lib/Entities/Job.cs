@@ -9,6 +9,7 @@ namespace TurnKeyOps.Lib.Entities;
 public class Job : IEntity, ITableEntity
 {
     public Guid Id { get; set; }
+    public Guid? LeadId { get; set; }
     public string PartitionKey { get; set; } = string.Empty;
     public string RowKey { get; set; } = string.Empty;
     public DateTimeOffset? Timestamp { get; set; }

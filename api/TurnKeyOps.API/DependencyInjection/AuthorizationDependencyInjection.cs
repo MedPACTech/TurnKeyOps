@@ -84,6 +84,20 @@ namespace MedInsights.API.DependencyInjection
         private static void RegisterTurnKeyPermissions(PermissionRegistrationBuilder builder)
         {
             builder
+                .AddPermission("finance.read", name: "Read tenant financial records")
+                .AddPermission("finance.write", name: "Manage tenant financial records")
+                .AddPermission("inventory.read", name: "Read inventory")
+                .AddPermission("inventory.write", name: "Manage inventory")
+                .AddPermission("purchasing.read", name: "Read purchasing and costs")
+                .AddPermission("purchasing.write", name: "Manage purchasing")
+                .AddPermission(TurnKeyPermissionKeys.LeadsRead, name: "Read leads")
+                .AddPermission(TurnKeyPermissionKeys.LeadsWrite, name: "Manage leads")
+                .AddPermission(TurnKeyPermissionKeys.EstimatesRead, name: "Read estimates")
+                .AddPermission(TurnKeyPermissionKeys.EstimatesWrite, name: "Manage estimates")
+                .AddPermission(TurnKeyPermissionKeys.JobsRead, name: "Read jobs")
+                .AddPermission("calendar.read", name: "Read calendar")
+                .AddPermission(TurnKeyPermissionKeys.JobsWrite, name: "Manage jobs")
+                .AddPermission(TurnKeyPermissionKeys.CalendarWrite, name: "Manage calendar")
                 .AddPermission(TurnKeyPermissionKeys.TenantRead, name: "Read tenant data")
                 .AddPermission(TurnKeyPermissionKeys.TenantManage, name: "Manage tenant settings")
                 .AddPermission(TurnKeyPermissionKeys.OperationsRead, name: "Read operations")
@@ -98,6 +112,16 @@ namespace MedInsights.API.DependencyInjection
                 .AddPermission(TurnKeyPermissionKeys.MembershipOwnerGrant, name: "Grant tenant ownership");
 
             builder.MapRole(TenantRoleCatalog.Owner,
+                "finance.read", "finance.write",
+                "inventory.read", "inventory.write", "purchasing.read", "purchasing.write",
+                TurnKeyPermissionKeys.LeadsRead,
+                TurnKeyPermissionKeys.LeadsWrite,
+                TurnKeyPermissionKeys.EstimatesRead,
+                TurnKeyPermissionKeys.EstimatesWrite,
+                TurnKeyPermissionKeys.JobsRead,
+                "calendar.read",
+                TurnKeyPermissionKeys.JobsWrite,
+                TurnKeyPermissionKeys.CalendarWrite,
                 TurnKeyPermissionKeys.TenantRead,
                 TurnKeyPermissionKeys.TenantManage,
                 TurnKeyPermissionKeys.OperationsRead,
@@ -111,6 +135,16 @@ namespace MedInsights.API.DependencyInjection
                 TurnKeyPermissionKeys.MembershipManage,
                 TurnKeyPermissionKeys.MembershipOwnerGrant);
             builder.MapRole(TenantRoleCatalog.Admin,
+                "finance.read", "finance.write",
+                "inventory.read", "inventory.write", "purchasing.read", "purchasing.write",
+                TurnKeyPermissionKeys.LeadsRead,
+                TurnKeyPermissionKeys.LeadsWrite,
+                TurnKeyPermissionKeys.EstimatesRead,
+                TurnKeyPermissionKeys.EstimatesWrite,
+                TurnKeyPermissionKeys.JobsRead,
+                "calendar.read",
+                TurnKeyPermissionKeys.JobsWrite,
+                TurnKeyPermissionKeys.CalendarWrite,
                 TurnKeyPermissionKeys.TenantRead,
                 TurnKeyPermissionKeys.TenantManage,
                 TurnKeyPermissionKeys.OperationsRead,

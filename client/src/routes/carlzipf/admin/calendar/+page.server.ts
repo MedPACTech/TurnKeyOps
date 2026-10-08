@@ -1,3 +1,5 @@
+import {loadJobCalendar} from '$lib/server/job-calendar';
+import type {RequestEvent} from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
 import { apiRequest } from '$lib/api/client';
 import { loadLocksmithSettings } from '$lib/server/locksmith-settings';
@@ -6,7 +8,7 @@ import { requestJobType, scheduleConflicts, schedulingTechnicians, validVisitWin
 import { fetchIntake, sessionToken } from '../records.server';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async (event) => {
+const loadLegacy = async (event: Parameters<PageServerLoad>[0]) => {
 	const token = sessionToken(event);
 	event.setHeaders({ 'Cache-Control': 'private, no-store' });
 	try {
@@ -59,3 +61,5 @@ export const actions: Actions = {
 		} catch (cause) { return fail(400, { error: cause instanceof Error ? cause.message : 'The assessment could not be scheduled.' }); }
 	}
 };
+
+export const load=async(event: Parameters<PageServerLoad>[0])=>({...await loadLegacy(event),...await loadJobCalendar(event)});

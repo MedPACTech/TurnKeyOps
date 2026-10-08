@@ -1,0 +1,22 @@
+import {test,expect} from '@playwright/test';import AxeBuilder from '@axe-core/playwright';
+const token=[{alg:'fixture'},{role:'owner',tenant_id:'7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b',exp:4102444800,email:'fixture@example.invalid'}].map(x=>Buffer.from(JSON.stringify(x)).toString('base64url')).join('.')+'.fixture';
+test.beforeEach(async({page,request})=>{await request.post('http://127.0.0.1:5598/reset');await page.context().addCookies([{name:'tko_auth_token',value:token,domain:'127.0.0.1',path:'/'}]);});
+for(const theme of ['light','dark'])test(`Inventory ${theme}: reserve with keyboard and accessible mobile forms`,async({page})=>{
+ await page.addInitScript(t=>localStorage.setItem('tko-admin-theme',t),theme);await page.goto('/bdr/admin/inventory');await expect(page.getByRole('heading',{name:'Inventory',exact:true})).toBeVisible();
+ await page.getByText('Availability & sourcing',{exact:true}).focus();await page.keyboard.press('Enter');await page.getByLabel('Reserve from').selectOption({label:'Warehouse · warehouse'});await expect(page.getByRole('button',{name:'Reserve stock'})).toBeEnabled();await page.getByRole('button',{name:'Reserve stock'}).click();await expect(page.getByRole('status')).toContainText('Supply updated');
+ await page.getByRole('button',{name:'Job demand',exact:true}).click();await expect(page.getByText('8 reserved · 0 allocated · 0 consumed')).toBeVisible();
+ const scan=await new AxeBuilder({page}).include('.supply').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(scan.violations).toEqual([]);expect(await page.locator('.supply').evaluate(e=>e.scrollWidth<=e.clientWidth)).toBeTruthy();await page.screenshot({path:`test-results/supply-${theme}-${test.info().project.name}.png`,fullPage:true});
+});
+test('Partial and damaged receiving stays explicit',async({page})=>{
+ await page.goto('/bdr/admin/purchasing');await page.getByRole('button',{name:'Receiving',exact:true}).click();await page.getByText('Receive items / confirm service',{exact:true}).click();await page.getByLabel('Accepted quantity').fill('3');await page.getByLabel('Damaged / rejected quantity').fill('1');await page.getByLabel('Packing slip / service reference').fill('Slip 123');await page.getByRole('button',{name:'Confirm receipt'}).click();await expect(page.getByText('Partially received',{exact:true})).toBeVisible();await expect(page.getByText('3 of 8 each received · Warehouse')).toBeVisible();
+ const scan=await new AxeBuilder({page}).include('.supply').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(scan.violations).toEqual([]);
+});
+test('Inventory read only exposes no mutation forms',async({page,request})=>{await request.post('http://127.0.0.1:5598/scenario',{data:{readOnly:true}});await page.goto('/bdr/admin/inventory');await expect(page.locator('.supply input[name=action]:not([value=bob])')).toHaveCount(0);await page.goto('/bdr/admin/purchasing');await expect(page.locator('.supply input[name=action]:not([value=bob])')).toHaveCount(0);});
+test('Offline disables receiving instead of claiming queued work',async({page,context})=>{await page.goto('/bdr/admin/purchasing');await page.getByRole('button',{name:'Receiving',exact:true}).click();await page.getByText('Receive items / confirm service',{exact:true}).click();await context.setOffline(true);await expect(page.getByRole('alert')).toContainText('No stock or purchasing changes can be submitted');await expect(page.getByRole('button',{name:'Confirm receipt'})).toBeDisabled();await context.setOffline(false);});
+
+test('Supply PWA caches only the public recovery page',async({page,context,request})=>{
+ await page.goto('/bdr/admin/inventory');await page.evaluate(async()=>{await navigator.serviceWorker.ready;if(!navigator.serviceWorker.controller)await new Promise<void>(r=>navigator.serviceWorker.addEventListener('controllerchange',()=>r(),{once:true}));});
+ const paths=await page.evaluate(async()=>(await Promise.all((await caches.keys()).map(async n=>(await(await caches.open(n)).keys()).map(r=>new URL(r.url).pathname)))).flat());expect(paths).toEqual(['/supply/offline.html']);
+ await context.setOffline(true);await page.reload();await expect(page.getByRole('heading')).toContainText('offline');await expect(page.getByText(/No inventory or purchasing changes have been submitted/)).toBeVisible();await context.setOffline(false);
+ for(const tenant of ['bdr','carlzipf','thinkpink'])expect((await request.get(`/${tenant}/admin/inventory/manifest.webmanifest`)).status()).toBe(200);
+});

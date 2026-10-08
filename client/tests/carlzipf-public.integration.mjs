@@ -25,7 +25,7 @@ try {
   if (process.env.CARLZIPF_RETRY_ONLY === '1' && !corruptFirst) continue;
   if (!firstScenario) { console.log('Waiting for the public intake rate-limit window…'); await new Promise((resolve) => setTimeout(resolve, 61_000)); }
   firstScenario = false;
-  await page.goto(`${client}/carlzipf/public`);
+  await page.goto(`${client}/carlzipf/public/residential`);
   await page.waitForLoadState('networkidle');
   let id = await page.locator('input[name=submissionId]').inputValue();
   const name = `Verification Carl Zipf ${id.slice(0, 8)}`;
@@ -79,7 +79,7 @@ try {
  }
  if (process.env.CARLZIPF_RETRY_ONLY !== '1') {
   if (!firstScenario) { console.log('Waiting for callback verification window…'); await new Promise(resolve => setTimeout(resolve, 61_000)); }
-  await page.goto(`${client}/carlzipf/public`);
+  await page.goto(`${client}/carlzipf/public/residential`);
   await page.waitForLoadState('networkidle');
   await page.getByLabel('Call me first').check();
   await expect(page.locator('[name=preferredDate]')).toHaveCount(0);
@@ -101,7 +101,7 @@ try {
   console.log(`PASS durable callback request + photo without appointment: ${id}`);
  }
  for (const [label, overrides, message] of [['invalid contact preference', { requestMode: 'book-now' }, 'assessment request or a callback'], ['invalid job type', { jobType: 'industrial' }, 'property type'], ['impossible date', { preferredDate: '2026-02-30' }, 'valid preferred date'], ['oversized details', { details: 'x'.repeat(3501) }, '3,500']]) {
-  const response = await page.request.post(`${client}/carlzipf/public?/quote`, { form: { name: 'Validation only', email: 'verification@example.invalid', phone: '614-555-0199', address: '161 East Fifth Avenue', service: 'repair', jobType: 'residential', ...overrides }, headers: { origin: client, accept: 'application/json', 'x-sveltekit-action': 'true' } });
+  const response = await page.request.post(`${client}/carlzipf/public/residential?/quote`, { form: { name: 'Validation only', email: 'verification@example.invalid', phone: '614-555-0199', address: '161 East Fifth Avenue', service: 'repair', jobType: 'residential', ...overrides }, headers: { origin: client, accept: 'application/json', 'x-sveltekit-action': 'true' } });
   const result = await response.json();
   assert.equal(result.type, 'failure'); assert.equal(result.status, 400); assert.ok(result.data.includes(message));
   console.log(`PASS ${label} rejected before submission`);

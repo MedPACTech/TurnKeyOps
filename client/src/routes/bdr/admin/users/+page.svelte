@@ -4,5 +4,5 @@
  import type { PageProps } from './$types';
  let {data,form}:PageProps=$props();
 </script>
-<PeopleManagement people={data.people} customerLinks={data.customerLinks} {form} canDelete={data.canDeleteUsers} canWrite={data.modulePermissions.includes('users.write')}/>
+<PeopleManagement canManagePortal={data.role === 'owner' && data.modulePermissions.includes('settings.write')} people={data.people} customerLinks={data.customerLinks} {form} canDelete={data.canDeleteUsers} canWrite={data.modulePermissions.includes('users.write')}/>
 <details class="mt-8"><summary class="cursor-pointer font-semibold">Invitations and existing access roles</summary><TenantUserManagement tenantName={data.tenantName} users={data.users} {form}/></details>

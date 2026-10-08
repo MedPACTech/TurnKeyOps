@@ -149,7 +149,7 @@
 	<InstallFieldApp />
 	<header class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-5">
 		<div><p class="text-xs font-bold uppercase tracking-widest text-amber-800">Carl Zipf Lock Shop · Field workspace</p><h1 class="mt-2 text-3xl font-bold">Measure. Specify. Prepare.</h1><p class="mt-2 max-w-2xl text-sm text-gray-600">Build an opening-by-opening draft for residential or commercial work.</p></div>
-		<div class="flex flex-wrap items-center gap-3"><a class="btn-secondary" href="/carlzipf/tech/invoices">Invoices & completion</a><span class={online ? 'badge-gray' : 'badge-yellow'}>{online ? 'Field workspace · device draft' : 'Offline · device draft'}</span></div>
+		<div class="flex flex-wrap items-center gap-3"><a class="btn-secondary" href="/carlzipf/admin/jobs">Today’s Jobs</a><a class="btn-secondary" href="/carlzipf/tech/invoices">Invoices & completion</a><span class={online ? 'badge-gray' : 'badge-yellow'}>{online ? 'Field workspace · device draft' : 'Offline · device draft'}</span></div>
 	</header>
 	{#if !context.capabilities.length}
 		<section class="card mt-6"><h2 class="text-lg font-semibold">Job types need to be assigned</h2><p class="mt-2 text-sm text-gray-600">Ask an administrator to enable Residential, Commercial, or both in your staff settings before capturing an opening.</p></section>

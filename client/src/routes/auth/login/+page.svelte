@@ -52,7 +52,7 @@
 			{/if}
 
 			{#if step === 'request'}
-				<form use:enhance={submitOnce} method="POST" action="?/request" class="space-y-4">
+				<form use:enhance={submitOnce} method="POST" action={`?/request&returnTo=${encodeURIComponent(returnTo)}`} class="space-y-4">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<div>
 						<label class="label" for="identifier">Work email or mobile number</label>
@@ -70,7 +70,7 @@
 					<button disabled={submitting} type="submit" class="btn-primary w-full" style:background-color={isCarlZipf ? '#213a32' : undefined}>{submitting ? 'Sending…' : 'Send code'}</button>
 				</form>
 			{:else}
-				<form use:enhance={submitOnce} method="POST" action="?/verify" class="space-y-4">
+				<form use:enhance={submitOnce} method="POST" action={`?/verify&returnTo=${encodeURIComponent(returnTo)}`} class="space-y-4">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<input type="hidden" name="identifier" value={identifier} />
 					<input type="hidden" name="challengeId" value={otpState?.challengeId ?? ''} />
@@ -95,7 +95,7 @@
 					<button disabled={submitting} type="submit" class="btn-primary w-full" style:background-color={isCarlZipf ? '#213a32' : undefined}>Verify and sign in</button>
 				</form>
 
-				<form use:enhance={submitOnce} method="POST" action="?/request" class="mt-3">
+				<form use:enhance={submitOnce} method="POST" action={`?/request&returnTo=${encodeURIComponent(returnTo)}`} class="mt-3">
 					<input type="hidden" name="returnTo" value={returnTo} />
 					<input type="hidden" name="identifier" value={identifier} />
 					<button disabled={submitting} type="submit" class="btn-secondary w-full">Resend code</button>

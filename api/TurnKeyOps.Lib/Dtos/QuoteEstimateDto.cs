@@ -2,11 +2,20 @@ namespace TurnKeyOps.Lib.Dtos;
 
 public sealed class QuoteEstimateDto
 {
+    public EstimateDocumentDto? Document { get; set; }
+    public EstimatePricingDto? Pricing { get; set; }
+    public List<EstimateEventDto> Events { get; set; } = [];
+    public List<string> AcceptedOptionIds { get; set; } = [];
+    public string? Outcome { get; set; }
+    public DateTime? ViewedAtUtc { get; set; }
+    public decimal AcceptedTotal => ApprovalSignature?.Total ?? Totals.EstimatedTotal;
     public string DocumentHash { get; set; } = string.Empty;
     public string ApprovalConsentText => QuoteApprovalConsent.Text;
     public string ApprovalConsentVersion => QuoteApprovalConsent.Version;
     public QuoteEstimateSignatureDto? ApprovalSignature { get; set; }
     public Guid Id { get; set; }
+    public Guid? LeadId { get; set; }
+    public Guid? CustomerId { get; set; }
     public Guid QuoteRequestId { get; set; }
     public int RevisionNumber { get; set; } = 1;
     public string CustomerName { get; set; } = string.Empty;
@@ -87,6 +96,11 @@ public sealed class QuoteEstimateDeliveryDto
 
 public sealed class QuoteEstimateRevisionDto
 {
+    public EstimateDocumentDto? Document { get; set; }
+    public EstimatePricingDto? Pricing { get; set; }
+    public QuoteEstimateDeliveryDto? Delivery { get; set; }
+    public DateTime? ExpiresAtUtc { get; set; }
+    public List<string> AcceptedOptionIds { get; set; } = [];
     public string DocumentHash { get; set; } = string.Empty;
     public QuoteEstimateSignatureDto? ApprovalSignature { get; set; }
     public int RevisionNumber { get; set; }
@@ -109,6 +123,8 @@ public sealed class QuoteEstimateRevisionDto
 
 public sealed class QuoteEstimateDecisionDto
 {
+    public List<string> SelectedOptionIds { get; set; } = [];
+    public bool Decline { get; set; }
     public string? SignerPrintedName { get; set; }
     public bool IntentToSign { get; set; }
     public string? ConsentVersion { get; set; }
@@ -126,6 +142,10 @@ public static class QuoteApprovalConsent
 
 public sealed class QuoteEstimateSignatureDto
 {
+    public Guid? PortalUserId { get; set; }
+    public string CustomerComment { get; set; } = "";
+    public string SignerContact { get; set; } = "";
+    public List<string> SelectedOptionIds { get; set; } = [];
     public string SignerPrintedName { get; set; } = string.Empty;
     public string ConsentText { get; set; } = string.Empty;
     public string ConsentVersion { get; set; } = string.Empty;

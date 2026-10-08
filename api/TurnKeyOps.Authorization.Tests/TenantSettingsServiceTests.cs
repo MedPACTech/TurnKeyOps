@@ -194,6 +194,17 @@ public sealed class TenantSettingsServiceTests
             Input(new { defaultCrewSize = 3, depositPercentRequired = 25, services = new[] { "" } })));
     }
 
+    [Fact] public async Task GeneralSettingsAccessCannotReadOrOverwritePrivateEstimatePolicy()
+    {
+        var fixture=new Fixture();var entity=Entity(TenantSettingKinds.Operational,"v1","{\"defaultCrewSize\":2,\"estimates\":{\"taxPercent\":8,\"catalog\":[]}}");
+        fixture.Repository.Setup(x=>x.GetAsync(It.IsAny<string>(),It.IsAny<string>(),It.IsAny<CancellationToken>(),It.IsAny<bool>())).ReturnsAsync(entity);
+        fixture.Repository.Setup(x=>x.SaveAsync(It.IsAny<TenantSettingsDocument>(),It.IsAny<CancellationToken>())).ReturnsAsync((TenantSettingsDocument e,CancellationToken ct)=>e);
+        Assert.False((await fixture.Service.GetProtectedAsync(TenantSettingKinds.Operational)).Values.TryGetProperty("estimates",out _));
+        var result=await fixture.Service.UpsertAsync(TenantSettingKinds.Operational,Input(new{defaultCrewSize=3},"v1"));
+        Assert.False(result.Values.TryGetProperty("estimates",out _));Assert.Contains("taxPercent",entity.ValuesJson);
+        await Assert.ThrowsAsync<MedInsights.Lib.ForbiddenAccessException>(()=>fixture.Service.UpsertAsync(TenantSettingKinds.Operational,Input(new{estimates=new{taxPercent=0}},"v1")));
+    }
+
     private static UpdateTenantSettingsDocumentDto Input(
         object values,
         string? expectedVersion = null,

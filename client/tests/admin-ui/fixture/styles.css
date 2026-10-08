@@ -1,0 +1,3 @@
+@import '../../../src/routes/layout.css';
+@source '../../../src';
+@source './Fixture.svelte';

@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {csv,money} from '../src/lib/finance.ts';import {hasModuleAccess} from '../src/lib/module-access.ts';
+test('bank CSV preserves quoted references and rejects broken input',()=>{assert.deepEqual(csv('external,2026-09-15,-12.50,"Supplier, Inc"\r\nnext,2026-09-16,1,"A ""quoted"" note"'),[['external','2026-09-15','-12.50','Supplier, Inc'],['next','2026-09-16','1','A "quoted" note']]);assert.throws(()=>csv('a,"unfinished'));});
+test('unknown cost stays unknown and signed currency remains explicit',()=>{assert.equal(money(null),'Unknown');assert.equal(money(-100),'-$100.00');});
+test('Jobs and platform billing do not grant Finance',()=>{assert.equal(hasModuleAccess(['jobs.read','billing.read','invoices.read'],'finance'),false);assert.equal(hasModuleAccess(['finance.read'],'finance'),true);assert.equal(hasModuleAccess(['finance.read'],'finance',true),false);});

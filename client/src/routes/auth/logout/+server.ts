@@ -1,3 +1,5 @@
+import { tenantLoginUrl } from '$lib/server/tenant-auth';
+import { pendingTokenCookie } from '$lib/server/workspaces';
 import { env } from '$env/dynamic/private';
 import {
 	authRefreshTokenCookie,
@@ -13,9 +15,8 @@ import {
 export const POST = async ({ cookies, fetch, url, request }) => {
 	const formData = await request.formData();
 	const requestedReturnTo = formData.get('returnTo');
-	const returnTo = getSafeAdminReturnTo(
-		typeof requestedReturnTo === 'string' ? requestedReturnTo : null
-	);
+	const returnTo = typeof requestedReturnTo === 'string' && requestedReturnTo
+        ? getSafeAdminReturnTo(requestedReturnTo) : '/auth/workspaces';
 	const accessToken = cookies.get(authTokenCookie);
 	const refreshToken = cookies.get(authRefreshTokenCookie);
 
@@ -51,6 +52,7 @@ export const POST = async ({ cookies, fetch, url, request }) => {
 	const secure = env.NODE_ENV === 'production' || url.protocol === 'https:';
 	const options = { path: '/', httpOnly: true, sameSite: 'strict' as const, secure };
 	cookies.delete(authTokenCookie, options);
+	cookies.delete(pendingTokenCookie, options);
 	cookies.delete(authRefreshTokenCookie, options);
 	for (const cookieName of legacyAdminCookieNames) {
 		cookies.delete(cookieName, options);
@@ -59,6 +61,6 @@ export const POST = async ({ cookies, fetch, url, request }) => {
 
 	return new Response(null, {
 		status: 303,
-		headers: { Location: `/auth/login?returnTo=${encodeURIComponent(returnTo)}` }
+		headers: { Location: tenantLoginUrl(returnTo) }
 	});
 };

@@ -18,7 +18,7 @@ for(const tenant of ['bdr','thinkpink']) {
   await page.getByLabel('Street address',{exact:true}).fill('1 Test Street');await page.getByLabel('Notes',{exact:true}).fill('Use the west entrance.');
   await page.getByLabel('Linked customer record').selectOption('22222222-2222-2222-2222-222222222222');
   await page.getByRole('button',{name:'Save contact',exact:true}).click();
-  await expect(page.getByRole('status')).toHaveText('Contact saved.');await page.reload();
+  await expect(page.getByRole('status').filter({hasText:'Contact saved.'})).toHaveText('Contact saved.');await page.reload();
   await expect(page.getByLabel('Notes',{exact:true})).toHaveValue('Use the west entrance.');
   await expect(page.getByText('No linked jobs yet.',{exact:true})).toBeVisible();
   await expect(page.getByLabel('Permission policy')).toHaveCount(0);

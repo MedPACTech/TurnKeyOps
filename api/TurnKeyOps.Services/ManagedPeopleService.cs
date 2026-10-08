@@ -149,7 +149,7 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         var partition = Partition;
         var result = new List<object>();
         await foreach (var c in customers.QueryAsync(c => c.PartitionKey == partition, ct, "PartitionKey"))
-            if (!c.IsDeleted) result.Add(new { c.Id, Name = $"{c.FirstName} {c.LastName}".Trim(), c.CompanyName });
+            if (!c.IsDeleted) result.Add(new { c.Id, Name = $"{c.FirstName} {c.LastName}".Trim(), c.CompanyName, c.CustomerType });
         return result;
     }
     public async Task<IReadOnlyList<ContactRecordDto>> ContactsAsync(CancellationToken ct)

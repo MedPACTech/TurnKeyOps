@@ -4,7 +4,10 @@ namespace TurnKeyOps.Lib.Dtos;
 
 public class JobDto
 {
+    public JobExecutionDto? Execution { get; set; }
+    public AcceptedEstimateDto? AcceptedEstimate { get; set; }
     public Guid Id { get; set; }
+    public Guid? LeadId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public TradeType TradeType { get; set; }
@@ -77,6 +80,7 @@ public sealed class JobMaterialDto
 
 public sealed class JobActivityDto
 {
+    public bool CustomerVisible { get; set; }
     public Guid Id { get; set; }
     public string Type { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
@@ -87,6 +91,9 @@ public sealed class JobActivityDto
 
 public sealed class JobWorkflowPayloadDto
 {
+    public string? PreviousVersionBlobName { get; set; }
+    public JobExecutionDto? Execution { get; set; }
+    public AcceptedEstimateDto? AcceptedEstimate { get; set; }
     public JobPlanningDto Planning { get; set; } = new();
     public List<JobActivityDto> Activity { get; set; } = [];
 }
@@ -118,4 +125,19 @@ public sealed class JobNoteInputDto
 {
     public string Note { get; set; } = string.Empty;
     public string? ExpectedVersion { get; set; }
+}
+
+public sealed class AcceptedEstimateDto
+{
+    public Guid EstimateId {get;set;}
+    public Guid LeadId {get;set;}
+    public int Revision {get;set;}
+    public string DocumentHash {get;set;}="";
+    public EstimateDocumentDto? Document {get;set;}
+    public List<EstimateOptionPriceDto> SelectedOptions {get;set;}=[];
+    public QuoteEstimateSignatureDto? Signature {get;set;}
+    public string Source {get;set;}="";
+    public string Referral {get;set;}="";
+    public Guid? SalesOwnerMembershipId {get;set;}
+    public Guid? SalesOwnerProfileId {get;set;}
 }

@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import { chromium } from '@playwright/test';
+const base = process.env.CARLZIPF_CLIENT_URL ?? 'http://127.0.0.1:5199';
+assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
+const browser = await chromium.launch({ headless: true });
+try {
+ const page = await browser.newPage();
+ await page.goto(base + '/carlzipf/public');
+ await page.locator('h1').waitFor();
+ assert.match(await page.locator('h1').innerText(), /More Than Locks/);
+ assert.equal(await page.locator('input[name=jobType]').inputValue(), 'commercial');
+ assert.equal(await page.locator('form').getAttribute('action'), '?/quote');
+ const links = await page.locator('[data-residential-link]').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')));
+ assert.deepEqual(links, Array(3).fill('/carlzipf/public/residential'));
+ const schema = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
+ assert.equal(schema['@graph'][0]['@type'], 'Locksmith');
+ assert.equal(await page.locator('h1').count(), 1);
+ const response = await page.request.post(base + '/carlzipf/public?/quote', { headers: { Origin: base, Accept: 'text/html' }, multipart: { jobType: 'commercial', service: 'electronic', requestMode: 'callback' } });
+ assert.equal(response.status(), 400);
+ await page.setViewportSize({ width: 390, height: 844 });
+ await page.getByRole('button', { name: 'Toggle navigation' }).click();
+ assert.equal(await page.getByRole('button', { name: 'Toggle navigation' }).getAttribute('aria-expanded'), 'true');
+ assert.ok(await page.getByRole('link', { name: 'Residential Services', exact: true }).first().isVisible());
+ assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+ await page.screenshot({ path: '/private/tmp/carlzipf-commercial-mobile.png', fullPage: true });
+ await page.setViewportSize({ width: 1440, height: 1000 });
+ await page.goto(base + '/carlzipf/public/residential');
+ assert.match(await page.locator('h1').innerText(), /Good doors/);
+ assert.equal(await page.locator('input[name=jobType]:checked').inputValue(), 'residential');
+ assert.equal(await page.locator('link[rel=canonical]').getAttribute('href'), base + '/carlzipf/public/residential');
+ await page.screenshot({ path: '/private/tmp/carlzipf-residential.png', fullPage: true });
+ await page.goto(base + '/carlzipf/public');
+ await page.screenshot({ path: '/private/tmp/carlzipf-commercial-desktop.png', fullPage: true });
+ const sitemap = await page.request.get(base + '/carlzipf/public/sitemap.xml');
+ assert.equal(sitemap.status(), 200); assert.match(await sitemap.text(), /\/residential/);
+ console.log('Commercial/residential SSR, metadata, schema, navigation, mobile layout, validation and sitemap passed.');
+} finally { await browser.close(); }

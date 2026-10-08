@@ -140,7 +140,7 @@
 				/>
 			</a>
 
-			<div class="nav-links">
+			<div class="nav-links"><a href="/bdr/portal/login">My project</a>
 				{#each content.navigation.links as link}
 					<a
 						href={link.href}

@@ -1,3 +1,4 @@
+import { loadPeople, peopleActions } from '$lib/server/people';
 import { fail } from '@sveltejs/kit';
 import { authTokenCookie } from '$lib/server/auth-session';
 import {
@@ -13,12 +14,14 @@ import { loadLocksmithSettings, saveLocksmithSettings } from '$lib/server/locksm
 const allowedRoles = new Set(['admin', 'staff', 'member']);
 const value = (data: FormData, key: string) => String(data.get(key) ?? '').trim();
 
-export const load = async ({ fetch, cookies }) => {
+export const load = async (event) => {
+ const { fetch, cookies } = event;
  const [users, { document, settings }] = await Promise.all([listCurrentTenantUsers(fetch, cookies.get(authTokenCookie)), loadLocksmithSettings(fetch, cookies.get(authTokenCookie))]);
- return { tenantName: 'Carl Zipf Lock Shop', users, settings, version: document.version };
+ return { ...(await loadPeople(event)), tenantName: 'Carl Zipf Lock Shop', users, settings, version: document.version };
 };
 
 export const actions = {
+ ...peopleActions,
  capabilities: async ({ request, fetch, cookies }) => {
   const data = await request.formData();
   try {

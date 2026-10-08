@@ -31,6 +31,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
         };
 
     private readonly IQuoteRequestRepository _repository;
+    private readonly LeadIntakeBridge? _leadBridge;
     private readonly IUserContext _userContext;
     private readonly IQuoteRequestTenantResolver _tenantResolver;
     private readonly ITenantSettingsRepository? _settings;
@@ -45,9 +46,11 @@ public sealed class QuoteRequestService : IQuoteRequestService
         ITenantSettingsRepository? settings = null,
         ITenantMembershipRepository? memberships = null,
         IJobRepository? jobs = null,
-        IOptions<QuoteRequestTenantOptions>? tenantOptions = null)
+        IOptions<QuoteRequestTenantOptions>? tenantOptions = null,
+        LeadIntakeBridge? leadBridge = null)
     {
         _repository = repository;
+        _leadBridge = leadBridge;
         _userContext = userContext;
         _tenantResolver = tenantResolver;
         _settings = settings;
@@ -113,6 +116,8 @@ public sealed class QuoteRequestService : IQuoteRequestService
     private async Task<QuoteRequestDto> CreateForTenantAsync(TurnKeyOps.Lib.Configurations.QuoteRequestTenantDefinition tenant, CreateQuoteRequestDto dto, bool fieldReviewed, CancellationToken ct)
     {
         ValidateCreate(dto);
+        if (dto.Attribution.Count > 20 || dto.Attribution.Any(x => x.Key.Length > 80 || x.Value.Length > 2000))
+            throw new ArgumentException("Source attribution is too large.");
 
         var id = dto.Id.GetValueOrDefault();
         if (id == Guid.Empty) id = Guid.NewGuid();
@@ -121,6 +126,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
         {
             if (!MatchesPublicRequest(existing, dto))
                 throw new ArgumentException("The request id is already in use.", nameof(dto.Id));
+            if (_leadBridge is not null) await _leadBridge.EnsureAsync(existing, ct);
             return QuoteRequestMapper.ToDto(existing);
         }
 
@@ -144,6 +150,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
         var result = new QuoteRequestDto
         {
             Id = id,
+            Attribution = dto.Attribution,
             TenantId = tenant.TenantId,
             SubmittedAtUtc = now,
             CompanyName = submittedPayload.CompanyName,
@@ -177,6 +184,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
         };
 
         var saved = await _repository.SaveAsync(QuoteRequestMapper.ToEntity(result), ct);
+        if (_leadBridge is not null) await _leadBridge.EnsureAsync(saved, ct);
         return QuoteRequestMapper.ToDto(saved);
     }
 
@@ -228,6 +236,7 @@ public sealed class QuoteRequestService : IQuoteRequestService
         var updated = new QuoteRequestDto
         {
             Id = current.Id,
+            Attribution = current.Attribution,
             TenantId = current.TenantId,
             SubmittedAtUtc = current.SubmittedAtUtc,
             CompanyName = CleanOrCurrent(dto.CompanyName, current.CompanyName),

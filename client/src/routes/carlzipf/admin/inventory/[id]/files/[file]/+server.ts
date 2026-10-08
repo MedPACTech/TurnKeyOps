@@ -1,0 +1,3 @@
+import {error} from '@sveltejs/kit';
+import {authTokenCookie} from '$lib/server/auth-session';import {getTurnKeyApiBaseUrl} from '$lib/server/turnkey-api';
+export const GET=async({fetch,cookies,params})=>{const token=cookies.get(authTokenCookie);if(!token)error(401,'Sign in');const r=await fetch(`${getTurnKeyApiBaseUrl()}/api/inventory/${params.id}/files/${params.file}`,{headers:{Authorization:`Bearer ${token}`}});if(!r.ok)error(r.status,'File unavailable');return new Response(r.body,{headers:{'Content-Type':r.headers.get('content-type')||'application/octet-stream','Content-Disposition':r.headers.get('content-disposition')||'attachment','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});};

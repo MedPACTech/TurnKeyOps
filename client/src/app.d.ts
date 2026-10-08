@@ -7,13 +7,13 @@ declare global {
             modulePermissions?: string[];
 			adminSession?: {
 				surface: 'external-admin' | 'internal-admin';
-				role: 'owner' | 'office-admin' | null;
+				role: 'owner' | 'office-admin' | 'estimator-crew-lite' | null;
 				email: string;
 				tenantId: string;
 				source: 'auth-token';
 			};
 			bdrAdminSession?: {
-				role: 'owner' | 'office-admin';
+				role: 'owner' | 'office-admin' | 'estimator-crew-lite';
 				source: 'auth-token';
 			};
 		}

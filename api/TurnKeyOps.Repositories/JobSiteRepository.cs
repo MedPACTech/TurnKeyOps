@@ -17,4 +17,5 @@ public class JobSiteRepository : AzureTablesRepositoryBase<JobSite>, IJobSiteRep
         IOptions<RepositoryOptions> repositoryOptions) : base(store, cache, tenantContext, repositoryOptions.Value)
     {
     }
+    public Task<JobSite?> GetAsync(string partitionKey,string rowKey,CancellationToken ct=default)=>GetByKeysAsync(partitionKey,rowKey,ct);
 }

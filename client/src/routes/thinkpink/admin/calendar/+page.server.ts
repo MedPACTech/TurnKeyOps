@@ -1,7 +1,9 @@
+import {loadJobCalendar} from '$lib/server/job-calendar';
+import type {RequestEvent} from '@sveltejs/kit';
 import { thinkPinkTenant } from '$lib/config/tenants';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
 
-export const load = async ({ fetch }) => {
+const loadLegacy = async ({ fetch }: RequestEvent) => {
 	const { requests, source } = await loadQuoteRequests(fetch, thinkPinkTenant.id);
 	return {
 		source,
@@ -30,3 +32,5 @@ export const load = async ({ fetch }) => {
 		)
 	};
 };
+
+export const load=async(event: RequestEvent)=>({...await loadLegacy(event),...await loadJobCalendar(event)});

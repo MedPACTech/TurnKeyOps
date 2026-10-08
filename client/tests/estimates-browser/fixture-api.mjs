@@ -1,0 +1,26 @@
+// Browser-only API contract fixture; never loaded by production application code.
+import http from 'node:http';import {randomUUID} from 'node:crypto';
+const id='11111111-2222-4333-8444-555555555555';
+let packet;let canWrite=true;
+const catalog=[{id:'service',name:'Fixture site service',kind:'service',unit:'each',tradeProfile:'general',unitPrice:100,unitCost:40,enabled:true,taxable:true,sample:false}];
+const policy={companyName:'Fixture contractor',publicOrigin:'https://example.invalid',catalog,taxPercent:8,maxDiscountPercent:10,minimumMarginPercent:null,approvalAboveTotal:null,minimumCharge:0,depositPercent:0,allowManualOverrides:false,terms:'Fixture terms',customerDiscounts:{},customerPrices:{},requiredFields:{},stageLabels:{}};
+function reset(){canWrite=true;packet={id,leadId:id,customerName:'Fixture customer',siteName:'Fixture project',serviceSummary:'Confirmed site scope',revisionNumber:1,version:randomUUID(),documentHash:'a'.repeat(64),document:{tradeProfile:'general',scope:'Confirmed site scope',terms:'Fixture terms',exclusions:'',timing:'',validDays:30,depositPercent:0,companyName:'Fixture contractor',source:'Referral',referral:'Fixture supplier',leadContext:{},inputs:{},suggestions:[{key:'scope',text:'Original field notes',provenance:'Lead intake; unconfirmed'}],options:[{id:'base',name:'Base scope',required:true,exclusiveGroup:'',items:[{catalogId:'service',quantity:1,quantityKey:'manual',confirmed:false,overridePrice:null,overrideReason:''}]}],attachments:[],narrativeSource:'Lead scope'},totals:{estimatedTotal:0},events:[{type:'created',text:'Estimate prepared from Lead.',actor:'Fixture estimator',revision:1,atUtc:new Date().toISOString()}],revisionHistory:[],approvalConsentVersion:'quote-approval-v1',approvalConsentText:'By typing my name and selecting this checkbox, I intend to electronically sign and approve this quote revision and its total.',acceptedOptionIds:[]};}reset();
+function state(){return packet.approvalSignature?'ACCEPTED':packet.delivery?'SENT':packet.pricing?'READY_TO_SEND':'DRAFT';}
+const workspace=()=>({packet,fields:[],catalog,state:state(),nextAction:packet.delivery?'Follow up with the customer':packet.pricing?'Preview and issue proposal':'Confirm scope and price the estimate',canWrite,canApprove:canWrite,canViewCosts:true});
+function price(){packet.pricing={ruleVersion:'fixture-rule-v1',discountPercent:0,taxPercent:8,options:packet.document.options.map(x=>({id:x.id,name:x.name,required:x.required,exclusiveGroup:x.exclusiveGroup,lines:x.items.map(i=>({name:'Fixture site service',kind:'service',unit:'each',quantity:i.quantity,unitPrice:100,total:i.quantity*100,cost:40,rule:'Tenant catalog'})),subtotal:100,discount:0,tax:8,total:108,cost:40,marginPercent:60})),baseTotal:108,blockers:[],approvalReasons:[]};packet.totals.estimatedTotal=108;}
+http.createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;const body=raw?JSON.parse(raw):{};const path=new URL(req.url,'http://local').pathname;const send=(data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify({success:status<400,data}));};
+ if(path==='/reset'){reset();return send(true);}if(path==='/scenario'){if(body.readOnly)canWrite=false;if(body.alternatives){packet.document.options[0].required=false;packet.document.options[0].exclusiveGroup='repair-or-replace';packet.document.options.push({...structuredClone(packet.document.options[0]),id:'replace',name:'Replace full opening'});}return send(true);}if(path==='/api/auth/session')return send({valid:true});if(path==='/api/my-module-access')return send(['estimates.read','estimates.write','leads.read','leads.write','settings.read','settings.write']);
+ if(path==='/api/estimate-workspace'&&req.method==='GET')return send({packets:[{...packet,total:packet.totals.estimatedTotal,state:state(),trade:'general',modern:true}],canWrite:true,canConfigure:true});
+ if(path==='/api/estimate-workspace/configuration')return send({policy,settings:{version:'config-v1'}});
+ if(path.startsWith('/api/public/quote-estimates/')){
+  if(req.method==='GET'){if(!packet.delivery){price();packet.delivery={status:'sent',reviewUrl:`/bdr/estimate/${id}?token=fixture`,email:'customer@example.invalid'};}return send(packet);}
+  if(path.endsWith('/approve')){packet.approvalSignature={signerPrintedName:body.signerPrintedName,signedAtUtc:new Date().toISOString(),revisionNumber:packet.revisionNumber,total:108,documentHash:packet.documentHash};packet.delivery.status='approved';return send(packet);}packet.delivery.status='changes-requested';return send(packet);
+ }
+ if(path===`/api/estimate-workspace/${id}`&&req.method==='GET')return send(workspace());
+ if(path.startsWith(`/api/estimate-workspace/${id}`)){
+  if(req.method==='PUT'){packet.document=body.document;price();}
+  if(path.endsWith('/issue'))packet.delivery={status:'sent',reviewUrl:`/bdr/estimate/${id}?token=fixture`,email:'customer@example.invalid',phone:'+15555550100'};
+  if(path.endsWith('/revision')){packet.revisionHistory.push(structuredClone(packet));packet.revisionNumber++;packet.delivery=null;packet.pricing=null;}
+  packet.version=randomUUID();return send(workspace());
+ }return send(null,404);
+}).listen(5398,'127.0.0.1');

@@ -4,7 +4,7 @@ export type Contact = {id:string;firstName:string;lastName:string;contactEmail?:
 export type ContactWork = {jobs:{id:string;name:string;status:string;address?:string}[];invoices:{id:string;number:string;status:string}[];canViewJobs:boolean;canViewInvoices:boolean};
 export const loadContacts = async (event:RequestEvent) => {
  const [contacts,customerLinks] = await Promise.all([
-  peopleRequest<Contact[]>(event,'/api/contacts'), peopleRequest<{id:string;name:string;companyName?:string}[]>(event,'/api/contacts/customers')
+  peopleRequest<Contact[]>(event,'/api/contacts'), peopleRequest<{id:string;name:string;companyName?:string;customerType?:string}[]>(event,'/api/contacts/customers')
  ]);
  const selectedId=event.url.searchParams.get('person');
  if(selectedId && !contacts.some(c=>c.id===selectedId))throw error(404,'Contact not found in this company.');

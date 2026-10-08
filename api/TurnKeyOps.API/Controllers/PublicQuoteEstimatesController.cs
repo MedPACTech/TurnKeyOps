@@ -11,6 +11,10 @@ namespace TurnKeyOps.API.Controllers;
 public sealed class PublicQuoteEstimatesController : ApiControllerBase
 {
     private readonly IQuoteEstimateService _service;
+    [HttpGet("{tenantSlug}/{quoteRequestId:guid}/files/{fileId:guid}")]
+    public async Task<IActionResult> Download(string tenantSlug,Guid quoteRequestId,Guid fileId,[FromQuery]string token,[FromServices]TurnKeyOps.Services.QuoteEstimateService packets,CancellationToken ct)
+    {var file=await packets.DownloadProposalFileAsync(tenantSlug,quoteRequestId,fileId,token,ct);return file is null?NotFound():File(file.Content,file.ContentType,file.FileName);}
+
     public PublicQuoteEstimatesController(IQuoteEstimateService service) => _service = service;
 
     [HttpGet("{tenantSlug}/{quoteRequestId:guid}")]
@@ -21,7 +25,7 @@ public sealed class PublicQuoteEstimatesController : ApiControllerBase
         CancellationToken ct)
     {
         var result = await _service.GetPublicAsync(tenantSlug, quoteRequestId, token, ct);
-        return result is null ? NotFound() : OkResponse(result);
+        return result is null ? NotFound() : OkResponse(TurnKeyOps.Services.QuoteEstimateService.CustomerProjection(result));
     }
 
     [HttpPost("{tenantSlug}/{quoteRequestId:guid}/approve")]
@@ -32,7 +36,7 @@ public sealed class PublicQuoteEstimatesController : ApiControllerBase
         CancellationToken ct)
     {
         var result = await _service.ApproveAsync(tenantSlug, quoteRequestId, decision, ct);
-        return result is null ? NotFound() : OkResponse(result);
+        return result is null ? NotFound() : OkResponse(TurnKeyOps.Services.QuoteEstimateService.CustomerProjection(result));
     }
 
     [HttpPost("{tenantSlug}/{quoteRequestId:guid}/request-changes")]
@@ -43,6 +47,6 @@ public sealed class PublicQuoteEstimatesController : ApiControllerBase
         CancellationToken ct)
     {
         var result = await _service.RequestChangesAsync(tenantSlug, quoteRequestId, decision, ct);
-        return result is null ? NotFound() : OkResponse(result);
+        return result is null ? NotFound() : OkResponse(TurnKeyOps.Services.QuoteEstimateService.CustomerProjection(result));
     }
 }

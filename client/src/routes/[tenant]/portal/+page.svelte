@@ -1,0 +1,25 @@
+<script lang="ts">
+ import {page} from '$app/state';import {onMount} from 'svelte';import {ArrowRight,CalendarDays} from 'lucide-svelte';
+ let {data,form}=$props();let site=$state('');let ready=$state(false);let view=$derived(page.url.searchParams.get('view')??'home');let base=$derived(`/${data.tenant.slug}/portal`);
+ let work=$derived(data.home.work.filter((w:any)=>!site||w.siteId===site));let attention=$derived(work.filter((w:any)=>w.status==='Ready for review'||w.status==='Finalizing your project'));
+ onMount(()=>{ready=true;if('serviceWorker' in navigator)navigator.serviceWorker.register(`${base}/service-worker.js`,{scope:base}).catch(()=>{});});
+</script>
+{#if form?.message}<p role="status" class="notice">{form.message}</p>{/if}
+<h1>{view==='home'?'Your next steps':view==='work'?'My work':view==='messages'?'Messages':view==='documents'?'Documents':'Your account'}</h1>
+{#if data.home.contexts.length>1}<label for="site">Location</label><select id="site" bind:value={site} disabled={!ready}><option value="">All locations</option>{#each data.home.contexts as id}<option value={id}>{data.home.work.find((w:any)=>w.siteId===id)?.siteName??data.home.work.find((w:any)=>w.siteId===id)?.title??'Location'}</option>{/each}</select>{/if}
+{#if view==='account'}<h2>{data.home.configuration.companyName}</h2><p class="prose">{data.home.configuration.contactInfo}</p><p class="muted">For changes to your contact information or access, contact your contractor.</p><h2>Notifications</h2><form method="POST" action="?/preferences"><label><input type="checkbox" name="channels" value="email" checked={data.home.notificationChannels?.includes('email')}/>Email me project updates</label><label><input type="checkbox" name="channels" value="sms" checked={data.home.notificationChannels?.includes('sms')}/>Text me project updates</label><p class="muted">Updates use your verified contact information. You can change these choices at any time.</p><div class="actions"><button>Save preferences</button></div></form><form method="POST" action="?/logout"><div class="actions"><button>Sign out</button></div></form>
+{:else}
+ {#if view==='home'}
+ <h2>Needs your attention</h2>{#if attention.length===0}<p class="muted">Nothing needs your attention right now.</p>{/if}
+ {#each attention as w}<a class="row flex items-center justify-between gap-3" href={`${base}/work/${w.kind}/${w.id}`}><span><strong>{w.title}</strong><br/>{w.status}</span><ArrowRight size={20}/></a>{/each}
+ <h2>Upcoming</h2>{#if data.home.appointments.filter((e:any)=>new Date(e.endUtc)>new Date()&&['scheduled','offered'].includes(e.status)).length===0}<p class="muted">No upcoming appointments have been shared.</p>{/if}
+ {#each data.home.appointments.filter((e:any)=>new Date(e.endUtc)>new Date()&&['scheduled','offered'].includes(e.status)) as e}
+ <section class="row"><h3 class="flex gap-2"><CalendarDays size={20}/>Your appointment</h3><p>{new Date(e.startUtc).toLocaleString()} – {new Date(e.endUtc).toLocaleTimeString()}</p><p>{e.response?e.response.replaceAll('-',' '):'Please confirm your appointment.'}</p>
+ <form method="POST" action="?/appointment"><input type="hidden" name="id" value={e.id}/><input type="hidden" name="version" value={e.version}/>{#if data.home.configuration.selfBookingEnabled&&e.slots?.length}<label for={`slot-${e.id}`}>Available appointment options</label><select id={`slot-${e.id}`} name="slotId"><option value="">Keep current time</option>{#each e.slots as slot}<option value={slot.id}>{new Date(slot.startUtc).toLocaleString()} – {new Date(slot.endUtc).toLocaleTimeString()}</option>{/each}</select><p class="muted">Availability is checked again when you confirm.</p>{/if}<details><summary>Need a different time?</summary><label for={`note-${e.id}`}>Preferred times or a note</label><textarea id={`note-${e.id}`} name="text" maxlength="2000"></textarea></details><div class="actions"><button class="primary" name="response" value="confirmed">Confirm appointment</button><button name="response" value="reschedule-requested">Request reschedule</button><button name="response" value="declined">Decline</button></div></form></section>{/each}
+ <h2>Active work</h2>{/if}
+ {#if view==='messages'}<p class="muted">Choose the project or request your message is about.</p>{/if}
+ {#if view==='documents'}<p class="muted">Shared documents and uploads stay with the work they relate to.</p>{/if}
+ {#each work as w}<a class="row flex items-center justify-between gap-3" href={`${base}/work/${w.kind}/${w.id}${view==='messages'?'#messages':view==='documents'?'#documents':''}`}><span><strong>{w.title||'Your request'}</strong><br/><span class="muted">{w.status}</span></span><ArrowRight size={20}/></a>{/each}
+ {#if view==='home'&&data.home.recent?.length}<h2>Recent updates</h2>{#each data.home.recent.slice(0,10) as item}<a class="row block" href={`${base}/work/${item.kind}/${item.id}`}><strong>{item.title}</strong><p>{item.text}</p><span class="muted">{new Date(item.atUtc).toLocaleDateString()}</span></a>{/each}{/if}
+ {#if work.length===0}<p class="muted">Your contractor has not shared any work in this location yet.</p>{/if}
+{/if}

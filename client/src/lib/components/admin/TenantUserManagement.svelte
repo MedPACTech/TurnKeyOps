@@ -34,20 +34,20 @@
 	</header>
 
 	{#if form?.message}
-		<p class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{form.message}</p>
+		<p class="rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm font-semibold text-[var(--positive-text)]">{form.message}</p>
 	{/if}
 	{#if form?.error}
-		<p class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{form.error}</p>
+		<p class="rounded-lg border border-[var(--critical-text)] bg-[var(--critical-soft)] px-4 py-3 text-sm font-semibold text-[var(--critical-text)]">{form.error}</p>
 	{/if}
 	{#if form?.inviteUrl}
-		<div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+		<div class="rounded-lg border border-[var(--positive-text)] bg-[var(--positive-soft)] px-4 py-3 text-sm text-[var(--positive-text)]">
 			<p class="font-semibold">Share this one-time activation link securely:</p>
 			<a href={form.inviteUrl} class="mt-1 block break-all underline">{form.inviteUrl}</a>
 		</div>
 	{/if}
 
 	<div class="grid gap-5 xl:grid-cols-[0.72fr_1.28fr]">
-		<form method="POST" action="?/invite" class="h-fit rounded-xl bg-white p-5 shadow-[var(--shell-shadow)]">
+		<form method="POST" action="?/invite" class="h-fit rounded-xl bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 			<h2 class="text-lg font-bold text-[var(--text-strong)]">Invite a user</h2>
 			<p class="mt-1 text-sm leading-6 text-[var(--text-muted)]">The invite must match the email address or mobile number the person verifies with iBeam.</p>
 			<div class="mt-5 grid gap-4">
@@ -61,17 +61,17 @@
 				</label>
 				<label class="grid gap-2 text-sm font-semibold text-[var(--text-strong)]">
 					Role
-					<select name="role" class="min-h-11 rounded-lg border border-[var(--shell-border)] bg-white px-3 font-normal outline-none focus:border-[var(--accent-border)]">
+					<select name="role" class="min-h-11 rounded-lg border border-[var(--shell-border)] bg-[var(--surface)] px-3 font-normal outline-none focus:border-[var(--accent-border)]">
 						{#each roles as role}
 							<option value={role.key}>{role.label} — {role.detail}</option>
 						{/each}
 					</select>
 				</label>
-				<button type="submit" class="min-h-11 rounded-lg bg-[var(--accent-text)] px-5 text-sm font-semibold text-white hover:opacity-90">Create invite</button>
+				<button type="submit" class="admin-primary min-h-11 rounded-lg bg-[var(--cta)] px-5 text-sm font-semibold text-white hover:opacity-90">Create invite</button>
 			</div>
 		</form>
 
-		<section class="overflow-hidden rounded-xl bg-white shadow-[var(--shell-shadow)]">
+		<section class="overflow-hidden rounded-xl bg-[var(--surface)] shadow-[var(--shell-shadow)]">
 			<div class="border-b border-[var(--shell-border)] px-5 py-4">
 				<h2 class="text-lg font-bold text-[var(--text-strong)]">Tenant access</h2>
 				<p class="mt-1 text-sm text-[var(--text-muted)]">{users.length} user record{users.length === 1 ? '' : 's'}</p>
@@ -90,7 +90,7 @@
 								<div class="flex flex-wrap gap-2">
 									<form method="POST" action="?/updateRole" class="flex gap-2">
 										<input type="hidden" name="membershipId" value={user.membershipId} />
-										<select name="role" value={user.role} class="min-h-9 rounded-md border border-[var(--shell-border)] bg-white px-2 text-xs">
+										<select name="role" value={user.role} class="min-h-9 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-2 text-xs">
 											{#each roles as role}<option value={role.key}>{role.label}</option>{/each}
 										</select>
 										<button type="submit" class="min-h-9 rounded-md border border-[var(--shell-border)] px-3 text-xs font-semibold">Save role</button>
@@ -98,7 +98,7 @@
 									<form method="POST" action={user.inviteId && !user.userId ? '?/cancelInvite' : '?/remove'}>
 										<input type="hidden" name="membershipId" value={user.membershipId} />
 										<input type="hidden" name="inviteId" value={user.inviteId ?? ''} />
-										<button type="submit" class="min-h-9 rounded-md border border-rose-200 px-3 text-xs font-semibold text-rose-700">
+										<button type="submit" class="min-h-9 rounded-md border border-[var(--critical-text)] px-3 text-xs font-semibold text-[var(--critical-text)]">
 											{user.inviteId && !user.userId ? 'Cancel invite' : 'Remove access'}
 										</button>
 									</form>

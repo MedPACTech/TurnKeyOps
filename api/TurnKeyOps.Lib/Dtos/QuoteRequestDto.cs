@@ -2,6 +2,7 @@ namespace TurnKeyOps.Lib.Dtos;
 
 public sealed class QuoteRequestDto
 {
+    public Dictionary<string, string> Attribution { get; set; } = [];
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
     public DateTime SubmittedAtUtc { get; set; }
@@ -35,6 +36,7 @@ public sealed class QuoteRequestDto
 
 public sealed class CreateQuoteRequestDto
 {
+    public Dictionary<string, string> Attribution { get; set; } = [];
     public Guid? Id { get; set; }
     public string Website { get; set; } = string.Empty;
     public string CompanyName { get; set; } = string.Empty;

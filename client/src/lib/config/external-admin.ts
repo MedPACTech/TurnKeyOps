@@ -6,7 +6,11 @@ export type ExternalAdminModule =
 	| 'dashboard'
 	| 'calendar'
 	| 'jobs'
+	| 'inventory'
+	| 'purchasing'
+	| 'finance'
 	| 'requests'
+	| 'leads'
 	| 'estimates'
 	| 'invoices'
 	| 'customers'
@@ -38,6 +42,10 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 	dashboard: { slug: 'dashboard', label: 'Dashboard', summary: 'Pipeline, schedule, workload, and cash visibility', contextLabel: 'Admin', focusLabel: 'Control room', canvasLabel: 'Operating canvas', section: 'overview' },
 	calendar: { slug: 'calendar', label: 'Calendar', summary: 'Appointments, site visits, production dates, and crew availability', contextLabel: 'Operations', focusLabel: 'Scheduling desk', canvasLabel: 'Dispatch canvas', section: 'operations' },
 	jobs: { slug: 'jobs', label: 'Jobs', summary: 'Active work, field status, holds, and completion controls', contextLabel: 'Production Ops', focusLabel: 'Run desk', canvasLabel: 'Job canvas', section: 'operations' },
+	inventory: { slug: 'inventory', label: 'Inventory', summary: 'Job materials, availability and stock movements', contextLabel: 'Supply', focusLabel: 'Material readiness', canvasLabel: 'Inventory workspace', section: 'operations' },
+	purchasing: { slug: 'purchasing', label: 'Purchasing', summary: 'Source, order and receive Job supplies', contextLabel: 'Supply', focusLabel: 'Buying desk', canvasLabel: 'Purchasing workspace', section: 'operations' },
+	finance: { slug: 'finance', label: 'Finance', summary: 'Cash, money in, money out and Job health', contextLabel: 'Finance', focusLabel: 'Financial priorities', canvasLabel: 'Finance workspace', section: 'revenue' },
+	leads: { slug: 'leads', label: 'Leads', summary: 'Opportunities, next actions and lead-to-won workflow', contextLabel: 'Leads', focusLabel: 'Next actions', canvasLabel: 'Lead workspace', section: 'customers' },
 	requests: { slug: 'requests', label: 'Requests', summary: 'Public-site intake, triage, follow-up, and conversion', contextLabel: 'Intake Ops', focusLabel: 'Request inbox', canvasLabel: 'Message canvas', section: 'customers' },
 	estimates: { slug: 'estimates', label: 'Estimates', summary: 'Estimate preparation, approval, deposits, and contract status', contextLabel: 'Sales Ops', focusLabel: 'Pipeline lane', canvasLabel: 'Estimate canvas', section: 'revenue' },
 	invoices: { slug: 'invoices', label: 'Invoices', summary: 'Billing status, payment holds, and collections', contextLabel: 'Finance Ops', focusLabel: 'Collections lane', canvasLabel: 'Billing canvas', section: 'revenue' },
@@ -47,9 +55,9 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 };
 
 const tenantModules: Record<TenantSlug, ExternalAdminModule[]> = {
-	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'users', 'settings'],
-	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'requests', 'estimates', 'invoices', 'customers', 'users', 'settings'],
-	carlzipf: ['bob', 'calendar', 'requests', 'estimates', 'invoices', 'customers', 'settings', 'users']
+	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'customers', 'users', 'settings'],
+	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'customers', 'users', 'settings'],
+	carlzipf: ['bob', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'customers', 'settings', 'users']
 };
 
 const themes: Record<TenantSlug, ExternalAdminTheme> = {
@@ -71,6 +79,10 @@ export const getExternalAdminConfig = (slug: TenantSlug): ExternalAdminConfig =>
 
 	const navigation = tenantModules[slug].map((module) => ({
 		...modules[module],
+		...(slug === 'carlzipf' && module === 'requests' ? {
+			label: 'Leads', summary: 'Potential jobs, lead details, and follow-up',
+			focusLabel: 'Leads', canvasLabel: 'Lead details'
+		} : {}),
 		href: moduleHref(tenant, module)
 	}));
 
@@ -90,9 +102,10 @@ export const normalizeExternalAdminPath = (config: ExternalAdminConfig, pathname
 		? config.homeHref
 		: pathname;
 
-export const getExternalAdminActiveNav = (config: ExternalAdminConfig, pathname: string) =>
-	config.navigation.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ??
-	config.navigation[0];
+export const getExternalAdminActiveNav = (config: ExternalAdminConfig, pathname: string) => {
+	const path = pathname.replace(/\/admin\/(?:contact|customer-records)(?=\/|$)/, '/admin/customers');
+	return config.navigation.find((item) => path === item.href || path.startsWith(`${item.href}/`)) ?? config.navigation[0];
+};
 
 export const getExternalAdminTenantForPath = (pathname: string) =>
 	(['bdr', 'thinkpink', 'carlzipf'] as TenantSlug[])

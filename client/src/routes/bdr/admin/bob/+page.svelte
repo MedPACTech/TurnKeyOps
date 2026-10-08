@@ -158,16 +158,16 @@
 	<title>Ask Bob · {data.tenant.shortName} Admin</title>
 </svelte:head>
 
-<section class="flex h-full min-h-0 overflow-hidden bg-white">
-	<aside class="hidden w-64 shrink-0 flex-col border-r border-[var(--shell-border)] bg-[#f8f9fb] lg:flex">
+<section class="flex h-full min-h-0 overflow-hidden bg-[var(--surface)]">
+	<aside class="hidden w-64 shrink-0 flex-col border-r border-[var(--shell-border)] bg-[var(--surface-subtle)] lg:flex">
 		<div class="border-b border-[var(--shell-border)] px-4 py-4">
 			<h1 class="text-lg font-semibold text-[var(--text-strong)]">Conversations</h1>
 			<a
 				href={data.bobHref}
 				class={`mt-3 flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-semibold transition ${
 					conversation.id === 'bob-home'
-						? 'bg-white text-[var(--accent-text)] shadow-sm ring-1 ring-[var(--shell-border)]'
-						: 'text-[var(--text-base)] hover:bg-white'
+						? 'bg-[var(--surface)] text-[var(--accent-text)] shadow-sm ring-1 ring-[var(--shell-border)]'
+						: 'text-[var(--text-base)] hover:bg-[var(--surface)]'
 				}`}
 			>
 				<Sparkles class="h-4 w-4 text-[var(--accent-text)]" aria-hidden="true" />
@@ -180,8 +180,8 @@
 				<div
 					class={`group mb-1 flex items-start rounded-md transition ${
 						item.id === conversation.id
-							? 'bg-white shadow-sm ring-1 ring-[var(--shell-border)]'
-							: 'hover:bg-white/70'
+							? 'bg-[var(--surface)] shadow-sm ring-1 ring-[var(--shell-border)]'
+							: 'hover:bg-[var(--surface)]'
 					}`}
 				>
 					<a
@@ -209,7 +209,7 @@
 								<input type="hidden" name="conversationId" value={item.id} />
 								<button
 									type="submit"
-									class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--muted)] hover:bg-slate-100 hover:text-[var(--text-strong)]"
+									class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text-strong)]"
 									aria-label={`Archive ${item.title}`}
 									title="Archive"
 								>
@@ -220,7 +220,7 @@
 								<input type="hidden" name="conversationId" value={item.id} />
 								<button
 									type="submit"
-									class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--muted)] hover:bg-rose-50 hover:text-rose-700"
+									class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--critical-soft)] hover:text-[var(--critical-text)]"
 									aria-label={`Delete ${item.title}`}
 									title="Delete"
 									onclick={(event) => confirmConversationDelete(event, item.title)}
@@ -235,7 +235,7 @@
 			{#if archivedConversations.length}
 				<button
 					type="button"
-					class="mt-3 flex min-h-10 w-full items-center justify-between rounded-md px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)] hover:bg-white"
+					class="mt-3 flex min-h-10 w-full items-center justify-between rounded-md px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)] hover:bg-[var(--surface)]"
 					onclick={() => (archivedOpen = !archivedOpen)}
 					aria-expanded={archivedOpen}
 				>
@@ -244,7 +244,7 @@
 				</button>
 				{#if archivedOpen}
 					{#each archivedConversations as item}
-						<div class="mb-1 flex items-center rounded-md px-3 py-2 text-[var(--text-muted)] hover:bg-white">
+						<div class="mb-1 flex items-center rounded-md px-3 py-2 text-[var(--text-muted)] hover:bg-[var(--surface)]">
 							<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-medium">{item.title}</p>
 								<p class="mt-0.5 text-xs">{formatConversationTime(item.updatedAtUtc)}</p>
@@ -264,7 +264,7 @@
 								<input type="hidden" name="conversationId" value={item.id} />
 								<button
 									type="submit"
-									class="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-rose-50 hover:text-rose-700"
+									class="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-[var(--critical-soft)] hover:text-[var(--critical-text)]"
 									aria-label={`Delete ${item.title}`}
 									title="Delete"
 									onclick={(event) => confirmConversationDelete(event, item.title)}
@@ -307,7 +307,7 @@
 						<input type="hidden" name="conversationId" value={conversation.id} />
 						<button
 							type="submit"
-							class="inline-flex h-10 w-10 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-slate-100"
+							class="inline-flex h-10 w-10 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
 							aria-label="Archive conversation"
 							title="Archive conversation"
 						>
@@ -318,7 +318,7 @@
 						<input type="hidden" name="conversationId" value={conversation.id} />
 						<button
 							type="submit"
-							class="inline-flex h-10 w-10 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-rose-50 hover:text-rose-700"
+							class="inline-flex h-10 w-10 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--critical-soft)] hover:text-[var(--critical-text)]"
 							aria-label="Delete conversation"
 							title="Delete conversation"
 							onclick={(event) => confirmConversationDelete(event, conversation.title)}
@@ -330,7 +330,7 @@
 			</div>
 		</header>
 
-			<div class="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-6 sm:px-8">
+			<div class="min-h-0 flex-1 overflow-y-auto bg-[var(--surface)] px-4 py-6 sm:px-8">
 				<div class="mx-auto max-w-3xl space-y-6">
 					{#if isEstimateBuilder}
 						<details class="border-y border-[var(--shell-border)] py-3 xl:hidden">
@@ -364,7 +364,7 @@
 					{#each conversation.messages as message}
 					<div class={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
 						{#if message.role === 'bob'}
-							<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--accent-solid)] text-white">
+							<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--accent-solid)] text-[var(--accent-solid-text)]">
 								<Bot class="h-4 w-4" aria-hidden="true" />
 							</div>
 						{/if}
@@ -372,7 +372,7 @@
 							<div
 								class={`px-4 py-3 text-sm leading-6 ${
 									message.role === 'user'
-										? 'rounded-2xl rounded-br-sm bg-[#1f2933] text-white'
+										? 'rounded-2xl rounded-br-sm bg-[var(--teal-soft)] text-[var(--teal-text)]'
 										: 'border-l-2 border-[var(--accent-border)] text-[var(--text-base)]'
 								}`}
 							>
@@ -388,7 +388,7 @@
 											type="submit"
 											name="question"
 											value={reply}
-											class="min-h-10 rounded-full border border-[var(--accent-border)] bg-white px-4 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+											class="min-h-10 rounded-full border border-[var(--accent-border)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
 										>
 											{reply}
 										</button>
@@ -414,7 +414,7 @@
 												/>
 												<button
 													type="submit"
-													class="inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--accent-border)] bg-white px-4 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+													class="inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--accent-border)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
 												>
 													<CalendarDays class="h-4 w-4" aria-hidden="true" />
 													{action.label}
@@ -423,7 +423,7 @@
 										{:else}
 											<a
 												href={action.href}
-												class="inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--shell-border-strong)] bg-white px-4 text-sm font-semibold text-[var(--text-base)] transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+												class="inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--shell-border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--text-base)] transition hover:bg-[var(--surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
 											>
 												<CalendarDays class="h-4 w-4" aria-hidden="true" />
 												{action.label}
@@ -455,7 +455,7 @@
 				{/if}
 
 				{#if actionResult?.message && actionResult.conversationId === conversation.id}
-					<p class="rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{actionResult.message}</p>
+					<p class="rounded-md bg-[var(--critical-soft)] px-3 py-2 text-sm font-medium text-[var(--critical-text)]">{actionResult.message}</p>
 				{/if}
 
 				{#if !isEstimateBuilder && !isEstimateFollowup && conversation.messages.length <= 2}
@@ -476,7 +476,7 @@
 			</div>
 		</div>
 
-		<footer class="border-t border-[var(--shell-border)] bg-white px-3 py-3 sm:px-6 sm:py-4">
+		<footer class="border-t border-[var(--shell-border)] bg-[var(--surface)] px-3 py-3 sm:px-6 sm:py-4">
 			<div
 				class={`mx-auto mb-2 flex max-w-3xl items-center gap-2 text-xs text-[var(--text-muted)] transition ${
 					isWaitingForBob ? 'min-h-5 opacity-100' : 'h-0 overflow-hidden opacity-0'
@@ -507,7 +507,7 @@
 						name="question"
 						bind:value={draft}
 						rows="1"
-						class="block min-h-12 max-h-40 w-full resize-y rounded-xl border border-[var(--shell-border-strong)] bg-white py-3 pl-4 pr-12 text-base leading-6 text-[var(--text-strong)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent-solid)] focus:ring-2 focus:ring-[var(--focus-ring)] disabled:cursor-wait disabled:bg-slate-50 sm:text-sm"
+						class="block min-h-12 max-h-40 w-full resize-y rounded-xl border border-[var(--shell-border-strong)] bg-[var(--surface)] py-3 pl-4 pr-12 text-base leading-6 text-[var(--text-strong)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent-solid)] focus:ring-2 focus:ring-[var(--focus-ring)] disabled:cursor-wait disabled:bg-[var(--surface-subtle)] sm:text-sm"
 						placeholder={isListening
 							? 'Listening…'
 							: isEstimateBuilder
@@ -521,7 +521,7 @@
 						type="button"
 						class={`absolute bottom-1.5 right-1.5 inline-flex h-9 w-9 items-center justify-center rounded-lg transition ${
 							isListening
-								? 'bg-rose-100 text-rose-700'
+								? 'bg-[var(--critical-soft)] text-[var(--critical-text)]'
 								: 'text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-text)]'
 						}`}
 						onclick={toggleDictation}
@@ -539,7 +539,7 @@
 				<button
 					type="submit"
 					disabled={isWaitingForBob || !draft.trim()}
-					class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-solid)] text-white transition hover:bg-[var(--accent-solid-hover)] disabled:cursor-not-allowed disabled:bg-slate-300"
+					class="admin-primary inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--cta)] text-white transition hover:bg-[var(--cta-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-elevated)]"
 					aria-label="Send message"
 				>
 					<Send class="h-5 w-5" aria-hidden="true" />
@@ -549,19 +549,19 @@
 	</div>
 
 	{#if isEstimateBuilder || isEstimateFollowup}
-		<aside class="hidden w-[390px] shrink-0 overflow-y-auto border-l border-[var(--shell-border)] bg-[#fbfbfc] p-5 xl:block">
+		<aside class="hidden w-[390px] shrink-0 overflow-y-auto border-l border-[var(--shell-border)] bg-[var(--surface-subtle)] p-5 xl:block">
 		{#if isEstimateBuilder}
 			<div class="flex items-start justify-between gap-4">
 				<div>
 					<p class="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-text)]">Working brief</p>
 					<h2 class="mt-1 text-xl font-semibold text-[var(--text-strong)]">Estimate details</h2>
 				</div>
-				<span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--text-muted)] ring-1 ring-[var(--shell-border)]">
+				<span class="rounded-full bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--text-muted)] ring-1 ring-[var(--shell-border)]">
 					{Math.round((estimateProgress.complete / estimateProgress.total) * 100)}%
 				</span>
 			</div>
 
-			<div class="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-200">
+			<div class="mt-5 h-1.5 overflow-hidden rounded-full bg-[var(--surface-elevated)]">
 				<div
 					class="h-full rounded-full bg-[var(--accent-solid)] transition-all"
 					style={`width: ${(estimateProgress.complete / estimateProgress.total) * 100}%`}
@@ -594,7 +594,7 @@
 			{#if estimateDraft?.createdRequestId}
 				<a
 					href={`${data.estimatesHref}?request=${encodeURIComponent(estimateDraft.createdRequestId)}`}
-					class="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-4 text-sm font-semibold text-white"
+					class="admin-primary mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--cta)] px-4 text-sm font-semibold text-white"
 				>
 					Open in Estimates
 					<ArrowRight class="h-4 w-4" aria-hidden="true" />
@@ -605,7 +605,7 @@
 					<button
 						type="submit"
 						disabled={!estimateProgress.isComplete}
-						class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--accent-solid)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-solid-hover)] disabled:cursor-not-allowed disabled:bg-slate-300"
+						class="admin-primary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--cta)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--cta-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-elevated)]"
 					>
 						<FilePlus2 class="h-4 w-4" aria-hidden="true" />
 						{data.tenant.slug === 'carlzipf' ? 'Create scope request for field pricing' : 'Create internal estimate'}
@@ -636,10 +636,10 @@
 							<span
 								class={`rounded-full px-2 py-1 text-[11px] font-semibold ${
 									item.priority === 'high'
-										? 'bg-rose-50 text-rose-700'
+										? 'bg-[var(--critical-soft)] text-[var(--critical-text)]'
 										: item.priority === 'medium'
-											? 'bg-amber-50 text-amber-700'
-											: 'bg-slate-100 text-slate-600'
+											? 'bg-[var(--warning-soft)] text-[var(--warning-text)]'
+											: 'bg-[var(--surface-elevated)] text-[var(--text-muted)]'
 								}`}
 							>
 								{item.ageDays}d

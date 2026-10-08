@@ -42,3 +42,9 @@ api/scripts/codex-cli-preflight.sh
 !/api/scripts/rollback-app-service.sh
 api/.azurite/
 client/test-results/
+
+# Separate Git repository, committed and pushed independently.
+/christian-think-pink-land-clearing/
+
+# Vite development cache
+.vite/

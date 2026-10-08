@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AdminIcon from '$lib/components/admin/AdminIcon.svelte';
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import { buildInvoiceViews } from '$lib/invoice-display';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
@@ -400,25 +401,25 @@
 			label: 'Draft invoices',
 			value: String(approvedEstimateDrafts.length),
 			detail: 'Customer-approved estimate invoices waiting on billing review',
-			icon: '🧾'
+			icon: 'invoices'
 		},
 		{
 			label: 'Receivables',
 			value: formatCurrency(receivablesValue),
 			detail: 'Outstanding balance visible from the billing desk',
-			icon: '💰'
+			icon: 'money'
 		},
 		{
 			label: 'Collected',
 			value: formatCurrency(collectedValue),
 			detail: 'Payments recorded against invoice balances',
-			icon: '💵'
+			icon: 'money'
 		},
 		{
 			label: 'Invoices',
 			value: String(totalInvoiceCount),
 			detail: pageData.loadedAtUtc ? `Live data refreshed ${formatDate(pageData.loadedAtUtc)}` : 'Live TurnKeyOps API data',
-			icon: '💸'
+			icon: 'money'
 		}
 	]);
 
@@ -474,7 +475,7 @@
 </script>
 
 {#if pageData.errors?.length}
-	<div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+	<div class="mb-4 rounded-lg border border-[var(--warning-text)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning-text)]" role="alert">
 		<p class="font-semibold">Some live billing data could not be loaded.</p>
 		<p class="mt-1">{pageData.errors.join(' ')}</p>
 		<a href="/bdr/admin/invoices" class="mt-2 inline-block font-semibold underline">Retry</a>
@@ -493,7 +494,7 @@
 		<div class="space-y-3">
 			<button
 				type="button"
-				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'ready' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'ready' ? 'border-transparent bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]' : 'border-transparent bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'}`}
 				onclick={() => (invoiceMode = 'ready')}
 			>
 				<span class="text-sm font-semibold text-[var(--text-strong)]">Draft invoices</span>
@@ -502,7 +503,7 @@
 
 			<button
 				type="button"
-				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'active' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'active' ? 'border-transparent bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]' : 'border-transparent bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'}`}
 				onclick={() => (invoiceMode = 'active')}
 			>
 				<span class="text-sm font-semibold text-[var(--text-strong)]">Active invoices</span>
@@ -511,7 +512,7 @@
 
 			<button
 				type="button"
-				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'paid' ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+				class={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition ${activeInvoiceMode === 'paid' ? 'border-transparent bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]' : 'border-transparent bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'}`}
 				onclick={() => (invoiceMode = 'paid')}
 			>
 				<span class="text-sm font-semibold text-[var(--text-strong)]">Paid invoices</span>
@@ -529,17 +530,17 @@
 				{#each approvedEstimateDrafts as estimate}
 					<button
 						type="button"
-						class={`w-full rounded-lg border px-3 py-3 text-left transition ${selectedReadyEstimate?.requestId === estimate.requestId ? 'border-transparent bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'border-transparent bg-white/80 shadow-sm hover:bg-white'}`}
+						class={`w-full rounded-lg border px-3 py-3 text-left transition ${selectedReadyEstimate?.requestId === estimate.requestId ? 'border-transparent bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]' : 'border-transparent bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'}`}
 						onclick={() => (selectedReadyEstimateId = estimate.requestId)}
 					>
 						<p class="text-sm font-semibold text-[var(--text-strong)]">{getDraftInvoiceNumber(estimate)}</p>
 						<p class="mt-1 text-xs text-[var(--text-muted)]">{estimate.siteName} / {estimate.customerName}</p>
 						<p class="mt-3 text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(parseApprovedEstimateTotal(estimate))}</p>
-						<p class="mt-1 text-xs font-semibold text-emerald-700">$0 collected</p>
+						<p class="mt-1 text-xs font-semibold text-[var(--positive-text)]">$0 collected</p>
 					</button>
 				{/each}
 				{#if !approvedEstimateDrafts.length}
-					<div class="rounded-lg bg-white/80 px-4 py-5 text-sm text-[var(--text-muted)] shadow-sm">
+					<div class="rounded-lg bg-[var(--surface)] px-4 py-5 text-sm text-[var(--text-muted)] shadow-sm">
 						No draft invoices are waiting for billing review.
 					</div>
 				{/if}
@@ -551,7 +552,7 @@
 					{@const status = getLifecycleStateLabel(invoice)}
 					<button
 						type="button"
-						class={`w-full rounded-lg border border-t-4 border-x-transparent border-b-transparent px-3 py-3 text-left transition ${getInvoiceCardStatusBorder(status)} ${selectedLifecycleInvoice?.id === invoice.id ? 'bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-white/80 shadow-sm hover:bg-white'}`}
+						class={`w-full rounded-lg border border-t-4 border-x-transparent border-b-transparent px-3 py-3 text-left transition ${getInvoiceCardStatusBorder(status)} ${selectedLifecycleInvoice?.id === invoice.id ? 'bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]' : 'bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'}`}
 						onclick={() => {
 							selectedLifecycleInvoiceId = invoice.id;
 							selectedInvoiceId = '';
@@ -560,14 +561,14 @@
 						<p class="text-sm font-semibold text-[var(--text-strong)]">{invoice.invoiceNumber}</p>
 						<p class="mt-1 text-xs text-[var(--text-muted)]">{invoice.siteName} / {invoice.customerName}</p>
 						<p class="mt-3 text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(invoice.amount)}</p>
-						<p class="mt-1 text-xs font-semibold text-emerald-700">{formatCurrency(getLifecycleAmountPaid(invoice))} collected</p>
+						<p class="mt-1 text-xs font-semibold text-[var(--positive-text)]">{formatCurrency(getLifecycleAmountPaid(invoice))} collected</p>
 					</button>
 				{/each}
 				{#each visibleInvoices as invoice}
 					{@const state = getBillingDeskState(invoice)}
 					<button
 						type="button"
-						class={`w-full rounded-lg border border-t-4 border-x-transparent border-b-transparent px-3 py-3 text-left transition ${getInvoiceCardStatusBorder(state)} ${selectedInvoice?.id === invoice.id ? 'bg-[#fff4ea] shadow-sm ring-1 ring-[rgba(249,115,22,0.32)]' : 'bg-white/80 shadow-sm hover:bg-white'}`}
+						class={`w-full rounded-lg border border-t-4 border-x-transparent border-b-transparent px-3 py-3 text-left transition ${getInvoiceCardStatusBorder(state)} ${selectedInvoice?.id === invoice.id ? 'bg-[var(--teal-soft)] shadow-sm ring-1 ring-[var(--teal-border)]' : 'bg-[var(--surface)] shadow-sm hover:bg-[var(--surface)]'}`}
 						onclick={() => {
 							selectedInvoiceId = invoice.id;
 							selectedLifecycleInvoiceId = '';
@@ -578,7 +579,7 @@
 							{invoice.customer?.displayName ?? 'Unknown project'} / {invoice.customer?.primaryContactName ?? invoice.customer?.displayName ?? 'Unknown owner'}
 						</p>
 						<p class="mt-3 text-lg font-semibold text-[var(--text-strong)]">{formatCurrency(invoice.balanceDue)}</p>
-						<p class="mt-1 text-xs font-semibold text-emerald-700">{formatCurrency(isPaid(invoice) ? invoice.balanceDue : 0)} collected</p>
+						<p class="mt-1 text-xs font-semibold text-[var(--positive-text)]">{formatCurrency(isPaid(invoice) ? invoice.balanceDue : 0)} collected</p>
 					</button>
 				{/each}
 			{/if}
@@ -590,7 +591,7 @@
 			{#if selectedReadyEstimate}
 				<div id="ready-estimate" class="space-y-4">
 					<div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex flex-wrap items-start justify-between gap-3">
 								<div>
 									<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Draft invoice</p>
@@ -603,19 +604,19 @@
 								</div>
 							</div>
 							{#if selectedReadyEstimate.delivery?.approvedAtUtc}
-								<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+								<p class="mt-4 rounded-md bg-[var(--positive-soft)] px-3 py-2 text-sm font-semibold text-[var(--positive-text)]">
 									{selectedReadyEstimate.customerName} approved via {getApprovalMethodLabel(selectedReadyEstimate)} on {formatDate(selectedReadyEstimate.delivery.approvedAtUtc)}.
 								</p>
 							{/if}
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 							<div class="flex items-start justify-between gap-3">
 								<div>
 									<p class="text-sm font-semibold text-[var(--text-strong)]">Bob</p>
 									<p class="mt-1 text-xs text-[var(--text-muted)]">Suggestions</p>
 								</div>
-								<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-lg shadow-sm">👷</span>
+								<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-lg shadow-sm"><AdminIcon name="jobs" /></span>
 							</div>
 							<div class="mt-3 grid gap-2">
 								{#each bobSuggestions as suggestion}
@@ -629,24 +630,24 @@
 					</div>
 
 					<div class="grid gap-3 md:grid-cols-3">
-						<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 							<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Approved by</p>
 							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedReadyEstimate.customerName}</p>
 							<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedReadyEstimate.delivery?.email || 'Email not captured'}</p>
 						</div>
-						<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 							<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Approval method</p>
 							<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">Customer review link</p>
 							<p class="mt-1 text-xs text-[var(--text-muted)]">{getApprovalDateLabel(selectedReadyEstimate)}</p>
 						</div>
-						<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 							<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Customer phone</p>
 							<p class="mt-2 text-sm text-[var(--text-base)]">{selectedReadyEstimate.delivery?.phone || 'Not captured'}</p>
 						</div>
 					</div>
 
 					<div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
-						<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 							<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Invoice basis</p>
 							<div class="mt-3 grid gap-2">
 								{#each selectedReadyEstimate.scopeLineItems as lineItem}
@@ -655,25 +656,25 @@
 							</div>
 						</div>
 
-						<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 							<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Invoice actions</p>
 							<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">This invoice draft was created when the customer approved the estimate. Review it, then send the billing packet or move it into scheduling handoff.</p>
 							<div class="mt-4 grid gap-2">
 								<button
 									type="button"
-									class="inline-flex w-full justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]"
+									class="admin-primary inline-flex w-full justify-center rounded-md bg-[var(--cta)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--cta-hover)]"
 									onclick={() => (reviewingReadyInvoiceId = isReviewingReadyInvoice ? '' : selectedReadyEstimate.requestId)}
 								>
 									Review invoice
 								</button>
 								<button
 									type="button"
-									class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]"
+									class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]"
 									onclick={() => (sendingReadyInvoiceId = isSendingReadyInvoice ? '' : selectedReadyEstimate.requestId)}
 								>
 									Send invoice
 								</button>
-								<a href={getPacketPreviewHref(selectedReadyEstimate)} class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+								<a href={getPacketPreviewHref(selectedReadyEstimate)} class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
 									Preview approved packet
 								</a>
 							</div>
@@ -681,7 +682,7 @@
 					</div>
 
 					{#if isSendingReadyInvoice}
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex flex-wrap items-start justify-between gap-3">
 								<div>
 									<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Send invoice</p>
@@ -718,7 +719,7 @@
 							</div>
 
 							{#if form?.invoiceActionMessage}
-								<p class="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+								<p class="mt-4 rounded-md bg-[var(--positive-soft)] px-3 py-2 text-sm font-semibold text-[var(--positive-text)]">
 									{form.invoiceActionMessage}
 								</p>
 							{/if}
@@ -728,31 +729,31 @@
 									<input type="hidden" name="invoiceId" value={selectedReadyEstimate.invoiceId ?? ''} />
 									<button
 										type="submit"
-										class="inline-flex justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]"
+										class="admin-primary inline-flex justify-center rounded-md bg-[var(--cta)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--cta-hover)]"
 									>
 										Submit invoice
 									</button>
 								</form>
-								<a href={getPacketPreviewHref(selectedReadyEstimate)} class="inline-flex justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+								<a href={getPacketPreviewHref(selectedReadyEstimate)} class="inline-flex justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
 									Open packet preview
 								</a>
 								<button
 									type="button"
-									class="inline-flex justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm"
+									class="inline-flex justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm"
 									disabled
 								>
 									Email unavailable
 								</button>
 								<button
 									type="button"
-									class="inline-flex justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm"
+									class="inline-flex justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm"
 									disabled
 								>
 									SMS unavailable
 								</button>
 								<button
 									type="button"
-									class="inline-flex justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]"
+									class="inline-flex justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]"
 									onclick={() => (sendingReadyInvoiceId = '')}
 								>
 									Close
@@ -762,7 +763,7 @@
 					{/if}
 
 					{#if isReviewingReadyInvoice}
-						<div class="rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+						<div class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 							<div class="flex flex-wrap items-start justify-between gap-3">
 								<div>
 									<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Invoice review</p>
@@ -799,7 +800,7 @@
 		{:else if selectedLifecycleInvoice}
 			<div id="invoice-record" class="space-y-4">
 				<div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
-					<div class="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+					<div class="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 						<div>
 							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
 								{selectedLifecycleInvoice.state === 'paid' ? 'Paid invoice' : 'Active invoice'}
@@ -811,18 +812,18 @@
 							<p class="text-xl font-semibold text-[var(--text-strong)]">{formatCurrency(getLifecycleBalanceDue(selectedLifecycleInvoice))}</p>
 							<p class="mt-1 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Balance due</p>
 							{#if getLifecycleAmountPaid(selectedLifecycleInvoice) > 0}
-								<p class="mt-2 text-xs font-semibold text-emerald-700">{formatCurrency(getLifecycleAmountPaid(selectedLifecycleInvoice))} collected</p>
+								<p class="mt-2 text-xs font-semibold text-[var(--positive-text)]">{formatCurrency(getLifecycleAmountPaid(selectedLifecycleInvoice))} collected</p>
 							{/if}
 						</div>
 					</div>
 
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<div class="flex items-start justify-between gap-3">
 							<div>
 								<p class="text-sm font-semibold text-[var(--text-strong)]">Bob</p>
 								<p class="mt-1 text-xs text-[var(--text-muted)]">Suggestions</p>
 							</div>
-							<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-lg shadow-sm">👷</span>
+							<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-lg shadow-sm"><AdminIcon name="jobs" /></span>
 						</div>
 						<div class="mt-3 grid gap-2">
 							{#each bobSuggestions as suggestion}
@@ -836,28 +837,28 @@
 				</div>
 
 				{#if form?.invoiceActionMessage}
-					<p class="rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+					<p class="rounded-md bg-[var(--positive-soft)] px-3 py-2 text-sm font-semibold text-[var(--positive-text)]">
 						{form.invoiceActionMessage}
 					</p>
 				{/if}
 
 				<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Approved by</p>
 						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedLifecycleInvoice.approvedBy}</p>
 						<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedLifecycleInvoice.approvedAtUtc ? formatDate(selectedLifecycleInvoice.approvedAtUtc) : 'Date not captured'}</p>
 					</div>
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Project description</p>
 						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedLifecycleInvoice.serviceSummary}</p>
 						<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedLifecycleInvoice.approvalMethod}</p>
 					</div>
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Delivery</p>
 						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedLifecycleInvoice.sentAtUtc ? `Sent ${formatDate(selectedLifecycleInvoice.sentAtUtc)}` : 'Not sent'}</p>
 						<p class="mt-1 text-xs text-[var(--text-muted)]">{selectedLifecycleInvoice.customerEmail || selectedLifecycleInvoice.customerPhone || 'No delivery contact'}</p>
 					</div>
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Payment</p>
 						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">
 							{isLifecycleInvoicePaid(selectedLifecycleInvoice)
@@ -878,7 +879,7 @@
 				</div>
 
 				{#if selectedLifecycleInvoice.payments.length}
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<div class="flex flex-wrap items-start justify-between gap-3">
 							<div>
 								<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Payment history</p>
@@ -900,7 +901,7 @@
 					</div>
 				{/if}
 
-				<div class={`rounded-lg p-4 shadow-[var(--shell-shadow)] ${selectedScheduledJob ? 'bg-emerald-50' : canScheduleLifecycleInvoice(selectedLifecycleInvoice) ? 'bg-white/90 ring-1 ring-emerald-200' : 'bg-amber-50'}`}>
+				<div class={`rounded-lg p-4 shadow-[var(--shell-shadow)] ${selectedScheduledJob ? 'bg-[var(--positive-soft)]' : canScheduleLifecycleInvoice(selectedLifecycleInvoice) ? 'bg-[var(--surface)] ring-1 ring-[var(--positive-text)]' : 'bg-[var(--warning-soft)]'}`}>
 					<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 						<div>
 							<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Schedule readiness</p>
@@ -915,12 +916,12 @@
 								{formatCurrency(getLifecycleAmountPaid(selectedLifecycleInvoice))} collected toward a {billingSettings.depositPercentRequired}% deposit gate.
 							</p>
 							{#if !canScheduleLifecycleInvoice(selectedLifecycleInvoice)}
-								<p class="mt-1 text-sm font-semibold text-amber-700">
+								<p class="mt-1 text-sm font-semibold text-[var(--warning-text)]">
 									Collect {formatCurrency(getLifecycleRemainingDepositAmount(selectedLifecycleInvoice))} more to unlock scheduling.
 								</p>
 							{/if}
 						</div>
-						<div class="rounded-lg bg-white/80 px-3 py-2 text-sm shadow-sm">
+						<div class="rounded-lg bg-[var(--surface)] px-3 py-2 text-sm shadow-sm">
 							<p class="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Required deposit</p>
 							<p class="mt-1 font-semibold text-[var(--text-strong)]">{formatCurrency(getLifecycleRequiredDepositAmount(selectedLifecycleInvoice))}</p>
 						</div>
@@ -928,15 +929,15 @@
 
 					{#if selectedScheduledJob}
 						<div class="mt-4 grid gap-3 md:grid-cols-3">
-							<div class="rounded-lg bg-white/90 p-3 shadow-sm">
+							<div class="rounded-lg bg-[var(--surface)] p-3 shadow-sm">
 								<p class="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Production date</p>
 								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatDate(selectedScheduledJob.scheduledDate)}</p>
 							</div>
-							<div class="rounded-lg bg-white/90 p-3 shadow-sm">
+							<div class="rounded-lg bg-[var(--surface)] p-3 shadow-sm">
 								<p class="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Window</p>
 								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatTimeLabel(selectedScheduledJob.windowStart)} - {formatTimeLabel(selectedScheduledJob.windowEnd)}</p>
 							</div>
-							<div class="rounded-lg bg-white/90 p-3 shadow-sm">
+							<div class="rounded-lg bg-[var(--surface)] p-3 shadow-sm">
 								<p class="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Crew</p>
 								<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{selectedScheduledJob.crew}</p>
 							</div>
@@ -944,11 +945,11 @@
 						<div class="mt-4 flex flex-wrap gap-2">
 							<a
 								href={`/bdr/admin/jobs?job=${encodeURIComponent(selectedScheduledJob.id)}`}
-								class="inline-flex rounded-md bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]"
+								class="admin-primary inline-flex rounded-md bg-[var(--cta)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--cta-hover)]"
 							>
 								Open job
 							</a>
-							<a href="/bdr/admin/calendar" class="inline-flex rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+							<a href="/bdr/admin/calendar" class="inline-flex rounded-md bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
 								Open calendar
 							</a>
 						</div>
@@ -961,7 +962,7 @@
 									type="date"
 									name="scheduledDate"
 									bind:value={scheduleDate}
-									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
 								/>
 							</label>
 							<label class="grid gap-1">
@@ -969,7 +970,7 @@
 								<input
 									name="crew"
 									bind:value={scheduleCrew}
-									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
 								/>
 							</label>
 							<label class="grid gap-1">
@@ -978,7 +979,7 @@
 									type="time"
 									name="windowStart"
 									bind:value={scheduleWindowStart}
-									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
 								/>
 							</label>
 							<label class="grid gap-1">
@@ -987,7 +988,7 @@
 									type="time"
 									name="windowEnd"
 									bind:value={scheduleWindowEnd}
-									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
 								/>
 							</label>
 							<label class="grid gap-1 lg:col-span-2">
@@ -995,11 +996,11 @@
 								<input
 									name="scheduleNotes"
 									bind:value={scheduleNotes}
-									class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+									class="h-11 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
 									placeholder="Access notes, prep constraints, production handoff..."
 								/>
 							</label>
-							<button type="submit" class="inline-flex justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)] lg:col-span-2">
+							<button type="submit" class="admin-primary inline-flex justify-center rounded-md bg-[var(--cta)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--cta-hover)] lg:col-span-2">
 								Schedule job
 							</button>
 						</form>
@@ -1007,7 +1008,7 @@
 				</div>
 
 				<div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Invoice basis</p>
 						<div class="mt-3 grid gap-2">
 							{#each selectedLifecycleInvoice.lineItems as lineItem}
@@ -1016,7 +1017,7 @@
 						</div>
 					</div>
 
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Invoice actions</p>
 						<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">Complete the billing step from this selected invoice.</p>
 						<div class="mt-4 grid gap-2">
@@ -1028,7 +1029,7 @@
 											<p class="text-sm font-semibold text-[var(--text-strong)]">Record payment</p>
 											<p class="mt-1 text-xs leading-5 text-[var(--text-muted)]">Use partial amounts for deposits, draws, or retainers.</p>
 										</div>
-										<span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--accent-text)]">
+										<span class="rounded-full bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-text)]">
 											{formatCurrency(getLifecycleBalanceDue(selectedLifecycleInvoice))} due
 										</span>
 									</div>
@@ -1039,7 +1040,7 @@
 												name="paymentAmount"
 												bind:value={paymentAmount}
 												inputmode="decimal"
-												class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+												class="h-11 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
 												placeholder="0.00"
 											/>
 										</label>
@@ -1048,7 +1049,7 @@
 											<select
 												name="paymentMethod"
 												bind:value={paymentMethod}
-												class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+												class="h-11 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
 											>
 												<option>ACH</option>
 												<option>Card</option>
@@ -1061,14 +1062,14 @@
 									<div class="mt-2 flex flex-wrap gap-2">
 										<button
 											type="button"
-											class="rounded-md bg-white px-3 py-2 text-xs font-semibold text-[var(--accent-text)] shadow-sm transition hover:bg-[var(--accent-soft)]"
+											class="rounded-md bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--accent-text)] shadow-sm transition hover:bg-[var(--accent-soft)]"
 											onclick={() => setDepositPaymentPreset(selectedLifecycleInvoice)}
 										>
 											{billingSettings.depositPercentRequired}% deposit
 										</button>
 										<button
 											type="button"
-											class="rounded-md bg-white px-3 py-2 text-xs font-semibold text-[var(--accent-text)] shadow-sm transition hover:bg-[var(--accent-soft)]"
+											class="rounded-md bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--accent-text)] shadow-sm transition hover:bg-[var(--accent-soft)]"
 											onclick={() => setPaymentPreset(getLifecycleBalanceDue(selectedLifecycleInvoice))}
 										>
 											Remaining balance
@@ -1079,35 +1080,35 @@
 										<input
 											name="paymentNote"
 											bind:value={paymentNote}
-											class="h-11 rounded-md border border-[var(--shell-border)] bg-white px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
+											class="h-11 rounded-md border border-[var(--shell-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-strong)] outline-none focus:border-[var(--accent-border)]"
 											placeholder="Deposit before production, progress draw, final payment..."
 										/>
 									</label>
-									<button type="submit" class="mt-3 inline-flex w-full justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">
+									<button type="submit" class="admin-primary mt-3 inline-flex w-full justify-center rounded-md bg-[var(--cta)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--cta-hover)]">
 										Record payment
 									</button>
 								</form>
 								<form method="POST" action="?/sendReminder">
 									<input type="hidden" name="invoiceId" value={selectedLifecycleInvoice.id} />
-									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
 										Send reminder
 									</button>
 								</form>
 							{/if}
-							<a href={`/bdr/invoice/${encodeURIComponent(selectedLifecycleInvoice.id)}?returnTo=${encodeURIComponent(invoicesReturnTo)}`} class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+							<a href={`/bdr/invoice/${encodeURIComponent(selectedLifecycleInvoice.id)}?returnTo=${encodeURIComponent(invoicesReturnTo)}`} class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
 								Open invoice
 							</a>
 							<button
 								type="button"
-								class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]"
+								class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]"
 								onclick={() => copyCustomerLink(getInvoicePacketHref(selectedLifecycleInvoice.id))}
 							>
 								{copiedCustomerLink === getInvoicePacketHref(selectedLifecycleInvoice.id) ? 'Link copied' : 'Copy customer link'}
 							</button>
-							<button type="button" class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm" disabled>
+							<button type="button" class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm" disabled>
 								Email provider not configured
 							</button>
-							<button type="button" class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm" disabled>
+							<button type="button" class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-muted)] shadow-sm" disabled>
 								SMS provider not configured
 							</button>
 						</div>
@@ -1117,7 +1118,7 @@
 		{:else if selectedInvoice}
 			<div id="invoice-record" class="space-y-4">
 				<div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
-					<div class="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-white/90 p-5 shadow-[var(--shell-shadow)]">
+					<div class="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 						<div>
 							<p class="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Invoice record</p>
 							<h4 class="mt-1 text-2xl font-semibold text-[var(--text-strong)]">{selectedInvoice.invoiceNumber}</h4>
@@ -1129,13 +1130,13 @@
 						</div>
 					</div>
 
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<div class="flex items-start justify-between gap-3">
 							<div>
 								<p class="text-sm font-semibold text-[var(--text-strong)]">Bob</p>
 								<p class="mt-1 text-xs text-[var(--text-muted)]">Suggestions</p>
 							</div>
-							<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-lg shadow-sm">👷</span>
+							<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-lg shadow-sm"><AdminIcon name="jobs" /></span>
 						</div>
 						<div class="mt-3 grid gap-2">
 							{#each bobSuggestions as suggestion}
@@ -1149,37 +1150,37 @@
 				</div>
 
 				<div class="grid gap-3 md:grid-cols-3">
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Due timing</p>
 						<p class="mt-2 text-sm text-[var(--text-base)]">{isOverdue(selectedInvoice) ? `Past due · ${formatDate(selectedInvoice.dueDateUtc)}` : `Due ${formatDate(selectedInvoice.dueDateUtc)}`}</p>
 					</div>
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Queue owner</p>
 						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedInvoice.owner}</p>
 					</div>
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Next move</p>
 						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedInvoice.nextStep}</p>
 					</div>
 				</div>
 
 				<div class="grid gap-3 md:grid-cols-3">
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Billing phase</p>
 						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedInvoice.billingPhase}</p>
 					</div>
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Payment method</p>
 						<p class="mt-2 text-sm text-[var(--text-base)]">{selectedInvoice.paymentMethod}</p>
 					</div>
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Amount due</p>
 						<p class="mt-2 text-sm font-semibold text-[var(--text-strong)]">{formatCurrency(selectedInvoice.balanceDue)}</p>
 					</div>
 				</div>
 
 				<div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Invoice detail</p>
 						<div class="mt-3 space-y-3">
 							<div class="rounded-lg bg-[var(--shell-panel-strong)] p-3 shadow-sm">
@@ -1193,17 +1194,17 @@
 						</div>
 					</div>
 
-					<div class="rounded-lg bg-white/90 p-4 shadow-[var(--shell-shadow)]">
+					<div class="rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shell-shadow)]">
 						<p class="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Invoice actions</p>
 						<p class="mt-3 text-sm leading-6 text-[var(--text-base)]">Complete the billing step from this selected invoice.</p>
 						<div class="mt-4 grid gap-2">
-							<button type="button" class="inline-flex w-full justify-center rounded-md bg-[var(--accent-solid)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-solid-hover)]">
+							<button type="button" class="admin-primary inline-flex w-full justify-center rounded-md bg-[var(--cta)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--cta-hover)]">
 								Record payment
 							</button>
-							<button type="button" class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+							<button type="button" class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
 								Send reminder
 							</button>
-							<button type="button" class="inline-flex w-full justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
+							<button type="button" class="inline-flex w-full justify-center rounded-md bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-strong)] shadow-sm transition hover:bg-[var(--shell-panel-strong)]">
 								Open invoice
 							</button>
 						</div>

@@ -15,11 +15,13 @@ using TurnKeyOps.Services.Mappers;
 
 namespace TurnKeyOps.Services;
 
-public sealed class QuoteEstimateService : IQuoteEstimateService
+public sealed partial class QuoteEstimateService : IQuoteEstimateService
 {
     internal const string ContainerName = "quote-estimate-packets";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IQuoteEstimateRepository _repository;
+    private readonly LeadWorkflowEvents? _leadEvents;
+    private readonly IEstimateAuthority? _authority;
     private readonly IQuoteRequestRepository _quoteRequests;
     private readonly IAzureBlobStorageService _blobStorage;
     private readonly IEstimateDefaultsService _defaults;
@@ -40,9 +42,13 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         ITenantSettingsRepository? settings = null,
         ITenantMembershipRepository? memberships = null,
         IJobRepository? jobs = null,
-        IOptions<QuoteRequestTenantOptions>? tenantOptions = null)
+        IOptions<QuoteRequestTenantOptions>? tenantOptions = null,
+        LeadWorkflowEvents? leadEvents = null,
+        IEstimateAuthority? authority = null)
     {
         _repository = repository;
+        _leadEvents = leadEvents;
+        _authority = authority;
         _quoteRequests = quoteRequests;
         _blobStorage = blobStorage;
         _defaults = defaults;
@@ -87,6 +93,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
 
     public async Task<QuoteEstimateDto> ApproveLocksmithPricingAsync(Guid quoteRequestId, string? expectedVersion, CancellationToken ct = default)
     {
+        if (_authority is not null) await _authority.RequireAsync(true, ct);
         if (_memberships is null || _settings is null) throw new UnauthorizedAccessException();
         var member = await _memberships.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(_userContext.TenantId), _userContext.UserId, ct);
         if (member is null || member.TenantId != _userContext.TenantId || member.UserId != _userContext.UserId || member.IsDeleted || member.DateRemoved.HasValue ||
@@ -108,19 +115,41 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
 
     public async Task<IReadOnlyCollection<QuoteEstimateDto>> ListAsync(CancellationToken ct = default)
     {
+        if (_authority is not null) await _authority.RequireAsync(false, ct);
         var entities = await _repository.ListAsync(Partition(_userContext.TenantId), ct);
         var results = new List<QuoteEstimateDto>(entities.Count);
         foreach (var entity in entities)
-            if (await CanAccessQuoteAsync(entity.QuoteRequestId, ct)) results.Add(await LoadPayloadAsync(entity, ct));
+            if (entity.PartitionKey == Partition(_userContext.TenantId) && !entity.IsDeleted && await CanAccessQuoteAsync(entity.QuoteRequestId, ct)) results.Add(await LoadPayloadAsync(entity, ct));
         return results;
     }
 
     public async Task<QuoteEstimateDto?> GetAsync(Guid quoteRequestId, CancellationToken ct = default)
     {
+        if (_authority is not null) await _authority.RequireAsync(false, ct);
         ValidateId(quoteRequestId);
         await RequireQuoteAccessAsync(quoteRequestId, ct);
         var entity = await GetEntityAsync(_userContext.TenantId, quoteRequestId, ct);
         return entity is null ? null : await LoadPayloadAsync(entity, ct);
+    }
+
+    public async Task<QuoteEstimateDto> PrepareFromLeadAsync(LeadDto lead, Guid requestId, CancellationToken ct = default)
+    {
+        if (_authority is not null) await _authority.RequireAsync(true, ct);
+        if (lead.TenantId != _userContext.TenantId || lead.IntakeRequestId != requestId || !lead.CustomerId.HasValue)
+            throw new ArgumentException("A linked tenant Lead and customer are required.");
+        var quote = await GetQuoteAsync(_userContext.TenantId, requestId, ct) ?? throw new ArgumentException("Intake not found.");
+        await RequireQuoteAccessAsync(requestId, ct);
+        var existing = await GetEntityAsync(_userContext.TenantId, requestId, ct);
+        if (existing is not null) return await LoadPayloadAsync(existing, ct);
+        var packet = new QuoteEstimateDto { Id = requestId, QuoteRequestId = requestId, LeadId = lead.Id, CustomerId = lead.CustomerId,
+            CustomerName = lead.ContactName, SiteName = lead.SiteAddress, ServiceSummary = lead.RequestedWork,
+            Status = "draft", SavedAtUtc = DateTime.UtcNow, Notes = "Prepared from Lead; scope and pricing require estimator review.",
+            CommercialSummary = "Not priced yet", ScopeLineItems = [lead.RequestedWork] };
+        packet.Document = await DocumentFromLeadAsync(lead, quote, ct);
+        AddEstimateEvent(packet, "created", "Scope and source references carried from the qualified Lead.");
+        var saved = await PersistAsync(null, packet, _userContext.TenantId, null, null, ct);
+        await UpdateQuoteAsync(quote, "estimate-drafted", "Complete estimate scope and pricing.", "Estimate prepared from Lead", ct);
+        return saved;
     }
 
     public async Task<QuoteEstimateDto> SaveDraftAsync(
@@ -128,6 +157,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         QuoteEstimateDraftInputDto input,
         CancellationToken ct = default)
     {
+        if (_authority is not null) await _authority.RequireAsync(true, ct);
         ValidateId(quoteRequestId);
         var tenantId = _userContext.TenantId;
         var quote = await GetQuoteAsync(tenantId, quoteRequestId, ct)
@@ -137,6 +167,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         var existing = await GetEntityAsync(tenantId, quoteRequestId, ct);
         ValidateVersion(existing, input.ExpectedVersion);
         var previous = existing is null ? null : await LoadPayloadAsync(existing, ct);
+        if (previous?.Document is not null) throw new ArgumentException("Use the shared estimate workspace to edit this packet.");
         if (previous?.Delivery?.Status == "approved")
             throw new ArgumentException("An approved estimate cannot be edited.");
         if (previous?.Delivery is not null)
@@ -179,6 +210,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             Id = existing?.Id ?? quoteRequestId,
             QuoteRequestId = quoteRequestId,
             RevisionNumber = previous?.RevisionNumber ?? 1,
+            LeadId = previous?.LeadId, CustomerId = previous?.CustomerId,
             CustomerName = Required(input.CustomerName, nameof(input.CustomerName), 200),
             SiteName = Required(input.SiteName, nameof(input.SiteName), 300),
             ServiceSummary = Clean(input.ServiceSummary, 2000),
@@ -209,18 +241,21 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         string? expectedVersion,
         CancellationToken ct = default)
     {
+        if (_authority is not null) await _authority.RequireAsync(true, ct);
         await RequireQuoteAccessAsync(quoteRequestId, ct);
         var tenantId = _userContext.TenantId;
         var entity = await GetEntityAsync(tenantId, quoteRequestId, ct)
             ?? throw new ArgumentException("Estimate not found.", nameof(quoteRequestId));
         ValidateVersion(entity, expectedVersion);
         var packet = await LoadPayloadAsync(entity, ct);
-        if (packet.Delivery?.Status == "approved")
-            throw new ArgumentException("An approved estimate cannot be revised.");
-        if (packet.Status != "sent" && packet.Delivery?.Status != "changes-requested")
+
+        if (packet.Status != "sent" && packet.Delivery?.Status != "changes-requested" && packet.Outcome != "DECLINED")
             throw new ArgumentException("Only a sent estimate or requested change can create a revision.");
 
+        await _repository.ArchiveAsync(entity,ct);
         packet.RevisionHistory.Add(ToRevision(packet));
+        packet.Pricing = null; packet.AcceptedOptionIds = []; packet.Outcome = null; packet.ViewedAtUtc = null;
+        AddEstimateEvent(packet, "revision", "New revision opened; previous issued document retained.");
         packet.DocumentHash = string.Empty;
         packet.ApprovalSignature = null;
         packet.RevisionNumber++;
@@ -244,13 +279,22 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         string reviewBasePath,
         CancellationToken ct = default)
     {
+        if (_authority is not null) await _authority.RequireAsync(true, ct);
         await RequireQuoteAccessAsync(quoteRequestId, ct);
         var tenantId = _userContext.TenantId;
         var entity = await GetEntityAsync(tenantId, quoteRequestId, ct)
             ?? throw new ArgumentException("Estimate not found.", nameof(quoteRequestId));
         ValidateVersion(entity, expectedVersion);
         var packet = await LoadPayloadAsync(entity, ct);
-        if (packet.LocksmithPricing is not null)
+        if (packet.Document is not null)
+        {
+            var policy = await PricingPolicyAsync(ct);
+            if (packet.Pricing is null || packet.Pricing.Blockers.Count > 0 || packet.Pricing.RuleVersion != EstimatePricingEngine.Version(policy))
+                throw new ArgumentException("Complete scope and recalculate using current pricing rules before issuing.");
+            if (packet.Pricing.ApprovalReasons.Count > 0 && packet.Pricing.ApprovedAtUtc is null)
+                throw new ArgumentException("Office pricing approval is required.");
+        }
+        else if (packet.LocksmithPricing is not null)
         {
             var current = await LocksmithQuotePricing.RequireContextAsync(_settings, _memberships, _userContext, packet.LocksmithPricing.JobType, ct, allowOfficeAdmin: true);
             if (packet.LocksmithPricing.PolicyVersion != LocksmithQuotePricing.PolicyVersion(current.Settings))
@@ -272,13 +316,14 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         if (!reviewBasePath.StartsWith("/", StringComparison.Ordinal) || reviewBasePath.Contains("//", StringComparison.Ordinal))
             throw new ArgumentException("The estimate review path is invalid.", nameof(reviewBasePath));
 
+        await FreezeAttachmentsAsync(packet, quote, ct);
         var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         var now = DateTime.UtcNow;
         packet.Status = "sent";
         packet.SavedAtUtc = now;
         packet.SentAtUtc = now;
         packet.SentBy = Actor();
-        packet.ExpiresAtUtc = now.AddDays(30);
+        packet.ExpiresAtUtc = now.AddDays(packet.Document?.ValidDays ?? 30);
         packet.Delivery = new QuoteEstimateDeliveryDto
         {
             Status = "sent",
@@ -288,6 +333,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             SentAtUtc = now
         };
 
+        AddEstimateEvent(packet, "issued", "Customer proposal revision issued; delivery is a separate recorded action.");
         var saved = await PersistAsync(entity, packet, tenantId, HashToken(token), packet.ExpiresAtUtc, ct);
         await UpdateQuoteAsync(quote, "estimate-sent", $"Estimate sent by {packet.SentBy}.", "Estimate sent to customer", ct);
         return saved;
@@ -301,8 +347,21 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
     {
         var tenantId = _tenantResolver.Resolve(tenantSlug).TenantId;
         var entity = await GetEntityAsync(tenantId, quoteRequestId, ct);
-        if (entity is null || !ValidToken(entity, accessToken)) return null;
-        return await LoadPayloadAsync(entity, ct);
+        if (entity is null || !ValidToken(entity, accessToken))
+        {
+            var archived=await _repository.GetArchiveAsync(Partition(tenantId),quoteRequestId,HashToken(accessToken),ct);
+            if(archived is null||archived.PartitionKey!=Partition(tenantId)||archived.QuoteRequestId!=quoteRequestId||!ValidToken(archived,accessToken))return null;
+            var historical=await LoadPayloadAsync(archived,ct);if(historical.ApprovalSignature is null)historical.Outcome="SUPERSEDED";return historical;
+        }
+        var packet = await LoadPayloadAsync(entity, ct);
+        if(packet.Document is not null && packet.ViewedAtUtc is null)
+        {
+            packet.ViewedAtUtc=DateTime.UtcNow;
+            packet.Events.Add(new(){Type="viewed",Text="Customer review page opened (link access, not proof of identity).",Actor="Review link",Revision=packet.RevisionNumber});
+            try { await PersistAsync(entity,packet,tenantId,entity.CustomerAccessTokenHash,entity.AccessTokenExpiresAtUtc,ct); }
+            catch(InvalidOperationException) { entity=await GetEntityAsync(tenantId,quoteRequestId,ct); if(entity is null||!ValidToken(entity,accessToken))return null;packet=await LoadPayloadAsync(entity,ct); }
+        }
+        return packet;
     }
 
     public Task<QuoteEstimateDto?> ApproveAsync(
@@ -324,14 +383,28 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         Guid quoteRequestId,
         QuoteEstimateDecisionDto decision,
         bool approve,
-        CancellationToken ct)
+        CancellationToken ct,
+        PortalActor? portal = null)
     {
         var tenantId = _tenantResolver.Resolve(tenantSlug).TenantId;
         var entity = await GetEntityAsync(tenantId, quoteRequestId, ct);
-        if (entity is null || !ValidToken(entity, decision.AccessToken)) return null;
+        if (entity is null || (portal is null && !ValidToken(entity, decision.AccessToken))) return null;
         var packet = await LoadPayloadAsync(entity, ct);
-        var target = approve ? "approved" : "changes-requested";
-        if (packet.Delivery?.Status == target) return packet;
+        if (portal is not null) {
+            if (portal.TenantId != tenantId || !PortalAccessService.Allows(portal, "estimate", quoteRequestId, packet.CustomerId, packet.Document?.SiteId)) throw new KeyNotFoundException();
+            if (packet.ExpiresAtUtc is null || packet.ExpiresAtUtc <= DateTime.UtcNow || packet.Outcome is not null) throw new ArgumentException("This proposal is no longer open for a decision.");
+        }
+        var target = approve ? "approved" : decision.Decline ? "declined" : "changes-requested";
+        if (packet.Delivery?.Status == target)
+        {
+            if (approve)
+            {
+                var source = await GetQuoteAsync(tenantId,quoteRequestId,ct);
+                if(source is not null && QuoteRequestMapper.ToDto(source).Status!="won") await UpdateQuoteAsync(source,"won","Customer signed proposal.","Customer approval synchronized",ct);
+                else if (_leadEvents is not null) await _leadEvents.FromEstimateAsync(tenantId, quoteRequestId, "won", "Customer approval synchronized", ct);
+            }
+            return packet;
+        }
         if (packet.Delivery?.Status != "sent")
             throw new ArgumentException("This estimate already has a customer decision.");
         var note = Clean(decision.ResponseNote, 2000);
@@ -339,6 +412,8 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             throw new ArgumentException("A change request note is required.", nameof(decision.ResponseNote));
 
         var now = DateTime.UtcNow;
+        if (packet.Document is not null && (decision.RevisionNumber != packet.RevisionNumber || decision.DocumentHash != packet.DocumentHash))
+            throw new ArgumentException("Review the current revision before submitting a decision.");
         if (approve)
         {
             var signerName = Required(decision.SignerPrintedName ?? string.Empty, nameof(decision.SignerPrintedName), 200);
@@ -348,18 +423,31 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             if (decision.RevisionNumber != packet.RevisionNumber || string.IsNullOrWhiteSpace(decision.DocumentHash) ||
                 !string.Equals(decision.DocumentHash, packet.DocumentHash, StringComparison.Ordinal))
                 throw new ArgumentException("The quote revision changed. Reload and review the current document before signing.");
+            var selectedTotal = packet.Totals.EstimatedTotal;
+            if (packet.Pricing is not null)
+            {
+                var selected = decision.SelectedOptionIds.Distinct().ToHashSet();
+                if (selected.Any(id => packet.Pricing.Options.All(x => x.Id != id)) || packet.Pricing.Options.Any(x => x.Required && !selected.Contains(x.Id)))
+                    throw new ArgumentException("Select the required base scope and only offered options.");
+                foreach(var group in packet.Pricing.Options.Where(x=>x.ExclusiveGroup!="").GroupBy(x=>x.ExclusiveGroup))
+                    if(group.Count(x=>selected.Contains(x.Id))!=1)throw new ArgumentException("Choose exactly one option in each alternative group.");
+                packet.AcceptedOptionIds = selected.Order().ToList();
+                selectedTotal = packet.Pricing.Options.Where(x => selected.Contains(x.Id)).Sum(x => x.Total);
+            }
             packet.ApprovalSignature = new QuoteEstimateSignatureDto
             {
-                SignerPrintedName = signerName, ConsentText = QuoteApprovalConsent.Text, ConsentVersion = QuoteApprovalConsent.Version,
-                SignedAtUtc = now, RevisionNumber = packet.RevisionNumber, Total = packet.Totals.EstimatedTotal,
+                PortalUserId = portal?.UserId, CustomerComment = note, SignerPrintedName = signerName, ConsentText = QuoteApprovalConsent.Text, ConsentVersion = QuoteApprovalConsent.Version,
+                SignedAtUtc = now, RevisionNumber = packet.RevisionNumber, Total = selectedTotal, SignerContact = packet.Delivery?.Email ?? packet.Delivery?.Phone ?? "", SelectedOptionIds = [..packet.AcceptedOptionIds],
                 DocumentHash = packet.DocumentHash, Method = "typed-name", QuoteRequestId = packet.QuoteRequestId
             };
         }
-        packet.Delivery.Status = target;
+        packet.Delivery!.Status = target;
         packet.Delivery.ResponseNote = approve ? null : note;
         packet.Delivery.ApprovedAtUtc = approve ? now : null;
         packet.Delivery.ChangesRequestedAtUtc = approve ? null : now;
         if (!approve) packet.Status = "ready-to-send";
+        if (decision.Decline && !approve) packet.Outcome = "DECLINED";
+        AddEstimateEvent(packet, approve ? "accepted" : decision.Decline ? "declined" : "revision-requested", approve ? "Customer signed this revision and option selection." : note);
         packet.SavedAtUtc = now;
         var quote = await GetQuoteAsync(tenantId, quoteRequestId, ct)
             ?? throw new ArgumentException("The source quote request was not found.", nameof(quoteRequestId));
@@ -415,11 +503,6 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         {
             var saved = await _repository.SaveAsync(entity, ct);
             packet.Version = VersionOf(saved);
-            if (existing is not null && !string.IsNullOrWhiteSpace(existing.PayloadBlobName))
-            {
-                try { await _blobStorage.DeleteIfExistsAsync(ContainerName, existing.PayloadBlobName, ct); }
-                catch { /* Orphan reconciliation is safer than rolling back committed metadata. */ }
-            }
             return packet;
         }
         catch
@@ -470,6 +553,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         updated.DateCreated = quoteEntity.DateCreated;
         updated.ETag = quoteEntity.ETag;
         await _quoteRequests.SaveAsync(updated, ct);
+        if (_leadEvents is not null && label != "Estimate prepared from Lead") await _leadEvents.FromEstimateAsync(quoteEntity.TenantId, quoteEntity.Id, status, label, ct);
     }
 
     private static (QuoteEstimateTotalsDto Totals, List<string> Scope, List<string> Assumptions) Calculate(
@@ -539,6 +623,7 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
 
     private static QuoteEstimateRevisionDto ToRevision(QuoteEstimateDto packet) => new()
     {
+        Document = packet.Document, Pricing = packet.Pricing, Delivery = packet.Delivery, ExpiresAtUtc = packet.ExpiresAtUtc, AcceptedOptionIds = [..packet.AcceptedOptionIds],
         DocumentHash = packet.DocumentHash, ApprovalSignature = packet.ApprovalSignature,
         RevisionNumber = packet.RevisionNumber, CustomerName = packet.CustomerName, SiteName = packet.SiteName,
         ServiceSummary = packet.ServiceSummary, VisitFindings = packet.VisitFindings,
@@ -565,7 +650,10 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
             packet.CommercialSummary, packet.Locations, packet.Totals, packet.LocksmithPricing,
             packet.SentAtUtc, packet.ExpiresAtUtc
         };
-        return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(document, JsonOptions))).ToLowerInvariant();
+        // Preserve legacy hash semantics exactly for historical signatures.
+        var bytes = packet.Document is null ? JsonSerializer.SerializeToUtf8Bytes(document, JsonOptions)
+            : JsonSerializer.SerializeToUtf8Bytes(new { Legacy = document, packet.Document, packet.Pricing, packet.LeadId, packet.CustomerId }, JsonOptions);
+        return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
     }
 
     private static string VersionOf(QuoteEstimate entity) => !string.IsNullOrWhiteSpace(entity.ETag.ToString())
@@ -584,8 +672,8 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
         if (string.Equals(current, target, StringComparison.OrdinalIgnoreCase)) return;
         var allowed = target switch
         {
-            "estimate-drafted" => current is "qualified" or "contacted" or "inspection-scheduled" or "estimate-sent",
-            "estimate-sent" => current is "estimate-drafted",
+            "estimate-drafted" => current is "qualified" or "contacted" or "inspection-scheduled" or "estimate-sent" or "won",
+            "estimate-sent" => current is "estimate-drafted" or "won",
             "won" => current is "estimate-sent",
             _ => false
         };
@@ -602,8 +690,11 @@ public sealed class QuoteEstimateService : IQuoteEstimateService
     }
 
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
-    private Task<QuoteEstimate?> GetEntityAsync(Guid tenantId, Guid requestId, CancellationToken ct) =>
-        _repository.GetAsync(Partition(tenantId), Row(requestId), ct);
+    private async Task<QuoteEstimate?> GetEntityAsync(Guid tenantId, Guid requestId, CancellationToken ct)
+    {
+        var value = await _repository.GetAsync(Partition(tenantId), Row(requestId), ct);
+        return value is not null && !value.IsDeleted && value.PartitionKey == Partition(tenantId) && value.QuoteRequestId == requestId ? value : null;
+    }
     private async Task<QuoteRequest?> GetQuoteAsync(Guid tenantId, Guid requestId, CancellationToken ct) =>
         await _quoteRequests.GetAsync(Partition(tenantId), Row(requestId), ct) is { IsDeleted: false } quote ? quote : null;
     private string Actor() => string.Join(' ', new[] { _userContext.FirstName, _userContext.LastName }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim() is { Length: > 0 } actor ? actor : "Tenant Admin";

@@ -17,6 +17,12 @@ namespace MedInsights.Authorization.Tests;
 
 public sealed class IdentityOtpAuthorizationTests
 {
+    [Fact]
+    public void InstalledOtpContractAcceptsTenantContext()
+    {
+        Assert.NotNull(typeof(StartOtpRequest).GetProperty("TenantId"));
+    }
+
     [Theory]
     [InlineData("/api/auth/startotp", true, HttpStatusCode.NoContent)]
     [InlineData("/api/auth/completeotp", true, HttpStatusCode.NoContent)]

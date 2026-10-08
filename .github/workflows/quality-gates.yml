@@ -209,6 +209,7 @@ jobs:
         working-directory: client
         run: |
           npm run test:e2e
+          npm run test:admin-ui
           npx playwright test --config playwright.people.config.ts
 
       - name: Publish Playwright evidence
