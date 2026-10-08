@@ -80,6 +80,7 @@ public sealed class JobMaterialDto
 
 public sealed class JobActivityDto
 {
+    public bool CustomerVisible { get; set; }
     public Guid Id { get; set; }
     public string Type { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;

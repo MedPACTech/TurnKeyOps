@@ -24,6 +24,7 @@ public sealed class JobExecutionDto
     public List<JobChangeDto> Changes { get; set; } = [];
     public List<JobEvidenceDto> Evidence { get; set; } = [];
     public List<JobAcceptanceDto> Acceptances { get; set; } = [];
+    public DateTime? WarrantyEndsAtUtc { get; set; }
     public string? BillingReference { get; set; }
     public int CompletionRevision { get; set; } = 1;
 }
@@ -61,6 +62,9 @@ public sealed class JobRequirementDto
 }
 public sealed class JobIssueDto
 {
+    public Guid? PortalUserId { get; set; }
+    public Guid? OriginalJobId { get; set; }
+    public string? ServiceKind { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Type { get; set; } = "other";
     public string Severity { get; set; } = "blocker";
@@ -73,6 +77,10 @@ public sealed class JobIssueDto
 }
 public sealed class JobChangeDto
 {
+    public bool CustomerVisible { get; set; }
+    public string? CustomerDecisionHash { get; set; }
+    public Guid? PortalUserId { get; set; }
+    public DateTime? CustomerDecidedAtUtc { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Origin { get; set; } = "field";
     public string RequestedBy { get; set; } = "";
@@ -91,6 +99,7 @@ public sealed class JobChangeDto
 }
 public sealed class JobEvidenceDto
 {
+    public bool CustomerVisible { get; set; }
     public string Purpose { get; set; } = "field";
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";

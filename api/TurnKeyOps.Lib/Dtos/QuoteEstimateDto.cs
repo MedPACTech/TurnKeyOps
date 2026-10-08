@@ -142,6 +142,8 @@ public static class QuoteApprovalConsent
 
 public sealed class QuoteEstimateSignatureDto
 {
+    public Guid? PortalUserId { get; set; }
+    public string CustomerComment { get; set; } = "";
     public string SignerContact { get; set; } = "";
     public List<string> SelectedOptionIds { get; set; } = [];
     public string SignerPrintedName { get; set; } = string.Empty;

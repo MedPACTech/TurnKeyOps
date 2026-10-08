@@ -1,29 +1,33 @@
 <script lang="ts">
+ import ContactPortalAccess from '$lib/components/portal/ContactPortalAccess.svelte';
  import { enhance } from '$app/forms';
  import { page } from '$app/state';
  import type { Contact, ContactWork } from '$lib/server/contacts';
- let {contacts,customerLinks,selectedId,work,contactSaved=false,canWrite=false,canManagePeople=false,form}: {
-  contacts:Contact[];customerLinks:{id:string;name:string;companyName?:string}[];selectedId:string|null;work:ContactWork|null;
-  contactSaved?:boolean;canWrite?:boolean;canManagePeople?:boolean;form?:{error?:string}|null
+ let {contacts,customerLinks,selectedId,work,contactSaved=false,canWrite=false,canManagePeople=false,canManagePortal=false,form}: {
+  contacts:Contact[];customerLinks:{id:string;name:string;companyName?:string;customerType?:string}[];selectedId:string|null;work:ContactWork|null;
+  contactSaved?:boolean;canWrite?:boolean;canManagePeople?:boolean;canManagePortal?:boolean;form?:{error?:string}|null
  }=$props();
- let query=$state('');let filter=$state('all');let pending=$state(false);
+ let query=$state('');let filter=$state('all');let customerTypeFilter=$state('all');let pending=$state(false);
  const creating=$derived(page.url.searchParams.has('new'));
  const selected=$derived(contacts.find(c=>c.id===selectedId));
  const base=$derived(page.url.pathname.replace(/\/(contact|customers)$/,''));
- const visible=$derived(contacts.filter(c=>(filter==='all'||c.profileTypes.includes(filter))&&`${c.firstName} ${c.lastName} ${c.companyName??''} ${c.contactEmail??''} ${c.contactPhone??''}`.toLowerCase().includes(query.toLowerCase())));
+ const customerType=(c:Contact)=>customerLinks.find(v=>v.id===c.customerId)?.customerType;
+ const customerRecords=$derived(`${base}/${page.url.pathname.split('/')[1]==='carlzipf'?'customers':'customer-records'}`);
+ const visible=$derived(contacts.filter(c=>(customerTypeFilter==='all'||(c.profileTypes.includes('customer')&&(customerType(c)??'unclassified')===customerTypeFilter))&&(filter==='all'||c.profileTypes.includes(filter))&&`${c.firstName} ${c.lastName} ${c.companyName??''} ${c.contactEmail??''} ${c.contactPhone??''}`.toLowerCase().includes(query.toLowerCase())));
  const name=(c:Contact)=>`${c.firstName} ${c.lastName}`.trim();
  const submit=()=>{pending=true;return async({update}:{update:()=>Promise<void>})=>{try{await update();}finally{pending=false;}};};
 </script>
 <svelte:head><title>Contacts</title></svelte:head>
 <section class="contacts">
- <header><div><h1>Contacts</h1><p>Customer and vendor relationships, addresses, notes, and linked work.</p></div>{#if canWrite}<a class="primary btn-primary" href="?new=1">Add contact</a>{/if}</header>
+ <header><div><h1>Contacts</h1><p>Customer and vendor relationships, addresses, notes, and linked work.</p></div><a class="access-link" href={customerRecords}>Customer accounts</a>{#if canWrite}<a class="primary btn-primary" href="?new=1">Add contact</a>{/if}</header>
  {#if form?.error}<p class="notice error" role="alert">{form.error}</p>{:else if contactSaved}<p class="notice" role="status">Contact saved.</p>{/if}
- <div class="toolbar"><label>Search contacts<input type="search" bind:value={query} placeholder="Name, company, email, or phone"/></label><label>Relationship<select bind:value={filter}><option value="all">All contacts</option><option value="customer">Customers</option><option value="vendor">Vendors</option></select></label></div>
+ <div class="toolbar"><label>Search contacts<input type="search" bind:value={query} placeholder="Name, company, email, or phone"/></label><label>Relationship<select bind:value={filter}><option value="all">All contacts</option><option value="customer">Customers</option><option value="vendor">Vendors</option></select></label><label>Customer type<select bind:value={customerTypeFilter}><option value="all">All types</option><option value="residential">Residential</option><option value="commercial">Commercial</option><option value="unclassified">Needs classification</option></select></label></div>
  <div class="workspace"><nav class="directory" aria-label="Contact directory">
- {#each visible as contact(contact.id)}<a class:selected={contact.id===selectedId&&!creating} href={`?person=${contact.id}`}><strong>{name(contact)}</strong><span>{contact.companyName||contact.contactEmail||contact.contactPhone||'No contact details'}</span><span class="types">{contact.profileTypes.join(' · ')}</span></a>{:else}<p class="empty">No contacts match this view.</p>{/each}
+ {#each visible as contact(contact.id)}<a class:selected={contact.id===selectedId&&!creating} href={`?person=${contact.id}`}><strong>{name(contact)}</strong><span>{contact.companyName||contact.contactEmail||contact.contactPhone||'No contact details'}</span><span class="types">{contact.profileTypes.join(' · ')}{customerType(contact)?` · ${customerType(contact)}`:''}</span></a>{:else}<p class="empty">No contacts match this view.</p>{/each}
  </nav><section class="editor">
  {#if creating||selected}{#key creating?'new':selected?.id}
  <h2>{creating?'Add contact':name(selected!)}</h2>
+ {#if !creating && selected?.customerId}<p class="help">Customer type: {customerType(selected)??'Needs classification'} · <a href={`${customerRecords}?customer=${selected.customerId}`}>Edit customer account</a></p>{/if}
  <form method="POST" action="?/saveContact" use:enhance={submit}>
  <input type="hidden" name="id" value={creating?'':selected?.id??''}/><input type="hidden" name="version" value={creating?'':selected?.version??''}/>
  <fieldset disabled={!canWrite||pending}>
@@ -35,7 +39,7 @@
  <h3>Address</h3><label>Street address<input name="address" maxlength="200" value={creating?'':selected?.address??''}/></label>
  <div class="fields"><label>City<input name="city" maxlength="200" value={creating?'':selected?.city??''}/></label><label>State / region<input name="state" maxlength="200" value={creating?'':selected?.state??''}/></label><label>Postal code<input name="postalCode" maxlength="200" value={creating?'':selected?.postalCode??''}/></label></div>
  <label>Notes<textarea name="notes" rows="5" maxlength="4000" value={creating?'':selected?.notes??''}></textarea></label>
- <label>Linked customer record<select name="customerId" value={creating?'':selected?.customerId??''}><option value="">No linked customer</option>{#each customerLinks as customer}<option value={customer.id}>{customer.name||customer.companyName||'Unnamed customer'}</option>{/each}</select></label>
+ <label>Linked customer record<select name="customerId" value={creating?(page.url.searchParams.get('customer')??''):selected?.customerId??''}><option value="">No linked customer</option>{#each customerLinks as customer}<option value={customer.id}>{customer.name||customer.companyName||'Unnamed customer'}</option>{/each}</select></label>
  <p class="help">Link an existing customer record to see their jobs and invoices here.</p>
  {#if canWrite}<button class="primary btn-primary" disabled={pending}>{pending?'Saving…':'Save contact'}</button>{/if}
  </fieldset></form>
@@ -47,6 +51,7 @@
  <h4>Invoices</h4>{#if !work.canViewInvoices}<p>Your role does not include invoice access.</p>{:else}<ul>{#each work.invoices as invoice}<li>{invoice.number||'Unnumbered invoice'} <span>{invoice.status}</span></li>{:else}<li>No linked invoices yet.</li>{/each}</ul>{#if work.invoices.length}<a href={`${base}/invoices`}>Open invoices</a>{/if}{/if}
  {/if}
  </section>
+ {#if canManagePortal && selected.profileTypes.includes('customer')}<ContactPortalAccess personId={selected.id} customerId={selected.customerId}/>{/if}
  {#if canManagePeople}<a class="access-link" href={`${base}/users?person=${selected.id}`}>Manage this person’s app access</a>{/if}
  {/if}
  {/key}{:else}<div class="empty"><h2>Select a contact</h2><p>Choose a customer or vendor to view their details and linked work.</p></div>{/if}

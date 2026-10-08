@@ -24,6 +24,7 @@ public sealed class InvoiceService : IInvoiceService
     private readonly IQuoteEstimateService _quoteEstimates;
     private readonly IInvoiceWorkflowPayloadStore _payloadStore;
     private readonly IUserContext _userContext;
+    private readonly IFinanceStore? _finance;
 
     public InvoiceService(
         IInvoiceRepository repo,
@@ -32,7 +33,8 @@ public sealed class InvoiceService : IInvoiceService
         IEstimateLineItemRepository estimateLineItemRepo,
         IQuoteEstimateService quoteEstimates,
         IInvoiceWorkflowPayloadStore payloadStore,
-        IUserContext userContext)
+        IUserContext userContext,
+        IFinanceStore? finance = null)
     {
         _repo = repo;
         _lineItemRepo = lineItemRepo;
@@ -41,6 +43,7 @@ public sealed class InvoiceService : IInvoiceService
         _quoteEstimates = quoteEstimates;
         _payloadStore = payloadStore;
         _userContext = userContext;
+        _finance = finance;
     }
 
     private string Partition(Guid tenantId) => RepositoryKeyHelper.ToTenantPartitionKey(tenantId);
@@ -328,7 +331,8 @@ public sealed class InvoiceService : IInvoiceService
         var tenantId = _userContext.TenantId;
         var (entity, payload) = await LoadForMutationAsync(tenantId, id, input.ExpectedVersion, ct);
         ApplyFinancialState(entity, payload);
-        if (entity.Status is InvoiceStatus.Draft or InvoiceStatus.Paid or InvoiceStatus.Void || entity.BalanceDue <= MoneyTolerance)
+        var current = await HydrateAsync(entity, tenantId, ct);
+        if (current.Status is InvoiceStatus.Draft or InvoiceStatus.Paid or InvoiceStatus.Void || current.BalanceDue <= MoneyTolerance)
             throw new ArgumentException("This invoice is not eligible for a reminder.");
 
         var channel = input.Channel.Trim().ToLowerInvariant();
@@ -358,9 +362,7 @@ public sealed class InvoiceService : IInvoiceService
     {
         var entity = await GetEntityAsync(_userContext.TenantId, id, ct)
             ?? throw new ArgumentException("Invoice not found.", nameof(id));
-        var payload = await _payloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
-        ApplyFinancialState(entity, payload);
-        return CalculateJobRelease(entity, payload);
+        return (await HydrateAsync(entity, _userContext.TenantId, ct)).JobRelease;
     }
 
     public async Task DeleteAsync(Guid id)
@@ -436,8 +438,23 @@ public sealed class InvoiceService : IInvoiceService
         var linePartition = RepositoryKeyHelper.ToTenantInvoicePartitionKey(tenantId, entity.Id);
         var lineItems = await _lineItemRepo.ListAsync(linePartition, ct);
         var payload = await _payloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
+        decimal credits = 0;
+        if (_finance is not null)
+        {
+            var financial = await _finance.ReadAsync(tenantId, ct);
+            // Read-only union of authoritative events. Imported invoice events already live in this payload.
+            payload = JobConfigurationService.Clone(payload);
+            foreach (var settlement in financial.Settlements.Where(s => s.Kind is "payment" or "refund" or "credit" && s.Origin!="invoice-event"))
+            foreach (var allocation in settlement.Allocations.Where(a => a.OpenItemId == entity.Id))
+            {
+                if(settlement.Kind == "credit"){credits += allocation.Amount;continue;}
+                payload.Payments.Add(new InvoicePaymentDto { Id=settlement.Id,FinanceSettlementId=settlement.Id,Kind=settlement.Kind,Status="succeeded",Amount=allocation.Amount,Method=settlement.Method,Provider="Finance",ExternalReference=settlement.Reference,IdempotencyKey="finance:"+settlement.SourceKey,OccurredAtUtc=settlement.Date.ToDateTime(TimeOnly.MinValue,DateTimeKind.Utc),Actor="Finance subledger" });
+            }
+        }
         ApplyFinancialState(entity, payload);
         var dto = InvoiceMapper.ToDto(entity, lineItems);
+        dto.CreditAmount=credits;dto.BalanceDue=Round(Math.Max(0,entity.Total-entity.AmountPaid-credits));
+        if(dto.BalanceDue==0&&entity.Status is not (InvoiceStatus.Draft or InvoiceStatus.Void))dto.Status=InvoiceStatus.Paid;
         dto.SentAtUtc = payload.SentAtUtc;
         dto.CustomerEmail = payload.CustomerEmail;
         dto.CustomerPhone = payload.CustomerPhone;

@@ -312,6 +312,35 @@ public sealed class QuoteEstimateServiceTests
         Assert.Equal(2, (await fixture.Service.CreateRevisionAsync(RequestId, "v1")).RevisionNumber);
     }
 
+    [Fact]
+    public async Task PortalUsesExactIssuedRevisionAndVerifiedIdentityWithoutPublicToken()
+    {
+        var customer=Guid.NewGuid();var user=Guid.NewGuid();var packet=Packet("sent");packet.CustomerId=customer;packet.Document=new(){Scope="Safe scope",LeadContext=new(){["private"]="PRIVATE NOTES"}};packet.SentAtUtc=DateTime.UtcNow;packet.ExpiresAtUtc=DateTime.UtcNow.AddDays(1);packet.Notes="PRIVATE NOTES";
+        var fixture=CreateFixture(Quote("estimate-sent"),Entity("v1"),packet);
+        var actor=new PortalActor(TenantId,user,[new(){UserId=user,CustomerId=customer,Scope="customer",RecordId=customer}],new(){Enabled=true});
+        var view=JsonSerializer.SerializeToElement(await fixture.Service.PortalProposalAsync(actor,RequestId,default));
+        Assert.DoesNotContain("PRIVATE",view.GetRawText());Assert.DoesNotContain("token=",view.GetRawText());
+        var hash=view.GetProperty("DocumentHash").GetString();
+        var decision=new QuoteEstimateDecisionDto{RevisionNumber=1,DocumentHash=hash,SignerPrintedName="Avery",IntentToSign=true,ConsentVersion=QuoteApprovalConsent.Version};
+        QuoteEstimateDto? saved=null;
+        fixture.Storage.Setup(x=>x.UploadAsync(QuoteEstimateService.ContainerName,It.IsAny<string>(),It.IsAny<Stream>(),"application/json",It.IsAny<IReadOnlyDictionary<string,string>>(),It.IsAny<CancellationToken>()))
+            .Callback((string _,string _,Stream stream,string _,IReadOnlyDictionary<string,string> _,CancellationToken _)=>saved=JsonSerializer.Deserialize<QuoteEstimateDto>(stream,new JsonSerializerOptions(JsonSerializerDefaults.Web))).Returns(Task.CompletedTask);
+        await fixture.Service.PortalDecideAsync(actor,"bdr",RequestId,decision,true,default);
+        Assert.NotNull(saved?.ApprovalSignature);Assert.Equal(user,saved!.ApprovalSignature!.PortalUserId);Assert.Equal(hash,saved.ApprovalSignature.DocumentHash);Assert.Equal(1,saved.ApprovalSignature.RevisionNumber);
+    }
+    [Fact]
+    public async Task PortalProposalRejectsWrongCustomerStaleRevisionAndMissingConsent()
+    {
+        var customer=Guid.NewGuid();var user=Guid.NewGuid();var packet=Packet("sent");packet.CustomerId=customer;packet.Document=new(){Scope="Issued scope"};packet.SentAtUtc=DateTime.UtcNow;packet.ExpiresAtUtc=DateTime.UtcNow.AddDays(1);
+        var fixture=CreateFixture(Quote("estimate-sent"),Entity("v1"),packet);var actor=new PortalActor(TenantId,user,[new(){UserId=user,CustomerId=customer,Scope="customer",RecordId=customer}],new());
+        var wrong=actor with{Grants=[new(){UserId=user,CustomerId=Guid.NewGuid(),RecordId=Guid.NewGuid()}]};
+        await Assert.ThrowsAsync<KeyNotFoundException>(()=>fixture.Service.PortalProposalAsync(wrong,RequestId,default));
+        var view=JsonSerializer.SerializeToElement(await fixture.Service.PortalProposalAsync(actor,RequestId,default));
+        await Assert.ThrowsAsync<ArgumentException>(()=>fixture.Service.PortalDecideAsync(actor,"bdr",RequestId,new(){RevisionNumber=2,DocumentHash="stale",SignerPrintedName="Avery",IntentToSign=true},true,default));
+        await Assert.ThrowsAsync<ArgumentException>(()=>fixture.Service.PortalDecideAsync(actor,"bdr",RequestId,new(){RevisionNumber=1,DocumentHash=view.GetProperty("DocumentHash").GetString(),SignerPrintedName="Avery"},true,default));
+        fixture.Estimates.Verify(e=>e.SaveAsync(It.IsAny<QuoteEstimate>(),It.IsAny<CancellationToken>()),Times.Never);
+    }
+
     private static QuoteEstimateDecisionDto SignedDecision(string token, QuoteEstimateDto document) => new()
     {
         AccessToken = token, SignerPrintedName = "Avery Customer", IntentToSign = true,

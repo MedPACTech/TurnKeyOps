@@ -5,6 +5,7 @@ using TurnKeyOps.Services.Interfaces;
 
 namespace TurnKeyOps.API.Controllers;
 
+[MedInsights.Controllers.PeopleInputErrors]
 [Authorize(Policy = MedInsights.Lib.Authorization.TurnKeyAuthorizationPolicies.TenantStaff)]
 public class CustomersController : ApiControllerBase
 {

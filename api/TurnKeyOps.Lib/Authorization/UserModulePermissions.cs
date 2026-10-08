@@ -4,7 +4,7 @@ namespace MedInsights.Lib.Authorization;
 
 public static class UserModulePermissions
 {
-    public static readonly string[] Modules = ["dashboard", "bob", "calendar", "jobs", "leads", "requests", "estimates", "invoices", "contacts", "users", "settings", "billing", "inventory", "purchasing"];
+    public static readonly string[] Modules = ["dashboard", "bob", "calendar", "jobs", "leads", "requests", "estimates", "invoices", "contacts", "users", "settings", "billing", "inventory", "purchasing", "finance"];
     public static readonly string[] Operations = ["calendar", "jobs", "leads", "requests", "estimates", "invoices", "contacts"];
     public static bool IsActive(TenantMembership? membership) => membership is not null && !membership.IsDeleted
         && membership.DateRemoved is null && string.Equals(membership.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase);
@@ -22,7 +22,7 @@ public static class UserModulePermissions
             _ => Array.Empty<string>()
         };
         var allowed = defaults.SelectMany(m => new[] { m + ".read", m + ".write" }).ToArray();
-        if (profile?.ModulePermissions is null && role is not ("owner" or "admin")) allowed = allowed.Where(p => !p.StartsWith("inventory.") && !p.StartsWith("purchasing.")).ToArray();
+        if (profile?.ModulePermissions is null && role is not ("owner" or "admin")) allowed = allowed.Where(p => !p.StartsWith("inventory.") && !p.StartsWith("purchasing.") && !p.StartsWith("finance.")).ToArray();
         return profile?.ModulePermissions is null ? allowed : allowed.Intersect(profile.ModulePermissions, StringComparer.Ordinal).ToArray();
     }
     public static bool Allows(IEnumerable<string> permissions, string module, bool write)

@@ -3,6 +3,7 @@ namespace TurnKeyOps.Lib.Dtos;
 public class CustomerDto
 {
     public Guid Id { get; set; }
+    public string? CustomerType { get; set; }
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? CompanyName { get; set; }

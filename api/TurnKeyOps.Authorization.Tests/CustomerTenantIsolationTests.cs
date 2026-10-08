@@ -34,6 +34,38 @@ public sealed class CustomerTenantIsolationTests
             It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 
+    [Theory]
+    [InlineData("residential")]
+    [InlineData("commercial")]
+    public async Task CustomerClassificationRoundTripsWithoutChangingIdentity(string type)
+    {
+        var repository=new Mock<ICustomerRepository>();
+        var service=new CustomerService(repository.Object,new User());
+        var id=Guid.NewGuid();
+        var result=await service.AddAsync(new(){Id=id,CustomerType=type,FirstName="Alex",CompanyName="Acme"});
+        Assert.Equal(id,result.Id);Assert.Equal(type,result.CustomerType);
+        repository.Verify(r=>r.SaveAsync(It.Is<Customer>(c=>c.Id==id && c.CustomerType==type),It.IsAny<CancellationToken>()),Times.Once);
+    }
+    [Theory]
+    [InlineData("unknown", "Alex", "Acme")]
+    [InlineData("commercial", "Alex", "")]
+    [InlineData("residential", "", "Acme")]
+    public async Task InvalidClassificationOrMissingIdentityCannotBeSaved(string type,string name,string company)
+    {
+        var repository=new Mock<ICustomerRepository>();var service=new CustomerService(repository.Object,new User());
+        await Assert.ThrowsAsync<ArgumentException>(()=>service.AddAsync(new(){CustomerType=type,FirstName=name,CompanyName=company}));
+        repository.Verify(r=>r.SaveAsync(It.IsAny<Customer>(),It.IsAny<CancellationToken>()),Times.Never);
+    }
+    [Fact]
+    public async Task OlderClientUpdatesPreserveExistingClassification()
+    {
+        var customer=new Customer{Id=Guid.NewGuid(),PartitionKey=TurnKeyOps.Lib.Utils.RepositoryKeyHelper.ToTenantPartitionKey(TenantId),CustomerType="commercial",CompanyName="Acme"};
+        var repository=new Mock<ICustomerRepository>();repository.Setup(r=>r.GetAsync(customer.PartitionKey,It.IsAny<string>(),It.IsAny<CancellationToken>())).ReturnsAsync(customer);
+        var result=await new CustomerService(repository.Object,new User()).UpdateAsync(new(){Id=customer.Id,CompanyName="Acme Updated"});
+        Assert.Equal("commercial",result.CustomerType);Assert.Equal(customer.Id,result.Id);
+        Assert.Null(TurnKeyOps.Services.Mappers.CustomerMapper.ToDto(new Customer{Id=Guid.NewGuid()}).CustomerType);
+    }
+
     private sealed class User : TurnKeyOps.Lib.Utils.IUserContext
     {
         public bool IsAuthenticated => true;

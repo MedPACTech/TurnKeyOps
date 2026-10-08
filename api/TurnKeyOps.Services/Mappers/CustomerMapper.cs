@@ -12,6 +12,7 @@ public static class CustomerMapper
         return new CustomerDto
         {
             Id = id,
+            CustomerType = entity.CustomerType,
             FirstName = entity.FirstName,
             LastName = entity.LastName,
             CompanyName = entity.CompanyName,
@@ -34,6 +35,7 @@ public static class CustomerMapper
             Id = dto.Id,
             PartitionKey = partitionKey,
             RowKey = RepositoryKeyHelper.ToRowKey(dto.Id),
+            CustomerType = dto.CustomerType,
             FirstName = dto.FirstName,
             LastName = dto.LastName,
             CompanyName = dto.CompanyName,

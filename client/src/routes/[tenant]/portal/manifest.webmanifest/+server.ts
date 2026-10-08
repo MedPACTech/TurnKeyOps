@@ -1,0 +1,2 @@
+import {json} from '@sveltejs/kit';import {portalTenant} from '$lib/server/portal';
+export const GET=(event)=>{const t=portalTenant(event);return json({id:`/${t.slug}/portal/`,name:`${t.name} · My work`,short_name:'My work',start_url:`/${t.slug}/portal`,scope:`/${t.slug}/portal`,display:'standalone',theme_color:'#0f766e',background_color:'#fafaf9',icons:[{src:'/portal-icon.svg',sizes:'any',type:'image/svg+xml',purpose:'any'}]});};

@@ -20,6 +20,7 @@ public class InvoiceDto
     public decimal TaxAmount { get; set; }
     public decimal Total { get; set; }
     public decimal AmountPaid { get; set; }
+    public decimal CreditAmount { get; set; }
     public decimal BalanceDue { get; set; }
 
     public DateTime IssueDate { get; set; }
@@ -49,6 +50,7 @@ public class InvoiceDto
 
 public sealed class InvoicePaymentDto
 {
+    public Guid? FinanceSettlementId { get; set; }
     public Guid Id { get; set; }
     public string Kind { get; set; } = "payment";
     public string Status { get; set; } = "succeeded";

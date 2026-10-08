@@ -56,6 +56,7 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto> AddAsync(CustomerDto dto)
     {
+        ValidateType(dto);
         dto.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
         var entity = CustomerMapper.ToEntity(dto, PartitionKeyForTenant());
         await _repo.SaveAsync(entity);
@@ -68,10 +69,20 @@ public class CustomerService : ICustomerService
             ?? throw new ArgumentException("Customer not found", nameof(dto.Id));
         if (existing.IsDeleted || existing.PartitionKey != PartitionKeyForTenant())
             throw new ArgumentException("Customer not found", nameof(dto.Id));
+        dto.CustomerType ??= existing.CustomerType;
+        ValidateType(dto);
         var entity = CustomerMapper.ToEntity(dto, existing.PartitionKey);
         entity.DateCreated = existing.DateCreated;
         await _repo.SaveAsync(entity);
         return CustomerMapper.ToDto(entity);
+    }
+
+    private static void ValidateType(CustomerDto dto)
+    {
+        if (dto.CustomerType is null) return; // Older clients and unclassified records remain valid.
+        if (dto.CustomerType is not ("residential" or "commercial")) throw new ArgumentException("Choose Residential or Commercial.");
+        if (dto.CustomerType == "commercial" && string.IsNullOrWhiteSpace(dto.CompanyName)) throw new ArgumentException("Enter the company name.");
+        if (dto.CustomerType == "residential" && string.IsNullOrWhiteSpace(dto.FirstName) && string.IsNullOrWhiteSpace(dto.LastName)) throw new ArgumentException("Enter the customer name.");
     }
 
     public async Task DeleteAsync(Guid id)

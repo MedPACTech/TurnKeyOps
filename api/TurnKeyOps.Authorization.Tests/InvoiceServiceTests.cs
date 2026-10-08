@@ -208,6 +208,20 @@ public sealed class InvoiceServiceTests
             new() { SignerPrintedName = "Another Person", IntentToSign = true }));
     }
 
+    [Fact]
+    public async Task FinanceReceiptProjectionDoesNotDuplicateImportedInvoiceEvents()
+    {
+        var financial=new FinanceState();var store=new Mock<IFinanceStore>();store.Setup(s=>s.ReadAsync(TenantA,It.IsAny<CancellationToken>())).ReturnsAsync(()=>financial);
+        var f=CreateFixture(TenantA,finance:store.Object);var draft=DraftInvoice(taxRate:0);draft.CustomerId=Guid.NewGuid();var created=await f.Service.AddAsync(draft);await f.Service.SendAsync(created.Id,null);
+        await f.Service.RecordPaymentAsync(created.Id,Payment(10,"stripe:paid"));
+        financial.Settlements.Add(new(Guid.NewGuid(),"payment",draft.CustomerId,DateOnly.FromDateTime(DateTime.UtcNow),10,"operating","Stripe","pi","existing",Guid.NewGuid(),[new(created.Id,10)],Origin:"invoice-event"));
+        var receiptId=Guid.NewGuid();financial.Settlements.Add(new(receiptId,"payment",draft.CustomerId,DateOnly.FromDateTime(DateTime.UtcNow),20,"operating","check","check1","manual-check",Guid.NewGuid(),[new(created.Id,20)]));
+        var first=await f.Service.GetAsync(created.Id);var second=await f.Service.GetAsync(created.Id);Assert.Equal(30,first!.AmountPaid);Assert.Equal(20,first.BalanceDue);Assert.Equal(2,first.Payments.Count);Assert.Equal(receiptId,first.Payments.Single(p=>p.Provider=="Finance").FinanceSettlementId);Assert.Equal(2,second!.Payments.Count);Assert.True(first.JobRelease.IsEligible);
+        Assert.True((await f.Service.GetJobReleaseAsync(created.Id)).IsEligible);
+        financial.Settlements.Add(new(Guid.NewGuid(),"payment",draft.CustomerId,DateOnly.FromDateTime(DateTime.UtcNow),20,"operating","check","check2","manual-check-2",Guid.NewGuid(),[new(created.Id,20)]));
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.RecordReminderAsync(created.Id,new(){Channel="email"}));
+    }
+
     private static InvoiceDto DraftInvoice(decimal taxRate = 0.10m) => new()
     {
         CustomerName = "Avery",
@@ -224,7 +238,7 @@ public sealed class InvoiceServiceTests
         Amount = amount, Method = "ACH", IdempotencyKey = key, Status = "succeeded"
     };
 
-    private static Fixture CreateFixture(Guid tenantId, State? state = null, IReadOnlyCollection<QuoteEstimateDto>? approved = null)
+    private static Fixture CreateFixture(Guid tenantId, State? state = null, IReadOnlyCollection<QuoteEstimateDto>? approved = null, IFinanceStore? finance = null)
     {
         state ??= new State();
         var invoices = new Mock<IInvoiceRepository>();
@@ -255,7 +269,7 @@ public sealed class InvoiceServiceTests
         quoteEstimates.Setup(x => x.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(approved ?? []);
         var payloads = new MemoryPayloadStore(state);
         var service = new InvoiceService(invoices.Object, lines.Object, estimates.Object, estimateLines.Object,
-            quoteEstimates.Object, payloads, new User(tenantId));
+            quoteEstimates.Object, payloads, new User(tenantId), finance);
         return new(service, invoices, lines);
     }
 

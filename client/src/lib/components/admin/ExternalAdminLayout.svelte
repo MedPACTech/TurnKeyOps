@@ -33,7 +33,13 @@
 	const canSettings = $derived(!data.modulePermissions || hasModuleAccess(data.modulePermissions, 'settings'));
 	const canPeople = $derived(!data.modulePermissions || hasModuleAccess(data.modulePermissions, 'users'));
 	const adminBase = $derived(`/${tenantSlug}/admin`);
-	const inAdmin = $derived(activeNav.slug === 'settings' || activeNav.slug === 'users');
+	const inAdmin = $derived(activeNav.slug === 'settings' || activeNav.slug === 'users' || activePath === `${adminBase}/website` || activePath.startsWith(`${adminBase}/website/`));
+	const adminSections = $derived([
+		...(canSettings ? [{label: 'Settings', href: `${adminBase}/settings`, icon: 'settings'}] : []),
+		...(canPeople ? [{label: 'People & Access', href: `${adminBase}/users`, icon: 'users'}] : []),
+		...(canSettings && data.role === 'owner' ? [{label: 'Customer Portal', href: `${adminBase}/settings/portal`, icon: 'customers'}] : []),
+		...(canSettings && tenantSlug === 'bdr' ? [{label: 'Website', href: `${adminBase}/website`, icon: 'content'}] : [])
+	]);
 	const navigation = $derived(config.navigation
 		.filter(item => item.slug !== 'users' && (item.slug === 'settings'
 			? canSettings || canPeople
@@ -49,6 +55,7 @@
 	activeNav={inAdmin ? {...activeNav, slug: 'settings'} : activeNav}
 	initialBobVoice={data.bobVoice}
 	navItems={navigation}
+	sectionNavigation={inAdmin ? {parentSlug: 'settings', label: 'Admin sections', items: adminSections} : undefined}
 	tenantName={config.tenant.name}
 	workspaceLabel={config.workspaceLabel}
 	workspaceSummary={config.workspaceSummary}
@@ -57,18 +64,5 @@
 	operatorEmail={data.adminSession?.email ?? ''}
 	theme={config.theme}
 >
-	{#if inAdmin}
-		<nav aria-label="Admin sections" class="admin-sections">
-			{#if canSettings}<a href={`${adminBase}/settings`} aria-current={activeNav.slug === 'settings' ? 'page' : undefined}>Settings</a>{/if}
-			{#if canPeople}<a href={`${adminBase}/users`} aria-current={activeNav.slug === 'users' ? 'page' : undefined}>People &amp; Access</a>{/if}
-		</nav>
-	{/if}
 	{@render children()}
 </AdminShell>
-
-<style>
-	.admin-sections { display: flex; flex-wrap: wrap; gap: .5rem; padding: .75rem 1.5rem; border-bottom: 1px solid var(--border); }
-	.admin-sections a { display: inline-flex; align-items: center; min-height: 44px; padding: .5rem .9rem; border-radius: .4rem; color: var(--text-muted); text-decoration: none; }
-	.admin-sections a[aria-current="page"] { color: var(--text-strong); background: var(--surface-elevated); font-weight: 600; }
-	.admin-sections a:focus-visible { outline: 3px solid var(--teal-text); outline-offset: 3px; }
-</style>

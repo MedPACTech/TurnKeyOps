@@ -42,3 +42,12 @@ test('unknown hosts, auth and assets retain existing behavior', () => {
   assert.equal(resolveProductionPathname('admin.thinkpinklc.com', path), path);
  }
 });
+
+
+test('Carl Zipf routes and aliases remain isolated from BDR', () => {
+ assert.equal(resolveProductionPathname('carlzipflockshop.com', '/'), '/carlzipf/public');
+ assert.equal(resolveProductionPathname('carlzipflockshop.com', '/residential'), '/carlzipf/public/residential');
+ assert.equal(resolveProductionPathname('bdrconcrete.com', '/'), '/bdr/public');
+ assert.equal(resolveProductionRedirect(new URL('https://carlzipflockshop.com/carlzipf/public/residential?source=test')), 'https://carlzipflockshop.com/residential?source=test');
+ assert.equal(resolveProductionRedirect(new URL('http://localhost:5199/carlzipf/public/residential')), null);
+});

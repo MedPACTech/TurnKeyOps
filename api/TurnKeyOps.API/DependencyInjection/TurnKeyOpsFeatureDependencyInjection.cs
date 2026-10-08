@@ -233,6 +233,17 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<JobConfigurationService>();
         services.AddScoped<JobExecutionService>();
         services.AddScoped<ISupplyStore,SupplyStore>();
+        services.AddScoped<IFinanceStore,FinanceStore>();
+        services.AddScoped<IFinanceAuthority,FinanceAuthority>();
+        services.AddScoped<FinanceService>();
+        services.AddScoped<PortalFinanceService>();
+        foreach(var tool in new[]{"finance.ar","finance.ap","finance.job-health","finance.cash","finance.close-readiness","finance.draft-journal"})
+            services.AddScoped<IBobActionProvider>(sp=>new BobFinanceActionProvider(sp.GetRequiredService<FinanceService>(),sp.GetRequiredService<TurnKeyOps.Lib.Utils.IUserContext>(),tool));
+        services.AddScoped<IPortalAccessStore,PortalAccessStore>();
+        services.AddScoped<PortalAccessService>();
+        services.AddScoped<PortalService>();
+        services.AddScoped<PortalMessages>();
+        services.AddScoped<PortalNotifications>();
         services.AddScoped<ISupplyAuthority,SupplyAuthority>();
         services.AddScoped<ISupplyJobReadiness,SupplyJobReadiness>();
         services.AddScoped<SupplyService>();

@@ -14,6 +14,7 @@ public class Customer : IEntity, ITableEntity
     public Azure.ETag ETag { get; set; }
 
     // --- Core fields ---
+    public string? CustomerType { get; set; }
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? CompanyName { get; set; }

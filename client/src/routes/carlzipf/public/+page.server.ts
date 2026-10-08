@@ -2,22 +2,26 @@ import { fail, redirect } from '@sveltejs/kit';
 import { carlZipfTenant } from '$lib/config/tenants';
 import { uploadQuoteRequestAttachments } from '$lib/server/quote-request-attachments';
 import { submitQuoteRequest } from '$lib/server/quote-requests';
-import type { Actions } from './$types';
+import { loadCarlZipfContent } from '$lib/server/carlzipf-site-content';
+import type { RequestEvent } from '@sveltejs/kit';
 
 const value = (data: FormData, key: string) => String(data.get(key) ?? '').trim();
-const services = ['replacement', 'hardware', 'repair', 'rekey'];
-export const load = ({ url }) => ({
+const services = ['replacement', 'hardware', 'repair', 'rekey', 'electronic', 'sourcing'];
+export const load = async ({ url, fetch }) => ({
+ content: await loadCarlZipfContent(fetch),
+ publicBase: url.pathname.startsWith('/carlzipf/') ? '/carlzipf/public' : '',
+ canonicalOrigin: url.origin,
  submissionId: crypto.randomUUID(),
  submitted: url.searchParams.get('submitted') === '1',
  reference: (url.searchParams.get('reference') ?? '').replace(/[^A-F0-9]/gi, '').slice(0, 8)
 });
 
-export const actions: Actions = {
- quote: async ({ request, fetch }) => {
+export const actions = {
+ quote: async ({ request, fetch, url }: Pick<RequestEvent, 'request' | 'fetch' | 'url'>) => {
   const data = await request.formData();
   const candidate = value(data, 'submissionId');
   const submissionId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate) ? candidate : crypto.randomUUID();
-  const values = Object.fromEntries(['name', 'company', 'email', 'phone', 'address', 'jobType', 'service', 'openings', 'details', 'preferredDate', 'preferredTime', 'requestMode'].map((key) => [key, value(data, key)]));
+  const values = Object.fromEntries(['name', 'company', 'email', 'phone', 'address', 'jobType', 'service', 'openings', 'details', 'preferredDate', 'preferredTime', 'requestMode', 'timeline'].map((key) => [key, value(data, key)]));
   // Older forms default to the existing assessment request workflow.
   values.requestMode ||= 'assessment';
   const invalid = (error: string) => fail(400, { success: false, error, values, submissionId });
@@ -43,7 +47,7 @@ export const actions: Actions = {
     id: submissionId, tenantId: carlZipfTenant.id, companyName: values.company || values.name,
     contactName: values.name, email: values.email, phone: values.phone, siteName: values.address,
     serviceAddress: values.address, propertyType: values.jobType, serviceType: values.service,
-    requestedTimeline: values.requestMode === 'callback' ? 'Callback requested before arranging an assessment' : [values.preferredDate, values.preferredTime].filter(Boolean).join(' / ') || 'Please call to arrange an assessment',
+    requestedTimeline: values.timeline || (values.requestMode === 'callback' ? 'Callback requested before arranging an assessment' : [values.preferredDate, values.preferredTime].filter(Boolean).join(' / ') || 'Please call to arrange an assessment'),
     priority: 'standard', attachments: [],
     need: [`Job type: ${values.jobType}`, `Service: ${values.service}`, values.openings ? `Openings: ${values.openings}` : 'Opening count to be assessed', values.details, values.requestMode === 'callback' ? 'Customer requests a callback before arranging an assessment. No appointment requested.' : 'Customer requests an assessment visit. Appointment preference only; office confirmation required.'].filter(Boolean).join('\n'),
     assignedTo: 'Office intake', nextAction: values.requestMode === 'callback' ? 'Call the customer to discuss their service request before arranging an assessment.' : 'Review the request and confirm an assessment appointment with an eligible technician.',
@@ -59,6 +63,6 @@ export const actions: Actions = {
     : status === 429 ? 'Too many requests were sent from this network. Wait one minute and retry; your request reference will be reused.'
     : 'We could not confirm your request. Check your connection and retry, or call 614-299-7303. Your request reference will be reused to prevent duplicates.' });
   }
-  throw redirect(303, `/carlzipf/public?submitted=1&reference=${submissionId.slice(0, 8).toUpperCase()}#request`);
+  throw redirect(303, `${url.pathname}?submitted=1&reference=${submissionId.slice(0, 8).toUpperCase()}#${values.jobType === 'commercial' && !url.pathname.endsWith('/residential') ? 'quote' : 'request'}`);
  }
 };

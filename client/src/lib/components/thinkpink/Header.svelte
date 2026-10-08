@@ -15,6 +15,7 @@
 		</a>
 
 		<nav class="hidden items-center gap-7 text-[15px] font-semibold lg:flex">
+			<a href="/thinkpink/portal/login" class="text-ink">My project</a>
 			{#each navLinks as link (link.href)}
 				<a href={link.href} class="text-ink hover:text-pink transition-colors">{link.label}</a>
 			{/each}
@@ -60,6 +61,7 @@
 			id="mobile-nav"
 			class="border-line bg-bone flex flex-col gap-1 border-t px-5 py-4 text-base font-semibold lg:hidden"
 		>
+			<a href="/thinkpink/portal/login" class="text-ink">My project</a>
 			{#each navLinks as link (link.href)}
 				<a href={link.href} class="text-ink hover:text-pink py-2" onclick={() => (open = false)}>
 					{link.label}

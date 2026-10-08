@@ -1,0 +1,16 @@
+import {peopleRequest} from './people';import {formText,actionFailure} from './portal';import type {RequestEvent} from '@sveltejs/kit';
+export const loadPortalAdmin=async(event:RequestEvent)=>{
+ const portal=await peopleRequest<any>(event,'/api/admin/portal');const customer=event.url.searchParams.get('customer');const kind=event.url.searchParams.get('kind');const id=event.url.searchParams.get('id');
+ const workspace=customer?await peopleRequest<any>(event,`/api/admin/portal/workspace/${encodeURIComponent(customer)}`):null;
+ const chosen=workspace?.work.find((w:any)=>w.kind===kind&&w.id===id);
+ const detail=chosen?await peopleRequest<any>(event,`/api/admin/portal/workspace/${customer}/${kind}/${id}`):null;
+ const messages=chosen?await peopleRequest<any>(event,`/api/admin/portal/messages/${customer}/${kind}/${id}`):[];
+ const sharing=chosen?.kind==='job'?await peopleRequest<any>(event,`/api/admin/portal/jobs/${id}/share-options`):null;
+ return {portal,workspace,chosen,detail,messages,sharing,customer};
+};
+export const portalAdminActions={
+ reply:async(event:RequestEvent)=>{try{const f=await event.request.formData();await peopleRequest(event,`/api/admin/portal/messages/${encodeURIComponent(formText(f,'customer'))}/${encodeURIComponent(formText(f,'kind'))}/${encodeURIComponent(formText(f,'id'))}`,{method:'POST',body:JSON.stringify({text:formText(f,'text')})});return {message:'Reply posted in customer portal.'};}catch(e){return actionFailure(e);}},
+ share:async(event:RequestEvent)=>{try{const f=await event.request.formData();await peopleRequest(event,`/api/admin/portal/jobs/${encodeURIComponent(formText(f,'id'))}/share`,{method:'POST',body:JSON.stringify({expectedVersion:formText(f,'version'),action:formText(f,'action'),text:formText(f,'text'),itemId:formText(f,'itemId')||null,changeEstimateId:formText(f,'changeEstimateId')||null,consent:f.get('consent')==='on'})});return {message:'Customer visibility updated.'};}catch(e){return actionFailure(e);}},
+ notify:async(event:RequestEvent)=>{try{const f=await event.request.formData();const result=await peopleRequest<any>(event,`/api/admin/portal/notify/${encodeURIComponent(formText(f,'kind'))}/${encodeURIComponent(formText(f,'id'))}`,{method:'POST',body:JSON.stringify({userId:formText(f,'userId'),channel:formText(f,'channel'),template:formText(f,'template'),expectedVersion:formText(f,'version')})});return {message:result.message};}catch(e){return actionFailure(e);}},
+ configure:async(event:RequestEvent)=>{try{const f=await event.request.formData();const current=await peopleRequest<any>(event,'/api/admin/portal');await peopleRequest(event,'/api/admin/portal/configuration',{method:'PUT',body:JSON.stringify({expectedVersion:formText(f,'version'),configuration:{...current.configuration,companyName:formText(f,'companyName'),logoPath:formText(f,'logoPath'),contactInfo:formText(f,'contactInfo'),accent:formText(f,'accent'),...Object.fromEntries(['enabled','financeEnabled','financePaymentsEnabled','selfBookingEnabled','messagingEnabled','uploadEnabled','customerBobEnabled','changeApprovalEnabled','completionAcceptanceEnabled'].map(k=>[k,f.get(k)==='on']))}})});return {message:'Portal configuration saved.'};}catch(e){return actionFailure(e);}}
+};

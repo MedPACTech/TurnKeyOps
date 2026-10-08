@@ -1,6 +1,5 @@
 <script lang="ts">
 	import AdminIcon from '$lib/components/admin/AdminIcon.svelte';
-	import AdminContextRail from '$lib/components/admin/AdminContextRail.svelte';
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import ContentEditorCard, {
 		type EditableField,
@@ -692,13 +691,8 @@
 	title="Website"
 	description="Keep website sections, edit targets, and publish-readiness visible in one compact utility workflow."
 	{metrics}
-	contextLabel="Admin"
 	focusLabel="Site sections"
 >
-	{#snippet context()}
-		<AdminContextRail active="website" />
-	{/snippet}
-
 	{#snippet focus()}
 		<div class="space-y-2">
 			<p class="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">

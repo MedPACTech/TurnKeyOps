@@ -23,6 +23,7 @@
 </script>
 <svelte:head><title>Quote policy · Carl Zipf</title></svelte:head>
 <div class="mx-auto max-w-3xl space-y-6 pb-10">
+ <p><a class="font-semibold underline" href="/carlzipf/admin/website">Manage website content</a></p>
  <header><p class="text-sm font-semibold text-[var(--accent-text)]">Carl Zipf Lock Shop</p><h1 class="mt-2 text-3xl font-bold">Quote policy</h1><p class="mt-3 text-[var(--text-muted)]">Configure pricing defaults for residential and commercial work in one shared workspace.</p></header>
  <p class="rounded-xl border border-[var(--warning-text)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning-text)]">Field quotes use saved labor, tax, and catalog prices. <a class="font-semibold underline" href="#tax-rate">Set the tax rate here</a>, including 0% if appropriate. Sample items cannot appear on a customer quote. Confirm Carl Zipf’s actual prices and tax treatment before enabling an item for quoting. Public booking remains off.</p>
  {#if form?.message}<p role="status" class="text-[var(--positive-text)]">{form.message}</p>{/if}

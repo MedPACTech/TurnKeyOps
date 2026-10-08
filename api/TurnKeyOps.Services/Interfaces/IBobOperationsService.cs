@@ -4,6 +4,8 @@ namespace TurnKeyOps.Services.Interfaces;
 
 public interface IBobOperationsService
 {
+    Task<BobActionDto> ApproveFinanceAsync(Guid financeId, Guid actionId, CancellationToken ct = default);
+    Task<BobActionDto> ProposeFinanceAsync(Guid financeId, ProposeBobActionDto input, CancellationToken ct = default);
     Task<BobActionDto> ApproveSupplyAsync(Guid supplyId, Guid actionId, CancellationToken ct = default);
     Task<BobActionDto> ProposeSupplyAsync(Guid supplyId, ProposeBobActionDto input, CancellationToken ct = default);
     Task<BobActionDto> ApproveJobAsync(Guid jobId, Guid actionId, CancellationToken ct = default);

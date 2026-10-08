@@ -8,6 +8,11 @@ namespace TurnKeyOps.Lib.Entities;
 [AzureTableStorageModel(AzureTableStorageModel.Envelope)]
 public class CalendarEvent : IEntity, ITableEntity
 {
+    public List<TurnKeyOps.Lib.Dtos.PortalSlot> CustomerSlots { get; set; } = [];
+    public string CustomerResponse { get; set; } = "";
+    public Guid? CustomerResponseUserId { get; set; }
+    public DateTime? CustomerRespondedAtUtc { get; set; }
+    public string CustomerResponseNote { get; set; } = "";
     public string? JobEventType { get; set; }
     public string EventStatus { get; set; } = "scheduled";
     public List<Guid> MembershipIds { get; set; } = [];

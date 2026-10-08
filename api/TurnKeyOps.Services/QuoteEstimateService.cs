@@ -383,12 +383,17 @@ public sealed partial class QuoteEstimateService : IQuoteEstimateService
         Guid quoteRequestId,
         QuoteEstimateDecisionDto decision,
         bool approve,
-        CancellationToken ct)
+        CancellationToken ct,
+        PortalActor? portal = null)
     {
         var tenantId = _tenantResolver.Resolve(tenantSlug).TenantId;
         var entity = await GetEntityAsync(tenantId, quoteRequestId, ct);
-        if (entity is null || !ValidToken(entity, decision.AccessToken)) return null;
+        if (entity is null || (portal is null && !ValidToken(entity, decision.AccessToken))) return null;
         var packet = await LoadPayloadAsync(entity, ct);
+        if (portal is not null) {
+            if (portal.TenantId != tenantId || !PortalAccessService.Allows(portal, "estimate", quoteRequestId, packet.CustomerId, packet.Document?.SiteId)) throw new KeyNotFoundException();
+            if (packet.ExpiresAtUtc is null || packet.ExpiresAtUtc <= DateTime.UtcNow || packet.Outcome is not null) throw new ArgumentException("This proposal is no longer open for a decision.");
+        }
         var target = approve ? "approved" : decision.Decline ? "declined" : "changes-requested";
         if (packet.Delivery?.Status == target)
         {
@@ -431,7 +436,7 @@ public sealed partial class QuoteEstimateService : IQuoteEstimateService
             }
             packet.ApprovalSignature = new QuoteEstimateSignatureDto
             {
-                SignerPrintedName = signerName, ConsentText = QuoteApprovalConsent.Text, ConsentVersion = QuoteApprovalConsent.Version,
+                PortalUserId = portal?.UserId, CustomerComment = note, SignerPrintedName = signerName, ConsentText = QuoteApprovalConsent.Text, ConsentVersion = QuoteApprovalConsent.Version,
                 SignedAtUtc = now, RevisionNumber = packet.RevisionNumber, Total = selectedTotal, SignerContact = packet.Delivery?.Email ?? packet.Delivery?.Phone ?? "", SelectedOptionIds = [..packet.AcceptedOptionIds],
                 DocumentHash = packet.DocumentHash, Method = "typed-name", QuoteRequestId = packet.QuoteRequestId
             };

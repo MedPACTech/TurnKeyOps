@@ -176,6 +176,36 @@ public sealed class BobOperationsService : IBobOperationsService
         return await ProposeAsync(supplyId, input, ct);
     }
 
+    public async Task<BobActionDto> ApproveFinanceAsync(Guid financeId, Guid actionId, CancellationToken ct = default)
+    {
+        var action = await RequireActionAsync(actionId, ct);
+        if (action.ConversationId != financeId || !action.ToolKey.StartsWith("finance.", StringComparison.Ordinal))
+            throw new ArgumentException("Action belongs to another finance workspace.");
+        await ApproveAsync(actionId, ct);
+        return await ExecuteAsync(actionId, ct);
+    }
+
+    public async Task<BobActionDto> ProposeFinanceAsync(Guid financeId, ProposeBobActionDto input, CancellationToken ct = default)
+    {
+        EnsureEnabled();
+        if (financeId == Guid.Empty || !input.ToolKey.StartsWith("finance.", StringComparison.Ordinal) ||
+            !input.Input.TryGetProperty("financeId", out var inputId) || inputId.GetGuid() != financeId)
+            throw new ArgumentException("The action must target this finance workspace.");
+        var provider = GetProvider(input.ToolKey);
+        await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
+        await PolicyRequiresApprovalAsync(provider, ct);
+        var partition = PartitionKey();
+        var row = MedInsights.Lib.EntityKeyPolicy.Row(financeId);
+        var conversation = await _chatRepository.GetAsync(partition, row, ct);
+        if (conversation is null)
+            await _chatRepository.SaveAsync(new MedInsights.Lib.Entities.Chat {
+                Id = financeId, TenantId = _userContext.TenantId, ActorUserId = _userContext.UserId,
+                PartitionKey = partition, RowKey = row, Title = "Finance workspace", Mode = "finance",
+                StateJson = JsonSerializer.Serialize(new { financeId }), DateChatCreated = DateTime.UtcNow, DateChatUpdated = DateTime.UtcNow
+            }, ct);
+        return await ProposeAsync(financeId, input, ct);
+    }
+
     public async Task<BobActionDto> ProposeAsync(
         Guid conversationId,
         ProposeBobActionDto input,
@@ -335,6 +365,7 @@ public sealed class BobOperationsService : IBobOperationsService
             throw new InvalidOperationException("Tenant policy does not allow this action to execute.");
         if (mode == "read" && provider.Risk != BobActionRisk.Read)
             throw new InvalidOperationException("Read-only policy cannot execute a mutation.");
+        if(provider.ToolKey=="finance.draft-journal")return true;
         // Financial outcomes remain approved until a deterministic outcome guardrail is configured.
         if (provider.ToolKey is "lead.stage" or "estimate.issue") return true;
         return mode == "approval" || (mode != "auto" && mode != "draft" && provider.Risk != BobActionRisk.Read);

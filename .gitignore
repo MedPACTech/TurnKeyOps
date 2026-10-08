@@ -45,3 +45,6 @@ client/test-results/
 
 # Separate Git repository, committed and pushed independently.
 /christian-think-pink-land-clearing/
+
+# Vite development cache
+.vite/

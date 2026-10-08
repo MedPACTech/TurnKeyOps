@@ -1,6 +1,5 @@
 <script lang="ts">
 	import AdminIcon from '$lib/components/admin/AdminIcon.svelte';
-	import AdminContextRail from '$lib/components/admin/AdminContextRail.svelte';
 	import AdminWorkspace from '$lib/components/admin/AdminWorkspace.svelte';
 	import { updateEstimateDefaults } from '$lib/api/estimate-defaults';
 	import { untrack } from 'svelte';
@@ -225,12 +224,7 @@
 	kicker="Admin"
 	title="Admin"
 	description="Manage defaults and public-site controls from one admin utility area."
-	contextLabel="Admin"
 >
-	{#snippet context()}
-		<AdminContextRail active="defaults" />
-	{/snippet}
-
 	{#snippet work()}
 		<form method="POST" action="?/saveBillingSettings" class="mb-5 space-y-5">
 			<section class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">

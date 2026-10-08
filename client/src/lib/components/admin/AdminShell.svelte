@@ -20,6 +20,7 @@
 		activeNav,
 		initialBobVoice,
 		navItems,
+		sectionNavigation,
 		tenantName,
 		workspaceLabel,
 		workspaceSummary,
@@ -34,6 +35,7 @@
 		activeNav: BdrAdminNavItem;
 		initialBobVoice: BobVoiceId;
 		navItems: BdrAdminNavItem[];
+		sectionNavigation?: {parentSlug: string; label: string; items: {label: string; href: string; icon: string}[]};
 		tenantName: string;
 		workspaceLabel: string;
 		workspaceSummary: string;
@@ -62,6 +64,10 @@
 					.join('')
 			: 'OP'
 	);
+
+	const activeSection = $derived(sectionNavigation?.items
+		.filter((item: {href: string}) => activePath === item.href || activePath.startsWith(`${item.href}/`))
+		.sort((a: {href: string}, b: {href: string}) => b.href.length - a.href.length)[0]?.href);
 
 	const isActive = (item: BdrAdminNavItem) => activeNav.slug === item.slug || activePath === item.href;
 	const selectedBobVoice = $derived(
@@ -101,11 +107,23 @@
 {#snippet navigation(collapsed = false, mobile = false)}
   <nav aria-label={mobile ? 'Mobile navigation' : 'Primary navigation'} class="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
     {#each navItems as item}
-      <a href={item.href} title={item.label} aria-label={collapsed ? item.label : undefined} aria-current={isActive(item) ? 'page' : undefined}
+      <a href={item.href} title={item.label} aria-label={collapsed ? item.label : undefined} aria-current={isActive(item) && sectionNavigation?.parentSlug !== item.slug ? 'page' : undefined}
         class={`flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${collapsed ? 'justify-center' : ''} ${isActive(item) ? 'bg-[var(--nav-active-bg)] text-[var(--nav-active-text)]' : 'text-[var(--nav-text)] hover:bg-[var(--nav-hover)]'}`}
         onclick={() => { sidebarOpen = false; }}>
         <AdminIcon name={item.slug} />{#if !collapsed}<span>{item.label}</span>{/if}
       </a>
+      {#if sectionNavigation?.parentSlug === item.slug}
+        <ul aria-label={sectionNavigation.label} class={`space-y-1 ${collapsed ? '' : 'ml-5 border-l border-[var(--nav-divider)] pl-2'}`}>
+          {#each sectionNavigation.items as section}
+            <li><a href={section.href} title={collapsed ? section.label : undefined} aria-label={collapsed ? section.label : undefined}
+              aria-current={activeSection === section.href ? 'page' : undefined}
+              class={`flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm ${collapsed ? 'justify-center' : ''} ${activeSection === section.href ? 'bg-[var(--nav-active-bg)] font-semibold text-[var(--nav-active-text)]' : 'text-[var(--nav-text)] hover:bg-[var(--nav-hover)]'}`}
+              onclick={() => { sidebarOpen = false; }}>
+              <AdminIcon name={section.icon} size={18} />{#if !collapsed}<span>{section.label}</span>{/if}
+            </a></li>
+          {/each}
+        </ul>
+      {/if}
     {/each}
   </nav>
 {/snippet}

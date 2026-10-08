@@ -94,6 +94,10 @@ def forbidden_name(path: Path) -> str | None:
 
 
 def is_placeholder(value: str) -> bool:
+    # Azurite's published default development key is not a private credential.
+    # Match only that exact value; arbitrary Azure storage keys still fail closed.
+    if value == "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==":
+        return True
     lowered = value.lower()
     return any(marker.lower() in lowered for marker in PLACEHOLDER_MARKERS) or "555" in lowered
 

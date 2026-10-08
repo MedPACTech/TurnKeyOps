@@ -4,7 +4,7 @@
  let { data, form }: PageProps = $props();
  const activeUsers = $derived(data.users.filter(user => user.status.toLowerCase() === 'active' && user.userId));
 </script>
-<PeopleManagement people={data.people} customerLinks={data.customerLinks} {form} canDelete={data.canDeleteUsers} canWrite={data.modulePermissions.includes('users.write')}/>
+<PeopleManagement canManagePortal={data.role === 'owner' && data.modulePermissions.includes('settings.write')} people={data.people} customerLinks={data.customerLinks} {form} canDelete={data.canDeleteUsers} canWrite={data.modulePermissions.includes('users.write')}/>
 <section class="mx-auto mb-10 max-w-7xl rounded-xl bg-[var(--surface)] p-6 shadow-sm">
  <h2 class="text-xl font-bold">Tech job types</h2>
  <p class="mt-2 text-sm text-[var(--text-muted)]">Choose residential, commercial, or both. An unchecked user has no tech capability. Everyone shares the same staffing pool.</p>
