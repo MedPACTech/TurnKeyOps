@@ -96,7 +96,7 @@
     <section aria-labelledby="up-next-title" class="lead-row rounded-r-lg bg-[var(--accent-soft)] p-5" data-tone={statusTone(upNext.status)}>
      <div class="flex flex-wrap items-center justify-between gap-4">
       <div><p class="text-xs font-semibold uppercase tracking-wide text-[var(--accent-text)]">Up next</p><h2 id="up-next-title" class="mt-2 text-lg font-semibold">{upNext.customerName || upNext.companyName || 'Unnamed lead'}</h2><p class="mt-1 text-sm">{upNext.nextAction || 'Review the lead and set a follow-up'}</p><p class="mt-2 text-xs text-[var(--text-muted)]">{upNext.priority === 'emergency' ? 'Emergency priority' : upNext.priority === 'priority' ? 'Priority lead' : upNext.status === 'new' ? 'New lead awaiting review' : 'Oldest active lead'} · {upNext.assignedTo || 'Unassigned'}</p></div>
-      <a href={leadUrl(upNext.id)} onclick={openLead} aria-haspopup="dialog" class="inline-flex min-h-11 items-center rounded-lg bg-[var(--accent-text)] px-4 text-sm font-semibold text-white">Review lead →</a>
+      <a href={leadUrl(upNext.id)} onclick={openLead} aria-haspopup="dialog" class="inline-flex min-h-11 items-center rounded-lg bg-[var(--cta)] px-4 text-sm font-semibold text-[var(--cta-text)]">Review lead →</a>
      </div>
     </section>
    {/if}
@@ -156,7 +156,7 @@
      <input type="hidden" name="id" value={selected.id} /><input type="hidden" name="updatedAtUtc" value={selected.updatedAtUtc} />
      <label class="grid gap-2 text-sm font-semibold">Lead status<select name="status" class="rounded-lg border bg-[var(--surface)] p-3 font-normal" value={selected.status}>{#each triageStatuses(selected.status) as status}<option value={status}>{statusLabel(status)}</option>{/each}</select></label>
      <label class="grid gap-2 text-sm font-semibold">Next action<textarea name="nextAction" required maxlength="1000" rows="3" class="rounded-lg border p-3 font-normal">{selected.nextAction}</textarea></label>
-     <button disabled={saving} class="min-h-11 rounded-lg bg-[var(--accent-text)] px-5 font-semibold text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save follow-up'}</button>
+     <button disabled={saving} class="min-h-11 rounded-lg bg-[var(--cta)] px-5 font-semibold text-[var(--cta-text)] disabled:opacity-50">{saving ? 'Saving…' : 'Save follow-up'}</button>
     </form>{/key}
    </section>
    {#if selected.attachments.length}<section aria-labelledby="photos-title" class="border-t pt-5"><h3 id="photos-title" class="font-semibold">Photos <span class="font-normal text-[var(--text-muted)]">{selected.attachments.length}</span></h3><ul class="mt-3 space-y-3">{#each selected.attachments as attachment}<li><a class="break-all text-sm underline" href={`/carlzipf/admin/requests/attachments/${selected.id}/${attachment.id}`}>{attachment.fileName}</a></li>{/each}</ul></section>{/if}
@@ -173,7 +173,7 @@
  [data-tone='emerald'] { --status-color: #047857; --status-bg: #ecfdf5; }
  [data-tone='slate'] { --status-color: #475569; --status-bg: #f1f5f9; }
  .lead-row { border-left: 4px solid var(--status-color, #475569); }
- .view-button[aria-pressed='true'] { background: var(--accent-text); color: white; }
+ .view-button[aria-pressed='true'] { background: var(--cta); color: var(--cta-text); }
  .status-label { display: inline-block; border-radius: 4px; padding: 3px 8px; font-size: 12px; font-weight: 600; color: var(--status-color, #475569); background: var(--status-bg, #f1f5f9); }
  .lead-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(100%, 38rem); max-width: 100%; height: 100dvh; max-height: 100dvh; border: 0; border-left: 1px solid #e2e8f0; padding: 0; overflow-y: auto; overscroll-behavior: contain; color: #0f172a; background: white; box-shadow: -12px 0 40px #0f172a1a; }
  .lead-drawer::backdrop { background: #0f172a66; }

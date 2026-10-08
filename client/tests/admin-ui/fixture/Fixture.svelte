@@ -22,15 +22,15 @@
  const module = params.get('module') || 'dashboard';
  const restricted = params.has('restricted');
  let drawerOpen = $state(false);
- const session = { role: 'owner' as const, bobVoice: 'practical' as const, adminSession: { email: 'operator@example.invalid' }, ...(restricted ? { modulePermissions: ['requests.read', 'contacts.read'] } : {}) };
+ const session = { role: 'owner' as const, bobVoice: 'practical' as const, adminSession: { email: 'operator@example.invalid' }, ...(restricted ? { modulePermissions: ['leads.read'] } : {}) };
  // Synthetic records used only to exercise real rendered components.
  const dashboardData: any = { metrics:{activeJobs:2,pendingEstimates:3,openInvoices:1,collectedThisMonth:1500,openBalance:350,newRequests:2,assessmentReady:1,visitsScheduled:1,activeEstimates:3},requestInbox:[{}],scheduleReadyJobs:[{}],jobs:[{id:'fixture-job',status:'scheduled',siteName:'Test patio',scheduledDate:'2026-10-06',windowStart:'09:00',windowEnd:'11:00',crew:'Crew A'}],invoices:[{invoiceNumber:'TEST-01',customerName:'Test customer',siteName:'Test patio',balanceDue:350}],integrationState:{errors:[],loadedAtUtc:'2026-10-05T16:00:00Z'},requestSource:'fixture',source:'fixture',requests:[] };
 </script>
 <ExternalAdminLayout data={session} {tenantSlug}>
  {#if module === 'requests'}<BdrRequests data={requestsData} form={null} />
- {:else if module === 'estimates'}<Estimates data={{quoteRequests:[{...request,status:'qualified'}],estimateDefaults:{}} as any} form={null} params={{}} />
+ {:else if module === 'estimates'}<Estimates data={{basePath:'/bdr/admin/estimates',workspace:{packets:[],canWrite:true,canConfigure:true},selected:null}} form={null} params={{}} />
  {:else if module === 'invoices'}<Invoices data={{invoices:[],customers:[]} as any} form={null} params={{}} />
- {:else if module === 'jobs'}<Jobs data={{jobs:[],scheduleReadyJobs:[]} as any} form={null} params={{}} />
+ {:else if module === 'jobs'}<Jobs data={{basePath:'/bdr/admin/jobs',fieldView:false,choices:{customers:[],sites:[],members:[]},workspace:{jobs:[],canWrite:true,canConfigure:true,configuration:{allowManual:true,enabledTrades:[]}},selected:null}} form={null} params={{}} />
  {:else if module === 'settings'}<Settings data={{estimateDefaults:{defaultCrewSize:3,concreteCostPerYard:100},billingSettings:{depositPercentRequired:50}} as any} form={null} params={{}} />
  {:else if module === 'bob'}<Bob data={bobData} form={null} params={{}} />
  {:else if module === 'customers'}

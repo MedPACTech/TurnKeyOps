@@ -42,14 +42,14 @@ for(const theme of ['light','dark'] as const) for(const module of ['controls','c
  });
 }
 test('permission-filtered navigation and collapse preserve destinations',async({page,isMobile})=>{
- await page.goto('/?tenant=bdr&module=requests&restricted=1');
+ await page.goto('/?tenant=bdr&module=leads&restricted=1');
  if(isMobile)await page.getByRole('button',{name:'Open navigation',exact:true}).click();
  const nav=page.getByRole('navigation',{name:isMobile?'Mobile navigation':'Primary navigation',exact:true});
- await expect(nav.getByRole('link',{name:'Requests',exact:true})).toHaveAttribute('href','/bdr/admin/requests');
- await expect(nav.getByRole('link',{name:'People & access'})).toHaveCount(0);
+ await expect(nav.getByRole('link',{name:'Leads',exact:true})).toHaveAttribute('href','/bdr/admin/leads');
+ await expect(nav.getByRole('link',{name:'Contacts'})).toHaveCount(0);
  await expect(nav.getByRole('link',{name:'Dashboard'})).toHaveCount(0);
- await expect(nav.getByRole('link',{name:'Requests',exact:true})).toHaveAttribute('aria-current','page');
- if(!isMobile) {await page.getByRole('button',{name:'Collapse navigation',exact:true}).click();await expect(nav.getByRole('link',{name:'Requests',exact:true})).toBeVisible();await page.getByRole('button',{name:'Expand navigation',exact:true}).click();}
+ await expect(nav.getByRole('link',{name:'Leads',exact:true})).toHaveAttribute('aria-current','page');
+ if(!isMobile) {await page.getByRole('button',{name:'Collapse navigation',exact:true}).click();await expect(nav.getByRole('link',{name:'Leads',exact:true})).toBeVisible();await page.getByRole('button',{name:'Expand navigation',exact:true}).click();}
 });
 
 for(const theme of ['light','dark'] as const) for(const module of ['requests','estimates','invoices','jobs','settings','bob']) {
