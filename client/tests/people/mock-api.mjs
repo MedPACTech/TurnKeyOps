@@ -34,6 +34,7 @@ http.createServer(async(req,res)=>{
  if(url.pathname==='/api/my-module-access'){
   return send(claims.fixtureContacts ? ['contacts.read','contacts.write'] : claims.fixtureRestricted ? ['users.read'] : modules.flatMap(m=>[m+'.read',m+'.write']));
  }
+ if(url.pathname==='/api/estimate-workspace')return send({packets:[],canWrite:true,canConfigure:true});
  if(url.pathname==='/api/quote-requests' || url.pathname==='/api/quote-estimates')return send([]);
  if(url.pathname==='/api/admin/estimate-defaults')return send({});
  if(url.pathname==='/api/Customers/search')return send(customerRecords);
