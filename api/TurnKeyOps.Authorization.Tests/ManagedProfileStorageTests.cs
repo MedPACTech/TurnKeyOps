@@ -21,6 +21,11 @@ public sealed class AzuriteFactAttribute : FactAttribute
             Skip = "Run with TKO_STORAGE_TESTS=1 and local Azurite (also exercised in CI).";
     }
 }
+// GUID key formatting is process-wide; this test must not overlap other tests.
+[CollectionDefinition("Guid key configuration", DisableParallelization = true)]
+public sealed class GuidKeyConfigurationCollection { }
+
+[Collection("Guid key configuration")]
 public sealed class ManagedProfileStorageTests
 {
     [AzuriteFact]
@@ -65,6 +70,9 @@ public sealed class ManagedProfileStorageTests
             Assert.False((await store.GetByKeysAsync(pk,rk,default))!.IsDeleted);
             await Assert.ThrowsAsync<ArgumentException>(() => store.UpdateAsync(tenant,archived,TableUpdateMode.Replace,ETag.All,default));
             Assert.Null(await store.GetByKeysAsync(EntityKeyPolicy.TenantPartition(Guid.NewGuid()),rk,default));
-        } finally { await table.DeleteEntityAsync(pk,rk,ETag.All); }
+        } finally {
+            RepositoryKeyHelper.ConfigureGuidKeyFormat("N");
+            await table.DeleteEntityAsync(pk,rk,ETag.All);
+        }
     }
 }
