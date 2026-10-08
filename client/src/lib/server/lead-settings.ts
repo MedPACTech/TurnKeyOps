@@ -10,7 +10,7 @@ export const load = async (event:RequestEvent) => {
 export const actions = { save: async (event:RequestEvent) => {
  const form=await event.request.formData();
  try {
-  
+
   const workspace=await leadApi<LeadWorkspace>(event,'leads');
   const config={...workspace.configuration,stageLabels:Object.fromEntries(leadStages.map(stage=>[stage,String(form.get(`stage.${stage}`)||stage.toLowerCase().replaceAll('_',' '))])),
    tradeProfiles:String(form.get('tradeProfiles')).split(',').map(s=>s.trim()).filter(Boolean),defaultTradeProfile:String(form.get('defaultTradeProfile')),
