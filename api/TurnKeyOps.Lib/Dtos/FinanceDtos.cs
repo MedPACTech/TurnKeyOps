@@ -16,12 +16,20 @@ public sealed class FinanceState
     public List<FinanceJobCost> Costs { get; set; } = [];
     public List<FinanceBudgetReview> BudgetReviews { get; set; } = [];
     public List<FinanceJobChangeValue> JobChanges { get; set; } = [];
+    public List<FinanceContractCorrection> ContractCorrections { get; set; } = [];
     public List<FinanceJobBudget> Budgets { get; set; } = [];
     public List<FinanceCashAccount> CashAccounts { get; set; } = [];
     public List<FinanceBankTransaction> BankTransactions { get; set; } = [];
     public List<FinanceReconciliation> Reconciliations { get; set; } = [];
     public List<FinanceAudit> Audit { get; set; } = [];
+    public List<FinanceMigrationBatch> MigrationBatches { get; set; } = [];
+    public List<FinanceImportedCommitment> ImportedCommitments { get; set; } = [];
+    public List<FinanceImportedInventory> ImportedInventory { get; set; } = [];
+    public FinanceOperationsState Operations { get; set; } = new();
     public FinancePolicy Policy { get; set; } = new();
+    public List<ConstructionPaymentIntent> ConstructionPayments { get; set; } = [];
+    public List<ConstructionPaymentReceipt> ConstructionPaymentReceipts { get; set; } = [];
+    public ConstructionFinanceState Construction { get; set; } = new();
 }
 public sealed record FinanceAccount(string Code, string Name, string Type, string NormalBalance, bool SystemControlled = false, bool Active = true, string? ParentCode = null, string? ExternalId = null);
 public sealed class FinancePeriod
@@ -56,6 +64,9 @@ public sealed class FinanceBill
     public Guid[] ReceiptIds { get; set; } = [];
     public string Status { get; set; } = "DRAFT";
     public List<FinanceBillLine> Lines { get; set; } = [];
+    public decimal RetainagePercent { get; set; }
+    public decimal RetainageAmount => Math.Round(Total*RetainagePercent/100,2,MidpointRounding.AwayFromZero);
+    public decimal NetPayable => Total-RetainageAmount;
     public decimal Tax { get; set; }
     public decimal Shipping { get; set; }
     public decimal Total => Lines.Sum(x => x.Amount) + Tax + Shipping;
@@ -64,11 +75,12 @@ public sealed class FinanceBill
     public string[] MatchExceptions { get; set; } = [];
     public Guid? JournalId { get; set; }
 }
-public sealed record FinanceBillLine(string Description, decimal Quantity, decimal UnitCost, string Account, string Category = "MATERIAL", Guid? JobId = null, string? CostCode = null, Guid? OrderLineId = null)
+public sealed record FinanceBillLine(string Description, decimal Quantity, decimal UnitCost, string Account, string Category = "MATERIAL", Guid? JobId = null, string? CostCode = null, Guid? OrderLineId = null, string? ImportedCommitmentId = null)
 {
     public decimal Amount => Math.Round(Quantity * UnitCost, 2, MidpointRounding.AwayFromZero);
 }
 public sealed record FinanceCostCode(string Code, string Name, string Category, string? Trade = null, bool Active = true);
+public sealed record FinanceContractCorrection(Guid Id,Guid JobId,Guid ChangeId,DateOnly Date,decimal Amount,string Reason,string Actor,DateTime AtUtc,string SourceKey);
 public sealed record FinanceJobCost(Guid Id, Guid JobId, string Category, string? CostCode, decimal Amount, DateOnly Date, string SourceType, string SourceId, Guid? JournalId = null, decimal? Hours = null, decimal? Rate = null);
 public sealed record FinanceJobBudget(Guid JobId, string SourceId, decimal Sold, decimal ApprovedChanges, Dictionary<string,decimal?> Categories, bool ActualsComplete, string CompletenessNote, bool TaxBasisKnown = true);
 public sealed record FinanceCashAccount(string Id, string Name, string LedgerAccount, string Institution, string MaskedReference, string Currency = "USD", bool Active = true);
@@ -126,4 +138,4 @@ public sealed class FinanceCommand
 public sealed record FinanceJournalDraft(Guid Id, DateOnly Date, string Memo, FinanceLine[] Lines, string CreatedBy, Guid? PostedJournalId = null);
 
 public sealed record FinanceBudgetReview(Guid Id, Guid JobId, string Actor, DateTime AtUtc, string Reason, Dictionary<string,decimal?> Categories, bool ActualsComplete);
-public sealed record FinanceJobChangeValue(Guid JobId, Guid ChangeId, Guid EstimateId, int Revision, string DocumentHash, decimal NetValue);
+public sealed record FinanceJobChangeValue(Guid JobId, Guid ChangeId, Guid EstimateId, int Revision, string DocumentHash, decimal NetValue, Dictionary<string,decimal?>? CategoryCostImpacts=null,DateTime ApprovedAtUtc=default,string ApprovalEvidence="");

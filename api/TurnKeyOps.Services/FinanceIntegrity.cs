@@ -4,11 +4,18 @@ public static class FinanceIntegrity
 {
     public static void ValidateTransition(FinanceState before,FinanceState after)
     {
+        FinanceOperationsEngine.ValidateTransition(before,after);
+        ConstructionPaymentIntegrity.ValidateTransition(before,after);
+        ConstructionFinanceEngine.ValidateTransition(before.Construction,after.Construction);
         Preserve(before.Journals,after.Journals,j=>j.Id,"posted journal");
+        Preserve(before.MigrationBatches,after.MigrationBatches,b=>b.Id,"migration batch");
+        Preserve(before.ImportedCommitments,after.ImportedCommitments,c=>c.Id,"imported commitment");
+        Preserve(before.ImportedInventory,after.ImportedInventory,i=>i.Id,"imported inventory valuation");
         Preserve(before.OpenItems,after.OpenItems,i=>i.Id,"open item");
         Preserve(before.Settlements,after.Settlements,i=>i.Id,"settlement");
         Preserve(before.BudgetReviews,after.BudgetReviews,i=>i.Id,"budget review");
         Preserve(before.JobChanges,after.JobChanges,i=>i.ChangeId,"accepted change value");
+        Preserve(before.ContractCorrections,after.ContractCorrections,i=>i.Id,"contract correction");
         Preserve(before.Costs,after.Costs,i=>i.Id,"job cost");
         Preserve(before.Reconciliations,after.Reconciliations,i=>i.Id,"reconciliation");
         Preserve(before.Audit,after.Audit,i=>i.CommandId,"audit evidence");

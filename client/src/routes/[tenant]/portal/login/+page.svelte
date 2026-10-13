@@ -1,5 +1,6 @@
-<script lang="ts">let {form}=$props();</script>
+<script lang="ts">
+ import {enhance} from '$app/forms';let {form}=$props();</script>
 <div class="max-w-md"><h1>Your project, in one place.</h1><p class="muted">Sign in with the email or phone number you shared with your contractor.</p>
 {#if form?.message}<p role="status" class="notice">{form.message}</p>{/if}
-{#if form?.challengeId}<form method="POST" action="?/verify"><input type="hidden" name="identifier" value={form.identifier}/><input type="hidden" name="challengeId" value={form.challengeId}/><label for="code">Sign-in code</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="10"/><div class="actions"><button class="primary">Sign in</button></div></form><a href="?">Use a different contact</a>
-{:else}<form method="POST" action="?/request"><label for="identifier">Email or mobile number</label><input id="identifier" name="identifier" autocomplete="username" required maxlength="254"/><div class="actions"><button class="primary">Send sign-in code</button></div></form>{/if}</div>
+{#if form?.challengeId}<form use:enhance method="POST" action="?/verify"><input type="hidden" name="identifier" value={form.identifier}/><input type="hidden" name="challengeId" value={form.challengeId}/><label for="code">Sign-in code</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="10"/><div class="actions"><button class="primary">Sign in</button></div></form><a href="?">Use a different contact</a>
+{:else}<form use:enhance method="POST" action="?/request"><label for="identifier">Email or mobile number</label><input id="identifier" name="identifier" autocomplete="username" required maxlength="254"/><div class="actions"><button class="primary">Send sign-in code</button></div></form>{/if}</div>

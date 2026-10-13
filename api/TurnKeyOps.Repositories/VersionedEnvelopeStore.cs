@@ -35,6 +35,11 @@ public sealed class VersionedEnvelopeStore<T> where T : class, ITableEntity
         if(_createTables)await _table.CreateIfNotExistsAsync(ct);
         await foreach(var row in _table.QueryAsync<TableEntity>(TableClient.CreateQueryFilter($"PartitionKey eq {partition}"),cancellationToken:ct))yield return Read(row);
     }
+    public async IAsyncEnumerable<T> ListAllAsync([EnumeratorCancellation]CancellationToken ct)
+    {
+        if(_createTables)await _table.CreateIfNotExistsAsync(ct);
+        await foreach(var row in _table.QueryAsync<TableEntity>(maxPerPage:100,cancellationToken:ct))yield return Read(row);
+    }
     public async Task<T> SaveAsync(T entity,bool create,CancellationToken ct)
     {
         if(!create&&(string.IsNullOrEmpty(entity.ETag.ToString())||entity.ETag==ETag.All))throw new InvalidOperationException("A current record version is required.");

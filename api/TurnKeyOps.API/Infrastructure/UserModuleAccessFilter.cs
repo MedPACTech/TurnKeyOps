@@ -13,7 +13,7 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
     public static string? ModuleFor(string controller) => controller switch {
         "People" or "TenantMembership" or "Invite" or "Roles" or "AdminContactAccess" => "users",
         "Contacts" or "Customers" or "JobSites" => "contacts",
-        "Finance" => "finance",
+        "Finance" or "FinanceMigration" or "ConstructionFinance" or "FinanceOperations" or "ConstructionPayment" => "finance",
         "Inventory" => "inventory",
         "Purchasing" => "purchasing",
         "Jobs" or "JobWorkspace" or "Locksmith" => "jobs",
@@ -38,6 +38,7 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
             ? "users" : ModuleFor(action.ControllerName);
         if (module is null) { await next(); return; }
         var write = !HttpMethods.IsGet(context.HttpContext.Request.Method) && !HttpMethods.IsHead(context.HttpContext.Request.Method);
+        if(action.ControllerName=="FinanceMigration"&&action.ActionName=="Preview")write=false;
         if(action.ControllerName=="Finance"&&action.ActionName=="Bob"&&context.ActionArguments.TryGetValue("input",out var financeProposal)&&financeProposal is TurnKeyOps.Lib.Dtos.ProposeBobActionDto financeAction&&financeAction.ToolKey!="finance.draft-journal")write=false;
         if(action.ControllerName=="JobWorkspace"&&action.ActionName=="Bob"&&context.ActionArguments.TryGetValue("input",out var proposal)&&proposal is TurnKeyOps.Lib.Dtos.ProposeBobActionDto jobAction&&jobAction.ToolKey is "job.summarize" or "job.readiness" or "job.recommend" or "job.structure")write=false;
         if(action.ControllerName is "Inventory" or "Purchasing" && action.ActionName=="Bob" && context.ActionArguments.TryGetValue("input",out var supplyProposal)&&supplyProposal is TurnKeyOps.Lib.Dtos.ProposeBobActionDto supplyAction&&supplyAction.ToolKey is "supply.availability" or "supply.shortages" or "supply.sources" or "supply.purchasing")write=false;

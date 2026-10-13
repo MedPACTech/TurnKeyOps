@@ -1,0 +1,16 @@
+import {error,type RequestHandler} from '@sveltejs/kit';
+import {leadApi} from './leads';
+import {financeCsvCell} from './finance-export';
+import type {ConstructionWorkspace} from '$lib/construction-finance';
+export const GET:RequestHandler=async(event)=>{
+ const w=await leadApi<ConstructionWorkspace>(event,'finance/construction');const kind=event.url.searchParams.get('type')||'health';const job=event.url.searchParams.get('job'),trade=event.url.searchParams.get('trade');const include=(id:string)=>(!job||id===job)&&(!trade||w.tradeByJob?.[id]===trade);
+ let rows:unknown[][];
+ if(kind==='health')rows=[['Job ID','Contract','Actual cost','Remaining commitment','Forecast remaining','EAC','Projected profit','Projected margin','Exceptions'],...w.jobs.filter(j=>include(j.jobId)).map(j=>[j.jobId,j.contractValue,j.actualCost,j.remainingCommitment,j.remainingForecast,j.estimatedFinalCost,j.projectedProfit,j.projectedMargin,j.exceptions.join('; ')])];
+ else if(kind==='codes')rows=[['Job ID','Category','Cost code','Budget','Actual','Remaining commitment','Forecast remaining','EAC','Actual variance','Forecast variance','Allocation current','Unclassified','Evidence'],...(w.codeReport??[]).filter(r=>include(r.jobId)).map(r=>[r.jobId,r.category,r.costCode,r.budget,r.actual,r.remainingCommitment,r.forecastRemaining,r.estimatedFinalCost,r.actualVariance,r.forecastVariance,r.allocationCurrent,r.unclassified,r.allocationNote])];
+ else if(kind==='categories')rows=[['Job ID','Trade','Category','Budget','Actual','Remaining commitment','Forecast remaining','EAC','Actual variance','Forecast variance'],...(w.categoryReport??[]).filter(r=>include(r.jobId)).map(r=>[r.jobId,r.trade,r.category,r.budget,r.actual,r.remainingCommitment,r.forecastRemaining,r.estimatedFinalCost,r.actualVariance,r.forecastVariance])];
+ else if(kind==='billing')rows=[['Application ID','Job ID','Number','Status','Period start','Period end','Prior billed','Current billable','Retainage','Net due'],...w.state.applications.filter(a=>include(a.jobId)).map(a=>[a.id,a.jobId,a.number,a.status,a.periodStart,a.periodEnd,a.priorBilled,a.currentBilling,a.retainage,a.totalDue])];
+ else if(kind==='retainage')rows=[['Job ID','Retainage remaining'],...w.jobs.filter(j=>include(j.jobId)).map(j=>[j.jobId,j.retainageHeld])];
+ else if(kind==='wip'){const id=event.url.searchParams.get('snapshot');const snapshot=w.state.wipSnapshots.find(s=>s.id===id);if(!snapshot)error(404,'Choose a recorded WIP snapshot.');rows=[['Snapshot','Period','Status','Job ID','Contract','Actual cost','EAC','Percent complete','Earned revenue','Billed','Underbilling','Overbilling','Exceptions'],...snapshot.jobs.filter(j=>include(j.jobId)).map(j=>[snapshot.id,snapshot.periodId,snapshot.status,j.jobId,j.contractValue,j.actualCost,j.estimatedFinalCost,j.percentComplete,j.earnedRevenue,j.billed,j.underbilling,j.overbilling,j.exceptions.join('; ')])];}
+ else error(400,'Unsupported construction report.');
+ return new Response(rows.map(row=>row.map(financeCsvCell).join(',')).join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="construction-${kind}.csv"`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+};

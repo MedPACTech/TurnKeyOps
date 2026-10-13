@@ -45,6 +45,12 @@ public class Invoice : IEntity, ITableEntity
     public string? StripePaymentUrl { get; set; }
     public string? WorkflowPayloadBlobName { get; set; }
 
+    // Transactional dispatch marker: saved with the exact invoice/payload pointer that contains
+    // the financial event. Finance journals acknowledge source IDs, so redelivery is harmless.
+    public bool FinanceDispatchPending { get; set; }
+    public string? FinanceDispatchError { get; set; }
+    public DateTime? FinanceDispatchAttemptedAtUtc { get; set; }
+
     public string? Notes { get; set; }
 
     // --- Audit ---

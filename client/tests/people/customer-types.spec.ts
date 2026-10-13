@@ -13,7 +13,7 @@ for(const tenant of ['carlzipf','bdr','thinkpink']) test(`${tenant}: customer cl
  await expect(page.getByRole('group',{name:'Customer type',exact:true}).getByRole('button',{name:'Needs classification',exact:true})).toHaveCount(0);
  await page.getByRole('radio',{name:'Residential',exact:true}).check();
  await page.getByRole('button',{name:'Save customer',exact:true}).click();
- await expect(page.getByRole('status')).toHaveText('Customer saved.');
+ await expect(page.getByRole('status').filter({hasText:/^Customer saved\.$/})).toHaveText('Customer saved.');
  await page.reload();
  await expect(page.getByRole('radio',{name:'Residential',exact:true})).toBeChecked();
  await expect(page.getByRole('img',{name:'Residential customer',exact:true})).toBeVisible();
@@ -26,7 +26,7 @@ for(const tenant of ['carlzipf','bdr','thinkpink']) test(`${tenant}: customer cl
  await page.getByRole('radio',{name:'Commercial',exact:true}).check();
  await page.getByLabel('Company name',{exact:true}).fill('Acme Facilities');
  await page.getByRole('button',{name:'Save customer',exact:true}).click();
- await expect(page.getByRole('status')).toHaveText('Customer saved.');await page.reload();
+ await expect(page.getByRole('status').filter({hasText:/^Customer saved\.$/})).toHaveText('Customer saved.');await page.reload();
  await expect(page.getByRole('radio',{name:'Commercial',exact:true})).toBeChecked();
  await expect(page.getByRole('img',{name:'Commercial customer',exact:true})).toBeVisible();
  const list=page.getByRole('region',{name:'Customers',exact:true});

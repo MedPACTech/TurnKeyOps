@@ -37,6 +37,7 @@ public static class FinanceLedger
         if(date==default)throw new ArgumentException("Accounting date is required.");
         var period=state.Periods.SingleOrDefault(p=>date>=p.Start&&date<=p.End)??throw new ArgumentException("Create the accounting period before posting.");
         if(period.Status!="OPEN")throw new ArgumentException("This accounting period is closed to posting.");
+        if(type!="construction-wip"&&lines.Any(l=>l.JobId!=null&&(state.Construction.Accounts.Values.Contains(l.Account)||state.Accounts.Any(a=>a.Code==l.Account&&a.Type is "REVENUE" or "COST_OF_GOODS_SOLD"))&&state.Construction.WipSnapshots.Any(w=>w.Status=="POSTED"&&state.Periods.Any(p=>p.Id==w.PeriodId&&date<=p.End)&&w.Jobs.Any(j=>j.JobId==l.JobId))))throw new ArgumentException("Posted WIP locks construction cost, billing and revenue inputs for this period. Record corrections in the next open period.");
         if(lines.Length is <2 or >500 || lines.Sum(l=>l.Debit)!=lines.Sum(l=>l.Credit) || lines.Sum(l=>l.Debit)<=0)throw new ArgumentException("A journal requires balanced, positive debits and credits.");
         foreach(var line in lines)
         {
@@ -74,6 +75,9 @@ public static class FinanceLedger
         if(s.BankTransactions.Any(b=>b.Date<=period.End&&b.ReconciliationId is null))issues.Add("Imported bank activity is not reconciled.");
         if(s.OpenItems.Where(i=>i.Kind=="AR").Sum(i=>Balance(s,i,period.End))!=AccountBalance(s,s.Policy.Accounts["ar"],period.End))issues.Add("AR control does not reconcile.");
         if(s.OpenItems.Where(i=>i.Kind=="AP").Sum(i=>Balance(s,i,period.End))!=-AccountBalance(s,s.Policy.Accounts["ap"],period.End))issues.Add("AP control does not reconcile.");
+        if(s.Operations.ApRetainageAccount.Length>0&&-AccountBalance(s,s.Operations.ApRetainageAccount,period.End)!=s.Bills.Where(b=>b.JournalId is not null).Sum(b=>FinanceApRetainage.Held(s,b,period.End)))issues.Add("AP retainage payable does not reconcile to retained bills.");
+        issues.AddRange(FinanceOperationsEngine.CloseIssues(s,period));
+        issues.AddRange(ConstructionFinanceEngine.CloseIssues(s,period));
         return issues.ToArray();
     }
     public static FinanceJournal Settle(FinanceState s,FinanceCommand c,string actor,string kind)
@@ -82,6 +86,7 @@ public static class FinanceLedger
         var previous=s.Settlements.SingleOrDefault(p=>p.Kind==kind&&p.SourceKey==c.SourceKey);
         if(previous is not null){if(previous.PartyId!=c.PartyId||previous.Amount!=c.Amount||previous.Date!=c.Date||previous.CashAccount!=c.Account||previous.Reference!=c.Reference||Hash(previous.Allocations)!=Hash(c.Allocations))throw new ArgumentException("Settlement source key conflicts with recorded content.");return s.Journals.Single(j=>j.Id==previous.JournalId);}
         if(c.PartyId==Guid.Empty||c.Allocations.Length==0||c.Allocations.Sum(a=>a.Amount)!=c.Amount||c.Allocations.Select(a=>a.OpenItemId).Distinct().Count()!=c.Allocations.Length)throw new ArgumentException("Allocate the entire amount once to each item for a single party.");
+        if(kind=="vendor-credit"&&c.Allocations.Any(a=>s.Bills.Any(b=>b.Id==a.OpenItemId&&b.RetainageAmount>0)||s.Operations.ApRetainageEvents.Any(e=>e.Kind=="RELEASE"&&e.Id==a.OpenItemId)))throw new ArgumentException("Retained bills require the gross retained-bill credit workflow.");
         var ap=kind is "vendor-payment" or "vendor-credit" or "vendor-refund";var refund=kind is "refund" or "vendor-refund";var credit=kind is "credit" or "vendor-credit";
         foreach(var allocation in c.Allocations)
         {
@@ -113,6 +118,7 @@ public static class FinanceLedger
         var journal=Post(s,c.Date,kind,c.SourceKey,c.Reason.Length>0?c.Reason:c.Reference,lines,actor);
         if(kind=="vendor-credit")foreach(var line in lines.Where(l=>l.JobId is not null&&l.Credit>0))s.Costs.Add(new(Guid.NewGuid(),line.JobId!.Value,line.Category??"OTHER_DIRECT_COST",line.CostCode,-line.Credit,c.Date,"vendor-credit",c.SourceKey,journal.Id));
         s.Settlements.Add(new(c.Id,kind,c.PartyId,c.Date,c.Amount,c.Account,c.Method,c.Reference,c.SourceKey,journal.Id,c.Allocations.ToArray()));
+        if(kind=="vendor-credit")FinanceBillExtraAllocations.ApplyCredits(s);
         return journal;
     }
     public static string[] Match(FinanceBill bill,SupplyState supply,IEnumerable<FinanceBill> existing)

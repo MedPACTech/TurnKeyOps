@@ -234,9 +234,25 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<JobExecutionService>();
         services.AddScoped<ISupplyStore,SupplyStore>();
         services.AddScoped<IFinanceStore,FinanceStore>();
+        services.AddScoped<IFinanceSourceCoordinator,FinanceSourceCoordinator>();
+        services.AddScoped<FinanceInvoiceDispatch>();
+        services.AddHostedService<FinanceInvoiceWorker>();
+        services.AddScoped<FinanceMigrationService>();
         services.AddScoped<IFinanceAuthority,FinanceAuthority>();
         services.AddScoped<FinanceService>();
+        services.AddScoped<ConstructionFinanceService>();
+        services.AddScoped<IConstructionPaymentProvider,ConstructionStripePaymentProvider>();
+        services.AddScoped<ConstructionPaymentService>();
+        services.AddScoped<FinanceOperationsService>();
+        services.AddScoped<FinanceAccrualReversalRunner>();
+        services.AddHostedService<FinanceAccrualReversalWorker>();
+        services.AddScoped<FinanceHttpBankFeedProvider>();
+        services.AddHttpClient("FinanceBankFeed",c=>c.Timeout=TimeSpan.FromSeconds(30)).ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false});
         services.AddScoped<PortalFinanceService>();
+        foreach(var tool in new[]{"finance.time-blockers","finance.vendor-compliance"})
+            services.AddScoped<IBobActionProvider>(sp=>new BobFinanceOperationsActionProvider(sp.GetRequiredService<FinanceOperationsService>(),sp.GetRequiredService<TurnKeyOps.Lib.Utils.IUserContext>(),tool));
+        foreach(var tool in new[]{"finance.construction-health","finance.construction-wip","finance.construction-retainage","finance.construction-backlog"})
+            services.AddScoped<IBobActionProvider>(sp=>new BobConstructionFinanceActionProvider(sp.GetRequiredService<ConstructionFinanceService>(),sp.GetRequiredService<TurnKeyOps.Lib.Utils.IUserContext>(),tool));
         foreach(var tool in new[]{"finance.ar","finance.ap","finance.job-health","finance.cash","finance.close-readiness","finance.draft-journal"})
             services.AddScoped<IBobActionProvider>(sp=>new BobFinanceActionProvider(sp.GetRequiredService<FinanceService>(),sp.GetRequiredService<TurnKeyOps.Lib.Utils.IUserContext>(),tool));
         services.AddScoped<IPortalAccessStore,PortalAccessStore>();

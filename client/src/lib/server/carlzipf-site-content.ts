@@ -8,7 +8,7 @@ export function normalizeCarlZipfContent(value: unknown): CarlZipfSiteContent {
    if (typeof input !== 'string' || !input.trim() || input.length > 5000) return fallback;
    if (fallback.startsWith('#') && !/^(#[a-zA-Z][\w-]*|\/(?!\/)[^<>\\]*|https:\/\/[^<>\\]+|tel:\+?[\d-]+)$/.test(input)) return fallback;
    if (fallback.startsWith('/carlzipf/') && !/^\/[^/][^"<>\\]*$/.test(input)) return fallback;
-   return input;
+   return input.replaceAll("Ohio’s Lock Doctor Since 1911", "Columbus' Lock Doctor Since 1911");
   }
   if (Array.isArray(fallback)) return Array.isArray(input) && input.length <= 20 ? input.map((item) => merge(fallback[0], item)) : fallback;
   return Object.fromEntries(Object.entries(fallback).map(([key, item]) => [key, merge(item, input?.[key])]));

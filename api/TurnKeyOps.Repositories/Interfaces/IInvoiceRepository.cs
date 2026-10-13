@@ -7,4 +7,5 @@ public interface IInvoiceRepository : IBaseRepositoryAsync<Invoice>
 {
     Task<Invoice?> GetAsync(string partitionKey, string rowKey, CancellationToken ct = default);
     Task<IReadOnlyCollection<Invoice>> ListAsync(string partitionKey, CancellationToken ct = default);
+    Task<IReadOnlyCollection<Invoice>> ListFinanceDispatchPendingAsync(int limit, CancellationToken ct = default);
 }
