@@ -11,7 +11,7 @@ public sealed class BobFinanceActionProvider(FinanceService service,TurnKeyOps.L
     public async Task<object?> ExecuteAsync(BobActionExecutionContext context,JsonElement input,CancellationToken ct=default)
     {
         if(context.TenantId!=user.TenantId||context.ActorUserId!=user.UserId)throw new UnauthorizedAccessException();
-        if(tool!="finance.draft-journal")return await service.WorkspaceAsync(ct:ct);
+        if(tool!="finance.draft-journal")return await service.AnalyzeAsync(tool,input,ct);
         var command=input.Deserialize<FinanceCommand>(JobConfigurationService.Json)??throw new ArgumentException("Explicit journal draft required.");
         command.Action="draft-journal";return await service.CommandAsync(command,ct);
     }

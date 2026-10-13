@@ -1,7 +1,7 @@
 export const defaultCarlZipfContent = {
   "text": {
     "skip_to_content": "Skip to content",
-    "ohio_s_lock_doctor_since_1911": "Ohio’s Lock Doctor Since 1911",
+    "ohio_s_lock_doctor_since_1911": "Columbus' Lock Doctor Since 1911",
     "established_in_columbus": "Established in Columbus",
     "carl_zipf": "CARL ZIPF",
     "lock_shop": "LOCK SHOP",
@@ -108,7 +108,7 @@ export const defaultCarlZipfContent = {
   ],
   "commercialSeo": {
     "title": "Commercial Door Hardware & Installation in Columbus | Carl Zipf",
-    "description": "Carl Zipf Lock Shop supplies and installs commercial door hardware, electronic locking and specialty hardware in Columbus. Ohio’s Lock Doctor Since 1911."
+    "description": "Carl Zipf Lock Shop supplies and installs commercial door hardware, electronic locking and specialty hardware in Columbus. Columbus' Lock Doctor Since 1911."
   },
   "residentialSeo": {
     "title": "Residential Doors, Locks & Rekeying in Columbus | Carl Zipf",

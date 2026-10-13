@@ -6,7 +6,8 @@ using TurnKeyOps.Services.Interfaces;
 namespace TurnKeyOps.Services;
 
 public sealed class FinanceService(IFinanceStore store, IFinanceAuthority authority, IUserContext user,
-    IInvoiceService invoices, IJobService jobs, ISupplyStore supplyStore, TurnKeyOps.Repositories.Interfaces.ICustomerRepository customers, IQuoteEstimateService? estimates=null)
+    IInvoiceService invoices, IJobService jobs, ISupplyStore supplyStore, TurnKeyOps.Repositories.Interfaces.ICustomerRepository customers, IQuoteEstimateService? estimates=null,
+    IFinanceSourceCoordinator? coordinator=null, FinanceInvoiceDispatch? dispatch=null)
 {
     public async Task<object> WorkspaceAsync(DateOnly? from=null,DateOnly? asOf=null,CancellationToken ct=default)
     {
@@ -14,39 +15,61 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
         var s=await store.ReadAsync(user.TenantId,ct);
         var end=asOf??DateOnly.FromDateTime(DateTime.UtcNow);var start=from??new DateOnly(end.Year,end.Month,1);
         if(start>end)throw new ArgumentException("Report start must precede as-of date.");
+        var bankSuggestions=s.BankTransactions.Where(b=>b.JournalId is null&&!s.Operations.BankSplits.Any(x=>x.BankTransactionId==b.Id)).Select(b=>new{b.Id,Candidates=BankCandidates(s,b)}).ToArray();
+        var closeReadiness=s.Periods.Select(p=>new{p.Id,Issues=FinanceLedger.CloseIssues(s,p)}).ToArray();
+        var canControl=await authority.CanControlAsync(ct);
+        if(!canControl)
+        {
+            s=JobConfigurationService.Clone(s);
+            s.Operations=new FinanceOperationsState();
+            s.Costs=s.Costs.Select(c=>c with{Rate=null,Hours=null}).ToList();
+        }
         var supply=await supplyStore.ReadAsync(user.TenantId,ct);
         var jobChoices=(await jobs.GetActiveAsync(ct)).Select(j=>new{j.Id,j.Name}).ToArray();
-        return new{JobChoices=jobChoices,Vendors=supply.Vendors.Where(v=>v.Active).Select(v=>new{Id=v.ContactId,v.Name}).ToArray(),Orders=supply.Orders.Select(o=>new{o.Id,o.Number,o.VendorId,Lines=o.Lines.Select(l=>new{l.Id,l.Description,l.Quantity,l.UnitCost}).ToArray()}).ToArray(),State=s,Reports=FinanceLedger.Reports(s,start,end),CanWrite=await authority.CanWriteAsync(ct),CanControl=await authority.CanControlAsync(ct),
-            Jobs=s.Budgets.Select(b=>JobHealth(s,supply,b,end)).ToArray(),
-            Close=s.Periods.Select(p=>new{p.Id,Issues=FinanceLedger.CloseIssues(s,p)}).ToArray(),
-            Suggestions=s.BankTransactions.Where(b=>b.JournalId is null).Select(b=>new{b.Id,Candidates=BankCandidates(s,b)}).ToArray()};
+        return new{JobChoices=jobChoices,Vendors=supply.Vendors.Where(v=>v.Active).Select(v=>new{Id=v.ContactId,v.Name}).ToArray(),Orders=supply.Orders.Select(o=>new{o.Id,o.Number,o.VendorId,Lines=o.Lines.Select(l=>new{l.Id,l.Description,l.Quantity,l.UnitCost}).ToArray()}).ToArray(),State=s,Reports=FinanceLedger.Reports(s,start,end),CanWrite=await authority.CanWriteAsync(ct),CanControl=canControl,
+            Jobs=s.Budgets.Select(b=>JobHealth(s,supply,b,end)).ToArray(),Forecast=FinanceInsights.Forecast(s,end),InvoiceDispatch=dispatch is null?null:await dispatch.GetStatusAsync(user.TenantId,ct),
+            Close=closeReadiness,
+            Suggestions=bankSuggestions};
+    }
+    public async Task<object> AnalyzeAsync(string tool,JsonElement input,CancellationToken ct=default)
+    {
+        await authority.RequireAsync(false,ct);
+        var date=DateOnly.FromDateTime(DateTime.UtcNow);
+        if(input.ValueKind==JsonValueKind.Object&&input.TryGetProperty("asOf",out var selected))
+        {
+            if(selected.ValueKind!=JsonValueKind.String||!DateOnly.TryParseExact(selected.GetString(),"yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out date))throw new ArgumentException("Use an ISO yyyy-MM-dd as-of date.");
+        }
+        return FinanceInsights.Review(await store.ReadAsync(user.TenantId,ct),await supplyStore.ReadAsync(user.TenantId,ct),tool,date);
     }
     public static object JobHealth(FinanceState s,SupplyState supply,FinanceJobBudget b,DateOnly asOf)
     {
         var actual=s.Costs.Where(c=>c.JobId==b.JobId&&c.Date<=asOf).ToArray();
-        var committed=supply.Orders.Where(o=>o.Status is "APPROVED" or "SENT" or "ACKNOWLEDGED" or "PARTIALLY_RECEIVED" or "RECEIVED").Sum(o=>o.Lines.Where(l=>supply.Demands.Any(d=>d.Id==l.DemandId&&d.JobId==b.JobId)).Sum(l=>Math.Max(0,l.Quantity-s.Bills.Where(bill=>bill.OrderId==o.Id&&bill.Status=="POSTED"&&bill.Date<=asOf).SelectMany(bill=>bill.Lines).Where(line=>line.OrderLineId==l.Id).Sum(line=>line.Quantity))*l.UnitCost));
+        var committed=FinanceMigrationCommitments.Remaining(s,supply,b.JobId,asOf);
         var revenue=s.Journals.Where(j=>j.Date<=asOf).SelectMany(j=>j.Lines).Where(l=>l.JobId==b.JobId&&s.Accounts.Any(a=>a.Code==l.Account&&a.Type is "REVENUE" or "OTHER_INCOME")).Sum(l=>l.Credit-l.Debit);
         var total=actual.Sum(c=>c.Amount);var contract=b.Sold+b.ApprovedChanges;
-        var complete=b.TaxBasisKnown&&b.ActualsComplete&&b.Categories.Values.All(v=>v.HasValue);
-        return new{b.JobId,ContractValue=b.Sold,b.ApprovedChanges,CurrentValue=contract,Budget=b.Categories,Committed=committed,Actual=total,Revenue=revenue,Categories=actual.GroupBy(c=>c.Category).Select(g=>new{Category=g.Key,Amount=g.Sum(c=>c.Amount)}).ToArray(),GrossProfit=complete?(decimal?)(revenue-total):null,GrossMargin=complete&&revenue!=0?(decimal?)((revenue-total)/revenue*100):null,CostDataIncomplete=!complete,b.CompletenessNote,SourceIds=actual.Select(c=>new{c.SourceType,c.SourceId,c.JournalId}).ToArray()};
+        var complete=b.TaxBasisKnown&&b.ActualsComplete&&b.Categories.Values.All(v=>v.HasValue)&&!actual.Any(c=>c.SourceType=="migration-job-cost")&&!FinanceBillExtraAllocations.Outstanding(s,b.JobId,asOf);
+        return new{b.JobId,ContractValue=b.Sold,b.ApprovedChanges,CurrentValue=contract,Budget=b.Categories,Committed=committed,CommitmentSources=FinanceInsights.Commitments(s,supply,b.JobId,asOf),ImportedCommitmentSources=s.ImportedCommitments.Where(c=>c.JobId==b.JobId&&c.Date<=asOf).ToArray(),Actual=total,Revenue=revenue,Categories=actual.GroupBy(c=>c.Category).Select(g=>new{Category=g.Key,Amount=g.Sum(c=>c.Amount)}).ToArray(),GrossProfit=complete?(decimal?)(revenue-total):null,GrossMargin=complete&&revenue!=0?(decimal?)((revenue-total)/revenue*100):null,CostDataIncomplete=!complete,CompletenessNote=FinanceBillExtraAllocations.Outstanding(s,b.JobId,asOf)?"Bill tax or shipping remains unallocated; profitability is unknown. "+b.CompletenessNote:actual.Any(c=>c.SourceType=="migration-job-cost")?"Historical earned revenue is not mapped; profitability remains unknown. "+b.CompletenessNote:b.CompletenessNote,SourceIds=actual.Select(c=>new{c.SourceType,c.SourceId,c.JournalId}).ToArray()};
     }
     public static object[] BankCandidates(FinanceState s,FinanceBankTransaction b)
     {
         var account=s.CashAccounts.Single(a=>a.Id==b.CashAccountId);
-        return s.Journals.Where(j=>Math.Abs(j.Date.DayNumber-b.Date.DayNumber)<=3&&j.Lines.Where(l=>l.Account==account.LedgerAccount).Sum(l=>l.Debit-l.Credit)==b.Amount&&!s.BankTransactions.Any(t=>t.CashAccountId==b.CashAccountId&&t.JournalId==j.Id)).Select(j=>(object)new{j.Id,j.Date,j.Memo,j.SourceType,j.SourceId,Confidence=j.Date==b.Date&&j.SourceId==b.Reference?"exact":"review required"}).ToArray();
+        return s.Journals.Where(j=>Math.Abs(j.Date.DayNumber-b.Date.DayNumber)<=3&&j.Lines.Where(l=>l.Account==account.LedgerAccount).Sum(l=>l.Debit-l.Credit)==b.Amount&&!s.BankTransactions.Any(t=>t.CashAccountId==b.CashAccountId&&t.JournalId==j.Id)&&!s.Operations.BankSplits.Any(x=>x.JournalId==j.Id&&s.BankTransactions.Any(t=>t.Id==x.BankTransactionId&&t.CashAccountId==b.CashAccountId))).Select(j=>(object)new{j.Id,j.Date,j.Memo,j.SourceType,j.SourceId,Confidence=j.Date==b.Date&&j.SourceId==b.Reference?"exact":"review required"}).ToArray();
     }
     public async Task<object> CommandAsync(FinanceCommand c,CancellationToken ct=default)
     {
         await authority.RequireAsync(true,ct);
         if(c.Id==Guid.Empty)throw new ArgumentException("Command identity is required.");
-        if(c.Action is "initialize" or "period" or "close" or "reopen" or "policy" or "post-journal" or "reverse" or "approve-bill" or "opening-import" or "reconcile" or "post-draft" or "budget-review" or "cost-completeness")
+        if(c.Action is "initialize" or "period" or "close" or "reopen" or "policy" or "post-journal" or "reverse" or "approve-bill" or "opening-import" or "reconcile" or "post-draft" or "budget-review" or "cost-completeness" or "correct-job-change" or "allocate-bill-extras" or "release-ap-retainage" or "credit-retained-bill")
             if(!await authority.CanControlAsync(ct))throw new MedInsights.Lib.ForbiddenAccessException("An authorized Finance owner must explicitly perform this control action.");
+        await using var sourceLease=coordinator is not null&&c.Action is ("close" or "sync-invoices" or "opening-import" or "payment" or "refund" or "credit")?await coordinator.AcquireAsync(user.TenantId,ct):null;
         var s=await store.ReadAsync(user.TenantId,ct);var expected=c.ExpectedVersion;
         var fingerprint=FinanceLedger.Hash(new{c.Id,c.Action,c.Target,c.Reason,c.Date,c.EndDate,c.Amount,c.OpeningBalance,c.Reference,c.Method,c.PartyId,c.JobId,c.Category,c.CostCode,c.Account,c.SourceKey,c.Hours,c.Rate,c.Lines,c.Allocations,c.ChartAccount,c.Bill,c.Code,c.CashAccount,c.BankTransactions,c.Policy,c.Budget,c.Complete,c.ArControl,c.ApControl,c.ImportOpenItems});
         var old=s.Audit.SingleOrDefault(a=>a.CommandId==c.Id);
         if(old is not null){if(old.Fingerprint!=fingerprint)throw new ArgumentException("Command identity was reused with different content.");return new{Version=s.Version,Replayed=true};}
         if(expected!=s.Version)throw new InvalidOperationException("Finance changed. Refresh before retrying.");
         var actor=user.UserId.ToString("D");
+        if(c.Action is "post-journal" or "draft-journal" && c.Lines.Any(l=>(s.Construction.Accounts.Values.Contains(l.Account)||l.Account==s.Operations.ApRetainageAccount)))throw new ArgumentException("Use construction subledger commands for construction control accounts.");
+        if(c.Action=="post-draft" && s.JournalDrafts.Where(d=>d.Id.ToString()==c.Target).SelectMany(d=>d.Lines).Any(l=>(s.Construction.Accounts.Values.Contains(l.Account)||l.Account==s.Operations.ApRetainageAccount)))throw new ArgumentException("Construction control accounts require source transactions.");
         if(c.Action!="initialize"&&s.Accounts.Count==0)throw new ArgumentException("Initialize Finance first.");
         switch(c.Action)
         {
@@ -98,34 +121,50 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
                 FinanceLedger.Required(bill.Number);
                 if(bill.Date==default||bill.DueDate<bill.Date||bill.Lines.Count==0||bill.Tax<0||bill.Shipping<0)throw new ArgumentException("Bill dates and amounts are invalid.");
                 foreach(var line in bill.Lines){if(line.CostCode is not null&&!s.CostCodes.Any(code=>code.Code==line.CostCode&&code.Category==line.Category&&code.Active))throw new ArgumentException("Bill cost code must match its category.");FinanceLedger.Positive(line.Quantity);FinanceLedger.Money(line.UnitCost);if(line.UnitCost<0||!FinanceLedger.Categories.Contains(line.Category))throw new ArgumentException("Invalid bill cost.");if(line.JobId is Guid jobId)await RequireJob(jobId,ct);}
-                FinanceLedger.Positive(bill.Total);bill.Status="PENDING_APPROVAL";bill.JournalId=null;
+                FinanceApRetainage.ValidateBill(s,bill);
+                FinanceLedger.Money(bill.Tax);FinanceLedger.Money(bill.Shipping);FinanceLedger.Positive(bill.Total);bill.Status="PENDING_APPROVAL";bill.JournalId=null;
+                FinanceMigrationCommitments.ValidateBill(s,bill);
                 bill.MatchExceptions=FinanceLedger.Match(bill,await supplyStore.ReadAsync(user.TenantId,ct),s.Bills);
                 if(bill.MatchExceptions.Contains("Duplicate vendor invoice number."))throw new ArgumentException("Duplicate vendor invoice number.");
                 s.Bills.Add(bill);break;
+            case "allocate-bill-extras":
+                foreach(var allocation in c.Lines){if(allocation.JobId is not Guid allocatedJob)throw new ArgumentException("Every bill-extra allocation requires a canonical Job.");await RequireJob(allocatedJob,ct);}
+                FinanceBillExtraAllocations.Allocate(s,c,actor);break;
             case "approve-bill":
                 var approved=s.Bills.SingleOrDefault(b=>b.Id.ToString()==c.Target&&b.Status=="PENDING_APPROVAL")??throw new ArgumentException("Bill not pending approval.");
+                FinanceMigrationCommitments.ValidateBill(s,approved);
                 approved.MatchExceptions=FinanceLedger.Match(approved,await supplyStore.ReadAsync(user.TenantId,ct),s.Bills);
                 if(s.Policy.Matching=="strict"&&approved.MatchExceptions.Length>0)throw new ArgumentException(string.Join(" ",approved.MatchExceptions));
                 if(s.Policy.Matching=="warning"&&approved.MatchExceptions.Length>0)FinanceLedger.Required(c.Reason);
                 var billLines=approved.Lines.Select(l=>new FinanceLine(l.Account,l.Amount,0,l.JobId,l.CostCode,VendorId:approved.VendorId,Description:l.Description,Category:l.Category)).ToList();
                 if(approved.Tax+approved.Shipping>0)billLines.Add(new(s.Policy.Accounts["cost"],approved.Tax+approved.Shipping,0,VendorId:approved.VendorId,Description:"Purchase tax and shipping (unallocated)"));
-                billLines.Add(new(s.Policy.Accounts["ap"],0,approved.Total,VendorId:approved.VendorId));
+                FinanceApRetainage.ValidateBill(s,approved);
+                if(approved.NetPayable>0)billLines.Add(new(s.Policy.Accounts["ap"],0,approved.NetPayable,VendorId:approved.VendorId));
+                if(approved.RetainageAmount>0)billLines.Add(new(FinanceApRetainage.Account(s),0,approved.RetainageAmount,VendorId:approved.VendorId));
                 if(approved.Lines.Any(l=>l.Account==s.Policy.Accounts["ar"]||l.Account==s.Policy.Accounts["ap"]||!s.Accounts.Any(a=>a.Code==l.Account&&a.Type is "EXPENSE" or "COST_OF_GOODS_SOLD")))throw new ArgumentException("V1 bills use expense/direct-cost accounts.");
                 var posted=FinanceLedger.Post(s,approved.Date,"vendor-bill",approved.Id.ToString(),approved.Number,billLines.ToArray(),actor);
-                approved.JournalId=posted.Id;approved.Status="APPROVED";s.OpenItems.Add(new(approved.Id,"AP",approved.VendorId,approved.Number,approved.Date,approved.DueDate,approved.Total,posted.Id,ExternalId:approved.ExternalId));
+                approved.JournalId=posted.Id;approved.Status="APPROVED";if(approved.NetPayable>0)s.OpenItems.Add(new(approved.Id,"AP",approved.VendorId,approved.Number,approved.Date,approved.DueDate,approved.NetPayable,posted.Id,ExternalId:approved.ExternalId));
                 foreach(var line in approved.Lines.Where(l=>l.JobId is not null))s.Costs.Add(new(Guid.NewGuid(),line.JobId!.Value,line.Category,line.CostCode,line.Amount,approved.Date,"vendor-bill",approved.Id.ToString(),posted.Id));break;
+            case "release-ap-retainage":FinanceApRetainage.Apply(s,c,actor,false);break;
+            case "credit-retained-bill":FinanceApRetainage.Apply(s,c,actor,true);break;
             case "void-bill":
                 var draft=s.Bills.SingleOrDefault(b=>b.Id.ToString()==c.Target&&b.JournalId is null)??throw new ArgumentException("Only unposted bills can be voided.");FinanceLedger.Required(c.Reason);draft.Status="VOID";break;
             case "payment":case "credit":case "refund":case "vendor-payment":case "vendor-credit":case "vendor-refund":
+                if(c.Action is "payment" or "refund" or "credit"&&c.Allocations.Any(a=>s.ConstructionPayments.Any(p=>p.OpenItemId==a.OpenItemId&&p.Status is "PENDING" or "READY" or "CANCEL_PENDING" or "RECEIVED")))throw new ArgumentException("Cancel or reconcile the active construction checkout before changing its receivable balance.");
                 if(s.Settlements.Any(p=>p.SourceKey==c.SourceKey&&p.Kind==c.Action))throw new ArgumentException("Settlement source key already exists.");
                 FinanceLedger.Settle(s,c,actor,c.Action);break;
             case "cost-code":
                 var code=c.Code??throw new ArgumentException("Cost code required.");FinanceLedger.Required(code.Code);FinanceLedger.Required(code.Name);
                 if(!FinanceLedger.Categories.Contains(code.Category))throw new ArgumentException("Unknown cost category.");
-                if(s.CostCodes.Any(x=>x.Code==code.Code)&&s.Costs.Any(x=>x.CostCode==code.Code))throw new ArgumentException("Used cost codes cannot be redefined.");
+                var usedConstructionCode=s.Construction.CodeBudgets.Any(b=>b.Status=="REVIEWED"&&b.Lines.Any(l=>l.CostCode==code.Code))||s.Construction.CommitmentCodings.Any(coding=>coding.CostCode==code.Code)||s.Construction.Forecasts.Any(f=>f.Costs?.Any(cost=>cost.CostCode==code.Code)==true)||s.Construction.Contracts.Any(contract=>contract.Lines.Any(line=>line.CostCode==code.Code))||s.Construction.ContractRevisions.Any(revision=>revision.Contract.Lines.Any(line=>line.CostCode==code.Code));
+                if(s.CostCodes.Any(x=>x.Code==code.Code)&&(s.Costs.Any(x=>x.CostCode==code.Code)||usedConstructionCode))throw new ArgumentException("Used cost codes cannot be redefined.");
                 s.CostCodes.RemoveAll(x=>x.Code==code.Code);s.CostCodes.Add(code);break;
             case "seed-budget": await SeedBudget(s,c,ct);break;
             case "sync-job-changes": await SyncJobChanges(s,c,ct);break;
+            case "correct-job-change":
+                if(c.JobId is not Guid correctionJobId)throw new ArgumentException("Canonical Job required.");
+                var correctionJob=await jobs.GetAsync(correctionJobId,ct)??throw new ArgumentException("Job is unavailable in this tenant.");
+                FinanceContractCorrections.Cancel(s,c,correctionJob,actor);break;
             case "budget-review":
                 var reviewed=s.Budgets.SingleOrDefault(b=>b.JobId==c.JobId)??throw new ArgumentException("Seed accepted Job budget first.");
                 FinanceLedger.Required(c.Reason);
@@ -144,7 +183,7 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
                 if(c.CostCode is not null&&!s.CostCodes.Any(code=>code.Code==c.CostCode&&code.Category==c.Category&&code.Active))throw new ArgumentException("Cost code must match the cost category.");
                 if(s.Costs.Any(x=>x.SourceType=="job-cost"&&x.SourceId==c.SourceKey))throw new ArgumentException("Cost source already recorded.");
                 if(c.Category=="LABOR"&&(c.Hours is null||c.Rate is null||c.Hours<=0||c.Rate<0||Math.Round(c.Hours.Value*c.Rate.Value,2,MidpointRounding.AwayFromZero)!=c.Amount))throw new ArgumentException("Labor cost must equal recorded hours times authorized rate.");
-                if(s.Policy.Accounts.Where(a=>a.Key!="equity").Any(a=>a.Value==c.Account)||!s.Accounts.Any(a=>a.Code==c.Account&&a.Type is "LIABILITY" or "EQUITY"))throw new ArgumentException("Use an accrual/equity offset for incurred costs; vendor bills handle vendor obligations.");
+                if(c.Account==s.Operations.ApRetainageAccount||s.Construction.Accounts.Values.Contains(c.Account)||s.Policy.Accounts.Where(a=>a.Key!="equity").Any(a=>a.Value==c.Account)||!s.Accounts.Any(a=>a.Code==c.Account&&a.Type is "LIABILITY" or "EQUITY"))throw new ArgumentException("Use an accrual/equity offset for incurred costs; vendor bills handle vendor obligations.");
                 var costJournal=FinanceLedger.Post(s,c.Date,"job-cost",c.SourceKey,c.Reason,[new(s.Policy.Accounts["cost"],c.Amount,0,jid,c.CostCode,Category:c.Category),new(c.Account,0,c.Amount)],actor);
                 s.Costs.Add(new(Guid.NewGuid(),jid,c.Category,c.CostCode,c.Amount,c.Date,"job-cost",c.SourceKey,costJournal.Id,c.Hours,c.Rate));break;
             case "cash-account":
@@ -185,28 +224,8 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
             var page=await invoices.GetPagedAsync(100,token);token=page.ContinuationToken;
             foreach(var invoice in page.Items)
             {
-                if(invoice.Status==InvoiceStatus.Draft)continue;
-                if(invoice.Status==InvoiceStatus.Void){if(s.OpenItems.Any(i=>i.Id==invoice.Id&&i.Kind=="AR"))throw new ArgumentException("A posted invoice was voided upstream; record an authorized credit before reconciliation.");continue;}
-                await RequireCustomer(invoice.CustomerId,ct);
-                FinanceLedger.Positive(invoice.Total);FinanceLedger.Money(invoice.Subtotal);FinanceLedger.Money(invoice.TaxAmount);
-                if(invoice.Subtotal+invoice.TaxAmount!=invoice.Total||invoice.TaxAmount<0||invoice.Subtotal<0)throw new ArgumentException("Invoice totals do not reconcile.");
-                if(invoice.CustomerId==Guid.Empty)throw new ArgumentException("Invoice needs a canonical Customer before posting.");
-                var lines=new List<FinanceLine>{new(s.Policy.Accounts["ar"],invoice.Total,0,invoice.JobId,CustomerId:invoice.CustomerId)};
-                if(invoice.Subtotal>0)lines.Add(new(s.Policy.Accounts["revenue"],0,invoice.Subtotal,invoice.JobId,CustomerId:invoice.CustomerId));
-                if(invoice.TaxAmount>0)lines.Add(new(s.Policy.Accounts["tax"],0,invoice.TaxAmount,invoice.JobId,CustomerId:invoice.CustomerId));
-                var journal=FinanceLedger.Post(s,DateOnly.FromDateTime(invoice.IssueDate),"invoice",invoice.Id.ToString(),invoice.InvoiceNumber,lines.ToArray(),actor);
-                if(!s.OpenItems.Any(i=>i.Id==invoice.Id&&i.Kind=="AR"))s.OpenItems.Add(new(invoice.Id,"AR",invoice.CustomerId,invoice.InvoiceNumber,DateOnly.FromDateTime(invoice.IssueDate),DateOnly.FromDateTime(invoice.DueDate),invoice.Total,journal.Id,invoice.JobId,invoice.EstimateId?.ToString()));
-                foreach(var payment in invoice.Payments.Where(p=>p.Status=="succeeded"))
-                {
-                    if(payment.FinanceSettlementId is Guid settlementId){if(!s.Settlements.Any(p=>p.Id==settlementId&&p.Allocations.Any(a=>a.OpenItemId==invoice.Id&&a.Amount==payment.Amount)))throw new ArgumentException("Finance settlement provenance does not match the invoice.");continue;}
-                    FinanceLedger.Positive(payment.Amount);
-                    var refund=payment.Kind=="refund";var kind=refund?"refund":"payment";
-                    var key=$"{invoice.Id}:{payment.IdempotencyKey}";
-                    var settlement=s.Settlements.SingleOrDefault(p=>p.SourceKey==key&&p.Kind==kind);
-                    FinanceLine[] paymentLines=[new(s.Policy.Accounts["cash"],refund?0:payment.Amount,refund?payment.Amount:0),new(s.Policy.Accounts["ar"],refund?payment.Amount:0,refund?0:payment.Amount,invoice.JobId,CustomerId:invoice.CustomerId)];
-                    var posted=FinanceLedger.Post(s,DateOnly.FromDateTime(payment.OccurredAtUtc),kind,key,payment.ExternalReference??key,paymentLines,actor);
-                    if(settlement is null)s.Settlements.Add(new(payment.Id,kind,invoice.CustomerId,DateOnly.FromDateTime(payment.OccurredAtUtc),payment.Amount,"operating",payment.Method,payment.ExternalReference??"",key,posted.Id,[new(invoice.Id,payment.Amount)],Origin:"invoice-event"));
-                }
+                if(invoice.Status is not (InvoiceStatus.Draft or InvoiceStatus.Void))await RequireCustomer(invoice.CustomerId,ct);
+                FinanceInvoicePosting.Apply(s,invoice,actor);
             }
         }while(token is not null);
     }
@@ -232,6 +251,7 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
         if(c.JobId is not Guid id)throw new ArgumentException("Job required.");
         var job=await jobs.GetAsync(id,ct)??throw new ArgumentException("Job unavailable.");
         var budget=s.Budgets.SingleOrDefault(b=>b.JobId==id)??throw new ArgumentException("Seed the accepted baseline first.");
+        var categories=new Dictionary<string,decimal?>(budget.Categories);
         foreach(var change in job.Execution?.Changes.Where(c=>c.PricingImpact&&c.Status is "APPROVED" or "IMPLEMENTED")??[])
         {
             if(s.JobChanges.Any(v=>v.ChangeId==change.Id))continue;
@@ -242,10 +262,12 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
             if(revision?.ApprovalSignature is null||revision.Pricing is null)throw new ArgumentException("The exact accepted change revision has no authoritative price breakdown.");
             var selected=revision.Pricing.Options.Where(o=>o.Required||revision.AcceptedOptionIds.Contains(o.Id)).ToArray();
             if(selected.Sum(o=>o.Total)!=revision.ApprovalSignature.Total)throw new ArgumentException("Accepted change pricing does not reconcile to signed total.");
-            s.JobChanges.Add(new(id,change.Id,estimateId,revision.RevisionNumber,revision.DocumentHash,selected.Sum(o=>o.Total-o.Tax)));
+            var impacts=selected.SelectMany(o=>o.Lines).GroupBy(l=>l.Kind.ToUpperInvariant() switch{"MATERIAL"=>"MATERIAL","LABOR"=>"LABOR","EQUIPMENT"=>"EQUIPMENT","SUBCONTRACT"=>"SUBCONTRACT",_=>"OTHER_DIRECT_COST"}).ToDictionary(g=>g.Key,g=>g.All(l=>l.Cost.HasValue)?(decimal?)g.Sum(l=>l.Cost!.Value):null);
+            foreach(var impact in impacts)categories[impact.Key]=categories.TryGetValue(impact.Key,out var original)&&original.HasValue&&impact.Value.HasValue?original.Value+impact.Value.Value:null;
+            s.JobChanges.Add(new(id,change.Id,estimateId,revision.RevisionNumber,revision.DocumentHash,selected.Sum(o=>o.Total-o.Tax),impacts,revision.ApprovalSignature.SignedAtUtc,FinanceLedger.Hash(revision.ApprovalSignature)));
         }
-        if(s.JobChanges.Where(v=>v.JobId==id).Any(v=>!job.Execution!.Changes.Any(c=>c.Id==v.ChangeId&&c.Status is "APPROVED" or "IMPLEMENTED")))throw new ArgumentException("A previously accepted financial change was cancelled. Review a controlled contract correction.");
-        s.Budgets.Remove(budget);s.Budgets.Add(budget with{ApprovedChanges=s.JobChanges.Where(v=>v.JobId==id).Sum(v=>v.NetValue),ActualsComplete=false,CompletenessNote="Approved changes refreshed from signed pricing. Review cost budget and completeness."});
+        if(s.JobChanges.Where(v=>v.JobId==id).Any(v=>!job.Execution!.Changes.Any(c=>c.Id==v.ChangeId&&c.Status is "APPROVED" or "IMPLEMENTED")&&s.ContractCorrections.Where(r=>r.ChangeId==v.ChangeId).Sum(r=>r.Amount)!=-v.NetValue))throw new ArgumentException("A previously accepted financial change was cancelled. Review a controlled contract correction.");
+        s.Budgets.Remove(budget);s.Budgets.Add(budget with{Categories=categories,ApprovedChanges=s.JobChanges.Where(v=>v.JobId==id).Sum(v=>v.NetValue)+s.ContractCorrections.Where(v=>v.JobId==id).Sum(v=>v.Amount),ActualsComplete=false,CompletenessNote="Approved changes refreshed from signed pricing. Review cost budget and completeness."});
     }
     private static void ImportBank(FinanceState s,FinanceCommand c)
     {
@@ -263,10 +285,10 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
     }
     private static void MatchBank(FinanceState s,FinanceCommand c,string actor)
     {
-        var bank=s.BankTransactions.SingleOrDefault(b=>b.Id.ToString()==c.Target&&b.JournalId is null)??throw new ArgumentException("Unmatched bank activity not found.");
+        var bank=s.BankTransactions.SingleOrDefault(b=>b.Id.ToString()==c.Target&&b.JournalId is null&&!s.Operations.BankSplits.Any(x=>x.BankTransactionId==b.Id))??throw new ArgumentException("Unmatched bank activity not found.");
         var journal=s.Journals.SingleOrDefault(j=>j.Id.ToString()==c.Reference)??throw new ArgumentException("Journal unavailable.");
         var account=s.CashAccounts.Single(a=>a.Id==bank.CashAccountId);
-        if(journal.Lines.Where(l=>l.Account==account.LedgerAccount).Sum(l=>l.Debit-l.Credit)!=bank.Amount||s.BankTransactions.Any(b=>b.CashAccountId==bank.CashAccountId&&b.JournalId==journal.Id))throw new ArgumentException("Match amount differs or journal is already matched.");
+        if(journal.Lines.Where(l=>l.Account==account.LedgerAccount).Sum(l=>l.Debit-l.Credit)!=bank.Amount||s.BankTransactions.Any(b=>b.CashAccountId==bank.CashAccountId&&b.JournalId==journal.Id)||s.Operations.BankSplits.Any(x=>x.JournalId==journal.Id&&s.BankTransactions.Any(b=>b.Id==x.BankTransactionId&&b.CashAccountId==bank.CashAccountId)))throw new ArgumentException("Match amount differs or journal is already matched.");
         FinanceLedger.Required(c.Reason);bank.JournalId=journal.Id;bank.ConfirmedBy=actor;
     }
     private static void Reconcile(FinanceState s,FinanceCommand c,string actor)
@@ -275,8 +297,8 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
         if(c.Date==default||c.EndDate<c.Date||s.Reconciliations.Any(r=>r.CashAccountId==c.Account&&r.Start<=c.EndDate&&r.End>=c.Date))throw new ArgumentException("Reconciliation dates overlap or are invalid.");
         FinanceLedger.Money(c.Amount);FinanceLedger.Money(c.OpeningBalance);FinanceLedger.Required(c.Reference);
         var transactions=s.BankTransactions.Where(b=>b.CashAccountId==c.Account&&b.Date>=c.Date&&b.Date<=c.EndDate).ToArray();
-        if(transactions.Any(b=>b.JournalId is null)||c.OpeningBalance+transactions.Sum(b=>b.Amount)!=c.Amount||FinanceLedger.AccountBalance(s,account.LedgerAccount,c.EndDate)!=c.Amount||FinanceLedger.AccountBalance(s,account.LedgerAccount,c.Date.AddDays(-1))!=c.OpeningBalance)throw new ArgumentException("Unmatched activity or statement/ledger balance difference prevents reconciliation.");
-        if(s.Journals.Where(j=>j.Date>=c.Date&&j.Date<=c.EndDate&&j.Lines.Any(l=>l.Account==account.LedgerAccount)).Any(j=>!transactions.Any(b=>b.JournalId==j.Id)))throw new ArgumentException("Ledger cash activity is missing from the statement match set.");
+        if(transactions.Any(b=>b.JournalId is null&&!s.Operations.BankSplits.Any(x=>x.BankTransactionId==b.Id))||c.OpeningBalance+transactions.Sum(b=>b.Amount)!=c.Amount||FinanceLedger.AccountBalance(s,account.LedgerAccount,c.EndDate)!=c.Amount||FinanceLedger.AccountBalance(s,account.LedgerAccount,c.Date.AddDays(-1))!=c.OpeningBalance)throw new ArgumentException("Unmatched activity or statement/ledger balance difference prevents reconciliation.");
+        if(s.Journals.Where(j=>j.Date>=c.Date&&j.Date<=c.EndDate&&j.Lines.Any(l=>l.Account==account.LedgerAccount)).Any(j=>!transactions.Any(b=>b.JournalId==j.Id)&&s.Operations.BankSplits.Where(x=>x.JournalId==j.Id&&transactions.Any(b=>b.Id==x.BankTransactionId)).Sum(x=>x.Amount)!=j.Lines.Where(l=>l.Account==account.LedgerAccount).Sum(l=>l.Debit-l.Credit)))throw new ArgumentException("Ledger cash activity is missing from the statement match set.");
         var id=c.Id.ToString();foreach(var transaction in transactions)transaction.ReconciliationId=id;
         s.Reconciliations.Add(new(id,c.Account,c.Date,c.EndDate,c.OpeningBalance,c.Amount,actor,DateTime.UtcNow));
     }

@@ -103,6 +103,26 @@ public sealed class FinanceTests
         var payment=new FinanceCommand{Action="vendor-payment",Date=Day,Amount=30,PartyId=vendor,Account="operating",SourceKey="check1",Reference="check1",Allocations=[new(bill.Id,30)]};await f.Do(payment);await f.Do(payment);
         Assert.Single(f.State.Costs);Assert.Equal(70,FinanceLedger.Balance(f.State,f.State.OpenItems.Single(),Day));Assert.Equal(2,f.State.Journals.Count);Assert.Equal(0,Json(FinanceLedger.Reports(f.State,Day,Day)).GetProperty("apDifference").GetDecimal());
     }
+    [Fact]public async Task BillTaxAndShippingRequireIndividualCentPrecision()
+    {
+        var f=new Fixture();var vendor=Guid.NewGuid();f.Supply.Vendors.Add(new(){ContactId=vendor});
+        var bill=new FinanceBill{VendorId=vendor,Number="FRACTIONAL",Date=Day,DueDate=Day,Tax=0.001m,Shipping=0.009m,Lines=[new("Material",1,100,"5000")]};
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Do(new(){Action="bill",Bill=bill}));Assert.Empty(f.State.Bills);
+    }
+    [Fact]public async Task BillExtrasNeedOwnerAndCanonicalJobsAndNeverPostExpenseTwice()
+    {
+        var f=new Fixture();var vendor=Guid.NewGuid();var job=Guid.NewGuid();f.Supply.Vendors.Add(new(){ContactId=vendor});f.Jobs.Setup(j=>j.GetAsync(job,It.IsAny<CancellationToken>())).ReturnsAsync(new JobDto{Id=job});
+        var bill=new FinanceBill{VendorId=vendor,Number="V-EXTRAS",Date=Day,DueDate=Day.AddDays(30),Tax=6,Shipping=4,Lines=[new("Material",1,100,"5000",JobId:job)]};
+        await f.Do(new(){Action="bill",Bill=bill});await f.Do(new(){Action="approve-bill",Target=bill.Id.ToString()});
+        var original=f.State.Journals.Single();var hash=FinanceLedger.Hash(original);
+        f.Authority.Setup(a=>a.CanControlAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        await Assert.ThrowsAsync<MedInsights.Lib.ForbiddenAccessException>(()=>f.Do(new(){Action="allocate-bill-extras",Target=bill.Id.ToString()}));
+        f.Authority.Setup(a=>a.CanControlAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Do(new(){Action="allocate-bill-extras",Target=bill.Id.ToString(),Date=Day,Reason="Reviewed allocation",Lines=[new("5000",10,0,Guid.NewGuid(),"MATERIAL",Category:"MATERIAL")]}));
+        await f.Do(new(){Action="allocate-bill-extras",Target=bill.Id.ToString(),Date=Day,Reason="Reviewed allocation",Lines=[new("5000",10,0,job,"MATERIAL",Category:"MATERIAL")]});
+        Assert.Single(f.State.Journals);Assert.Equal(hash,FinanceLedger.Hash(f.State.Journals.Single()));Assert.Equal(110,f.State.Costs.Where(c=>c.JobId==job).Sum(c=>c.Amount));
+        Assert.Contains(f.State.Audit,a=>a.Action=="allocate-bill-extras");
+    }
     [Fact]public async Task StaleCommandsAndUnauthorizedControlsDoNotCommit()
     {
         var f=new Fixture();await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Service.CommandAsync(new(){Action="period",ExpectedVersion="stale"}));
@@ -156,6 +176,32 @@ public sealed class FinanceTests
         var credit=FinanceLedger.Settle(s,new(){Id=Guid.NewGuid(),Date=Day,Amount=55,PartyId=party,SourceKey="credit1",Reference="Credit",Allocations=[new(invoiceId,55)]},"owner","credit");Assert.Equal(50,credit.Lines.Single(l=>l.Account=="4000").Debit);Assert.Equal(5,credit.Lines.Single(l=>l.Account=="2100").Debit);
         var vendor=Guid.NewGuid();var job=Guid.NewGuid();var billId=Guid.NewGuid();j=FinanceLedger.Post(s,Day,"vendor-bill",billId.ToString(),"Bill",[new("5000",100,0,job,Category:"MATERIAL"),new("2000",0,100)],"owner");s.OpenItems.Add(new(billId,"AP",vendor,"Bill",Day,Day,100,j.Id));s.Costs.Add(new(Guid.NewGuid(),job,"MATERIAL",null,100,Day,"vendor-bill",billId.ToString(),j.Id));
         FinanceLedger.Settle(s,new(){Id=Guid.NewGuid(),Date=Day,Amount=30,PartyId=vendor,SourceKey="vc1",Reference="Vendor credit",Allocations=[new(billId,30)]},"owner","vendor-credit");Assert.Equal(70,s.Costs.Sum(c=>c.Amount));FinanceIntegrity.ValidateTransition(new(),s);
+    }
+    [Fact]public async Task RetainedVendorBillPostsGrossCostNetApAndCreditsAfterRelease()
+    {
+        var f=new Fixture();var vendor=Guid.NewGuid();var job=Guid.NewGuid();f.Supply.Vendors.Add(new(){ContactId=vendor});f.Jobs.Setup(j=>j.GetAsync(job,It.IsAny<CancellationToken>())).ReturnsAsync(new JobDto{Id=job});
+        f.State.Accounts.Add(new("2250","AP retainage payable","LIABILITY","CREDIT"));f.State.Operations.ApRetainageAccount="2250";
+        var order=Guid.NewGuid();var orderLine=Guid.NewGuid();var demand=Guid.NewGuid();f.Supply.Demands.Add(new(){Id=demand,JobId=job});f.Supply.Orders.Add(new(){Id=order,VendorId=vendor,Status="APPROVED",Lines=[new(){Id=orderLine,DemandId=demand,Quantity=1,UnitCost=100}]});
+        var bill=new FinanceBill{VendorId=vendor,OrderId=order,Number="SUB-1",Date=Day,DueDate=Day,RetainagePercent=10,Lines=[new("Subcontract",1,100,"5000","SUBCONTRACT",job,"SUBCONTRACT",OrderLineId:orderLine)]};
+        await f.Do(new(){Action="bill",Bill=bill});await f.Do(new(){Action="approve-bill",Target=bill.Id.ToString(),Reason="Approved subcontract"});
+        Assert.Equal(0,FinanceMigrationCommitments.Remaining(f.State,f.Supply,job,Day));Assert.Equal(100,f.State.Costs.Sum(c=>c.Amount));Assert.Equal(90,f.State.OpenItems.Single().Total);Assert.Equal(-10,FinanceLedger.AccountBalance(f.State,"2250",Day));
+        var credit=new FinanceCommand{Action="credit-retained-bill",Target=bill.Id.ToString(),Date=Day,Amount=50,SourceKey="gross-credit-1",Reason="Approved gross credit"};await f.Do(credit);await f.Do(credit);
+        Assert.Equal(5,FinanceApRetainage.Held(f.State,f.State.Bills.Single(),Day));Assert.Equal(50,f.State.Costs.Sum(c=>c.Amount));
+        await f.Do(new(){Action="release-ap-retainage",Target=bill.Id.ToString(),Date=Day,Amount=5,SourceKey="release-1",Reason="Release remaining held"});
+        await f.Do(new(){Action="credit-retained-bill",Target=bill.Id.ToString(),Date=Day,Amount=50,SourceKey="gross-credit-2",Reason="Credit final gross balance"});
+        Assert.Equal(0,FinanceLedger.AccountBalance(f.State,"2000",Day));Assert.Equal(0,FinanceLedger.AccountBalance(f.State,"2250",Day));Assert.Equal(0,f.State.Costs.Sum(c=>c.Amount));
+        Assert.Throws<ArgumentException>(()=>FinanceApRetainage.Apply(f.State,new(){Id=Guid.NewGuid(),Target=bill.Id.ToString(),Date=Day,Amount=1,SourceKey="release-1",Reason="Duplicate source"},"owner",false));
+        FinanceIntegrity.ValidateTransition(new(),f.State);
+    }
+    [Fact]public async Task RetainedBillCreditCannotConsumePaidApOrBypassGrossWorkflow()
+    {
+        var f=new Fixture();var vendor=Guid.NewGuid();f.Supply.Vendors.Add(new(){ContactId=vendor});f.State.Accounts.Add(new("2250","AP retainage payable","LIABILITY","CREDIT"));f.State.Operations.ApRetainageAccount="2250";
+        var bill=new FinanceBill{VendorId=vendor,Number="SUB-2",Date=Day,DueDate=Day,RetainagePercent=10,Lines=[new("Service",1,100,"6000","SUBCONTRACT")]};await f.Do(new(){Action="bill",Bill=bill});await f.Do(new(){Action="approve-bill",Target=bill.Id.ToString(),Reason="Approved"});
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Do(new(){Action="vendor-credit",Date=Day,Amount=90,PartyId=vendor,SourceKey="bypass",Reference="Credit",Allocations=[new(bill.Id,90)]}));
+        await f.Do(new(){Action="vendor-payment",Date=Day,Amount=90,PartyId=vendor,Account="operating",SourceKey="paid",Reference="Check",Allocations=[new(bill.Id,90)]});
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Do(new(){Action="credit-retained-bill",Target=bill.Id.ToString(),Date=Day,Amount=100,SourceKey="paid-credit",Reason="Already paid"}));
+        f.State.Periods[0].Status="CLOSED";await Assert.ThrowsAsync<ArgumentException>(()=>f.Do(new(){Action="release-ap-retainage",Target=bill.Id.ToString(),Date=Day,Amount=10,SourceKey="closed-release",Reason="Closed"}));
+        Assert.Equal(10,FinanceApRetainage.Held(f.State,f.State.Bills.Single(),Day));
     }
     private sealed class Fixture
     {

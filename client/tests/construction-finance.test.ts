@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {financeCsvCell} from '../src/lib/finance-csv.ts';
+test('financial exports neutralize formulas hidden by whitespace and controls',()=>{for(const value of ['=SUM(A1)','+CMD','-CMD','@SUM','\n=HYPERLINK("unsafe")','\ufeff=SUM(A1)','  =SUM(A1)','\tplain','\rplain','\nplain'])assert.ok(financeCsvCell(value).startsWith('"\''),JSON.stringify(value));});
+test('numeric negatives remain numeric and CSV quotes are escaped',()=>{assert.equal(financeCsvCell(-12.5),'"-12.5"');assert.equal(financeCsvCell('Normal "quoted", text'),'"Normal ""quoted"", text"');assert.equal(financeCsvCell(null),'""');assert.equal(financeCsvCell('2026-09-30'),'"2026-09-30"');});

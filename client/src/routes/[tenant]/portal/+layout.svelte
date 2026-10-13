@@ -1,18 +1,20 @@
 <script lang="ts">
+ import {onMount} from 'svelte';
  import {page} from '$app/state';
  import {House,FolderOpen,MessageCircle,FileText,UserRound} from 'lucide-svelte';
  let {data,children}=$props();
+ let ready=$state(false);onMount(()=>ready=true);
  let branding=$derived(page.data.home?.configuration);
  let base=$derived(`/${data.tenant.slug}/portal`);
 </script>
 <svelte:head><meta name="robots" content="noindex,nofollow"/><meta name="theme-color" content="#0f766e"/><link rel="manifest" href={`${base}/manifest.webmanifest`}/><title>My work · {data.tenant.name}</title></svelte:head>
-<div data-accent={branding?.accent??'teal'} class="portal min-h-screen bg-[var(--surface)] text-[var(--text)]">
+<div data-portal-ready={ready} data-accent={branding?.accent??'teal'} class="portal min-h-screen bg-[var(--surface)] text-[var(--text)]">
  <a class="skip" href="#portal-main">Skip to content</a>
  <header class="mx-auto flex max-w-4xl items-center justify-between gap-4 px-5 py-5"><a class="brand" href={base}>{#if branding?.logoPath}<img class="mb-2 max-h-12 max-w-32 object-contain" src={branding.logoPath} alt=""/>{/if}{branding?.companyName??data.tenant.name}</a><span class="text-sm text-[var(--text-muted)]">Customer portal</span></header>
  {#if !page.url.pathname.endsWith('/login')}
  <nav aria-label="Customer portal" class="mx-auto flex max-w-4xl gap-1 overflow-x-auto border-b border-[var(--border)] px-3">
  {#each [{label:'Home',icon:House,key:'home'},{label:'My work',icon:FolderOpen,key:'work'},{label:'Messages',icon:MessageCircle,key:'messages'},{label:'Documents',icon:FileText,key:'documents'},{label:'Account',icon:UserRound,key:'account'}] as item}
- <a href={`${base}?view=${item.key}`} aria-current={(page.url.searchParams.get('view')??'home')===item.key?'page':undefined} class="navlink"><item.icon size={18}/><span>{item.label}</span></a>
+ <a href={`${base}?view=${item.key}`} aria-current={page.url.pathname===base&&(page.url.searchParams.get('view')??'home')===item.key?'page':undefined} class="navlink"><item.icon size={18}/><span>{item.label}</span></a>
  {/each}{#if branding?.financeEnabled}<a class="navlink" href={`${base}/finance`} aria-current={page.url.pathname.endsWith('/finance')?'page':undefined}><FileText size={18}/><span>Invoices</span></a>{/if}</nav>{/if}
  <main id="portal-main" tabindex="-1" class="mx-auto max-w-4xl px-5 py-8">{@render children()}</main>
  <footer class="mx-auto max-w-4xl px-5 py-8 text-sm text-[var(--text-muted)]">Powered by TurnKeyOps</footer>

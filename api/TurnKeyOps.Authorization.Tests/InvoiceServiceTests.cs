@@ -222,6 +222,73 @@ public sealed class InvoiceServiceTests
         await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.RecordReminderAsync(created.Id,new(){Channel="email"}));
     }
 
+    [Fact]
+    public async Task SentInvoiceCommitsFinanceDispatchMarkerWithItsSourcePointer()
+    {
+        var state = new State(); var fixture = CreateFixture(TenantA, state);
+        var draft = await fixture.Service.AddAsync(DraftInvoice());
+        Assert.False(state.Invoices.Values.Single().FinanceDispatchPending);
+        await fixture.Service.SendAsync(draft.Id, draft.Version);
+        var source = Assert.Single(state.Invoices.Values);
+        Assert.True(source.FinanceDispatchPending);
+        Assert.NotNull(state.Payloads[source.WorkflowPayloadBlobName!].SentAtUtc);
+    }
+
+    [Fact]
+    public async Task ClosedFinancePeriodRejectsSourceEventBeforePayloadCommit()
+    {
+        var financial = new FinanceState(); FinanceLedger.Initialize(financial);
+        var day = DateOnly.FromDateTime(DateTime.UtcNow);
+        financial.Periods.Add(new() { Id = "current", Start = day.AddDays(-1), End = day.AddDays(1), Status = "CLOSED" });
+        var finance = new Mock<IFinanceStore>(); finance.Setup(s => s.ReadAsync(TenantA, It.IsAny<CancellationToken>())).ReturnsAsync(financial);
+        var state = new State(); var fixture = CreateFixture(TenantA, state, finance: finance.Object);
+        var draft = await fixture.Service.AddAsync(DraftInvoice());
+        await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.SendAsync(draft.Id, draft.Version));
+        Assert.Null(state.Payloads[state.Invoices.Values.Single().WorkflowPayloadBlobName!].SentAtUtc);
+        Assert.False(state.Invoices.Values.Single().FinanceDispatchPending);
+    }
+
+    [Fact]
+    public async Task SourceWriterWaitsForCloseFenceThenRechecksCommittedPeriodLock()
+    {
+        var financial = new FinanceState(); FinanceLedger.Initialize(financial);
+        var day = DateOnly.FromDateTime(DateTime.UtcNow);
+        financial.Periods.Add(new() { Id = "current", Start = day.AddDays(-1), End = day.AddDays(1) });
+        var finance = new Mock<IFinanceStore>(); finance.Setup(s => s.ReadAsync(TenantA, It.IsAny<CancellationToken>())).ReturnsAsync(() => financial);
+        var coordinator = new TestSourceCoordinator();
+        var fixture = CreateFixture(TenantA, finance: finance.Object, financeSources: coordinator);
+        var draft = await fixture.Service.AddAsync(DraftInvoice());
+        var closeFence = await coordinator.AcquireAsync(TenantA);
+        var send = fixture.Service.SendAsync(draft.Id, draft.Version);
+        await coordinator.Waiting.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(send.IsCompleted);
+        financial.Periods[0].Status = "CLOSED";
+        await closeFence.DisposeAsync();
+        await Assert.ThrowsAsync<ArgumentException>(() => send);
+    }
+
+    [Fact]
+    public async Task PartialDraftLineWriteCannotBecomeAPostedInvoiceWithDifferentStoredTotals()
+    {
+        var state = new State(); var fixture = CreateFixture(TenantA, state);
+        var draft = await fixture.Service.AddAsync(DraftInvoice());
+        state.Lines.Values.Single().UnitPrice += 10;
+        state.Lines.Values.Single().LineTotal += 20;
+        await Assert.ThrowsAsync<ArgumentException>(() => fixture.Service.SendAsync(draft.Id, draft.Version));
+        Assert.False(state.Invoices.Values.Single().FinanceDispatchPending);
+        Assert.Null(state.Payloads[state.Invoices.Values.Single().WorkflowPayloadBlobName!].SentAtUtc);
+    }
+
+    [Fact]
+    public async Task SendPreservesAuthoritativeCentsWhenLegacyDoubleQuantityLosesDecimalPrecision()
+    {
+        var fixture=CreateFixture(TenantA);var input=DraftInvoice(taxRate:0);
+        input.LineItems[0].Quantity=999999.9999999995m;input.LineItems[0].UnitPrice=100000000m;
+        var draft=await fixture.Service.AddAsync(input);
+        var sent=await fixture.Service.SendAsync(draft.Id,draft.Version);
+        Assert.Equal(draft.Total,sent.Total);Assert.Equal(99999999999999.95m,sent.Total);
+    }
+
     private static InvoiceDto DraftInvoice(decimal taxRate = 0.10m) => new()
     {
         CustomerName = "Avery",
@@ -238,7 +305,7 @@ public sealed class InvoiceServiceTests
         Amount = amount, Method = "ACH", IdempotencyKey = key, Status = "succeeded"
     };
 
-    private static Fixture CreateFixture(Guid tenantId, State? state = null, IReadOnlyCollection<QuoteEstimateDto>? approved = null, IFinanceStore? finance = null)
+    private static Fixture CreateFixture(Guid tenantId, State? state = null, IReadOnlyCollection<QuoteEstimateDto>? approved = null, IFinanceStore? finance = null, IFinanceSourceCoordinator? financeSources = null)
     {
         state ??= new State();
         var invoices = new Mock<IInvoiceRepository>();
@@ -269,13 +336,26 @@ public sealed class InvoiceServiceTests
         quoteEstimates.Setup(x => x.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(approved ?? []);
         var payloads = new MemoryPayloadStore(state);
         var service = new InvoiceService(invoices.Object, lines.Object, estimates.Object, estimateLines.Object,
-            quoteEstimates.Object, payloads, new User(tenantId), finance);
+            quoteEstimates.Object, payloads, new User(tenantId), finance, financeSources);
         return new(service, invoices, lines);
     }
 
     private static string Partition(Guid tenantId) => RepositoryKeyHelper.ToTenantPartitionKey(tenantId);
 
     private sealed record Fixture(InvoiceService Service, Mock<IInvoiceRepository> Invoices, Mock<IInvoiceLineItemRepository> Lines);
+
+    private sealed class TestSourceCoordinator : IFinanceSourceCoordinator
+    {
+        private readonly SemaphoreSlim gate = new(1);
+        public TaskCompletionSource Waiting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async Task<IAsyncDisposable> AcquireAsync(Guid tenant, CancellationToken ct = default)
+        {
+            if (gate.CurrentCount == 0) Waiting.TrySetResult();
+            await gate.WaitAsync(ct); return new Handle(gate);
+        }
+        private sealed class Handle(SemaphoreSlim gate) : IAsyncDisposable
+        { public ValueTask DisposeAsync() { gate.Release(); return ValueTask.CompletedTask; } }
+    }
 
     private sealed class State
     {

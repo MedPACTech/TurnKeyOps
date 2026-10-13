@@ -25,6 +25,7 @@ public sealed class InvoiceService : IInvoiceService
     private readonly IInvoiceWorkflowPayloadStore _payloadStore;
     private readonly IUserContext _userContext;
     private readonly IFinanceStore? _finance;
+    private readonly IFinanceSourceCoordinator? _financeSources;
 
     public InvoiceService(
         IInvoiceRepository repo,
@@ -34,7 +35,8 @@ public sealed class InvoiceService : IInvoiceService
         IQuoteEstimateService quoteEstimates,
         IInvoiceWorkflowPayloadStore payloadStore,
         IUserContext userContext,
-        IFinanceStore? finance = null)
+        IFinanceStore? finance = null,
+        IFinanceSourceCoordinator? financeSources = null)
     {
         _repo = repo;
         _lineItemRepo = lineItemRepo;
@@ -44,6 +46,7 @@ public sealed class InvoiceService : IInvoiceService
         _payloadStore = payloadStore;
         _userContext = userContext;
         _finance = finance;
+        _financeSources = financeSources;
     }
 
     private string Partition(Guid tenantId) => RepositoryKeyHelper.ToTenantPartitionKey(tenantId);
@@ -53,7 +56,14 @@ public sealed class InvoiceService : IInvoiceService
     {
         ValidateId(id);
         var entity = await GetEntityAsync(_userContext.TenantId, id, default);
-        return entity is null ? null : await HydrateAsync(entity, _userContext.TenantId, default);
+        if(entity is not null)return await HydrateAsync(entity,_userContext.TenantId,default);
+        if(_finance is null)return null;
+        var financial=await _finance.ReadAsync(_userContext.TenantId);
+        var item=financial.OpenItems.SingleOrDefault(i=>i.Id==id&&i.Kind=="AR");
+        if(item is null||!financial.Construction.Applications.Any(a=>a.InvoiceId==id)||item.JobId is null)return null;
+        var application=financial.Construction.Applications.Single(a=>a.InvoiceId==id);
+        var balance=FinanceLedger.Balance(financial,item,DateOnly.MaxValue);
+        return new InvoiceDto{Id=id,InvoiceNumber=item.Number,CustomerId=item.PartyId,JobId=item.JobId,IssueDate=item.Date.ToDateTime(TimeOnly.MinValue),DueDate=item.DueDate.ToDateTime(TimeOnly.MinValue),Subtotal=item.Total,Total=item.Total,BalanceDue=balance,AmountPaid=item.Total-balance,Status=balance==0?InvoiceStatus.Paid:balance<item.Total?InvoiceStatus.PartiallyPaid:InvoiceStatus.Sent,Notes=$"Progress billing: gross {application.CurrentBilling:F2}; retainage {application.Retainage:F2}. This invoice is controlled by Construction Finance.",Version=financial.Version};
     }
 
     public async Task<(IEnumerable<InvoiceDto> Items, string? ContinuationToken)> GetPagedAsync(
@@ -74,6 +84,7 @@ public sealed class InvoiceService : IInvoiceService
     {
         ArgumentNullException.ThrowIfNull(dto);
         var tenantId = _userContext.TenantId;
+        await using var sourceLease = _financeSources is null ? null : await _financeSources.AcquireAsync(tenantId);
         dto.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
         if (await GetEntityAsync(tenantId, dto.Id, default) is not null)
             throw new ArgumentException("Invoice already exists.", nameof(dto.Id));
@@ -95,7 +106,7 @@ public sealed class InvoiceService : IInvoiceService
         entity.DateCreated = now;
         entity.DateUpdated = now;
         await SaveLineItemsAsync(tenantId, dto.Id, dto.LineItems, default);
-        var saved = await PersistAsync(entity, payload, tenantId, default);
+        var saved = await PersistAsync(entity, payload, tenantId, default, sourceFenced: true);
         return await HydrateAsync(saved, tenantId, default);
     }
 
@@ -103,6 +114,7 @@ public sealed class InvoiceService : IInvoiceService
     {
         ArgumentNullException.ThrowIfNull(dto);
         var tenantId = _userContext.TenantId;
+        await using var sourceLease = _financeSources is null ? null : await _financeSources.AcquireAsync(tenantId);
         var existing = await GetEntityAsync(tenantId, dto.Id, default)
             ?? throw new ArgumentException("Invoice not found.", nameof(dto.Id));
         ValidateVersion(existing, dto.Version);
@@ -125,7 +137,7 @@ public sealed class InvoiceService : IInvoiceService
         entity.DateCreated = existing.DateCreated;
         entity.WorkflowPayloadBlobName = existing.WorkflowPayloadBlobName;
         await SaveLineItemsAsync(tenantId, dto.Id, dto.LineItems, default);
-        var saved = await PersistAsync(entity, payload, tenantId, default);
+        var saved = await PersistAsync(entity, payload, tenantId, default, sourceFenced: true);
         return await HydrateAsync(saved, tenantId, default);
     }
 
@@ -244,6 +256,7 @@ public sealed class InvoiceService : IInvoiceService
     public async Task<InvoiceDto> SendAsync(Guid id, string? expectedVersion, CancellationToken ct = default)
     {
         var tenantId = _userContext.TenantId;
+        await using var sourceLease = _financeSources is null ? null : await _financeSources.AcquireAsync(tenantId, ct);
         var (entity, payload) = await LoadForMutationAsync(tenantId, id, expectedVersion, ct);
         if (entity.Status != InvoiceStatus.Draft)
         {
@@ -252,12 +265,18 @@ public sealed class InvoiceService : IInvoiceService
         }
         if (string.IsNullOrWhiteSpace(payload.CustomerEmail) && string.IsNullOrWhiteSpace(payload.CustomerPhone))
             throw new ArgumentException("A customer email or phone is required before sending an invoice.");
+        var lines = await _lineItemRepo.ListAsync(RepositoryKeyHelper.ToTenantInvoicePartitionKey(tenantId, id), ct);
+        // Persisted LineTotal and tax are the authoritative server-calculated source amounts.
+        // Quantity is a legacy double field; recomputing it here can change valid cent rounding.
+        var subtotal = Round(lines.Sum(l => l.LineTotal));
+        if (lines.Count == 0 || subtotal != entity.Subtotal || entity.TaxAmount < 0 || subtotal + entity.TaxAmount != entity.Total)
+            throw new ArgumentException("Invoice line items and stored totals differ. Review and save the draft before sending.");
 
         var now = DateTime.UtcNow;
         entity.Status = InvoiceStatus.Sent;
         payload.SentAtUtc = now;
         payload.AuditEvents.Add(Audit("invoice_sent", "Invoice moved to the customer delivery workflow.", Actor(), now));
-        var saved = await PersistAsync(entity, payload, tenantId, ct);
+        var saved = await PersistAsync(entity, payload, tenantId, ct, sourceFenced: true);
         return await HydrateAsync(saved, tenantId, ct);
     }
 
@@ -367,6 +386,7 @@ public sealed class InvoiceService : IInvoiceService
 
     public async Task DeleteAsync(Guid id)
     {
+        await using var sourceLease = _financeSources is null ? null : await _financeSources.AcquireAsync(_userContext.TenantId);
         var entity = await GetEntityAsync(_userContext.TenantId, id, default);
         if (entity is null) return;
         var payload = await _payloadStore.LoadAsync(entity.WorkflowPayloadBlobName);
@@ -439,9 +459,22 @@ public sealed class InvoiceService : IInvoiceService
         var lineItems = await _lineItemRepo.ListAsync(linePartition, ct);
         var payload = await _payloadStore.LoadAsync(entity.WorkflowPayloadBlobName, ct);
         decimal credits = 0;
+        decimal? receivableBalance = null;
         if (_finance is not null)
         {
             var financial = await _finance.ReadAsync(tenantId, ct);
+            var item = financial.OpenItems.SingleOrDefault(i => i.Kind == "AR" && i.Id == entity.Id);
+            if (item is not null)
+            {
+                if (item.PartyId != entity.CustomerId) throw new InvalidOperationException("Invoice and Finance customer identity do not match.");
+                receivableBalance = FinanceLedger.Balance(financial, item, DateOnly.MaxValue);
+                var cutover = FinanceInvoicePosting.Cutover(financial);
+                // Source cash is visible immediately even if durable dispatch has not yet acknowledged
+                // it. Historical cash is already represented by the imported opening AR balance.
+                foreach (var pending in payload.Payments.Where(p => p.Status == "succeeded" && p.FinanceSettlementId is null &&
+                    DateOnly.FromDateTime(p.OccurredAtUtc) > cutover && !financial.Settlements.Any(s => s.Origin == "invoice-event" && s.SourceKey == $"{entity.Id}:{p.IdempotencyKey}" && s.Kind == p.Kind)))
+                    receivableBalance += pending.Kind == "refund" ? pending.Amount : -pending.Amount;
+            }
             // Read-only union of authoritative events. Imported invoice events already live in this payload.
             payload = JobConfigurationService.Clone(payload);
             foreach (var settlement in financial.Settlements.Where(s => s.Kind is "payment" or "refund" or "credit" && s.Origin!="invoice-event"))
@@ -453,8 +486,10 @@ public sealed class InvoiceService : IInvoiceService
         }
         ApplyFinancialState(entity, payload);
         var dto = InvoiceMapper.ToDto(entity, lineItems);
-        dto.CreditAmount=credits;dto.BalanceDue=Round(Math.Max(0,entity.Total-entity.AmountPaid-credits));
+        dto.CreditAmount=credits;dto.BalanceDue=Round(Math.Max(0,receivableBalance ?? entity.Total-entity.AmountPaid-credits));
         if(dto.BalanceDue==0&&entity.Status is not (InvoiceStatus.Draft or InvoiceStatus.Void))dto.Status=InvoiceStatus.Paid;
+        else if(receivableBalance.HasValue&&dto.BalanceDue>0&&entity.Status is not (InvoiceStatus.Draft or InvoiceStatus.Void))
+            dto.Status=entity.DueDate<DateTime.UtcNow?InvoiceStatus.Overdue:dto.BalanceDue<entity.Total||entity.AmountPaid>0?InvoiceStatus.PartiallyPaid:InvoiceStatus.Sent;
         dto.SentAtUtc = payload.SentAtUtc;
         dto.CustomerEmail = payload.CustomerEmail;
         dto.CustomerPhone = payload.CustomerPhone;
@@ -475,8 +510,40 @@ public sealed class InvoiceService : IInvoiceService
         Invoice entity,
         InvoiceWorkflowPayloadDto payload,
         Guid tenantId,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool sourceFenced = false)
     {
+        await using var sourceLease = sourceFenced || _financeSources is null ? null : await _financeSources.AcquireAsync(tenantId, ct);
+        var previous = await GetEntityAsync(tenantId, entity.Id, ct);
+        if (previous is not null && previous.ETag != entity.ETag)
+            throw new InvalidOperationException("Invoice changed while waiting for accounting coordination. Refresh before retrying.");
+        var previousPayload = previous is null ? new InvoiceWorkflowPayloadDto()
+            : await _payloadStore.LoadAsync(previous.WorkflowPayloadBlobName, ct);
+        var newlySent = payload.SentAtUtc.HasValue && !previousPayload.SentAtUtc.HasValue;
+        var newEvents = payload.Payments.Where(p => p.Status == "succeeded" &&
+            !previousPayload.Payments.Any(old => old.IdempotencyKey == p.IdempotencyKey && old.Status == "succeeded")).ToArray();
+        if (_finance is not null && (newlySent || newEvents.Length > 0))
+        {
+            var financial = await _finance.ReadAsync(tenantId, ct);
+            if(newlySent&&financial.Construction.Contracts.Any(c=>c.JobId==entity.JobId))throw new ArgumentException("Construction Jobs must be issued through progress billing pay applications.");
+            // Allow operational activity before Finance onboarding. Once initialized, require an
+            // explicitly open period before committing a new event; close holds the same fence.
+            if (financial.Accounts.Count > 0)
+            {
+                var dates = newEvents.Select(p => DateOnly.FromDateTime(p.OccurredAtUtc)).ToList();
+                if (newlySent) dates.Add(DateOnly.FromDateTime(entity.IssueDate));
+                var cutover = FinanceInvoicePosting.Cutover(financial);
+                foreach (var date in dates)
+                {
+                    if (date <= cutover)
+                        throw new ArgumentException("New invoice accounting activity must be after the imported cutover date. Use an authorized current-period correction for historical activity.");
+                    if (!financial.Periods.Any(p => p.Start <= date && p.End >= date && p.Status == "OPEN"))
+                        throw new ArgumentException("Invoice accounting activity requires an open Finance period. Reopen the source period or choose an authorized correction workflow.");
+                }
+            }
+        }
+        entity.FinanceDispatchPending = previous?.FinanceDispatchPending == true || newlySent || newEvents.Length > 0;
+        entity.FinanceDispatchError = entity.FinanceDispatchPending ? null : previous?.FinanceDispatchError;
         var oldBlob = entity.WorkflowPayloadBlobName;
         var newBlob = await _payloadStore.SaveAsync(tenantId, entity.Id, payload, ct);
         entity.WorkflowPayloadBlobName = newBlob;
@@ -491,12 +558,13 @@ public sealed class InvoiceService : IInvoiceService
             }
             return saved;
         }
-        catch
+        catch (Azure.RequestFailedException ex) when (ex.Status is 409 or 412)
         {
             try { await _payloadStore.DeleteIfExistsAsync(newBlob, CancellationToken.None); }
             catch { /* Preserve the repository failure. */ }
             throw;
         }
+        // Preserve the new payload on ambiguous failures: its pointer may already have committed.
     }
 
     private async Task SaveLineItemsAsync(
