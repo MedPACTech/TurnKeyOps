@@ -1,7 +1,7 @@
 <!-- Temporary staff shortcuts; remove after rollout. -->
 <nav aria-label="Staff access">
-  <a href="/carlzipf/admin">Admin</a>
-  <a href="/carlzipf/tech">Mobile / Tech</a>
+  <a href="/carlzipf/auth/login?returnTo=%2Fcarlzipf%2Fadmin">Admin</a>
+  <a href="/carlzipf/auth/login?returnTo=%2Fcarlzipf%2Ftech">Mobile / Tech</a>
 </nav>
 
 <style>
