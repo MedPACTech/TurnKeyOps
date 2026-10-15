@@ -31,6 +31,8 @@ public sealed class BobOperationsService : IBobOperationsService
     private readonly LeadConfigurationService? _leadConfiguration;
     private readonly JobConfigurationService? _jobConfiguration;
     private readonly ISupplyStore? _supplyStore;
+    private readonly IPayrollStore? _payrollStore;
+    private readonly IBobActionGuard? _guard;
 
     public BobOperationsService(
         IBobActionRepository repository,
@@ -41,7 +43,7 @@ public sealed class BobOperationsService : IBobOperationsService
         IAuditService audit,
         IBobContextMinimizer minimizer,
         IOptions<BobOperationsOptions> options,
-        LeadConfigurationService? leadConfiguration = null, JobConfigurationService? jobConfiguration = null, ISupplyStore? supplyStore = null)
+        LeadConfigurationService? leadConfiguration = null, JobConfigurationService? jobConfiguration = null, ISupplyStore? supplyStore = null, IPayrollStore? payrollStore = null, IBobActionGuard? guard = null)
     {
         _repository = repository;
         _chatRepository = chatRepository;
@@ -53,7 +55,7 @@ public sealed class BobOperationsService : IBobOperationsService
         _options = options.Value;
         _leadConfiguration = leadConfiguration;
         _jobConfiguration = jobConfiguration;
-        _supplyStore = supplyStore;
+        _supplyStore = supplyStore;_payrollStore=payrollStore; _guard = guard;
     }
 
     public async Task<BobActionDto> ApproveLeadAsync(Guid leadId, Guid actionId, CancellationToken ct = default)
@@ -185,6 +187,16 @@ public sealed class BobOperationsService : IBobOperationsService
         return await ExecuteAsync(actionId, ct);
     }
 
+    public async Task<BobActionDto> ProposePayrollAsync(Guid payrollId,ProposeBobActionDto input,CancellationToken ct=default)
+    {
+        EnsureEnabled();if(payrollId!=_userContext.TenantId||input.ToolKey is not("payroll.readiness" or "payroll.prepare"))throw new ArgumentException("Select an authorized payroll tool.");
+        var provider=GetProvider(input.ToolKey);await _roleAccess.RequirePermissionAsync(provider.PermissionKey,ct);await PolicyRequiresApprovalAsync(provider,ct);
+        var partition=PartitionKey();var row=MedInsights.Lib.EntityKeyPolicy.Row(payrollId);var chat=await _chatRepository.GetAsync(partition,row,ct);
+        if(chat==null)await _chatRepository.SaveAsync(new MedInsights.Lib.Entities.Chat{Id=payrollId,TenantId=_userContext.TenantId,ActorUserId=_userContext.UserId,PartitionKey=partition,RowKey=row,Title="Payroll workspace",Mode="payroll",StateJson="{}",DateChatCreated=DateTime.UtcNow,DateChatUpdated=DateTime.UtcNow},ct);
+        return await ProposeAsync(payrollId,input,ct);
+    }
+    public async Task<BobActionDto> ApprovePayrollAsync(Guid payrollId,Guid actionId,CancellationToken ct=default)
+    {var action=await RequireActionAsync(actionId,ct);if(action.ConversationId!=payrollId||payrollId!=_userContext.TenantId||!action.ToolKey.StartsWith("payroll."))throw new ArgumentException("Action belongs to another payroll workspace.");await ApproveAsync(actionId,ct);return await ExecuteAsync(actionId,ct);}
     public async Task<BobActionDto> ProposeFinanceAsync(Guid financeId, ProposeBobActionDto input, CancellationToken ct = default)
     {
         EnsureEnabled();
@@ -219,6 +231,7 @@ public sealed class BobOperationsService : IBobOperationsService
 
         var provider = GetProvider(input.ToolKey);
         EnsureWriteEnabled(provider);
+        if (_guard is not null) await _guard.RequireAsync(provider, ct);
         await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
 
         var partitionKey = PartitionKey();
@@ -230,9 +243,13 @@ public sealed class BobOperationsService : IBobOperationsService
             if (replay.ConversationId != conversationId ||
                 !string.Equals(replay.ToolKey, provider.ToolKey, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("The idempotency key is already bound to another Bob action.");
+            var replayInput = _minimizer.Minimize(input.Input.ValueKind == JsonValueKind.Undefined ? new { } : input.Input, _options.MaxStoredInputCharacters);
+            if (_guard is not null && replay.InputJson != replayInput.GetRawText())
+                throw new InvalidOperationException("The idempotency key is already bound to different action input.");
             return Map(replay);
         }
 
+        if (_guard is not null) new BobCapabilityRegistry([provider]).Get(provider.ToolKey).Validate(input.Input);
         var now = DateTime.UtcNow;
         var actionId = Guid.NewGuid();
         var confirmationRequired = await PolicyRequiresApprovalAsync(provider, ct);
@@ -270,6 +287,7 @@ public sealed class BobOperationsService : IBobOperationsService
         var entity = await RequireActionAsync(actionId, ct);
         var provider = GetProvider(entity.ToolKey);
         EnsureWriteEnabled(provider);
+        if (_guard is not null) await _guard.RequireAsync(provider, ct);
         await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
 
         if (!entity.ConfirmationRequired || entity.Status == Completed)
@@ -295,6 +313,7 @@ public sealed class BobOperationsService : IBobOperationsService
         var entity = await RequireActionAsync(actionId, ct);
         var provider = GetProvider(entity.ToolKey);
         EnsureWriteEnabled(provider);
+        if (_guard is not null) await _guard.RequireAsync(provider, ct);
         await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
         if (entity.Status == Completed) return Map(entity);
         if (entity.ConfirmationRequired && entity.Status != Approved && entity.Status != Failed)
@@ -322,6 +341,8 @@ public sealed class BobOperationsService : IBobOperationsService
         await _roleAccess.RequirePermissionAsync(provider.PermissionKey, ct);
         if (await PolicyRequiresApprovalAsync(provider, ct) && !entity.ApprovedAtUtc.HasValue)
             throw new InvalidOperationException("Tenant policy requires approval for this action.");
+        if (_guard is not null && provider.Risk != BobActionRisk.Read)
+            await _guard.ClaimExecutionAsync(entity.IdempotencyKey, entity.Id, ct);
         entity.Status = Executing;
         entity.UpdatedAtUtc = DateTime.UtcNow;
         entity.FailureCode = string.Empty;
@@ -357,6 +378,7 @@ public sealed class BobOperationsService : IBobOperationsService
 
     private async Task<bool> PolicyRequiresApprovalAsync(IBobActionProvider provider, CancellationToken ct)
     {
+        if (_guard is not null) return await _guard.RequireAsync(provider, ct);
         var mode=provider.Risk==BobActionRisk.Read?"read":"approval";
         if(_leadConfiguration is not null)mode=(await _leadConfiguration.GetAsync(_userContext.TenantId,ct)).AiActions.GetValueOrDefault(provider.ToolKey,mode);
         if(provider.ToolKey.StartsWith("job.")&&_jobConfiguration is not null)mode=(await _jobConfiguration.GetAsync(_userContext.TenantId,ct)).AiActions.GetValueOrDefault(provider.ToolKey,mode);
@@ -365,6 +387,8 @@ public sealed class BobOperationsService : IBobOperationsService
             throw new InvalidOperationException("Tenant policy does not allow this action to execute.");
         if (mode == "read" && provider.Risk != BobActionRisk.Read)
             throw new InvalidOperationException("Read-only policy cannot execute a mutation.");
+        if(provider.ToolKey.StartsWith("payroll.")&&_payrollStore!=null){var payroll=await _payrollStore.ReadAsync(_userContext.TenantId,ct);if(!payroll.Configuration.Enabled)throw new InvalidOperationException("Payroll is disabled.");var policy=payroll.Configuration.AiActions.GetValueOrDefault(provider.ToolKey,"disabled");if(policy=="disabled"||provider.Risk!=BobActionRisk.Read&&policy is not("approval" or "auto"))throw new InvalidOperationException("Payroll action policy requires review or is disabled.");return provider.Risk!=BobActionRisk.Read;}
+        if(provider.ToolKey=="payroll.prepare")return true;
         if(provider.ToolKey=="finance.draft-journal")return true;
         // Financial outcomes remain approved until a deterministic outcome guardrail is configured.
         if (provider.ToolKey is "lead.stage" or "estimate.issue") return true;
@@ -431,7 +455,11 @@ public sealed class BobOperationsService : IBobOperationsService
                 entity.ToolKey,
                 entity.Risk,
                 entity.Status,
-                entity.ConfirmationRequired
+                entity.ConfirmationRequired,
+                ExecutedService = _providers.GetValueOrDefault(entity.ToolKey)?.GetType().Name,
+                PermissionEvaluation = "Target permission rechecked at action boundary",
+                PolicyEvaluation = "Current module and tenant action policies evaluated before execution",
+                OperationalRationale = $"Requested registered capability {entity.ToolKey} for workspace {entity.ConversationId:N}"
             })
         }, ct);
 

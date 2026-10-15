@@ -211,6 +211,8 @@ jobs:
           npm run test:e2e
           npm run test:admin-ui
           npx playwright test --config playwright.people.config.ts
+          npx playwright test --config playwright.payroll.config.ts
+          npx playwright test --config playwright.bob.config.ts
 
       - name: Publish Playwright evidence
         if: always()

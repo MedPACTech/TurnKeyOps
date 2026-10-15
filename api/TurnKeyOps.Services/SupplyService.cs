@@ -10,6 +10,28 @@ public sealed class SupplyService(ISupplyStore store,ISupplyAuthority authority,
     private string Partition=>RepositoryKeyHelper.ToTenantPartitionKey(user.TenantId);
     private string Actor=>user.UserId.ToString("D");
     private static readonly string[] PurchasingActions=["vendor","offer","request","approve-request","draft-order","order-status","policy"];
+    public async Task<IReadOnlyList<BobContextFact>> BobIntelligenceAsync(string module, string? entityId, DateTime now, CancellationToken ct)
+    {
+        await authority.RequireAsync(module, false, ct);
+        var s = await store.ReadAsync(user.TenantId, ct);
+        var facts = new List<BobContextFact>();
+        if (module == "inventory") foreach (var d in s.Demands.Where(d => !d.Cancelled).OrderBy(d => d.RequiredAtUtc).Take(60))
+        {
+            var readiness = SupplyRules.Readiness(s, d, now);
+            if (readiness.Shortage <= 0 || entityId is not null && entityId != d.Id.ToString()) continue;
+            facts.Add(new(new(module, d.Id.ToString(), "material-shortage", s.Version), d.Description,
+                $"Recorded shortage: {readiness.Shortage} {d.Unit}. " + string.Join("; ", readiness.Reasons.Take(3)),
+                "Review valid stock or purchasing sources", AttentionSeverity.WARNING, d.RequiredAtUtc, "supply.availability", d.Trade));
+        }
+        if (module == "purchasing") foreach (var o in s.Orders.Where(o => o.ExpectedAtUtc < now && o.Status is not ("RECEIVED" or "CLOSED" or "CANCELLED")).OrderBy(o => o.ExpectedAtUtc).Take(60))
+        {
+            if (entityId is not null && entityId != o.Id.ToString()) continue;
+            facts.Add(new(new(module, o.Id.ToString(), "po-overdue", s.Version), o.Number,
+                "Expected delivery has passed without a completed receipt.", "Review delivery and contact the vendor", AttentionSeverity.WARNING,
+                o.ExpectedAtUtc, "supply.purchasing"));
+        }
+        return facts;
+    }
     public async Task<object> WorkspaceAsync(string module,CancellationToken ct=default)
     {
         await authority.RequireAsync(module,false,ct);var s=await store.ReadAsync(user.TenantId,ct);var now=DateTime.UtcNow;

@@ -4,7 +4,8 @@ namespace MedInsights.Lib.Authorization;
 
 public static class UserModulePermissions
 {
-    public static readonly string[] Modules = ["dashboard", "bob", "calendar", "jobs", "leads", "requests", "estimates", "invoices", "contacts", "users", "settings", "billing", "inventory", "purchasing", "finance"];
+    public static readonly string[] Modules = ["dashboard", "bob", "calendar", "jobs", "leads", "requests", "estimates", "invoices", "contacts", "users", "settings", "billing", "inventory", "purchasing", "finance", "payroll"];
+    public static readonly string[] PayrollActions = ["time.self", "time.crew", "time.approve", "payroll.prepare", "payroll.export", "payroll.results", "payroll.compensation.read", "payroll.admin"];
     public static readonly string[] Operations = ["calendar", "jobs", "leads", "requests", "estimates", "invoices", "contacts"];
     public static bool IsActive(TenantMembership? membership) => membership is not null && !membership.IsDeleted
         && membership.DateRemoved is null && string.Equals(membership.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase);
@@ -12,7 +13,7 @@ public static class UserModulePermissions
     {
         if (!IsActive(membership)) return [];
         if (membership!.IsOwner || membership.Role.Equals("owner", StringComparison.OrdinalIgnoreCase))
-            return Modules.SelectMany(m => new[] { m + ".read", m + ".write" }).ToArray();
+            return Modules.SelectMany(m => new[] { m + ".read", m + ".write" }).Concat(PayrollActions).ToArray();
         if (profile is not null && (!profile.IsActive || profile.IsDeleted)) return [];
         var role = membership.Role.ToLowerInvariant();
         var defaults = role switch {
@@ -21,8 +22,9 @@ public static class UserModulePermissions
             "billing_admin" => new[] { "billing" },
             _ => Array.Empty<string>()
         };
-        var allowed = defaults.SelectMany(m => new[] { m + ".read", m + ".write" }).ToArray();
-        if (profile?.ModulePermissions is null && role is not ("owner" or "admin")) allowed = allowed.Where(p => !p.StartsWith("inventory.") && !p.StartsWith("purchasing.") && !p.StartsWith("finance.")).ToArray();
+        var allowed = defaults.SelectMany(m => new[] { m + ".read", m + ".write" }).Concat(PayrollActions.Where(p => role=="admin" || p is not ("payroll.admin" or "payroll.compensation.read"))).ToArray();
+        if (profile?.ModulePermissions is null && role is not ("owner" or "admin")) allowed = allowed.Where(p => !p.StartsWith("inventory.") && !p.StartsWith("purchasing.") && !p.StartsWith("finance.") && !p.StartsWith("payroll.") && !p.StartsWith("time.")).ToArray();
+        if(profile?.ModulePermissions is null)allowed=allowed.Where(p=>p is not("payroll.admin" or "payroll.compensation.read")).ToArray();
         return profile?.ModulePermissions is null ? allowed : allowed.Intersect(profile.ModulePermissions, StringComparer.Ordinal).ToArray();
     }
     public static bool Allows(IEnumerable<string> permissions, string module, bool write)
@@ -38,7 +40,7 @@ public static class UserModulePermissions
     public static string[]? Validate(string[]? permissions)
     {
         if (permissions is null) return null;
-        var known = Modules.SelectMany(m => new[] { m + ".read", m + ".write" }).ToHashSet();
+        var known = Modules.SelectMany(m => new[] { m + ".read", m + ".write" }).Concat(PayrollActions).ToHashSet();
         if (permissions.Any(p => !known.Contains(p))) throw new ArgumentException("Unknown module permission.");
         if (permissions.Any(p => p.EndsWith(".write") && !permissions.Contains(p.Replace(".write", ".read"))))
             throw new ArgumentException("Write access also requires read access.");

@@ -6,7 +6,7 @@ export type Person = { id: string; firstName: string; lastName: string; contactE
  profileTypes: string[]; companyName?: string; title?: string; team?: string; customerId?: string;
  modulePermissions: string[] | null; effectivePermissions: string[]; role?: string; membershipId?: string;
  isOwner: boolean; isActive: boolean; version: string };
-export const modules = ['dashboard','bob','calendar','jobs','leads','requests','estimates','invoices','contacts','users','settings','billing','inventory','purchasing','finance'];
+export const modules = ['dashboard','bob','calendar','jobs','leads','requests','estimates','invoices','contacts','users','settings','billing','inventory','purchasing','finance','payroll'];
 export async function peopleRequest<T>(event: Pick<RequestEvent, 'fetch' | 'cookies'>, path: string, init?: RequestInit): Promise<T> {
  const token = event.cookies.get(authTokenCookie);
  if (!token) throw error(401, 'Sign in to continue.');
@@ -36,9 +36,10 @@ export const peopleActions = {
  }),
  savePerson: (event: RequestEvent) => action(event, async d => {
   const id = text(d,'id');
+  const payrollActions = ["time.self","time.crew","time.approve","payroll.prepare","payroll.export","payroll.results","payroll.compensation.read","payroll.admin"];
   const permissions = text(d,'permissionMode') === 'default' ? null : modules.flatMap(m => {
    const level = text(d,`module:${m}`); return level === 'write' ? [`${m}.read`,`${m}.write`] : level === 'read' ? [`${m}.read`] : [];
-  });
+  }).concat(payrollActions.filter(a=>d.get(`grant:${a}`)==='on'));
   const person = await peopleRequest<Person>(event, `/api/people${id ? '/'+encodeURIComponent(id) : ''}`, {method:id ? 'PUT':'POST', body:JSON.stringify({
    firstName:text(d,'firstName'),lastName:text(d,'lastName'),contactEmail:text(d,'contactEmail') || null,contactPhone:text(d,'contactPhone') || null,
    loginIdentifier:text(d,'loginIdentifier') || null,profileTypes:d.getAll('profileTypes').map(String),companyName:text(d,'companyName'),title:text(d,'title'),team:text(d,'team'),

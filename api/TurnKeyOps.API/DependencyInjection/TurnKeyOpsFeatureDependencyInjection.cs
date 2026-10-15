@@ -234,6 +234,13 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<JobExecutionService>();
         services.AddScoped<ISupplyStore,SupplyStore>();
         services.AddScoped<IFinanceStore,FinanceStore>();
+        services.AddScoped<IPayrollStore,PayrollStore>();
+        services.AddScoped<IPayrollAuthority,PayrollAuthority>();
+        services.AddScoped<PayrollService>();
+        services.AddScoped<IPayrollAvailability,PayrollAvailability>();
+        services.AddScoped<PayrollFinanceConsumer>();
+        services.AddScoped<IPayrollProvider,GenericCsvPayrollProvider>();
+        foreach(var tool in new[]{"payroll.readiness","payroll.prepare"})services.AddScoped<IBobActionProvider>(sp=>new BobPayrollActionProvider(sp.GetRequiredService<PayrollService>(),sp.GetRequiredService<TurnKeyOps.Lib.Utils.IUserContext>(),tool));
         services.AddScoped<IFinanceSourceCoordinator,FinanceSourceCoordinator>();
         services.AddScoped<FinanceInvoiceDispatch>();
         services.AddHostedService<FinanceInvoiceWorker>();
@@ -277,6 +284,11 @@ public static class TurnKeyOpsFeatureDependencyInjection
         services.AddScoped<ITurnKeyChatService, TurnKeyChatService>();
         services.AddScoped<IBobContextMinimizer, BobContextMinimizer>();
         services.AddScoped<IBobOperationsService, BobOperationsService>();
+        services.AddScoped<IBobIntelligenceStore, BobIntelligenceStore>();
+        services.AddScoped<BobCapabilityRegistry>();
+        services.AddScoped<IBobActionGuard, BobActionGuard>();
+        services.AddScoped<BobIntelligenceService>();
+        services.AddScoped<IBobContextSource, BobModuleContextSource>();
         foreach (var tool in new[] { "lead.summarize", "lead.assign", "lead.stage", "lead.task", "lead.estimate", "lead.draft", "lead.send", "lead.schedule" })
             services.AddScoped<IBobActionProvider>(sp => new BobLeadActionProvider(sp.GetRequiredService<LeadService>(), tool));
         services.AddScoped<IBobActionProvider, BobConversationReadProvider>();

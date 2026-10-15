@@ -5,7 +5,7 @@
  import { enhance } from '$app/forms';
  import type { Person } from '$lib/server/people';
  let { people, customerLinks = [], form, canWrite = false, canDelete = false, canManagePortal = false }: { people: Person[]; customerLinks?: {id:string;name:string;companyName?:string;customerType?:string}[]; form?: {message?: string; error?: string; inviteUrl?: string; savedId?: string} | null; canWrite?: boolean; canDelete?: boolean; canManagePortal?: boolean } = $props();
- const modules = ['dashboard','bob','calendar','jobs','leads','requests','estimates','invoices','contacts','users','settings','billing','inventory','purchasing','finance'];
+ const modules = ['dashboard','bob','calendar','jobs','leads','requests','estimates','invoices','contacts','users','settings','billing','inventory','purchasing','finance','payroll'];
  let filter = $state('all'); let query = $state(''); let selectedId = $state<string | null>(null);
  let confirmDelete = $state(false); let creating = $state(false); let pending = $state(false); let permissionMode = $state('default');
  let lastRequestedId = $state<string|null>(null);
@@ -46,7 +46,7 @@
  <h3>Module permissions</h3>
  {#if selected?.isOwner}<p>Owners retain full company access.</p><input type="hidden" name="permissionMode" value="default"/>
  {:else}<label>Permission policy<select name="permissionMode" bind:value={permissionMode}><option value="default">Use role defaults</option><option value="custom">Custom module permissions</option></select></label>
- {#if permissionMode==='custom'}<div class="permissions">{#each modules as module}<label>{module}<select name={`module:${module}`} value={selected?.modulePermissions?.includes(`${module}.write`) ? 'write' : selected?.modulePermissions?.includes(`${module}.read`) ? 'read':'none'}><option value="none">No access</option><option value="read">View</option><option value="write">View and manage</option></select></label>{/each}</div><p class="help">Permissions stay within the access role. Dashboard requires visibility into all operational modules; Bob requires management access to them.</p>{/if}{/if}
+ {#if permissionMode==='custom'}<div class="permissions">{#each modules as module}<label>{module}<select name={`module:${module}`} value={selected?.modulePermissions?.includes(`${module}.write`) ? 'write' : selected?.modulePermissions?.includes(`${module}.read`) ? 'read':'none'}><option value="none">No access</option><option value="read">View</option><option value="write">View and manage</option></select></label>{/each}</div><fieldset><legend>Payroll & Time action grants</legend>{#each ["time.self","time.crew","time.approve","payroll.prepare","payroll.export","payroll.results","payroll.compensation.read","payroll.admin"] as grant}<label><input type="checkbox" name={`grant:${grant}`} checked={selected?.modulePermissions?.includes(grant)}/>{grant}</label>{/each}</fieldset><p class="help">Permissions stay within the access role. Dashboard requires visibility into all operational modules; Bob requires management access to them.</p>{/if}{/if}
  <button class="btn-primary" type="submit">{pending ? 'Saving…':'Save user'}</button></fieldset></form>
  {#if selected && canManagePortal && selected.profileTypes.includes('customer')}<ContactPortalAccess personId={selected.id} customerId={selected.customerId} active={selected.isActive}/>{/if}
  {#if selected && canWrite}

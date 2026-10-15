@@ -16,6 +16,7 @@ public sealed class FinanceController(FinanceService service,IFinanceAuthority a
     }
     [HttpPost("bob/{actionId:guid}/approve")]public async Task<IActionResult> ApproveBob(Guid actionId,CancellationToken ct)
     {await authority.RequireAsync(true,ct);return OkResponse(await bob.ApproveFinanceAsync(user.TenantId,actionId,ct));}
+    [HttpPost("payroll-events")]public async Task<IActionResult> PayrollEvents(PayrollFinanceCommand input,[FromServices]PayrollFinanceConsumer consumer,CancellationToken ct)=>OkResponse(await consumer.ConsumeAsync(input,ct));
     [HttpGet]public async Task<IActionResult> Get(DateOnly? from,DateOnly? asOf,CancellationToken ct)=>OkResponse(await service.WorkspaceAsync(from,asOf,ct));
     [HttpPost("command")]public async Task<IActionResult> Command(FinanceCommand input,CancellationToken ct)=>OkResponse(await service.CommandAsync(input,ct));
 }

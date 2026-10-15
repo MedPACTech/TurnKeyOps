@@ -53,3 +53,9 @@ azurite --silent --location .azurite --debug .azurite/debug.log
 - `admin/` was consolidated from the previous `turnkeyops-client` repository and renamed from `frontend/`.
 - `client/` was added from the older `turnkeyops-client` app that contains the public-facing site foundation.
 - I did not find a separate local `platform` repository in the workspace during consolidation.
+
+Payroll & Time V1 architecture, rollout controls and verification are documented in
+[`docs/payroll-time-v1.md`](docs/payroll-time-v1.md).
+
+Bob intelligence architecture, action safety, rollout and verification are documented in
+[`docs/bob-intelligence-v1.md`](docs/bob-intelligence-v1.md).

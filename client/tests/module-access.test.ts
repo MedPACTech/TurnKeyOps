@@ -23,6 +23,6 @@ test('restricted users land on an allowed page instead of Bob',()=>{
  assert.equal(firstAllowedAdminPage(['leads.read']),'leads');
  assert.equal(hasModuleAccess(['leads.read'],'leads',true),false);
  assert.equal(firstAllowedAdminPage(['contacts.read']),'customers');
- assert.equal(firstAllowedAdminPage(['bob.read','bob.write','users.read']),'users');
+ assert.equal(firstAllowedAdminPage(['bob.read','bob.write','users.read']),'intelligence');
  assert.equal(firstAllowedAdminPage([]),null);
 });

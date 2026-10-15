@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+ import {sourceHref} from '$lib/bob-intelligence';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageProps } from './$types';
 	import {
@@ -332,6 +333,13 @@
 
 			<div class="min-h-0 flex-1 overflow-y-auto bg-[var(--surface)] px-4 py-6 sm:px-8">
 				<div class="mx-auto max-w-3xl space-y-6">
+                    {#if conversation.id === 'bob-home' && data.intelligence}
+                        <section aria-label="Daily intelligence" class="border-b border-[var(--shell-border)] pb-5">
+                            <div class="flex items-center justify-between gap-3"><h2 class="font-semibold text-[var(--text-strong)]">Today's priorities</h2><a class="min-h-11 inline-flex items-center text-sm font-semibold underline" href={data.bobHref.replace(/\/bob$/, '/intelligence')}>Full briefing</a></div>
+                            {#each data.intelligence.priorities.slice(0,3) as item}<a class="block py-3" href={sourceHref(data.bobHref.replace(/\/bob$/, ''), item.source)}><strong>{item.title}</strong><p class="mt-1 text-sm text-[var(--text-muted)]">{item.explanation}</p></a>{:else}<p class="text-sm text-[var(--text-muted)]">No active priorities in the current source checks.</p>{/each}
+                            {#if data.intelligence.context.unavailableModules.length}<p class="text-sm text-[var(--text-muted)]">Some source checks are unavailable; the full briefing identifies them.</p>{/if}
+                        </section>
+                    {/if}
 					{#if isEstimateBuilder}
 						<details class="border-y border-[var(--shell-border)] py-3 xl:hidden">
 							<summary class="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[var(--text-strong)]">

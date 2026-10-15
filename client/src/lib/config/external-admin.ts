@@ -3,12 +3,14 @@ import { getTenant, type TenantDefinition, type TenantSlug } from '$lib/config/t
 
 export type ExternalAdminModule =
 	| 'bob'
+	| 'intelligence'
 	| 'dashboard'
 	| 'calendar'
 	| 'jobs'
 	| 'inventory'
 	| 'purchasing'
 	| 'finance'
+	| 'payroll'
 	| 'requests'
 	| 'leads'
 	| 'estimates'
@@ -38,12 +40,14 @@ export type ExternalAdminConfig = {
 type ModuleDefinition = Omit<BdrAdminNavItem, 'href'>;
 
 const modules: Record<ExternalAdminModule, ModuleDefinition> = {
+	intelligence: { slug: 'intelligence', label: 'Today', summary: 'Role priorities, decisions and Bob activity', contextLabel: 'Intelligence', focusLabel: 'Daily briefing', canvasLabel: 'Next action', section: 'overview' },
 	bob: { slug: 'bob', label: 'Ask Bob', summary: 'AI operating partner for priorities, decisions, and approved actions', contextLabel: 'AI Ops', focusLabel: 'Daily briefing', canvasLabel: 'Decision canvas', section: 'overview' },
 	dashboard: { slug: 'dashboard', label: 'Dashboard', summary: 'Pipeline, schedule, workload, and cash visibility', contextLabel: 'Admin', focusLabel: 'Control room', canvasLabel: 'Operating canvas', section: 'overview' },
 	calendar: { slug: 'calendar', label: 'Calendar', summary: 'Appointments, site visits, production dates, and crew availability', contextLabel: 'Operations', focusLabel: 'Scheduling desk', canvasLabel: 'Dispatch canvas', section: 'operations' },
 	jobs: { slug: 'jobs', label: 'Jobs', summary: 'Active work, field status, holds, and completion controls', contextLabel: 'Production Ops', focusLabel: 'Run desk', canvasLabel: 'Job canvas', section: 'operations' },
 	inventory: { slug: 'inventory', label: 'Inventory', summary: 'Job materials, availability and stock movements', contextLabel: 'Supply', focusLabel: 'Material readiness', canvasLabel: 'Inventory workspace', section: 'operations' },
 	purchasing: { slug: 'purchasing', label: 'Purchasing', summary: 'Source, order and receive Job supplies', contextLabel: 'Supply', focusLabel: 'Buying desk', canvasLabel: 'Purchasing workspace', section: 'operations' },
+	payroll: { slug: 'payroll', label: 'Payroll & Time', summary: 'Field time, crew approvals and payroll preparation', contextLabel: 'People Ops', focusLabel: 'Time and payroll', canvasLabel: 'Payroll workspace', section: 'operations' },
 	finance: { slug: 'finance', label: 'Finance', summary: 'Cash, money in, money out and Job health', contextLabel: 'Finance', focusLabel: 'Financial priorities', canvasLabel: 'Finance workspace', section: 'revenue' },
 	leads: { slug: 'leads', label: 'Leads', summary: 'Opportunities, next actions and lead-to-won workflow', contextLabel: 'Leads', focusLabel: 'Next actions', canvasLabel: 'Lead workspace', section: 'customers' },
 	requests: { slug: 'requests', label: 'Requests', summary: 'Public-site intake, triage, follow-up, and conversion', contextLabel: 'Intake Ops', focusLabel: 'Request inbox', canvasLabel: 'Message canvas', section: 'customers' },
@@ -55,9 +59,9 @@ const modules: Record<ExternalAdminModule, ModuleDefinition> = {
 };
 
 const tenantModules: Record<TenantSlug, ExternalAdminModule[]> = {
-	bdr: ['bob', 'dashboard', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'customers', 'users', 'settings'],
-	thinkpink: ['bob', 'dashboard', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'customers', 'users', 'settings'],
-	carlzipf: ['bob', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'customers', 'settings', 'users']
+	bdr: ['bob', 'intelligence', 'dashboard', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'payroll', 'customers', 'users', 'settings'],
+	thinkpink: ['bob', 'intelligence', 'dashboard', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'payroll', 'customers', 'users', 'settings'],
+	carlzipf: ['bob', 'intelligence', 'calendar', 'jobs', 'inventory', 'purchasing', 'leads', 'estimates', 'invoices', 'finance', 'payroll', 'customers', 'settings', 'users']
 };
 
 const themes: Record<TenantSlug, ExternalAdminTheme> = {
