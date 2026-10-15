@@ -1,4 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
+import type { Briefing, BobCommand } from '$lib/bob-intelligence';
 import { authTokenCookie, getAuthApiBaseUrl } from '$lib/server/auth-session';
 import {
 	bobVoiceCookie,
@@ -305,10 +306,11 @@ export const load = async ({ fetch, url, cookies }) => {
 	const token = cookies.get(authTokenCookie) ?? '';
 	const persistence = { fetch, token };
 	const tenant = await tenantForUrl(url, fetch, token);
-	const [briefing, conversations, estimateFollowups] = await Promise.all([
+	const [briefing, conversations, estimateFollowups, intelligence] = await Promise.all([
 		buildBobBriefing(fetch, tenant, token),
 		ensureBobConversations(tenant.slug, persistence),
-		buildEstimateFollowups(fetch, tenant, token)
+		buildEstimateFollowups(fetch, tenant, token),
+		apiRequest<Briefing>('/api/bob/intelligence/briefing', {}, fetch, token).catch(() => null)
 	]);
 	const storedConversation =
 		conversations.find((conversation) => conversation.id === url.searchParams.get('conversation')) ??
@@ -332,6 +334,7 @@ export const load = async ({ fetch, url, cookies }) => {
 
 	return {
 		briefing,
+		intelligence,
 		conversations,
 		selectedConversation,
 		bobVoice,
@@ -390,6 +393,16 @@ export const actions = {
 
 		try {
 			const bobVoice = normalizeBobVoice(cookies.get(bobVoiceCookie));
+			if ((conversation.mode === 'general' || conversation.id === bobHomeConversationId) && /^(what|which|show|why)\b/i.test(question)) {
+                const resolved = await apiRequest<BobCommand>('/api/bob/intelligence/command', {
+                    method: 'POST', body: JSON.stringify({ text: question })
+                }, fetch, token).catch(() => null);
+                if (resolved && (resolved.matches.length || resolved.status === 'denied')) {
+                    const answer = [resolved.message, ...resolved.matches.slice(0, 5).map(item => `${item.title}: ${item.explanation} Next: ${item.nextAction}.`)].join('\n\n');
+                    await appendGeneralConversationExchange(conversation.id, question, answer, [], tenant.slug, persistence);
+                    throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversation.id)}`);
+                }
+            }
 			if (conversation.mode === 'estimate-followup') {
 				const inspectionOffer = await buildInspectionOffer(fetch, conversation, question, bobVoice, tenant);
 				if (inspectionOffer) {

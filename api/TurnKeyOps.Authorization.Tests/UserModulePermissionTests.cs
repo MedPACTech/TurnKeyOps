@@ -12,7 +12,7 @@ public sealed class UserModulePermissionTests
         var m = Member("owner"); m.IsOwner = true;
         var resolved = UserModulePermissions.Resolve(m, new() { ModulePermissions = [], IsActive = false });
         Assert.True(UserModulePermissions.Allows(resolved,"users",true));
-        Assert.Equal(UserModulePermissions.Modules.Length * 2, resolved.Length);
+        Assert.Equal(UserModulePermissions.Modules.Length * 2 + UserModulePermissions.PayrollActions.Length, resolved.Length);
     }
     [Fact] public void ExplicitEmptyOverrideIsNotRoleDefaults() {
         Assert.NotEmpty(UserModulePermissions.Resolve(Member(), null));

@@ -15,7 +15,7 @@ namespace TurnKeyOps.Services;
 public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadStore payloads,IJobService legacy,
     IJobAuthority authority,JobConfigurationService configuration,IUserContext user,ICalendarEventRepository calendar,
     ITenantMembershipRepository memberships,ICustomerRepository customers,IJobSiteRepository sites,
-    IAzureBlobStorageService blobs,IQuoteEstimateService estimates, IUserProfileRepository profiles, ISupplyJobReadiness? supplyReadiness = null)
+    IAzureBlobStorageService blobs,IQuoteEstimateService estimates, IUserProfileRepository profiles, ISupplyJobReadiness? supplyReadiness = null, IPayrollAvailability? payrollAvailability = null)
 {
     private string Partition=>RepositoryKeyHelper.ToTenantPartitionKey(user.TenantId);
     private string Actor=>user.UserId.ToString("D");
@@ -225,7 +225,7 @@ public sealed class JobExecutionService(IJobRepository jobs,IJobWorkflowPayloadS
         if(input.Status is not ("scheduled" or "completed" or "cancelled"))throw new ArgumentException("Invalid event status.");
         if(string.IsNullOrWhiteSpace(input.Title)||input.MembershipIds.Count==0&&input.Type!="delivery")throw new ArgumentException("Event title and assigned people are required.");
         var blockers=JobExecutionRules.Blockers(x,"schedule");if(input.Status=="scheduled"&&blockers.Count>0)throw new ArgumentException(string.Join("; ",blockers));
-        if(input.Status=="scheduled")await ValidateMembers(input.MembershipIds,input.Type=="delivery"?[]:x.Profile.RequiredSkills,ct);
+        if(input.Status=="scheduled"){await ValidateMembers(input.MembershipIds,input.Type=="delivery"?[]:x.Profile.RequiredSkills,ct);if(payrollAvailability!=null)await payrollAvailability.RequireAvailableAsync(user.TenantId,input.MembershipIds,input.StartUtc,input.EndUtc,ct);}
         var all=await calendar.ListAsync(Partition,ct);
         var existing=input.Id==Guid.Empty?null:all.SingleOrDefault(e=>e.Id==input.Id&&e.JobId==id);
         if(input.Id!=Guid.Empty&&existing is null)throw new ArgumentException("Job event not found.");

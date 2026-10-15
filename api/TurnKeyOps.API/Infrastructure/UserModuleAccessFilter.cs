@@ -13,6 +13,7 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
     public static string? ModuleFor(string controller) => controller switch {
         "People" or "TenantMembership" or "Invite" or "Roles" or "AdminContactAccess" => "users",
         "Contacts" or "Customers" or "JobSites" => "contacts",
+        "Payroll" => "payroll",
         "Finance" or "FinanceMigration" or "ConstructionFinance" or "FinanceOperations" or "ConstructionPayment" => "finance",
         "Inventory" => "inventory",
         "Purchasing" => "purchasing",
@@ -23,6 +24,7 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
         "EstimateWorkspace" or "Estimates" or "QuoteEstimates" or "AdminEstimateDefaults" => "estimates",
         "Invoices" or "LocksmithFieldInvoices" => "invoices",
         "Dashboard" => "dashboard",
+        "BobIntelligence" => "bob",
         "Bob" or "BobActions" or "Chat" or "AIRealtime" => "bob",
         "PortalAdmin" or "AdminTenantSettings" or "TenantProfile" or "TenantOnboardingPolicy" or "ActivityLogs" => "settings",
         "Billing" or "BillingAdmin" or "TenantBillingAccount" or "TenantSubscription" or "TenantSeatEntitlement" or "TenantCreditBalance" or "TokenLedger" => "billing",
@@ -38,6 +40,7 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
             ? "users" : ModuleFor(action.ControllerName);
         if (module is null) { await next(); return; }
         var write = !HttpMethods.IsGet(context.HttpContext.Request.Method) && !HttpMethods.IsHead(context.HttpContext.Request.Method);
+        if(action.ControllerName=="Payroll"&&action.ActionName=="Bob"&&context.ActionArguments.TryGetValue("input",out var payrollProposal)&&payrollProposal is TurnKeyOps.Lib.Dtos.ProposeBobActionDto payrollAction&&payrollAction.ToolKey=="payroll.readiness")write=false;
         if(action.ControllerName=="FinanceMigration"&&action.ActionName=="Preview")write=false;
         if(action.ControllerName=="Finance"&&action.ActionName=="Bob"&&context.ActionArguments.TryGetValue("input",out var financeProposal)&&financeProposal is TurnKeyOps.Lib.Dtos.ProposeBobActionDto financeAction&&financeAction.ToolKey!="finance.draft-journal")write=false;
         if(action.ControllerName=="JobWorkspace"&&action.ActionName=="Bob"&&context.ActionArguments.TryGetValue("input",out var proposal)&&proposal is TurnKeyOps.Lib.Dtos.ProposeBobActionDto jobAction&&jobAction.ToolKey is "job.summarize" or "job.readiness" or "job.recommend" or "job.structure")write=false;
@@ -46,7 +49,11 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
             context.Result = new ObjectResult(new { error = "Only an owner can change access roles and invitations." }) { StatusCode = 403 };
             return;
         }
-        if (!UserModulePermissions.Allows(await access.GetAsync(context.HttpContext.RequestAborted), module, write)) {
+        var permissions = await access.GetAsync(context.HttpContext.RequestAborted);
+        var allowed = action.ControllerName == "BobIntelligence"
+            ? permissions.Contains("bob.read") && (!write || permissions.Contains("bob.write") || action.ActionName is "Command" or "Feedback" or "Dismiss")
+            : UserModulePermissions.Allows(permissions, module, write);
+        if (!allowed) {
             context.Result = new ObjectResult(new { error = "You do not have access to this module." }) { StatusCode = 403 };
             return;
         }

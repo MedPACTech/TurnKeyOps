@@ -18,6 +18,7 @@ public class CalendarEventService : ICalendarEventService
     private readonly IJobRepository _jobs;
     private readonly IJobAuthority? _jobAuthority;
     private readonly IJobWorkflowPayloadStore? _jobPayloads;
+    private readonly IPayrollAvailability? _payrollAvailability;
 
     public CalendarEventService(
         ICalendarEventRepository repo,
@@ -25,7 +26,7 @@ public class CalendarEventService : ICalendarEventService
         IUserContext userContext,
         ITenantMembershipRepository memberships,
         ITenantSettingsRepository settings,
-        IJobRepository jobs, IJobAuthority? jobAuthority = null, IJobWorkflowPayloadStore? jobPayloads = null)
+        IJobRepository jobs, IJobAuthority? jobAuthority = null, IJobWorkflowPayloadStore? jobPayloads = null, IPayrollAvailability? payrollAvailability = null)
     {
         _repo = repo;
         _weatherService = weatherService;
@@ -33,7 +34,7 @@ public class CalendarEventService : ICalendarEventService
         _memberships = memberships;
         _settings = settings;
         _jobs = jobs;
-        _jobAuthority = jobAuthority;_jobPayloads=jobPayloads;
+        _jobAuthority = jobAuthority;_jobPayloads=jobPayloads;_payrollAvailability=payrollAvailability;
     }
 
     private string PartitionKeyForTenant() => RepositoryKeyHelper.ToTenantPartitionKey(_userContext.TenantId);
@@ -153,6 +154,7 @@ public class CalendarEventService : ICalendarEventService
             item.Status is JobStatus.Scheduled or JobStatus.InProgress &&
             item.AssignedTechnicianMembershipId == membershipId &&
             item.ScheduledStart < dto.EndUtc && item.ScheduledEnd > dto.StartUtc);
+        if(_payrollAvailability!=null)await _payrollAvailability.RequireAvailableAsync(_userContext.TenantId,[membershipId],dto.StartUtc,dto.EndUtc);
         if (conflictingVisit || conflictingJob)
             throw new ArgumentException("The selected technician already has an overlapping assignment.", nameof(dto.AssignedTechnicianMembershipId));
     }

@@ -4,7 +4,7 @@
 	import AdminIcon from './AdminIcon.svelte';
 	import AdminDrawer from './AdminDrawer.svelte';
 	import '$lib/styles/admin-theme.css';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 	import type { BdrAdminNavItem, BdrAdminRole } from '$lib/config/platform';
 	import type { ExternalAdminTheme } from '$lib/config/external-admin';
 	import {
@@ -84,6 +84,17 @@
   let themeChoice = $state<ThemeChoice>('system');
   let systemDark = $state(false);
   const resolvedTheme = $derived(themeChoice === 'system' ? (systemDark ? 'dark' : 'light') : themeChoice);
+  onMount(() => {
+    const openBob = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
+      const destination = navItems.find((item: BdrAdminNavItem) => item.slug === 'intelligence')?.href;
+      if (!destination || activePath.includes('/intelligence')) return;
+      event.preventDefault();
+      void goto(destination + '?command=1');
+    };
+    window.addEventListener('keydown', openBob);
+    return () => window.removeEventListener('keydown', openBob);
+  });
   onMount(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     systemDark = media.matches;

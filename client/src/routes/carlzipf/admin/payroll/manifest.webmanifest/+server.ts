@@ -1,0 +1,1 @@
+export const GET=()=>new Response(JSON.stringify({name:'TurnKeyOps Time',short_name:'Time',start_url:'/carlzipf/admin/payroll/clock',scope:'/carlzipf/admin/payroll',display:'standalone',theme_color:'#0f766e',background_color:'#ffffff'}),{headers:{'Content-Type':'application/manifest+json','Cache-Control':'public, max-age=3600'}});

@@ -9,6 +9,31 @@ public sealed class FinanceService(IFinanceStore store, IFinanceAuthority author
     IInvoiceService invoices, IJobService jobs, ISupplyStore supplyStore, TurnKeyOps.Repositories.Interfaces.ICustomerRepository customers, IQuoteEstimateService? estimates=null,
     IFinanceSourceCoordinator? coordinator=null, FinanceInvoiceDispatch? dispatch=null)
 {
+    public async Task<IReadOnlyList<BobContextFact>> BobIntelligenceAsync(string? entityId, DateTime now, CancellationToken ct)
+    {
+        await authority.RequireAsync(false, ct);
+        var s = await store.ReadAsync(user.TenantId, ct);
+        var today = DateOnly.FromDateTime(now);
+        var facts = new List<BobContextFact>();
+        foreach (var item in s.OpenItems.Where(i => i.DueDate < today).OrderBy(i => i.DueDate).Take(60))
+        {
+            var settled = s.Settlements.SelectMany(x => x.Allocations).Where(a => a.OpenItemId == item.Id).Sum(a => a.Amount);
+            if (settled >= item.Total || entityId is not null && entityId != item.Id.ToString()) continue;
+            facts.Add(new(new("finance", item.Id.ToString(), "overdue-open-item", s.Version), item.Number,
+                $"{item.Kind} has an unsettled balance of {item.Total - settled:0.00}; due {item.DueDate:yyyy-MM-dd}.",
+                "Review the authoritative open item and collection or payment options", AttentionSeverity.WARNING,
+                item.DueDate.ToDateTime(TimeOnly.MinValue), item.Kind == "AR" ? "finance.ar" : "finance.ap"));
+        }
+        foreach (var period in s.Periods.Where(p => p.Status != "CLOSED" && p.End <= today))
+        {
+            var issues = FinanceLedger.CloseIssues(s, period);
+            if (issues.Length == 0 || entityId is not null && entityId != period.Id) continue;
+            facts.Add(new(new("finance", period.Id, "close-blocked", s.Version), $"Close: {period.Id}",
+                string.Join("; ", issues.Take(4)), "Review close readiness; closing remains an explicit human operation",
+                AttentionSeverity.WARNING, CapabilityId: "finance.close-readiness"));
+        }
+        return facts.Take(60).ToArray();
+    }
     public async Task<object> WorkspaceAsync(DateOnly? from=null,DateOnly? asOf=null,CancellationToken ct=default)
     {
         await authority.RequireAsync(false,ct);

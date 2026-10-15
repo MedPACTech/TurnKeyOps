@@ -118,7 +118,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Install metadata contains no account data. Browsers can fetch manifests without
 	// cookies; treating those requests as failed sessions also cleared the user's cookies.
 	const publicManifest = ['GET', 'HEAD'].includes(event.request.method) &&
-		/^\/(bdr|carlzipf|thinkpink)\/admin\/(leads|estimates|jobs|inventory|purchasing)\/manifest\.webmanifest$/.test(authPathname);
+		/^\/(bdr|carlzipf|thinkpink)\/admin\/(leads|estimates|jobs|inventory|purchasing|payroll)\/manifest\.webmanifest$/.test(authPathname);
 	if (publicManifest || !isAdminPath(authPathname)) {
 		return withSecurityHeaders(await resolve(event), event.url.protocol === 'https:');
 	}
@@ -159,7 +159,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             const permissions = await peopleRequest<string[]>(event, '/api/my-module-access');
             event.locals.modulePermissions = permissions;
             const module = adminModule(authPathname);
-            const write = !['GET', 'HEAD'].includes(event.request.method);
+            const write = !['GET', 'HEAD'].includes(event.request.method) && !(module === 'intelligence' && ['/command','/dismiss','/feedback'].some(action => event.url.searchParams.has(action)));
             if (!write && /^\/(bdr|thinkpink)\/admin\/?$/.test(authPathname)) {
                 const landing = firstAllowedAdminPage(permissions);
                 if (landing) return withSecurityHeaders(new Response(null, {status:303,
