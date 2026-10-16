@@ -7,6 +7,7 @@ public static class TenantSettingKinds
     public const string PublicContent = "public-content";
     public const string Billing = "billing";
     public const string Operational = "operational";
+    public const string EmployeeAccess = "employee-access";
     public const string Brand = "brand";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
@@ -14,7 +15,8 @@ public static class TenantSettingKinds
         PublicContent,
         Billing,
         Operational,
-        Brand
+        Brand,
+        EmployeeAccess
     };
 }
 

@@ -1,4 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { hasModuleAccess } from '$lib/module-access';
 import type { Briefing, BobCommand } from '$lib/bob-intelligence';
 import { authTokenCookie, getAuthApiBaseUrl } from '$lib/server/auth-session';
 import {
@@ -60,10 +61,11 @@ type BobTenantPreset = TenantDefinition & { operatingDefaults?: unknown };
 const tenantForUrl = async (
 	url: URL,
 	requestFetch: typeof globalThis.fetch,
-	accessToken?: string | null
+	accessToken?: string | null,
+ permissions?: string[]
 ): Promise<BobTenantPreset> => {
 	const tenant = getExternalAdminTenantForPath(url.pathname) ?? bdrTenant;
-	if (tenant.slug !== 'thinkpink') return tenant;
+	if (tenant.slug !== 'thinkpink' || (permissions && !hasModuleAccess(permissions, 'settings'))) return tenant;
 	const settings = await loadThinkPinkSettings(requestFetch, accessToken);
 	return {
 		...tenant,
@@ -302,14 +304,20 @@ const buildInspectionOffer = async (
 	return { target, content, actions };
 };
 
-export const load = async ({ fetch, url, cookies }) => {
+const scopedBriefing = async (fetch: typeof globalThis.fetch, tenant: TenantDefinition, token: string | null | undefined, permissions: string[]): Promise<Awaited<ReturnType<typeof buildBobBriefing>>> => {
+ if (['calendar','jobs','requests','estimates','invoices','contacts'].every(module => hasModuleAccess(permissions, module))) return buildBobBriefing(fetch, tenant, token);
+ const context = await apiRequest<{ facts: unknown[] }>('/api/bob/intelligence/context', {}, fetch, token).catch(() => null);
+ return { generatedAtUtc: new Date().toISOString(), headline: 'Your work today', summary: 'Bob uses only the modules enabled for your role.', metrics: [], attention: [], recommendations: [], context: { quoteRequests: [], invoices: [], jobs: [], estimates: { facts: context?.facts ?? [] } } };
+};
+
+export const load = async ({ fetch, url, cookies, locals }) => {
 	const token = cookies.get(authTokenCookie) ?? '';
 	const persistence = { fetch, token };
-	const tenant = await tenantForUrl(url, fetch, token);
+	const tenant = await tenantForUrl(url, fetch, token, locals.modulePermissions ?? []);
 	const [briefing, conversations, estimateFollowups, intelligence] = await Promise.all([
-		buildBobBriefing(fetch, tenant, token),
+		scopedBriefing(fetch, tenant, token, locals.modulePermissions ?? []),
 		ensureBobConversations(tenant.slug, persistence),
-		buildEstimateFollowups(fetch, tenant, token),
+		hasModuleAccess(locals.modulePermissions ?? [], 'requests') ? buildEstimateFollowups(fetch, tenant, token) : Promise.resolve([]),
 		apiRequest<Briefing>('/api/bob/intelligence/briefing', {}, fetch, token).catch(() => null)
 	]);
 	const storedConversation =
@@ -353,34 +361,34 @@ export const load = async ({ fetch, url, cookies }) => {
 };
 
 export const actions = {
-	archiveConversation: async ({ request, url, fetch, cookies }) => {
+	archiveConversation: async ({ request, url, fetch, cookies, locals }) => {
 		const token = cookies.get(authTokenCookie) ?? '';
 		const persistence = { fetch, token };
-		const tenant = await tenantForUrl(url, fetch, token);
+		const tenant = await tenantForUrl(url, fetch, token, locals.modulePermissions ?? []);
 		const formData = await request.formData();
 		await setBobConversationArchived(formString(formData, 'conversationId'), true, tenant.slug, persistence);
 		throw redirect(303, bobHref(tenant));
 	},
-	restoreConversation: async ({ request, url, fetch, cookies }) => {
+	restoreConversation: async ({ request, url, fetch, cookies, locals }) => {
 		const token = cookies.get(authTokenCookie) ?? '';
 		const persistence = { fetch, token };
-		const tenant = await tenantForUrl(url, fetch, token);
+		const tenant = await tenantForUrl(url, fetch, token, locals.modulePermissions ?? []);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		await setBobConversationArchived(conversationId, false, tenant.slug, persistence);
 		throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`);
 	},
-	deleteConversation: async ({ request, url, fetch, cookies }) => {
+	deleteConversation: async ({ request, url, fetch, cookies, locals }) => {
 		const token = cookies.get(authTokenCookie) ?? '';
 		const persistence = { fetch, token };
-		const tenant = await tenantForUrl(url, fetch, token);
+		const tenant = await tenantForUrl(url, fetch, token, locals.modulePermissions ?? []);
 		const formData = await request.formData();
 		await deleteBobConversation(formString(formData, 'conversationId'), tenant.slug, persistence);
 		throw redirect(303, bobHref(tenant));
 	},
-	ask: async ({ request, fetch, cookies, url }) => {
+	ask: async ({ request, fetch, cookies, url, locals }) => {
 		const token = cookies.get(authTokenCookie);
-		const tenant = await tenantForUrl(url, fetch, token);
+		const tenant = await tenantForUrl(url, fetch, token, locals.modulePermissions ?? []);
 		const formData = await request.formData();
 		const question = formString(formData, 'question');
 		const conversationId = formString(formData, 'conversationId');
@@ -403,7 +411,7 @@ export const actions = {
                     throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversation.id)}`);
                 }
             }
-			if (conversation.mode === 'estimate-followup') {
+			if (conversation.mode === 'estimate-followup' && hasModuleAccess(locals.modulePermissions ?? [], 'requests')) {
 				const inspectionOffer = await buildInspectionOffer(fetch, conversation, question, bobVoice, tenant);
 				if (inspectionOffer) {
 					await appendBobMessage(conversation.id, 'user', question, undefined, undefined, tenant.slug, persistence);
@@ -422,7 +430,7 @@ export const actions = {
 					);
 				}
 			}
-			const briefing = await buildBobBriefing(fetch, tenant, token);
+			const briefing = await scopedBriefing(fetch, tenant, token, locals.modulePermissions ?? []);
 			const analysis = await analyzeWithBob({
 				fetch,
 				token,
@@ -448,7 +456,7 @@ export const actions = {
 			}
 
 			if (conversation.mode === 'estimate-followup') {
-				const followups = await buildEstimateFollowups(fetch, tenant, token);
+				const followups = hasModuleAccess(locals.modulePermissions ?? [], 'requests') ? await buildEstimateFollowups(fetch, tenant, token) : [];
 				await appendGeneralConversationExchange(
 					conversation.id,
 					question,
@@ -460,7 +468,7 @@ export const actions = {
 				throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversation.id)}`);
 			}
 
-			if (analysis.intent === 'start_estimate') {
+			if (analysis.intent === 'start_estimate' && hasModuleAccess(locals.modulePermissions ?? [], 'requests', true)) {
 				const estimateConversation = await createBobConversation('estimate-builder', tenant.slug, persistence);
 				if (Object.keys(analysis.fields).length) {
 					await advanceEstimateConversation(
@@ -478,9 +486,9 @@ export const actions = {
 				);
 			}
 
-			if (analysis.intent === 'estimate_followup') {
+			if (analysis.intent === 'estimate_followup' && hasModuleAccess(locals.modulePermissions ?? [], 'requests')) {
 				const followupConversation = await createBobConversation('estimate-followup', tenant.slug, persistence);
-				const followups = await buildEstimateFollowups(fetch, tenant, token);
+				const followups = hasModuleAccess(locals.modulePermissions ?? [], 'requests') ? await buildEstimateFollowups(fetch, tenant, token) : [];
 				await appendBobMessage(followupConversation.id, 'user', question, undefined, undefined, tenant.slug, persistence);
 				await appendBobMessage(
 					followupConversation.id,
@@ -522,9 +530,10 @@ export const actions = {
 			});
 		}
 	},
-	scheduleInspection: async ({ request, fetch, cookies, url }) => {
+	scheduleInspection: async ({ request, fetch, cookies, url, locals }) => {
+        if (!hasModuleAccess(locals.modulePermissions ?? [], 'requests', true)) return fail(403, { action: 'scheduleInspection', message: 'Use the modules enabled for your role.' });
 		const token = cookies.get(authTokenCookie);
-		const tenant = await tenantForUrl(url, fetch, token);
+		const tenant = await tenantForUrl(url, fetch, token, locals.modulePermissions ?? []);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		if (!token) {
@@ -601,12 +610,12 @@ export const actions = {
 			});
 		}
 	},
-	approve: async ({ request, fetch, url, cookies }) => {
-		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie));
+	approve: async ({ request, fetch, url, cookies, locals }) => {
+		const tenant = await tenantForUrl(url, fetch, cookies.get(authTokenCookie), locals.modulePermissions ?? []);
 		const formData = await request.formData();
 		const recommendationId = formString(formData, 'recommendationId');
 		const conversationId = formString(formData, 'conversationId');
-		const briefing = await buildBobBriefing(fetch, tenant, cookies.get(authTokenCookie));
+		const briefing = await scopedBriefing(fetch, tenant, cookies.get(authTokenCookie), locals.modulePermissions ?? []);
 		const recommendation = briefing.recommendations.find((item) => item.id === recommendationId);
 		if (!recommendation) {
 			return fail(404, {
@@ -617,6 +626,8 @@ export const actions = {
 		}
 
 		try {
+            const target = recommendation.kind === 'invoice-reminder' ? 'invoices' : recommendation.kind === 'quote-follow-up' ? 'requests' : recommendation.kind === 'job-note' ? 'jobs' : null;
+            if (target && !hasModuleAccess(locals.modulePermissions ?? [], target, true)) return fail(403, { action: 'approve', message: 'Your role cannot perform this action.' });
 			await executeBobRecommendation(fetch, recommendation);
 			throw redirect(303, `${bobHref(tenant)}?conversation=${encodeURIComponent(conversationId)}`);
 		} catch (cause) {
@@ -628,9 +639,10 @@ export const actions = {
 			});
 		}
 	},
-	createEstimate: async ({ request, fetch, url, cookies }) => {
+	createEstimate: async ({ request, fetch, url, cookies, locals }) => {
+        if (!hasModuleAccess(locals.modulePermissions ?? [], 'requests', true)) return fail(403, { action: 'createEstimate', message: 'Use the modules enabled for your role.' });
 		const token = cookies.get(authTokenCookie);
-		const tenant = await tenantForUrl(url, fetch, token);
+		const tenant = await tenantForUrl(url, fetch, token, locals.modulePermissions ?? []);
 		const formData = await request.formData();
 		const conversationId = formString(formData, 'conversationId');
 		if (!token) {

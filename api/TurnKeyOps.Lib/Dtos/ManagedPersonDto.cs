@@ -11,6 +11,7 @@ public sealed class SaveManagedPersonDto
     public string? CompanyName { get; set; }
     public string? Title { get; set; }
     public string? Team { get; set; }
+    public string? EmployeeRoleId { get; set; }
     public Guid? CustomerId { get; set; }
     public string[]? ModulePermissions { get; set; }
     public string? ExpectedVersion { get; set; }
@@ -18,4 +19,4 @@ public sealed class SaveManagedPersonDto
 public sealed record ManagedPersonDto(Guid Id, string FirstName, string LastName, string? ContactEmail,
     string? ContactPhone, string[] ProfileTypes, string? CompanyName, string? Title, string? Team,
     Guid? CustomerId, string[]? ModulePermissions, string[] EffectivePermissions, string? Role,
-    Guid? MembershipId, bool IsOwner, bool IsActive, string Version);
+    Guid? MembershipId, bool IsOwner, bool IsActive, string Version, string? EmployeeRoleId = null);

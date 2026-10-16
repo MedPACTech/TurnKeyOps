@@ -52,7 +52,6 @@
  {/if}
  </section>
  {#if canManagePortal && selected.profileTypes.includes('customer')}<ContactPortalAccess personId={selected.id} customerId={selected.customerId}/>{/if}
- {#if canManagePeople}<a class="access-link" href={`${base}/users?person=${selected.id}`}>Manage this person’s app access</a>{/if}
  {/if}
  {/key}{:else}<div class="empty"><h2>Select a contact</h2><p>Choose a customer or vendor to view their details and linked work.</p></div>{/if}
  </section></div>

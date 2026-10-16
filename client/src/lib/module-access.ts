@@ -7,7 +7,7 @@ export const adminModule = (pathname: string): string | null => {
 export const hasModuleAccess = (permissions: string[], module: string, write = false) => {
  if(module==='intelligence')return permissions.includes('bob.read')&&(!write||permissions.includes('bob.write'));
  if (!permissions.includes(`${module}.read`) || (write && !permissions.includes(`${module}.write`))) return false;
- if (module==='dashboard' || module==='bob') return ['calendar','jobs','requests','estimates','invoices','contacts'].every(m=>permissions.includes(`${m}.read`) && (module!=='bob' || permissions.includes(`${m}.write`)));
+ if (module==='dashboard') return ['calendar','jobs','requests','estimates','invoices','contacts'].every(m=>permissions.includes(`${m}.read`));
  return true;
 };
 

@@ -6,7 +6,7 @@
  const activeUsers = $derived(data.users.filter(user => user.status.toLowerCase() === 'active' && user.userId));
  let saving = $state(false);
 </script>
-<PeopleManagement initialFilter="employee" canManagePortal={data.role === 'owner' && data.modulePermissions.includes('settings.write')} people={data.people} customerLinks={data.customerLinks} {form} canDelete={data.canDeleteUsers} canWrite={data.modulePermissions.includes('users.write')}>
+<PeopleManagement initialFilter="employee" canManagePortal={data.role === 'owner' && data.modulePermissions.includes('settings.write')} employeeAccess={data.employeeAccess} people={data.people} customerLinks={data.customerLinks} {form} canDelete={data.canDeleteUsers} canWrite={data.modulePermissions.includes('users.write')}>
  {#snippet personDetails(person)}
   {#if person.isActive && person.profileTypes.includes('employee') && activeUsers.some(user => user.membershipId === person.membershipId)}
    <section class="mt-6 border-t border-[var(--border)] pt-5">

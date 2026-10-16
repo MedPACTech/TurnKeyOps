@@ -32,7 +32,7 @@ for(const tenant of ['bdr','thinkpink','carlzipf']) for(const theme of ['light',
 for(const theme of ['light','dark'] as const) for(const module of ['controls','customers','users']) {
  test(`${module} ${theme}: controls and keyboard`,async({page})=>{
   await page.emulateMedia({colorScheme:theme});await page.goto(`/?module=${module}&new=1`);
-  if(module==='users')await page.getByRole('button',{name:'Add user',exact:true}).click();
+  if(module==='users')await page.getByRole('button',{name:'Add employee',exact:true}).click();
   await axe(page);
   if(module==='controls') {
    await page.getByRole('button',{name:'Open details'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await axe(page);

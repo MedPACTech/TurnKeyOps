@@ -23,6 +23,7 @@
 	{#if data.loadError}<p role="alert" class="rounded-xl border border-[var(--critical-text)] bg-[var(--critical-soft)] p-4 text-sm text-[var(--critical-text)]">{data.loadError} <a class="underline" href="/carlzipf/admin/calendar">Retry</a></p>{/if}
 	{#if form?.error}<p role="alert" class="rounded-xl border border-[var(--critical-text)] bg-[var(--critical-soft)] p-4 text-sm text-[var(--critical-text)]">{form.error}</p>{/if}
 	{#if form?.message}<p role="status" class="rounded-xl border border-[var(--positive-text)] bg-[var(--positive-soft)] p-4 text-sm text-[var(--positive-text)]">{form.message}</p>{/if}
+	{#if data.modulePermissions.includes('requests.read')}
 	<div class="grid gap-5 lg:grid-cols-[1fr_21rem]">
 		<section class="space-y-3" aria-label="Scheduled assessments">
 			<h2 class="text-lg font-bold">Scheduled assessments <span class="ml-2 text-sm font-normal text-[var(--text-muted)]">{visits.length}</span></h2>
@@ -52,4 +53,5 @@
 			</section>{/if}
 		</aside>
 	</div>
+{/if}
 </div>

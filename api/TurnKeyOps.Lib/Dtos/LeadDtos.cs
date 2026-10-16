@@ -120,7 +120,7 @@ public sealed class LeadAssignmentRuleDto
     public string Territory { get; set; } = "";
     public int Priority { get; set; }
 }
-public sealed record LeadMemberDto(Guid Id, string Name);
+public sealed record LeadMemberDto(Guid Id, string Name, Guid? ProfileId = null);
 public sealed record LeadWorkspaceDto(IReadOnlyList<LeadDto> Leads, LeadConfigurationDto Configuration,
     IReadOnlyList<LeadMemberDto> Members, bool CanWrite, bool CanConfigure, IReadOnlyList<LeadMemberDto>? Associates = null);
 public sealed class LeadScheduleDto

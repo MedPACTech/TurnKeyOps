@@ -39,6 +39,8 @@ public sealed class BobActionGuard(BobCapabilityRegistry registry, UserModuleAcc
             throw new InvalidOperationException("Tenant policy has not enabled external Bob communication.");
         var required = capability.ReadPermissions.Concat(capability.WritePermissions).Append("bob.read")
             .Concat(capability.WritePermissions.Length > 0 ? new[] { "bob.write" } : []);
+        if (capability.WritePermissions.Contains("estimates.write") && !permissions.Contains("estimates.manage") && provider.ToolKey is not ("estimate.extract" or "estimate.price"))
+            throw new MedInsights.Lib.ForbiddenAccessException("This role can draft and submit estimates, but cannot manage proposals through Bob.");
         if (required.Any(p => !permissions.Contains(p))) throw new MedInsights.Lib.ForbiddenAccessException("Bob requires both Bob and target module grants.");
         await roles.RequirePermissionAsync(provider.PermissionKey, ct);
         var mode = capability.WritePermissions.Length == 0 || capability.IsDraft ? BobAutonomy.AUTO_ACT_BY_POLICY : BobAutonomy.ACT_WITH_APPROVAL;

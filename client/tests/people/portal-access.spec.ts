@@ -6,7 +6,7 @@ for (const mobile of [false,true]) test(`Contact portal access ${mobile?'mobile'
  await page.setViewportSize(mobile?{width:393,height:851}:{width:1440,height:1000});
  const claims={sub:'11111111-1111-1111-1111-111111111111',role:['owner'],tid:'7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b',exp:Math.floor(Date.now()/1000)+3600};
  const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.ui-fixture`;
- await context.addCookies([{name:'tko_auth_token',value:token,url:'http://127.0.0.1:5191'}]);
+ await context.addCookies([{name:'tko_auth_token',value:token,url:(process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191')}]);
  await page.goto('/bdr/admin/contact?new=1');
  await page.waitForLoadState('networkidle');
  await page.getByLabel('First name',{exact:true}).fill('Portal');
@@ -32,7 +32,7 @@ for (const mobile of [false,true]) test(`Contact portal access ${mobile?'mobile'
  await expect(panel.getByRole('listitem')).toHaveCount(2);
  const endpoint=`/bdr/admin/settings/portal/contacts/${person}`;
  const state=await (await page.request.get(endpoint)).json();
- const stale=await page.request.post(endpoint,{headers:{Origin:'http://127.0.0.1:5191'},data:{action:'disable',version:'stale'}});expect(stale.status()).toBe(409);
+ const stale=await page.request.post(endpoint,{headers:{Origin:(process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191')},data:{action:'disable',version:'stale'}});expect(stale.status()).toBe(409);
  const foreign=await page.request.post(endpoint,{headers:{Origin:'https://other.example'},data:{action:'disable',version:state.version}});expect(foreign.status()).toBe(403);
  expect((await page.request.get(endpoint)).headers()['cache-control']).toContain('no-store');
  await panel.getByLabel('Allow portal access',{exact:true}).click();
@@ -41,7 +41,7 @@ for (const mobile of [false,true]) test(`Contact portal access ${mobile?'mobile'
  const violations=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations;
  expect(violations).toEqual([]);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.goto(`/bdr/admin/users?person=${person}`);
+ await page.goto(`/bdr/admin/contact?person=${person}`);
  await expect(panel.getByText('Status: Active',{exact:true})).toBeVisible();
  await panel.getByLabel('Allow portal access',{exact:true}).click();
  await panel.getByRole('button',{name:'Revoke all portal access',exact:true}).click();
@@ -51,7 +51,7 @@ for (const mobile of [false,true]) test(`Contact portal access ${mobile?'mobile'
  const saved=await (await request.get('http://127.0.0.1:5190/api/people',{headers:{Authorization:`Bearer ${token}`}})).json();
  expect(saved.data.find((p:{id:string})=>p.id===person).role).toBeUndefined();
  const adminToken=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify({...claims,role:['admin']})).toString('base64url')}.ui-fixture`;
- await context.addCookies([{name:'tko_auth_token',value:adminToken,url:'http://127.0.0.1:5191'}]);
+ await context.addCookies([{name:'tko_auth_token',value:adminToken,url:(process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191')}]);
  expect((await page.request.get(endpoint)).status()).toBe(403);
 });
 
@@ -60,7 +60,7 @@ for (const mobile of [false,true]) test(`Carl Zipf customer screen exposes linke
  await page.setViewportSize(mobile?{width:393,height:851}:{width:1440,height:1000});
  const claims={sub:'11111111-1111-1111-1111-111111111111',role:['owner'],tid:'88888888-8888-4888-8888-888888888883',exp:Math.floor(Date.now()/1000)+3600};
  const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.ui-fixture`;
- await context.addCookies([{name:'tko_auth_token',value:token,url:'http://127.0.0.1:5191'}]);
+ await context.addCookies([{name:'tko_auth_token',value:token,url:(process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191')}]);
  const customer='22222222-2222-2222-2222-222222222222';
  await page.goto(`/carlzipf/admin/customers?customer=${customer}`);
  await expect(page.getByText('No customer contacts are linked yet.',{exact:false})).toBeVisible();

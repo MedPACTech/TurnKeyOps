@@ -1,34 +1,27 @@
-# People and company access
+# Employees, roles, and company access
 
-A person has one iBeam identity. Their existing `UserProfiles` row, keyed by company and identity, holds the company's business details and Employee, Customer, and Vendor contact profiles. Profiles can coexist. They do not imply permission to sign in or view company records.
+**People & Access** is the employee directory for BDR, Think Pink, and Carl Zipf. Search and status filters sit above the list; selecting an employee opens their details. Employee fields are name, contact details, job title, Role, and Team. Creating an employee automatically adds the employee profile. Company, Customer/Vendor classification, customer-account links, and customer portal access belong in **Contacts**, not the employee editor.
 
-Open **People & access** in BDR or Think Pink admin (`/{tenant}/admin/users`). The former BDR Contacts employee/vendor editor at `/bdr/admin/contact` now opens this persisted directory. Operational customer records remain under `/bdr/admin/customers`; link those records from the person editor. No demo vendor contacts are synthesized. Company names, employee title/team, and business contact details are editable without changing the person's verified login credentials.
+An identity can still have both employee and contact records. Editing employee details preserves its existing customer/vendor profile, company, customer link, and verified sign-in credentials. Customer/vendor-only contacts do not appear in People & Access.
 
-## Lifecycle
+## Roles and teams
 
-- Create with a name and one login email or international phone number. Reuse an existing matching iBeam identity; otherwise create an unverified identity. This sends no code and grants no company membership.
-- Add any combination of business profiles and optionally link an existing customer belonging to this company.
-- Invite the person through the existing activation process. Employee profiles can receive Staff, Member, or Admin roles. Contact is the limited contact role. Contact access does not grant the employee admin portal or a new customer/vendor portal.
-- Owners can change access roles and promote an active employee member to Owner. Promotion preserves existing identity roles. Existing owners cannot be demoted or archived through this workflow.
-- Archive removes active company membership using the existing seat-release service, then soft-deletes the company profile. Other companies and the global identity remain intact.
-- Restore restores the company profile only. A new invitation is required to restore membership. Owners and the current operator cannot be archived.
+Open **Settings → Roles & teams** (`/{tenant}/admin/settings/people`). Company owners can create and rename roles, configure module access, and add or remove team names. Changes use a separate, tenant-scoped `employee-access` settings document with conditional versions and audit history. Team names must be unique. Existing employee team names remain visible after removal from the catalog; new assignments must use configured names.
 
-## Module permissions
+Roles have stable IDs. An employee's `EmployeeRoleId` references a configured role. Changes to a role apply on the employee's next request, with the same effective permissions used for navigation and API enforcement. Membership authority remains a ceiling; an employee role cannot grant staff ownership or access-management authority beyond their membership. Owners retain full access. Only owners assign employee roles, and another owner must change the current operator's assignment.
 
-Permission choices are **No access**, **View**, and **View and manage**. A null override preserves existing role defaults; an empty override denies all modules. Overrides cannot exceed the role's authority. Owners always retain full access. Profile edits and module restrictions are scoped to the authenticated company; neither target company nor identity can be reassigned through update payloads.
+The initial **Technician** role enables Ask Bob / Today, Calendar, Jobs, Inventory, Estimates (draft and submit), and Contacts. It grants no Purchasing, Leads, Requests, Invoices, Finance, Payroll, Dashboard, People & Access, Settings, or Billing access. Technician estimates may be drafted, priced, have scope files added, and submitted for office review. Submitting records `SUBMITTED` and an audit event; it does not create a customer proposal link or send a message. Issuing, delivering, voiding, approving, and converting proposals require management authority. Bob applies the same target-module and estimate-management checks.
 
-Permissions are read server-side per request and applied to named operational API controllers and external-admin page routes. Navigation uses the same effective grants. Dashboard needs all operational read grants because it aggregates those records. Bob needs all operational read/write grants because it can read and act across modules. Existing role/service checks still apply. Identity/membership/role/invitation mutations through legacy endpoints require an owner; non-owner profile managers cannot assign permissions beyond their own or change another owner.
+Ask Bob uses permission-scoped intelligence context for restricted roles. It does not load the legacy aggregate of requests, invoices, and jobs for those users. Today already filters facts, attention, workflows, and actions by the operator's permissions. Dashboard retains its aggregate-module requirements.
 
-This release implements company-wide module access, not assigned-record policies for new vendor/customer portal workflows. Existing internal-platform authorization and verified-contact-change flows remain separate. Those future portals must add ownership/assignment checks before exposing transactional data.
+Existing employees without a configured role keep their current access policy until explicitly assigned. Existing individual restrictions remain a ceiling on inherited role access. The employee form clears those overrides when an owner explicitly assigns a configured role. Missing role references fail closed. New employees require a configured role and an accepted invitation before gaining app access; invitations use the staff membership ceiling. No employees are automatically reassigned by deployment.
 
-## Rollout
+## Lifecycle and rollout
 
-Deploy **Production API first**, then **Production Web**. The new web code fails closed if the permissions API is unavailable. The profile fields are additive and existing owner/member rows are included in the directory without a bulk rewrite. Existing employee access roles are presented as employee profiles until saved explicitly. No production people records are migrated or edited by deployment itself.
+Archiving removes company membership while retaining the employee record. Restoring the record does not restore membership; create a new invitation. Owner-only deletion and self-removal safeguards remain. Global login credentials continue to use the verified-contact workflow.
 
-The application supports shared identity across companies; each company controls only its own profile. Matching a second independent login identity or merging accounts is deliberately not automatic. Changes to login email/phone continue to require the verified-contact workflow.
+Deploy API before Web: the new web app loads the employee role catalog from `/api/people/configuration`. The profile field and settings kind are additive. No existing employee or contact records require a bulk rewrite.
 
 ## Verification
 
-Authorization tests cover role ceilings, empty overrides, owner preservation, cross-company lookup, stale edits, contact/identity separation, archive/revoke, restoration without access, and customer-link scope. An isolated browser/API-contract fixture exercises create, edit, reload persistence, multiple profiles, module selection, archive/restore, owner protections, and accessibility. The fixture is test-only and does not use production storage or send OTPs. Standard release E2E tests run against the local API and Azurite. A separate real Azure Tables test verifies envelope serialization, physical ETag concurrency, stale-write rejection, archived listing/restoration, and empty permission arrays. The managed profile adapter reads payload and ETag from the same physical row because IBeam 2.0.32 drops envelope ETags on typed readback.
-
-Implemented and validated by OpenAI Codex at Christian Armstrong's request.
+Authorization tests cover role inheritance and edits, membership ceilings, explicit restrictions, missing role references, owner preservation, owner-only settings writes, invalid catalogs, tenant scope, contact-field preservation, employee role/team validation, and submission without proposal-management authority. Browser tests cover persisted employee assignments, Settings catalog edits, separation from Contacts, customer portal behavior, keyboard-accessible forms, and accessibility checks. Storage tests needing an explicitly configured Azure/Azurite environment remain separate.

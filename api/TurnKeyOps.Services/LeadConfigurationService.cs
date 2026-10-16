@@ -8,6 +8,11 @@ namespace TurnKeyOps.Services;
 public sealed class LeadConfigurationService(ITenantSettingsRepository settings)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    public async Task<MedInsights.Lib.Authorization.EmployeeAccessConfiguration> EmployeeAccessAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        var document = await settings.GetAsync(RepositoryKeyHelper.ToTenantPartitionKey(tenantId), "SETTINGS|EMPLOYEE-ACCESS", ct);
+        return MedInsights.Lib.Authorization.EmployeeAccessConfiguration.Parse(document is { IsDeleted: false } ? document.ValuesJson : null);
+    }
     public async Task<LeadConfigurationDto> GetAsync(Guid tenantId, CancellationToken ct = default)
     {
         var document = await settings.GetAsync(RepositoryKeyHelper.ToTenantPartitionKey(tenantId), "SETTINGS|OPERATIONAL", ct);

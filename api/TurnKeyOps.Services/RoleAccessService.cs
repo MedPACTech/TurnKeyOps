@@ -12,6 +12,7 @@ namespace MedInsights.Services
 {
     public sealed class RoleAccessService : IRoleAccessService
     {
+        private readonly UserModuleAccessService? _moduleAccess;
         private readonly IUserContext _userContext;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ITenantMembershipRepository _membershipRepository;
@@ -23,8 +24,9 @@ namespace MedInsights.Services
             IHttpContextAccessor httpContextAccessor,
             ITenantMembershipRepository membershipRepository,
             IRolePermissionMappingRepository mappingRepository,
-            IRoleDirectoryService roleDirectoryService)
+            IRoleDirectoryService roleDirectoryService, UserModuleAccessService? moduleAccess = null)
         {
+            _moduleAccess = moduleAccess;
             _userContext = userContext;
             _httpContextAccessor = httpContextAccessor;
             _membershipRepository = membershipRepository;
@@ -72,6 +74,10 @@ namespace MedInsights.Services
                 || membership.DateRemoved.HasValue
                 || !string.Equals(membership.MembershipStatus, "Active", StringComparison.OrdinalIgnoreCase))
                 return false;
+
+            if (_moduleAccess is not null && await _moduleAccess.HasEmployeeRoleAsync(ct) &&
+                (MedInsights.Lib.Authorization.UserModulePermissions.Modules.SelectMany(m => new[] { m + ".read", m + ".write" }).Contains(permissionKey) || MedInsights.Lib.Authorization.UserModulePermissions.EstimateActions.Contains(permissionKey)))
+                return (await _moduleAccess.GetAsync(ct)).Contains(permissionKey);
 
             var role = await _roleDirectoryService.GetRoleAsync(_userContext.TenantId, membership.Role, ct);
             if (role is null)

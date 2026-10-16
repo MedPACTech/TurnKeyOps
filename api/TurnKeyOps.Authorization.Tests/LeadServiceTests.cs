@@ -162,7 +162,7 @@ public sealed class LeadServiceTests
 
     [Fact] public async Task EmployeeProfilesCanOwnLeadsWithoutAppAccessAndAssignmentIsAudited()
     {
-        var f = new Fixture(); var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(), PartitionKey=Pk, FirstName="Jordan", LastName="Ellis", IsActive=true, ProfileTypes=["employee"] };
+        var f = new Fixture(); var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(), PartitionKey=Pk, FirstName="Jordan", LastName="Ellis", IsActive=true, ProfileTypes=["employee"], EmployeeRoleId="sales" };
         f.People.Add(profile);
         var lead = await f.Service.CreateAsync(Input());
         var update = JsonSerializer.Deserialize<UpdateLeadDto>(JsonSerializer.Serialize(lead))!;
@@ -177,10 +177,25 @@ public sealed class LeadServiceTests
         update.ExpectedVersion=assigned.Version; update.OwnerProfileId=null;
         Assert.Equal("Unassigned",(await f.Service.UpdateAsync(lead.Id,update)).OwnerName);
     }
-    [Theory] [InlineData("foreign")] [InlineData("archived")] [InlineData("deleted")] [InlineData("customer")]
+    [Fact] public async Task AssignmentCandidatesIncludeOwnersAdminsAndConfiguredSalesButNotTechnicians()
+    {
+        var f=new Fixture();
+        foreach(var role in new[]{"owner","admin","sales","technician"}) {
+            var id=Guid.NewGuid();
+            f.People.Add(new(){Id=id,ApplicationUserId=id,PartitionKey=Pk,FirstName=role,IsActive=true,ProfileTypes=["employee"],EmployeeRoleId=role is "sales" or "technician"?role:null});
+            f.MemberRows.Add(new(){Id=Guid.NewGuid(),TenantId=Tenant,UserId=id,MembershipStatus="Active",Role=role is "sales" or "technician"?"admin":role});
+        }
+        var workspace=await f.Service.WorkspaceAsync();
+        Assert.Equal(new[]{"admin","owner","sales"},workspace.Associates!.Select(p=>p.Name).Order().ToArray());
+        Assert.Equal(new[]{"admin","owner","sales"},workspace.Members.Select(p=>p.Name).Order().ToArray());
+        Assert.All(workspace.Members,p=>Assert.NotNull(p.ProfileId));
+        var forbidden=Input();forbidden.OwnerMembershipId=f.MemberRows.Last().Id;
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.CreateAsync(forbidden));
+    }
+    [Theory] [InlineData("foreign")] [InlineData("archived")] [InlineData("deleted")] [InlineData("customer")] [InlineData("technician")] [InlineData("roleless")]
     public async Task IneligibleProfilesCannotBeAssigned(string reason)
     {
-        var f = new Fixture(); var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(), PartitionKey=reason=="foreign" ? "another-tenant" : Pk, IsActive=reason!="archived", IsDeleted=reason=="deleted", ProfileTypes=[reason=="customer" ? "customer" : "employee"] };
+        var f = new Fixture(); var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(), PartitionKey=reason=="foreign" ? "another-tenant" : Pk, IsActive=reason!="archived", IsDeleted=reason=="deleted", ProfileTypes=[reason=="customer" ? "customer" : "employee"],EmployeeRoleId=reason=="technician"?"technician":reason=="roleless"?null:"sales" };
         f.People.Add(profile);
         Assert.Empty((await f.Service.WorkspaceAsync()).Associates!);
         var input=Input();input.OwnerProfileId=profile.Id;
@@ -189,7 +204,7 @@ public sealed class LeadServiceTests
     }
     [Fact] public async Task ArchivedAssigneeIsRetainedWhileEditingOtherLeadDetails()
     {
-        var f = new Fixture();var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(),PartitionKey=Pk,FirstName="Jordan",IsActive=true,ProfileTypes=["employee"] };f.People.Add(profile);
+        var f = new Fixture();var profile = new MedInsights.Lib.Entities.UserProfile { Id=Guid.NewGuid(),PartitionKey=Pk,FirstName="Jordan",IsActive=true,ProfileTypes=["employee"],EmployeeRoleId="sales" };f.People.Add(profile);
         var input=Input();input.OwnerProfileId=profile.Id;var lead=await f.Service.CreateAsync(input);
         profile.IsActive=false;
         var update=JsonSerializer.Deserialize<UpdateLeadDto>(JsonSerializer.Serialize(lead))!;update.ExpectedVersion=lead.Version;update.Title="Updated scope";
@@ -202,6 +217,9 @@ public sealed class LeadServiceTests
     private sealed class User:IUserContext {public bool IsAuthenticated=>true;public Guid TenantId=>Tenant;public Guid UserId=>Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");public AppTimeZone Timezone=>AppTimeZone.Utc;public string FirstName=>"Test";public string LastName=>"User";}
     private sealed class Fixture
     {
+        public List<MedInsights.Lib.Entities.TenantMembership> MemberRows {get;}=[];
+        public MedInsights.Lib.Authorization.EmployeeAccessConfiguration EmployeeRoles {get;}=new(){Roles=[new(){Id="sales",Name="Sales"},new(){Id="technician",Name="Technician"}]};
+
         public Dictionary<Guid,Lead> Store {get;}=[];
         public List<MedInsights.Lib.Entities.UserProfile> People {get;}=[];
         private async IAsyncEnumerable<MedInsights.Lib.Entities.UserProfile> ReadPeople() { await Task.CompletedTask; foreach(var p in People) yield return p; }
@@ -223,8 +241,9 @@ public sealed class LeadServiceTests
             Customers.Setup(x=>x.ListAsync(Pk,It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<Customer>());
             var settings=new Mock<ITenantSettingsRepository>();
             settings.Setup(x=>x.GetAsync(Pk,"SETTINGS|OPERATIONAL",It.IsAny<CancellationToken>(),false)).ReturnsAsync(()=>new TenantSettingsDocument{ValuesJson=JsonSerializer.Serialize(new{leads=Config},new JsonSerializerOptions(JsonSerializerDefaults.Web))});
+            settings.Setup(x=>x.GetAsync(Pk,"SETTINGS|EMPLOYEE-ACCESS",It.IsAny<CancellationToken>(),false)).ReturnsAsync(()=>new TenantSettingsDocument{ValuesJson=JsonSerializer.Serialize(EmployeeRoles)});
             var configuration=new LeadConfigurationService(settings.Object);Bridge=new(Repository.Object,configuration);
-            var members=new Mock<MedInsights.Repositories.Interfaces.ITenantMembershipRepository>();members.Setup(x=>x.GetActiveAssignedByTenantAsync(Tenant,It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<MedInsights.Lib.Entities.TenantMembership>());
+            var members=new Mock<MedInsights.Repositories.Interfaces.ITenantMembershipRepository>();members.Setup(x=>x.GetActiveAssignedByTenantAsync(Tenant,It.IsAny<CancellationToken>())).ReturnsAsync(()=>MemberRows.ToArray());
             Estimates.Setup(x=>x.PrepareFromLeadAsync(It.IsAny<LeadDto>(),It.IsAny<Guid>(),It.IsAny<CancellationToken>())).ReturnsAsync((LeadDto dto,Guid requestId,CancellationToken ct)=>new QuoteEstimateDto{Id=requestId,LeadId=dto.Id,CustomerId=dto.CustomerId});
             var blobContents = new Dictionary<string, byte[]>();
             var blobs = new Mock<MedInsights.AzureServices.Interfaces.IAzureBlobStorageService>();

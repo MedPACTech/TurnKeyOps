@@ -12,7 +12,7 @@ public sealed class UserModulePermissionTests
         var m = Member("owner"); m.IsOwner = true;
         var resolved = UserModulePermissions.Resolve(m, new() { ModulePermissions = [], IsActive = false });
         Assert.True(UserModulePermissions.Allows(resolved,"users",true));
-        Assert.Equal(UserModulePermissions.Modules.Length * 2 + UserModulePermissions.PayrollActions.Length, resolved.Length);
+        Assert.Equal(UserModulePermissions.Modules.Length * 2 + UserModulePermissions.PayrollActions.Length + UserModulePermissions.EstimateActions.Length, resolved.Length);
     }
     [Fact] public void ExplicitEmptyOverrideIsNotRoleDefaults() {
         Assert.NotEmpty(UserModulePermissions.Resolve(Member(), null));
@@ -38,7 +38,42 @@ public sealed class UserModulePermissionTests
     }
     [Fact] public void ReadOnlyAggregateCannotLeakOtherModules() {
         Assert.False(UserModulePermissions.Allows(["dashboard.read"],"dashboard",false));
-        Assert.False(UserModulePermissions.Allows(["bob.read","bob.write"],"bob",false));
+        Assert.True(UserModulePermissions.Allows(["bob.read","bob.write"],"bob",false));
+    }
+    [Fact] public void TechnicianGetsExactlyItsRoleModulesAndCannotManageEstimates() {
+        var grants = UserModulePermissions.Resolve(Member("staff"), new() { IsActive=true, EmployeeRoleId="technician" }, EmployeeAccessConfiguration.Default());
+        foreach(var module in new[]{"bob","calendar","jobs","inventory","estimates","contacts"}) Assert.True(UserModulePermissions.Allows(grants,module,true));
+        foreach(var module in new[]{"purchasing","leads","requests","invoices","finance","payroll","users","settings","billing","dashboard"}) Assert.False(UserModulePermissions.Allows(grants,module,false));
+        Assert.Contains("estimates.submit",grants); Assert.DoesNotContain("estimates.manage",grants);
+        Assert.True(UserModuleAccessFilter.AllowsEstimateSubmission("EstimateWorkspace","Submit",grants));
+        foreach(var action in new[]{"Issue","Deliver","Approve","Void","Job","Revise","ApproveBob"}) Assert.False(UserModuleAccessFilter.AllowsEstimateSubmission("EstimateWorkspace",action,grants));
+    }
+    [Fact] public void UpdatedRoleIsInheritedAndUnknownRoleFailsClosed() {
+        var profile = new UserProfile { IsActive=true,EmployeeRoleId="technician" };
+        var config=EmployeeAccessConfiguration.Default();
+        config.Roles[0].ModulePermissions=["jobs.read"];
+        Assert.Equal(["jobs.read"],UserModulePermissions.Resolve(Member("staff"),profile,config));
+        config.Roles=[]; Assert.Empty(UserModulePermissions.Resolve(Member("staff"),profile,config));
+        Assert.NotEmpty(UserModulePermissions.Resolve(Member("owner"),profile,config));
+    }
+    [Fact] public void RoleDoesNotBypassMembershipCeilingOrExplicitUserRestrictions() {
+        var config=EmployeeAccessConfiguration.Default();config.Roles[0].ModulePermissions=["users.read","users.write","jobs.read","jobs.write"];
+        var profile=new UserProfile {IsActive=true,EmployeeRoleId="technician",ModulePermissions=["users.read","users.write","jobs.read"]};
+        Assert.Equal(["jobs.read"],UserModulePermissions.Resolve(Member("staff"),profile,config));
+    }
+    [Fact] public void LegacyEstimateWriteOverridesRetainManagementWhileAssignedTechniciansCannotElevate() {
+        var p=new UserProfile{IsActive=true,ModulePermissions=["estimates.read","estimates.write"]};
+        Assert.Contains("estimates.manage",UserModulePermissions.Resolve(Member("staff"),p));
+        p.EmployeeRoleId="technician";
+        Assert.DoesNotContain("estimates.manage",UserModulePermissions.Resolve(Member("staff"),p));
+    }
+    [Fact] public void RoleCatalogRejectsDuplicateNamesAndUnknownGrants() {
+        var config=EmployeeAccessConfiguration.Default();config.Roles=[config.Roles[0],new(){Id="other",Name="Technician"}];
+        Assert.Throws<ArgumentException>(()=>config.Validate());
+        config=EmployeeAccessConfiguration.Default();config.Roles[0].ModulePermissions=["superuser.write"];
+        Assert.Throws<ArgumentException>(()=>config.Validate());
+        config=EmployeeAccessConfiguration.Default();config.Teams=["Field","field"];
+        Assert.Throws<ArgumentException>(()=>config.Validate());
     }
     [Fact] public void InvalidPermissionOrWriteWithoutReadRejected() {
         Assert.Throws<ArgumentException>(()=>UserModulePermissions.Validate(["root.write"]));

@@ -64,7 +64,7 @@ public sealed class ManagedPeopleServiceTests
         f.MembershipService.VerifyNoOtherCalls();
     }
     [Fact] public async Task NonOwnerCannotResetAnotherUserToUnlimitedRoleDefaults() {
-        var f=new Fixture();f.Existing();
+        var f=new Fixture();f.Existing();f.Profile.ModulePermissions=["jobs.read"];
         f.Members.Setup(m=>m.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(f.Tenant),f.Actor,It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TenantMembership {Role="admin",MembershipStatus="Active"});
         await Assert.ThrowsAsync<ForbiddenAccessException>(()=>f.Service.SaveAsync(f.Target,new() {FirstName="Test",ProfileTypes=["employee"],ExpectedVersion="v1",ModulePermissions=null},default));
@@ -121,6 +121,22 @@ public sealed class ManagedPeopleServiceTests
         var result=await service.GetAsync(f.Target,default);
         Assert.False(result.CanViewJobs);Assert.False(result.CanViewInvoices);Assert.Empty(result.Jobs);Assert.Empty(result.Invoices);
         jobs.VerifyNoOtherCalls();invoices.VerifyNoOtherCalls();
+    }
+    [Fact] public async Task EmployeeEditorPreservesContactCompanyAndAssignsConfiguredRole() {
+        var f=new Fixture();f.Existing();f.Profile.ProfileTypes=["employee","vendor"];f.Profile.CompanyName="Vendor company";
+        await f.Service.SaveAsync(f.Target,new() {FirstName="Updated",ExpectedVersion="v1",EmployeeRoleId="technician",CompanyName="Overwrite",Title="Lead technician"},default);
+        Assert.Equal("Vendor company",f.Profile.CompanyName);Assert.Contains("vendor",f.Profile.ProfileTypes);
+        Assert.Equal("technician",f.Profile.EmployeeRoleId);Assert.Equal("Lead technician",f.Profile.Title);
+    }
+    [Fact] public async Task ProfileManagerCanEditEmployeeDetailsWithoutChangingInheritedRoleAccess() {
+        var f=new Fixture();f.Existing();f.Profile.ProfileTypes=["employee"];f.Profile.EmployeeRoleId="technician";f.ActAsAdmin(["users.read","users.write"]);
+        await f.Service.SaveAsync(f.Target,new(){FirstName="Updated",ExpectedVersion="v1",EmployeeRoleId="technician",Title="Senior technician"},default);
+        Assert.Equal("Senior technician",f.Profile.Title);Assert.Equal("technician",f.Profile.EmployeeRoleId);Assert.Null(f.Profile.ModulePermissions);
+    }
+    [Fact] public async Task EmployeeEditorRejectsUnknownRolesAndTeams() {
+        var f=new Fixture();f.Existing();
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.SaveAsync(f.Target,new(){FirstName="Test",ExpectedVersion="v1",EmployeeRoleId="unknown"},default));
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.SaveAsync(f.Target,new(){FirstName="Test",ExpectedVersion="v1",Team="Unconfigured team"},default));
     }
     private sealed class Fixture {
         public Guid Actor=Guid.NewGuid(),Target=Guid.NewGuid(),Tenant=Guid.NewGuid();

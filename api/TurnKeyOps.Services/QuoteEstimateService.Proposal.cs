@@ -37,6 +37,7 @@ public sealed partial class QuoteEstimateService
     }
     public async Task<QuoteEstimateDto> DeliverAsync(Guid id,EstimateTaskDto input,EstimateDeliveryService delivery,CancellationToken ct=default)
     {
+        if (_authority is not null) await _authority.RequireManageAsync(ct);
         var(entity,packet)=await EditablePacketAsync(id,input.ExpectedVersion,ct);
         if(packet.Delivery is null||packet.ExpiresAtUtc<=DateTime.UtcNow||packet.Outcome is not null||packet.Delivery.Status!="sent")throw new ArgumentException("Only an open, unexpired issued proposal can be delivered/reminded.");
         if(input.Text.Length>2000||input.Channel is not("email" or "sms"))throw new ArgumentException("Choose email/SMS and use a message up to 2000 characters.");
@@ -51,6 +52,7 @@ public sealed partial class QuoteEstimateService
     }
     public async Task<QuoteEstimateDto> VoidAsync(Guid id,string version,CancellationToken ct=default)
     {
+        if (_authority is not null) await _authority.RequireManageAsync(ct);
         var(entity,packet)=await EditablePacketAsync(id,version,ct);
         if(packet.ApprovalSignature is not null)throw new ArgumentException("Accepted proposals cannot be voided through this workflow.");
         packet.Outcome="VOID";AddEstimateEvent(packet,"void","Proposal withdrawn; its document remains preserved.");

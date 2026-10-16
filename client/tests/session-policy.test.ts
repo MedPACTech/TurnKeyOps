@@ -30,11 +30,11 @@ test('safe admin redirects stay on an exact protected route family', () => {
 	}
 });
 
-test('external admin session requires unexpired token, tenant, and elevated role', () => {
+test('employee workspace session requires an unexpired token, tenant, and employee or elevated role', () => {
 	assert.equal(getAdminSessionFromToken(token({ role: 'admin', exp: future() }), '/bdr/admin/jobs'), null);
 	assert.equal(
-		getAdminSessionFromToken(token({ role: 'member', tenant_id: 'tenant-a', exp: future() }), '/bdr/admin/jobs'),
-		null
+		getAdminSessionFromToken(token({ role: 'member', tenant_id: 'tenant-a', exp: future() }), '/bdr/admin/jobs')?.role,
+		'estimator-crew-lite'
 	);
 	assert.equal(
 		getAdminSessionFromToken(
@@ -101,4 +101,9 @@ test('cross-site browser form mutations are rejected', () => {
 	);
 	assert.equal(isCrossSiteFormMutation('GET', null, null, 'https://app.test'), false);
 	assert.equal(isCrossSiteFormMutation('POST', 'application/json', 'https://evil.test', 'https://app.test'), false);
+});
+
+test('staff can reach module-gated pages without becoming office administrators',()=>{
+ for(const module of ['bob','intelligence','calendar','jobs','inventory','estimates','customers'])assert.equal(getAdminSessionFromToken(token({role:'staff',tenant_id:'tenant-a',exp:future()}),`/bdr/admin/${module}`)?.role,'estimator-crew-lite');
+ for(const role of ['contact','billing_admin','unknown'])assert.equal(getAdminSessionFromToken(token({role,tenant_id:'tenant-a',exp:future()}),'/bdr/admin/bob'),null);
 });

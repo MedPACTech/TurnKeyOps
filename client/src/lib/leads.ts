@@ -16,7 +16,16 @@ export type LeadConfiguration = {
  assignmentRules: {membershipId:string; trade:string; service:string; propertyType:string; source:string; territory:string; priority:number}[];
  aiActions: Record<string,string>;
 };
-export type LeadWorkspace = {leads: Lead[]; configuration: LeadConfiguration; members: {id:string; name:string}[]; associates?: {id:string; name:string}[]; canWrite: boolean; canConfigure: boolean};
+export type LeadWorkspace = {leads: Lead[]; configuration: LeadConfiguration; members: {id:string; name:string; profileId?:string|null}[]; associates?: {id:string; name:string}[]; canWrite: boolean; canConfigure: boolean};
 export type Duplicate = {id:string; kind:string; name:string; match:string};
 export const queueFor = (stage: string) => ({NEW:'Needs response', NEEDS_RESPONSE:'Needs response', QUALIFYING:'Ready to qualify', QUALIFIED:'Discovery / site visit', DISCOVERY:'Discovery / site visit', READY_TO_ESTIMATE:'Ready to estimate', ESTIMATING:'Ready to estimate', PROPOSAL:'Waiting on customer', FOLLOW_UP:'Follow up', WON:'Won', LOST:'Lost'}[stage] ?? 'Needs response');
 export const stageLabel = (stage:string, config:LeadConfiguration) => config.stageLabels[stage] || stage.toLowerCase().replaceAll('_',' ');
+
+export const leadAssignees = (
+ associates: {id:string;name:string}[],
+ members: {id:string;name:string;profileId?:string|null}[],
+ currentMembershipId?: string | null
+) => [
+ ...associates.filter(person => !members.some(member => member.id === currentMembershipId && member.profileId === person.id)).map(person => ({value:`profile:${person.id}`,name:person.name})),
+ ...members.filter(member => member.id === currentMembershipId || !member.profileId || !associates.some(person => person.id === member.profileId)).map(member => ({value:`member:${member.id}`,name:member.name}))
+];

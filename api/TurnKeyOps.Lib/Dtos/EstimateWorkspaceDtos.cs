@@ -132,6 +132,7 @@ public sealed class EstimateWorkspaceDto
     public string StateLabel { get; set; } = "";
     public string NextAction { get; set; } = "Complete scope";
     public bool CanWrite { get; set; }
+    public bool CanManage { get; set; }
     public bool CanApprove { get; set; }
     public bool CanViewCosts { get; set; }
 }
