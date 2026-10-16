@@ -10,7 +10,7 @@ for(const theme of ['light','dark'])test(`Leads ${theme}: queue, detail and keyb
  await page.goto('/bdr/admin/leads');
  await expect(page.getByRole('heading',{name:'What needs to happen next?'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Queue',exact:true})).toHaveAttribute('aria-pressed','true');
- await page.getByRole('button',{name:'Pipeline',exact:true}).click();await expect(page.getByRole('button',{name:'Pipeline',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.getByRole('button',{name:'Board',exact:true}).click();await expect(page.getByRole('button',{name:'Board',exact:true})).toHaveAttribute('aria-pressed','true');
  await page.getByRole('button',{name:'Queue',exact:true}).click();
  await page.getByRole('link',{name:'Respond to the customer',exact:true}).focus();await page.keyboard.press('Enter');
  await expect(page.getByRole('heading',{name:'Browser fixture opportunity',exact:true})).toBeVisible();
@@ -52,4 +52,26 @@ test('Assign, reassign and unassign an associate with matching card avatars',asy
   await expect(card).toContainText(name);await expect(card.locator('.avatar')).toHaveText(initials);
   await card.getByRole('link',{name:'Respond to the customer',exact:true}).click();
  }
+});
+
+test('Board moves persist and closing requires an outcome reason',async({page},testInfo)=>{
+ await page.goto('/bdr/admin/leads');
+ await page.getByRole('button',{name:'Board',exact:true}).click();
+ const board=page.getByRole('region',{name:'Lead status board'});
+ const results=await new AxeBuilder({page}).include('.leads').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(results.violations).toEqual([]);
+ await page.screenshot({path:`test-results/leads-board-${testInfo.project.name}.png`,fullPage:true});
+ const card=board.locator('article').first();
+ if(testInfo.project.name==='desktop'){
+  await card.dragTo(board.getByRole('region',{name:/^qualifying status$/i}));
+ }else{
+  await card.getByRole('combobox').selectOption('QUALIFYING');
+ }
+ await expect(board.locator('article').getByRole('combobox')).toHaveValue('QUALIFYING');
+ await board.locator('article').getByRole('combobox').selectOption('LOST');
+ await expect(page.getByLabel('Outcome reason',{exact:true})).toBeVisible();
+ await page.getByLabel('Outcome reason',{exact:true}).selectOption('Price');
+ await page.getByRole('button',{name:'Save status',exact:true}).click();
+ await expect(board.locator('article').getByRole('combobox')).toHaveValue('LOST');
+ await page.reload();await page.getByRole('button',{name:'Board',exact:true}).click();
+ await expect(board.locator('article').getByRole('combobox')).toHaveValue('LOST');
 });
