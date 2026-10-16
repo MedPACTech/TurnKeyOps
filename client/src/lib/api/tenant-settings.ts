@@ -1,6 +1,6 @@
 import { apiRequest } from './client';
 
-export type TenantSettingKind = 'public-content' | 'billing' | 'operational' | 'brand';
+export type TenantSettingKind = 'public-content' | 'billing' | 'operational' | 'brand' | 'employee-access';
 
 export type TenantSettingsDocument<T extends object> = {
 	kind: TenantSettingKind;

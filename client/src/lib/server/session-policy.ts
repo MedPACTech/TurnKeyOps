@@ -125,8 +125,9 @@ export const getAdminSessionFromToken = (
 	const claims = decodeJwtClaims(token);
 	if (!Object.keys(claims).length || isExpired(claims)) return null;
 	const roles = extractTokenRoles(token);
-	const moduleRoute = /^\/(bdr|thinkpink|carlzipf)\/admin\/(?:leads|estimates|payroll)(?:\/|$)/.test(pathname);
-	const role = resolveBdrAdminRole(roles) ?? (moduleRoute && roles.length > 0 && !roles.some(r => r.toLowerCase() === 'contact') ? 'estimator-crew-lite' : null);
+	// Employee navigation is gated by server-resolved module permissions after session validation.
+	const employee = roles.some(role => ['staff','member'].includes(role.trim().toLowerCase()));
+	const role = resolveBdrAdminRole(roles) ?? (employee && isExternalAdminPath(pathname) ? 'estimator-crew-lite' : null);
 	const surface = getAdminSurface(pathname);
 	const tenantId = getClaimString(claims, ['tenant_id', 'tenant', 'tid']);
 	if (surface === 'external-admin' && (!role || !tenantId)) return null;

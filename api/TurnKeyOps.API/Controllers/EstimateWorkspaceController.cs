@@ -33,6 +33,8 @@ public sealed class EstimateWorkspaceController(QuoteEstimateService service,IEs
     {await service.PriceWorkspaceAsync(id,input,ct);return OkResponse(await service.WorkspaceAsync(id,ct));}
     [HttpPost("{id:guid}/extract")] public async Task<IActionResult> Extract(Guid id,EstimateTaskDto input,CancellationToken ct)
     {await service.StructureAsync(id,input,ct);return OkResponse(await service.WorkspaceAsync(id,ct));}
+    [HttpPost("{id:guid}/submit")] public async Task<IActionResult> Submit(Guid id,EstimateTaskDto input,CancellationToken ct)
+    {await service.SubmitWorkspaceAsync(id,input.ExpectedVersion,ct);return OkResponse(await service.WorkspaceAsync(id,ct));}
     [HttpPost("{id:guid}/approve")] public async Task<IActionResult> Approve(Guid id,EstimateTaskDto input,CancellationToken ct)
     {await service.ApproveWorkspaceAsync(id,input.ExpectedVersion,ct);return OkResponse(await service.WorkspaceAsync(id,ct));}
     [HttpPost("{id:guid}/issue")] public async Task<IActionResult> Issue(Guid id,EstimateTaskDto input,CancellationToken ct)

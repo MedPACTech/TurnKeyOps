@@ -54,24 +54,28 @@ test('Assign, reassign and unassign an associate with matching card avatars',asy
  }
 });
 
-test('Board moves persist and closing requires an outcome reason',async({page},testInfo)=>{
+test('Board assignment dropdown saves immediately and status changes persist without Move to controls',async({page},testInfo)=>{
  await page.goto('/bdr/admin/leads');
  await page.getByRole('button',{name:'Board',exact:true}).click();
  const board=page.getByRole('region',{name:'Lead status board'});
+ await expect(page.getByText('Move to',{exact:true})).toHaveCount(0);
+ const card=board.locator('article').first();
+ await card.getByRole('combobox',{name:'Assign Browser fixture opportunity to employee',exact:true}).selectOption('profile:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+ await expect(card).toContainText('Morgan Chen');await expect(card.locator('.avatar')).toHaveText('MC');
+ await page.reload();await page.getByRole('button',{name:'Board',exact:true}).click();
+ await expect(board.locator('article').getByRole('combobox')).toHaveValue('profile:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
  const results=await new AxeBuilder({page}).include('.leads').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(results.violations).toEqual([]);
  await page.screenshot({path:`test-results/leads-board-${testInfo.project.name}.png`,fullPage:true});
- const card=board.locator('article').first();
  if(testInfo.project.name==='desktop'){
-  await card.dragTo(board.getByRole('region',{name:/^qualifying status$/i}));
- }else{
-  await card.getByRole('combobox').selectOption('QUALIFYING');
+  await board.locator('article').first().dragTo(board.getByRole('region',{name:/^qualifying status$/i}));
+  await expect(board.getByRole('region',{name:/^qualifying status$/i}).locator('article')).toContainText('Browser fixture opportunity');
  }
- await expect(board.locator('article').getByRole('combobox')).toHaveValue('QUALIFYING');
- await board.locator('article').getByRole('combobox').selectOption('LOST');
- await expect(page.getByLabel('Outcome reason',{exact:true})).toBeVisible();
- await page.getByLabel('Outcome reason',{exact:true}).selectOption('Price');
- await page.getByRole('button',{name:'Save status',exact:true}).click();
- await expect(board.locator('article').getByRole('combobox')).toHaveValue('LOST');
+ await board.locator('article').getByRole('link',{name:'Browser fixture opportunity',exact:true}).click();
+ await page.getByRole('combobox',{name:'Next stage',exact:true}).selectOption('LOST');
+ await page.getByRole('combobox',{name:'Outcome reason',exact:true}).selectOption('Price');
+ await page.getByRole('button',{name:'Move forward',exact:true}).click();
+ await page.getByRole('link',{name:'All leads',exact:true}).click();await page.getByRole('button',{name:'Board',exact:true}).click();
+ await expect(board.getByRole('region',{name:/^lost status$/i}).locator('article')).toContainText('Browser fixture opportunity');
  await page.reload();await page.getByRole('button',{name:'Board',exact:true}).click();
- await expect(board.locator('article').getByRole('combobox')).toHaveValue('LOST');
+ await expect(board.getByRole('region',{name:/^lost status$/i}).locator('article')).toContainText('Morgan Chen');
 });

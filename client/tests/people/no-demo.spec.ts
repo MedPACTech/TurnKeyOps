@@ -2,7 +2,7 @@ import {test,expect,type BrowserContext} from '@playwright/test';
 async function signIn(context:BrowserContext,role:string) {
  const claims={sub:'11111111-1111-1111-1111-111111111111',role:[role],tid:'7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b',exp:Math.floor(Date.now()/1000)+3600};
  const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.ui-fixture`;
- await context.addCookies([{name:'tko_auth_token',value:token,url:'http://127.0.0.1:5191'}]);
+ await context.addCookies([{name:'tko_auth_token',value:token,url:(process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191')}]);
 }
 test('platform overview and health show configuration and unavailable telemetry instead of invented metrics',async({page,context})=>{
  await signIn(context,'internal_admin');

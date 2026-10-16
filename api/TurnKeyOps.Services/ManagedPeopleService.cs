@@ -46,14 +46,21 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         foreach (var m in memberRows.Where(UserModulePermissions.IsActive))
             rows.TryAdd(m.UserId, new UserProfile { Id = m.UserId, ApplicationUserId = m.UserId, IsActive = true,
                 ContactEmail = m.InvitedEmail, ContactPhone = m.InvitedPhone, Role = m.Role });
-        return rows.Values.Select(p => View(p, memberRows.FirstOrDefault(m => m.UserId == p.Id && UserModulePermissions.IsActive(m))))
-            .OrderBy(p => p.FirstName).ThenBy(p => p.LastName).ToArray();
+        var configuration = await access.ConfigurationAsync(ct);
+        return rows.Values.Select(p => View(p, memberRows.FirstOrDefault(m => m.UserId == p.Id && UserModulePermissions.IsActive(m)), configuration))
+            .Where(p => p.ProfileTypes.Contains("employee")).OrderBy(p => p.FirstName).ThenBy(p => p.LastName).ToArray();
+    }
+    public async Task<EmployeeAccessConfiguration> ConfigurationAsync(CancellationToken ct)
+    {
+        await RequireAsync(false, ct);
+        return await access.ConfigurationAsync(ct);
     }
     public Task<ManagedPersonDto> SaveAsync(Guid? id, SaveManagedPersonDto input, CancellationToken ct)
         => SaveCoreAsync(id, input, ct);
     private async Task<ManagedPersonDto> SaveCoreAsync(Guid? id, SaveManagedPersonDto input, CancellationToken ct, SaveContactRecordDto? contact = null)
     {
         await RequireAsync(true, ct, contact is null ? "users" : "contacts");
+        if (contact is null) input.ProfileTypes = ["employee"];
         Validate(input);
         if (input.CustomerId.HasValue && await customers.GetByKeysAsync(Partition, EntityKeyPolicy.Row(input.CustomerId.Value), ct) is not { IsDeleted: false })
             throw new ArgumentException("The linked customer must belong to this company.");
@@ -93,22 +100,32 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         var owner = membership?.IsOwner == true || membership?.Role == "owner";
         if (contact is null && owner && input.ModulePermissions is not null) throw new ArgumentException("Owners retain full module access.");
         if (contact is null && id == user.UserId && input.ModulePermissions is not null) throw new ArgumentException("You cannot restrict your own access.");
+        var configuration = await access.ConfigurationAsync(ct);
+        if (contact is null) {
+            if (existing is null && membership is null && string.IsNullOrEmpty(input.EmployeeRoleId)) throw new ArgumentException("Choose an employee role configured in Settings.");
+            if (!string.IsNullOrEmpty(input.EmployeeRoleId) && !configuration.Roles.Any(r => r.Id == input.EmployeeRoleId)) throw new ArgumentException("Choose a configured employee role.");
+            if (!string.IsNullOrEmpty(input.Team) && input.Team != existing?.Team && !configuration.Teams.Contains(input.Team)) throw new ArgumentException("Choose a team configured in Settings.");
+            if (id == user.UserId && input.EmployeeRoleId != existing?.EmployeeRoleId) throw new ArgumentException("Another owner must change your role.");
+        }
         var currentPermissions = await access.GetAsync(ct);
         var actor = await memberships.GetByUserIdAsync(Partition, user.UserId, ct);
         if (contact is null && actor?.IsOwner != true && actor?.Role != "owner") {
             if (owner) throw new ForbiddenAccessException("Only an owner can edit another owner.");
-            if (input.ModulePermissions is null || input.ModulePermissions.Except(currentPermissions).Any())
+            if (input.EmployeeRoleId != existing?.EmployeeRoleId) throw new ForbiddenAccessException("Only an owner can assign employee roles.");
+            var permissionsUnchanged = input.ModulePermissions is null && existing?.ModulePermissions is null
+                || input.ModulePermissions is not null && existing?.ModulePermissions is not null && input.ModulePermissions.ToHashSet().SetEquals(existing.ModulePermissions);
+            if (!permissionsUnchanged && (input.ModulePermissions is null || input.ModulePermissions.Except(currentPermissions).Any()))
                 throw new ForbiddenAccessException("Choose explicit permissions within your own access.");
         }
         var p = existing ?? new UserProfile { Id = id.Value, ApplicationUserId = id.Value, PartitionKey = Partition,
             RowKey = EntityKeyPolicy.Row(id.Value), PrimaryEmail = loginEmail ?? membership?.InvitedEmail, PrimaryPhone = loginPhone ?? membership?.InvitedPhone, IsActive = true, Role = membership?.Role ?? "contact" };
         p.FirstName = input.FirstName.Trim(); p.LastName = input.LastName.Trim();
         p.ContactEmail = input.ContactEmail?.Trim(); p.ContactPhone = input.ContactPhone?.Trim();
-        p.ProfileTypes = contact is null ? input.ProfileTypes.Distinct().ToArray()
+        p.ProfileTypes = contact is null ? (existing?.ProfileTypes ?? []).Where(t => t is "customer" or "vendor").Append("employee").ToArray()
             : p.ProfileTypes.Where(t => t == "employee").Concat(input.ProfileTypes).Distinct().ToArray();
-        p.CompanyName = input.CompanyName?.Trim(); p.CustomerId = input.CustomerId;
+        if (contact is not null) { p.CompanyName = input.CompanyName?.Trim(); p.CustomerId = input.CustomerId; }
         if (contact is null) {
-            p.Title = input.Title?.Trim(); p.Team = input.Team?.Trim();
+            p.Title = input.Title?.Trim(); p.Team = input.Team?.Trim(); p.EmployeeRoleId = string.IsNullOrEmpty(input.EmployeeRoleId) ? null : input.EmployeeRoleId;
             p.ModulePermissions = UserModulePermissions.Validate(input.ModulePermissions);
         } else {
             p.AddressLine1 = contact.Address?.Trim(); p.City = contact.City?.Trim();
@@ -118,7 +135,7 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         else await profiles.UpdateAsync(user.TenantId, p, TableUpdateMode.Replace, existing.ETag, ct);
         await AuditAsync(p.Id, contact is null ? "user_profile_saved" : "contact_saved", ct);
         var saved = await profiles.GetByKeysAsync(Partition, p.RowKey, ct) ?? p;
-        return View(saved, membership);
+        return View(saved, membership, configuration);
     }
     public async Task DeleteAsync(Guid id, string version, CancellationToken ct)
     {
@@ -249,9 +266,9 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
             throw new ArgumentException("Contact and business details must be at most 200 characters.");
         UserModulePermissions.Validate(input.ModulePermissions);
     }
-    private static ManagedPersonDto View(UserProfile p, TenantMembership? m) => new(p.Id, p.FirstName, p.LastName,
+    private ManagedPersonDto View(UserProfile p, TenantMembership? m, EmployeeAccessConfiguration? configuration = null) => new(p.Id, p.FirstName, p.LastName,
         p.ContactEmail ?? p.PrimaryEmail ?? m?.InvitedEmail, p.ContactPhone ?? p.PrimaryPhone ?? m?.InvitedPhone,
-        p.ProfileTypes.Length == 0 && m?.Role is "owner" or "admin" or "staff" or "member" ? ["employee"] : p.ProfileTypes,
+        p.ProfileTypes.Length == 0 && (m?.Role ?? p.Role) is "owner" or "admin" or "staff" or "member" ? ["employee"] : p.ProfileTypes,
         p.CompanyName, p.Title, p.Team, p.CustomerId, p.ModulePermissions,
-        UserModulePermissions.Resolve(m,p), m?.Role, m?.Id, m?.IsOwner == true || m?.Role == "owner", p.IsActive, p.ETag.ToString());
+        UserModulePermissions.Resolve(m,p,configuration), m?.Role, m?.Id, m?.IsOwner == true || m?.Role == "owner", p.IsActive, p.ETag.ToString(), p.EmployeeRoleId);
 }

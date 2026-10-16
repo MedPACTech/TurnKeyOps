@@ -16,6 +16,17 @@ public sealed class TenantSettingsServiceTests
     private static readonly Guid TenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static readonly Guid OtherTenantId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
+    [Fact] public async Task EmployeeRolesRequireOwnerAndUseDedicatedTenantSettings() {
+        var fixture=new Fixture();
+        fixture.RoleAccess.Setup(x=>x.RequireAnyRoleAsync(It.IsAny<IEnumerable<string>>(),It.IsAny<CancellationToken>())).ThrowsAsync(new MedInsights.Lib.ForbiddenAccessException("Owner required"));
+        await Assert.ThrowsAsync<MedInsights.Lib.ForbiddenAccessException>(()=>fixture.Service.UpsertAsync(TenantSettingKinds.EmployeeAccess,Input(EmployeeAccessConfiguration.Default())));
+        fixture.Repository.Verify(x=>x.SaveAsync(It.IsAny<TenantSettingsDocument>(),It.IsAny<CancellationToken>()),Times.Never);
+    }
+    [Fact] public async Task MissingEmployeeSettingsProvideTechnicianWithoutAssigningExistingEmployees() {
+        var fixture=new Fixture();var result=await fixture.Service.GetProtectedAsync(TenantSettingKinds.EmployeeAccess);
+        var config=EmployeeAccessConfiguration.Parse(result.Values.GetRawText());
+        Assert.Equal("technician",Assert.Single(config.Roles).Id);Assert.Empty(config.Teams);
+    }
     [Fact]
     public async Task MissingBillingSettingsReturnTypedDefaults()
     {

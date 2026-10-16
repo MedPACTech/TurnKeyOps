@@ -9,6 +9,7 @@ import { fetchIntake, sessionToken } from '../records.server';
 import type { Actions, PageServerLoad } from './$types';
 
 const loadLegacy = async (event: Parameters<PageServerLoad>[0]) => {
+ if (!['requests','users','settings'].every(module => (event.locals.modulePermissions ?? []).includes(`${module}.read`))) return { requests: [], technicians: [], selectedId: '', loadError: '' };
 	const token = sessionToken(event);
 	event.setHeaders({ 'Cache-Control': 'private, no-store' });
 	try {
@@ -26,6 +27,7 @@ const loadLegacy = async (event: Parameters<PageServerLoad>[0]) => {
 
 export const actions: Actions = {
 	schedule: async (event) => {
+ if (!['requests','users','settings'].every(module => (event.locals.modulePermissions ?? []).includes(`${module}.read`)) || !(event.locals.modulePermissions ?? []).includes('requests.write')) return fail(403, { error: 'Office access is required to schedule assessments.' });
 		const token = sessionToken(event);
 		const form = await event.request.formData();
 		const id = String(form.get('requestId') ?? '');

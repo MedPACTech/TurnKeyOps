@@ -12,7 +12,8 @@ const failure = (label: string, result: PromiseSettledResult<unknown>) =>
 		? `${label}: ${result.reason instanceof Error ? result.reason.message : 'unavailable'}`
 		: null;
 
-const loadLegacy = async ({ fetch, url, cookies }: RequestEvent) => {
+const loadLegacy = async ({ fetch, url, cookies, locals }: RequestEvent) => {
+ if (!['requests','invoices','settings'].every(module => (locals.modulePermissions ?? []).includes(`${module}.read`))) return { source: 'api', scheduledVisitRequests: [], scheduledRequest: null, scheduledRequestQualification: null, scheduledJobs: [], scheduleReadyJobs: [], integrationState: { loadedAtUtc: new Date().toISOString(), errors: [] } };
 	const scheduleRequestId = url.searchParams.get('scheduleRequest')?.trim() ?? '';
 	const [requestResult, billingResult, invoiceResult, jobResult] = await Promise.allSettled([
 		loadQuoteRequests(fetch),

@@ -14,6 +14,23 @@ using TurnKeyOps.Services.Interfaces;
 namespace MedInsights.Authorization.Tests;
 public sealed class EstimateWorkspaceTests
 {
+    [Fact] public async Task TechnicianSubmissionPersistsOfficeReviewWithoutIssuingAndCannotManageProposal() {
+        var f=new Fixture();var priced=await f.Price();f.Authority.Manage=false;
+        var submitted=await f.Service.SubmitWorkspaceAsync(f.Id,priced.Version);
+        Assert.Equal("SUBMITTED",QuoteEstimateService.State(submitted));Assert.Null(submitted.Delivery);
+        Assert.Contains(submitted.Events,e=>e.Type=="submitted");
+        var workspace=await f.Service.WorkspaceAsync(f.Id);Assert.True(workspace.CanWrite);Assert.False(workspace.CanManage);
+        await Assert.ThrowsAsync<MedInsights.Lib.ForbiddenAccessException>(()=>f.Service.IssueAsync(f.Id,submitted.Version));
+        await Assert.ThrowsAsync<MedInsights.Lib.ForbiddenAccessException>(()=>f.Service.VoidAsync(f.Id,submitted.Version));
+        f.Authority.Manage=true;
+        var issued=await f.Service.IssueAsync(f.Id,submitted.Version);Assert.NotNull(issued.Delivery);
+    }
+    [Fact] public async Task IncompleteOrStaleEstimateCannotBeSubmitted() {
+        var f=new Fixture();var draft=await f.Create();
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.SubmitWorkspaceAsync(f.Id,draft.Version));
+        var priced=await f.Price();
+        await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.SubmitWorkspaceAsync(f.Id,draft.Version));
+    }
     [Fact] public void ConcreteQuantitiesAndTaxComeFromConfirmedInputsAndCatalog()
     {
         var doc=Document("concrete");doc.Inputs=new(){["length"]=Value(60),["width"]=Value(20),["depth"]=Value(4),["waste"]=Value(10)};
@@ -168,7 +185,7 @@ public sealed class EstimateWorkspaceTests
     private static string Token(QuoteEstimateDto p)=>p.Delivery!.ReviewUrl.Split("token=")[1];
     private static QuoteEstimateDecisionDto Decision(QuoteEstimateDto p,string token)=>new(){AccessToken=token,SignerPrintedName="Customer Test",IntentToSign=true,ConsentVersion=QuoteApprovalConsent.Version,RevisionNumber=p.RevisionNumber,DocumentHash=p.DocumentHash,SelectedOptionIds=["base"]};
     private sealed class Authority:IEstimateAuthority
-    {public bool Read=true,Write=true,Owner=true;public Task RequireAsync(bool write,CancellationToken ct){if(!Read||write&&!Write)throw new MedInsights.Lib.ForbiddenAccessException("Denied");return Task.CompletedTask;}public Task<bool> CanWriteAsync(CancellationToken ct)=>Task.FromResult(Write);public Task<bool> CanApproveAsync(CancellationToken ct)=>Task.FromResult(Owner);}
+    {public bool Read=true,Write=true,Owner=true,Manage=true;public Task<bool> CanManageAsync(CancellationToken ct)=>Task.FromResult(Manage);public Task RequireAsync(bool write,CancellationToken ct){if(!Read||write&&!Write)throw new MedInsights.Lib.ForbiddenAccessException("Denied");return Task.CompletedTask;}public Task<bool> CanWriteAsync(CancellationToken ct)=>Task.FromResult(Write);public Task<bool> CanApproveAsync(CancellationToken ct)=>Task.FromResult(Owner);}
     private sealed class User:IUserContext
     {public bool IsAuthenticated=>true;public Guid TenantId=>Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");public Guid UserId=>Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");public MedInsights.Lib.Utils.AppTimeZone Timezone=>MedInsights.Lib.Utils.AppTimeZone.Utc;public string FirstName=>"Estimator";public string LastName=>"Test";}
     private sealed class Resolver(Guid tenant):IQuoteRequestTenantResolver{public QuoteRequestTenantDefinition Resolve(string slug)=>new(){TenantId=tenant};}

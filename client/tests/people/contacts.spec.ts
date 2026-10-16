@@ -3,10 +3,10 @@ import AxeBuilder from '@axe-core/playwright';
 async function signIn(context:BrowserContext, contactsOnly=false, tenant='bdr') {
  const claims={sub:'11111111-1111-1111-1111-111111111111',role:[contactsOnly?'admin':'owner'],fixtureContacts:contactsOnly,tid:tenant==='bdr'?'7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b':'88888888-8888-8888-8888-888888888882',exp:Math.floor(Date.now()/1000)+3600};
  const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.ui-fixture`;
- await context.addCookies([{name:'tko_auth_token',value:token,url:'http://127.0.0.1:5191'}]);
+ await context.addCookies([{name:'tko_auth_token',value:token,url:(process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191')}]);
 }
 for(const tenant of ['bdr','thinkpink']) {
- test(`${tenant} contacts persist business details and share the person with People & Access`,async({page,context,request})=>{
+ test(`${tenant} contacts persist business details separately from People & Access`,async({page,context,request})=>{
   await request.get('http://127.0.0.1:5190/reset');await signIn(context,false,tenant);
   await page.goto(`/${tenant}/admin/customers`);
   await expect(page.getByRole('heading',{name:'Contacts',exact:true})).toBeVisible();
@@ -27,9 +27,9 @@ for(const tenant of ['bdr','thinkpink']) {
   await page.setViewportSize({width:390,height:844});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.screenshot({path:test.info().outputPath('contacts-mobile.png'),fullPage:true});
-  await page.getByRole('link',{name:'Manage this person’s app access'}).click();
-  await expect(page.getByLabel('First name',{exact:true})).toHaveValue('Casey');
-  await expect(page.getByRole('checkbox',{name:'vendor',exact:true})).toBeChecked();
+  await expect(page.getByRole('link',{name:'Manage this person’s app access'})).toHaveCount(0);
+  await page.goto(`/${tenant}/admin/users`);
+  await expect(page.getByRole('button',{name:/Casey Jordan/})).toHaveCount(0);
   await page.getByRole('button',{name:/Existing Owner/}).click();
   await page.screenshot({path:test.info().outputPath('people-corner.png'),fullPage:true});
  });

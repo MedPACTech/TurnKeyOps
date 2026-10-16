@@ -1,11 +1,11 @@
 # People and Contacts
 
-BDR and Think Pink share these workflows with separate tenant partitions and permissions.
+BDR, Think Pink, and Carl Zipf share these workflows with separate tenant partitions and permissions.
 
-- **People & access** manages the person identity, business profiles, invitations, access roles, and module permissions.
+- **People & access** is the employee directory, with job title, configured role and team assignments, and invitations. Roles and Teams are configured in Settings, including module access inherited by employees.
 - **Contacts** manages customer/vendor details, a contact address, notes, and links to existing customer records. Linked jobs (including their property addresses) and invoices are shown only when the viewer has the corresponding module permission. Work is matched by customer ID, never by a similar name or phone number.
 
-Both screens use the same company `UserProfile`. Contacts saves preserve employee profiles, verified sign-in identifiers, teams, access roles, and module permissions. A new contact needs an email or international phone number to create/reuse the underlying identity. Creating the contact grants no company membership and sends no invitation. Existing employees can receive a Customer or Vendor profile in People & access to appear in Contacts.
+Both screens use the same company `UserProfile`. Contacts saves preserve employee profiles, verified sign-in identifiers, teams, access roles, and module permissions. A new contact needs an email or international phone number to create/reuse the underlying identity. Creating the contact grants no company membership and sends no invitation. Customer and Vendor profiles are edited in Contacts. Customer/vendor-only contacts do not appear in People & Access. Existing dual-profile records retain their independent contact details when employee access is edited.
 
 Contacts requires `contacts.read`/`contacts.write`; it does not require `users.read`/`users.write`. The legacy `/contact` and navigation `/customers` routes render the same contact workflow for each company.
 

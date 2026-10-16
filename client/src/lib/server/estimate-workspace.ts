@@ -21,7 +21,7 @@ export const actions={save:async(event:RequestEvent)=>{
    const bob=await leadApi<{id:string;status:string;confirmationRequired:boolean}>(event,`${path}/bob`,{toolKey,input:{estimateId:id,expectedVersion,text:String(form.get('text')||'')},idempotencyKey:crypto.randomUUID()});
    return {message:'Bob action recorded.',bob};
   }else if(action==='approve-bob')await leadApi(event,`${path}/bob/${encodeURIComponent(String(form.get('actionId')))}/approve`,{});
-  else if(['approve','issue','revision','void','deliver','job'].includes(action))await leadApi(event,`${path}/${action}`,{expectedVersion,text:String(form.get('text')||''),channel:String(form.get('channel')||'email')});
+  else if(['submit','approve','issue','revision','void','deliver','job'].includes(action))await leadApi(event,`${path}/${action}`,{expectedVersion,text:String(form.get('text')||''),channel:String(form.get('channel')||'email')});
   else throw new Error('Unsupported action');
   return {message:action==='job'?'Accepted scope linked to Job.':'Estimate updated.'};
  }catch(e){return fail(400,{message:(e as {body?:{message?:string}}).body?.message||(e instanceof Error?e.message:'The estimate could not be updated.'),failed:true});}

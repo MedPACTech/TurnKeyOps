@@ -52,19 +52,48 @@ public sealed partial class LeadService(
     }
     private async Task<List<Lead>> AllAsync(CancellationToken ct) => (await leads.ListAsync(Partition, ct))
         .Where(x => !x.IsDeleted && x.PartitionKey == Partition && x.Data.TenantId == user.TenantId).ToList();
-    private async Task<IReadOnlyList<LeadMemberDto>> MembersAsync(CancellationToken ct) =>
+    private async Task<List<MedInsights.Lib.Entities.UserProfile>> EmployeeProfilesAsync(CancellationToken ct)
+    {
+        var result = new List<MedInsights.Lib.Entities.UserProfile>();
+        if (profiles is not null)
+            await foreach (var profile in profiles.ListAsync(Partition, ct))
+                if (profile.PartitionKey == Partition) result.Add(profile);
+        return result;
+    }
+    private async Task<MedInsights.Lib.Entities.TenantMembership[]> ActiveMembersAsync(CancellationToken ct) =>
         (await memberships.GetActiveAssignedByTenantAsync(user.TenantId, ct))
-        .Where(x => x.TenantId == user.TenantId && !x.IsDeleted && !x.DateRemoved.HasValue && x.MembershipStatus == "Active" && x.Role != "contact")
-        .Select(x => new LeadMemberDto(x.Id, x.InvitedEmail ?? x.InvitedPhone ?? x.UserId.ToString())).ToArray();
-
+        .Where(m => m.TenantId == user.TenantId && UserModulePermissions.IsActive(m) && m.UserId != Guid.Empty).ToArray();
+    private static bool Assignable(MedInsights.Lib.Entities.UserProfile? profile, MedInsights.Lib.Entities.TenantMembership? member, EmployeeAccessConfiguration roles)
+    {
+        if (profile is not null && (!profile.IsActive || profile.IsDeleted)) return false;
+        if (member?.IsOwner == true || member?.Role.Equals("owner", StringComparison.OrdinalIgnoreCase) == true) return true;
+        if (profile is not null && !profile.ProfileTypes.Contains("employee") && member?.Role != "admin") return false;
+        var role = !string.IsNullOrEmpty(profile?.EmployeeRoleId)
+            ? roles.Roles.FirstOrDefault(r => r.Id == profile.EmployeeRoleId)?.Name
+            : member?.Role ?? profile?.Role;
+        return role?.Trim().ToLowerInvariant() is "owner" or "admin" or "administrator" or "sales";
+    }
+    private static Guid ProfileUserId(MedInsights.Lib.Entities.UserProfile profile) => profile.ApplicationUserId == Guid.Empty ? profile.Id : profile.ApplicationUserId;
+    private static string AssociateName(MedInsights.Lib.Entities.UserProfile? profile, MedInsights.Lib.Entities.TenantMembership? member)
+    {
+        var name = $"{profile?.FirstName} {profile?.LastName}".Trim();
+        return name.Length > 0 ? name : profile?.ContactEmail ?? member?.InvitedEmail ?? member?.InvitedPhone ?? "Unnamed employee";
+    }
+    private async Task<IReadOnlyList<LeadMemberDto>> MembersAsync(CancellationToken ct)
+    {
+        var employees = await EmployeeProfilesAsync(ct);
+        var roles = await configuration.EmployeeAccessAsync(user.TenantId, ct);
+        return (await ActiveMembersAsync(ct)).Select(member => (member, profile: employees.FirstOrDefault(p => ProfileUserId(p) == member.UserId)))
+            .Where(x => Assignable(x.profile, x.member, roles))
+            .Select(x => new LeadMemberDto(x.member.Id, AssociateName(x.profile, x.member), x.profile?.Id)).OrderBy(x => x.Name).ToArray();
+    }
     private async Task<IReadOnlyList<LeadMemberDto>> AssociatesAsync(CancellationToken ct)
     {
-        var result = new List<LeadMemberDto>();
-        if (profiles is not null)
-            await foreach (var p in profiles.ListAsync(Partition, ct))
-                if (p.PartitionKey == Partition && p.IsActive && !p.IsDeleted && p.ProfileTypes.Contains("employee"))
-                    result.Add(new(p.Id, string.Join(" ", new[] { p.FirstName, p.LastName }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim() is { Length: > 0 } name ? name : p.ContactEmail ?? "Unnamed associate"));
-        return result.OrderBy(x => x.Name).ToArray();
+        var members = await ActiveMembersAsync(ct);
+        var roles = await configuration.EmployeeAccessAsync(user.TenantId, ct);
+        return (await EmployeeProfilesAsync(ct)).Where(p => p.ProfileTypes.Contains("employee") && Assignable(p, members.FirstOrDefault(m => m.UserId == ProfileUserId(p)), roles))
+            .Select(p => new LeadMemberDto(p.Id, AssociateName(p, members.FirstOrDefault(m => m.UserId == ProfileUserId(p)))))
+            .OrderBy(p => p.Name).ToArray();
     }
 
     private static LeadDto Decorate(LeadDto lead, LeadConfigurationDto config, IReadOnlyList<LeadMemberDto> members, IReadOnlyList<LeadMemberDto> associates)
@@ -182,9 +211,9 @@ public sealed partial class LeadService(
         if (input.OwnerMembershipId.HasValue && input.OwnerProfileId.HasValue)
             throw new ArgumentException("Choose one assigned associate.");
         if (validateAssignment && input.OwnerProfileId.HasValue && !(await AssociatesAsync(ct)).Any(x => x.Id == input.OwnerProfileId))
-            throw new ArgumentException("Choose an active employee profile in this company.");
+            throw new ArgumentException("Choose an active Owner, Admin, or Sales employee in this company.");
         if (validateAssignment && input.OwnerMembershipId.HasValue && !(await MembersAsync(ct)).Any(x => x.Id == input.OwnerMembershipId))
-            throw new ArgumentException("The lead owner must be an active employee in this tenant.");
+            throw new ArgumentException("The assignee must be an active Owner, Admin, or Sales employee in this company.");
     }
     public async Task<LeadDto> StageAsync(Guid id, LeadStageDto input, CancellationToken ct = default)
     {

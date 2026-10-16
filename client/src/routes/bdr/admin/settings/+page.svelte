@@ -226,6 +226,8 @@
 	description="Manage defaults and public-site controls from one admin utility area."
 >
 	{#snippet work()}
+<p class="mx-auto my-4 max-w-5xl"><a class="font-semibold underline" href="/bdr/admin/settings/people">Roles & teams — configure employee module access</a></p>
+
 		<form method="POST" action="?/saveBillingSettings" class="mb-5 space-y-5">
 			<section class="rounded-lg bg-[var(--surface)] p-5 shadow-[var(--shell-shadow)]">
 				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

@@ -3,7 +3,8 @@ import type {RequestEvent} from '@sveltejs/kit';
 import { thinkPinkTenant } from '$lib/config/tenants';
 import { loadQuoteRequests } from '$lib/server/quote-requests';
 
-const loadLegacy = async ({ fetch }: RequestEvent) => {
+const loadLegacy = async ({ fetch, locals }: RequestEvent) => {
+ if (!(locals.modulePermissions ?? []).includes('requests.read')) return { source: 'api', visits: [], unscheduled: [] };
 	const { requests, source } = await loadQuoteRequests(fetch, thinkPinkTenant.id);
 	return {
 		source,

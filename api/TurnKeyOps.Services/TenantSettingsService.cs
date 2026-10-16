@@ -73,6 +73,11 @@ public sealed class TenantSettingsService : ITenantSettingsService
     {
         kind = NormalizeKind(kind);
         await _roleAccess.RequirePermissionAsync(TurnKeyPermissionKeys.TenantSettingsManage, ct);
+        if (kind == TenantSettingKinds.EmployeeAccess) {
+            await _roleAccess.RequireAnyRoleAsync(["owner"], ct);
+            EmployeeAccessConfiguration.Parse(input.Values.GetRawText());
+            if (input.SecretReferences.Count != 0) throw new ArgumentException("Employee access settings do not accept secret references.");
+        }
         ValidateInput(kind, input);
 
         var partitionKey = Partition(_userContext.TenantId);
@@ -361,6 +366,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
     {
         var values = kind switch
         {
+            TenantSettingKinds.EmployeeAccess => JsonSerializer.SerializeToElement(EmployeeAccessConfiguration.Default(), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
             TenantSettingKinds.Billing => JsonSerializer.SerializeToElement(new { depositPercentRequired = 50m }),
             _ => JsonSerializer.SerializeToElement(new { })
         };

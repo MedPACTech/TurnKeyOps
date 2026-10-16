@@ -30,6 +30,17 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
         "Billing" or "BillingAdmin" or "TenantBillingAccount" or "TenantSubscription" or "TenantSeatEntitlement" or "TenantCreditBalance" or "TokenLedger" => "billing",
         _ => null
     };
+    public static bool AllowsEstimateSubmission(string controller, string action, IEnumerable<string> permissions)
+    {
+        var set = permissions.ToHashSet();
+        if (!set.Contains("estimates.read") || !set.Contains("estimates.write") || !set.Contains("estimates.submit")) return false;
+        return controller switch {
+            "EstimateWorkspace" => action is "Price" or "Extract" or "Upload" or "Submit",
+            "QuoteEstimates" => action == "SaveDraft",
+            "Estimates" => action is "Submit" or "Calculate" or "CalculateConcrete" or "UpdateStructured" or "CreateFromAppointment",
+            _ => false
+        };
+    }
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         if (context.ActionDescriptor is not ControllerActionDescriptor action ||
@@ -50,6 +61,10 @@ public sealed class UserModuleAccessFilter(UserModuleAccessService access) : IAs
             return;
         }
         var permissions = await access.GetAsync(context.HttpContext.RequestAborted);
+        if (module == "estimates" && write && !permissions.Contains("estimates.manage") && !AllowsEstimateSubmission(action.ControllerName, action.ActionName, permissions)) {
+            context.Result = new ObjectResult(new { error = "This role can draft and submit estimates. Managing or issuing proposals requires additional access." }) { StatusCode = 403 };
+            return;
+        }
         var allowed = action.ControllerName == "BobIntelligence"
             ? permissions.Contains("bob.read") && (!write || permissions.Contains("bob.write") || action.ActionName is "Command" or "Feedback" or "Dismiss")
             : UserModulePermissions.Allows(permissions, module, write);

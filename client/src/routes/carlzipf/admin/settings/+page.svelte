@@ -22,6 +22,8 @@
  })); };
 </script>
 <svelte:head><title>Quote policy · Carl Zipf</title></svelte:head>
+<p class="mx-auto my-4 max-w-5xl"><a class="font-semibold underline" href="/carlzipf/admin/settings/people">Roles & teams — configure employee module access</a></p>
+
 <div class="mx-auto max-w-3xl space-y-6 pb-10">
  <p><a class="font-semibold underline" href="/carlzipf/admin/website">Manage website content</a></p>
  <header><p class="text-sm font-semibold text-[var(--accent-text)]">Carl Zipf Lock Shop</p><h1 class="mt-2 text-3xl font-bold">Quote policy</h1><p class="mt-3 text-[var(--text-muted)]">Configure pricing defaults for residential and commercial work in one shared workspace.</p></header>

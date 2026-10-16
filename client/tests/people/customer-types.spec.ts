@@ -5,7 +5,7 @@ for(const tenant of ['carlzipf','bdr','thinkpink']) test(`${tenant}: customer cl
  if(tenant==='bdr')await page.setViewportSize({width:393,height:851});
  const tid=tenant==='carlzipf'?'88888888-8888-4888-8888-888888888883':tenant==='bdr'?'7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b':'88888888-8888-8888-8888-888888888882';
  const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify({sub:'11111111-1111-1111-1111-111111111111',role:['owner'],tid,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.fixture`;
- await context.addCookies([{name:'tko_auth_token',value:token,url:'http://127.0.0.1:5191'}]);
+ await context.addCookies([{name:'tko_auth_token',value:token,url:(process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191')}]);
  const base=`/${tenant}/admin/${tenant==='carlzipf'?'customers':'customer-records'}`, customer='22222222-2222-2222-2222-222222222222';
  await page.goto(`${base}?customer=${customer}`);await page.waitForLoadState('networkidle');
  await expect(page.getByRole('radio',{name:'Residential',exact:true})).not.toBeChecked();

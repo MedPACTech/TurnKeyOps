@@ -241,6 +241,7 @@ public sealed partial class QuoteEstimateService : IQuoteEstimateService
         string? expectedVersion,
         CancellationToken ct = default)
     {
+        if (_authority is not null) await _authority.RequireManageAsync(ct);
         if (_authority is not null) await _authority.RequireAsync(true, ct);
         await RequireQuoteAccessAsync(quoteRequestId, ct);
         var tenantId = _userContext.TenantId;
@@ -279,6 +280,7 @@ public sealed partial class QuoteEstimateService : IQuoteEstimateService
         string reviewBasePath,
         CancellationToken ct = default)
     {
+        if (_authority is not null) await _authority.RequireManageAsync(ct);
         if (_authority is not null) await _authority.RequireAsync(true, ct);
         await RequireQuoteAccessAsync(quoteRequestId, ct);
         var tenantId = _userContext.TenantId;
@@ -308,7 +310,7 @@ public sealed partial class QuoteEstimateService : IQuoteEstimateService
             if (settings is not null && !settings.IsDeleted && LocksmithPolicy.IsConfigured(settings.ValuesJson))
                 throw new ArgumentException("Recalculate this quote with doors and locksmith pricing before sharing.");
         }
-        if (packet.Status != "ready-to-send")
+        if (packet.Status is not ("ready-to-send" or "submitted"))
             throw new ArgumentException("Move the estimate to ready-to-send before sending.");
         var quote = await GetQuoteAsync(tenantId, quoteRequestId, ct)
             ?? throw new ArgumentException("The source quote request was not found.", nameof(quoteRequestId));

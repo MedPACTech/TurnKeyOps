@@ -24,6 +24,15 @@ public sealed partial class QuoteEstimateService
         var values=System.Text.Json.Nodes.JsonNode.Parse(prior?.ValuesJson??"{}")!.AsObject();values["estimates"]=JsonSerializer.SerializeToNode(policy,JsonOptions);
         return await service.UpsertAsync("operational",new(){ExpectedVersion=version,SchemaVersion=prior?.SchemaVersion??1,Values=JsonSerializer.SerializeToElement(values),SecretReferences=JsonSerializer.Deserialize<Dictionary<string,string>>(prior?.SecretReferencesJson??"{}")??[]},ct);
     }
+    public async Task<QuoteEstimateDto> SubmitWorkspaceAsync(Guid id, string version, CancellationToken ct = default)
+    {
+        var (entity, packet) = await EditablePacketAsync(id, version, ct);
+        if (packet.Delivery is not null || packet.Outcome is not null) throw new ArgumentException("Only a draft estimate can be submitted.");
+        if (packet.Pricing is null || packet.Pricing.Blockers.Count > 0) throw new ArgumentException("Complete the estimate before submitting it for office review.");
+        packet.Status = "submitted";
+        AddEstimateEvent(packet, "submitted", "Estimate submitted for office review. No customer proposal was issued.");
+        return await PersistAsync(entity, packet, _userContext.TenantId, null, null, ct);
+    }
     public async Task<QuoteEstimateDto> IssueAsync(Guid id,string version,CancellationToken ct=default)
     {
         await RequireWorkspaceAsync(true,ct);
@@ -62,10 +71,10 @@ public sealed partial class QuoteEstimateService
         var catalog=policy.Catalog.Where(x=>x.Enabled&&!x.Sample&&(x.TradeProfile=="general"||x.TradeProfile==packet.Document?.TradeProfile)).ToList();
         if(!owner){packet=CustomerProjection(packet,false);catalog=catalog.Select(x=>new EstimateCatalogItemDto{Id=x.Id,Name=x.Name,Kind=x.Kind,Unit=x.Unit,TradeProfile=x.TradeProfile,Enabled=x.Enabled,Taxable=x.Taxable,UnitPrice=x.UnitPrice}).ToList();}
         return new(){Packet=packet,Fields=EstimatePricingEngine.Fields(packet.Document?.TradeProfile??"general",policy),Catalog=catalog,State=state,StateLabel=policy.StageLabels.GetValueOrDefault(state,state.ToLowerInvariant().Replace('_',' ')),
-            CanWrite=await _authority.CanWriteAsync(ct),CanApprove=owner,CanViewCosts=owner,
-            NextAction=state switch {"ACCEPTED"=>"Hand accepted scope to Job","SENT" or "VIEWED"=>"Follow up with the customer","REVISION_REQUESTED"=>"Create a revision","NEEDS_APPROVAL"=>"Request office pricing approval","READY_TO_SEND"=>"Preview and issue proposal",_=>"Confirm scope and price the estimate"}};
+            CanWrite=await _authority.CanWriteAsync(ct),CanApprove=owner,CanViewCosts=owner,CanManage=await _authority.CanManageAsync(ct),
+            NextAction=state switch {"ACCEPTED"=>"Hand accepted scope to Job","SENT" or "VIEWED"=>"Follow up with the customer","REVISION_REQUESTED"=>"Create a revision","SUBMITTED"=>"Office review required", "NEEDS_APPROVAL"=>"Request office pricing approval","READY_TO_SEND"=>"Preview and issue proposal",_=>"Confirm scope and price the estimate"}};
     }
-    public static string State(QuoteEstimateDto p)=>p.Outcome??(p.Delivery?.Status=="approved"?"ACCEPTED":p.ExpiresAtUtc<DateTime.UtcNow&&p.Delivery is not null?"EXPIRED":p.Delivery?.Status=="changes-requested"?"REVISION_REQUESTED":p.Delivery is not null?p.ViewedAtUtc.HasValue?"VIEWED":"SENT":p.Pricing?.Blockers.Count>0?"NEEDS_INFORMATION":p.Pricing is null?"DRAFT":p.Pricing.ApprovalReasons.Count>0&&p.Pricing.ApprovedAtUtc is null?"NEEDS_APPROVAL":"READY_TO_SEND");
+    public static string State(QuoteEstimateDto p)=>p.Outcome??(p.Status=="submitted"?"SUBMITTED":p.Delivery?.Status=="approved"?"ACCEPTED":p.ExpiresAtUtc<DateTime.UtcNow&&p.Delivery is not null?"EXPIRED":p.Delivery?.Status=="changes-requested"?"REVISION_REQUESTED":p.Delivery is not null?p.ViewedAtUtc.HasValue?"VIEWED":"SENT":p.Pricing?.Blockers.Count>0?"NEEDS_INFORMATION":p.Pricing is null?"DRAFT":p.Pricing.ApprovalReasons.Count>0&&p.Pricing.ApprovedAtUtc is null?"NEEDS_APPROVAL":"READY_TO_SEND");
     private async Task<(QuoteEstimate Entity,QuoteEstimateDto Packet)> EditablePacketAsync(Guid id,string version,CancellationToken ct)
     {
         await RequireWorkspaceAsync(true,ct);await RequireQuoteAccessAsync(id,ct);

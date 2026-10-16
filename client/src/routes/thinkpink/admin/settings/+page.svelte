@@ -104,6 +104,8 @@
 </script>
 
 <svelte:head><title>Admin · Think Pink</title></svelte:head>
+<p class="mx-auto my-4 max-w-5xl"><a class="font-semibold underline" href="/thinkpink/admin/settings/people">Roles & teams — configure employee module access</a></p>
+
 
 <form method="POST" action="?/save" class="mx-auto max-w-7xl space-y-5 pb-10">
 	<header class="sticky top-0 z-10 flex flex-col gap-4 border-b border-[var(--shell-border)] bg-[var(--shell-canvas)]/95 py-5 backdrop-blur sm:flex-row sm:items-end sm:justify-between">
