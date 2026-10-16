@@ -86,7 +86,7 @@ test('settings persist role permissions and teams and employee form uses the sav
  await page.getByLabel('First name',{exact:true}).fill('Team');await page.getByLabel('Last name',{exact:true}).fill('Technician');
  await page.getByLabel('Login email or phone').fill('team@example.invalid');await page.getByRole('combobox',{name:'Team',exact:true}).selectOption('Field service');
  await page.getByRole('button',{name:'Save employee',exact:true}).click();await expect(page.getByRole('status')).toContainText('User saved');
- await page.reload();await page.getByRole('button',{name:/Team Technician/}).click();await expect(page.getByRole('combobox',{name:'Team',exact:true})).toHaveValue('Field service');
+ await page.reload();await page.waitForLoadState('networkidle');await page.getByRole('button',{name:/Team Technician/}).click();await expect(page.getByRole('combobox',{name:'Team',exact:true})).toHaveValue('Field service');
  await page.screenshot({path:test.info().outputPath('employee-details.png'),fullPage:true});
 });
 
