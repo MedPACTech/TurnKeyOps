@@ -4,7 +4,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 
 export type Person = { id: string; firstName: string; lastName: string; contactEmail?: string; contactPhone?: string;
  profileTypes: string[]; companyName?: string; title?: string; team?: string; customerId?: string;
- employeeRoleId?: string; modulePermissions: string[] | null; effectivePermissions: string[]; role?: string; membershipId?: string;
+ employeeRoleIds?: string[]; employeeRoleId?: string; modulePermissions: string[] | null; effectivePermissions: string[]; role?: string; membershipId?: string;
  isOwner: boolean; isActive: boolean; version: string };
 export const modules = ['dashboard','bob','calendar','jobs','leads','requests','estimates','invoices','contacts','users','settings','billing','inventory','purchasing','finance','payroll'];
 export async function peopleRequest<T>(event: Pick<RequestEvent, 'fetch' | 'cookies'>, path: string, init?: RequestInit): Promise<T> {
@@ -42,11 +42,12 @@ export const peopleActions = {
  }),
  savePerson: (event: RequestEvent) => action(event, async d => {
   const id = text(d,'id');
-  const employeeRoleId = text(d, 'employeeRoleId') || null;
-  const permissions = employeeRoleId ? null : JSON.parse(text(d, 'existingPermissions') || 'null');
+  const employeeRoleIds = d.getAll('employeeRoleIds').map(String).filter(Boolean);
+  const employeeRoleId = employeeRoleIds[0] || null;
+  const permissions = employeeRoleIds.length ? null : JSON.parse(text(d, 'existingPermissions') || 'null');
   const person = await peopleRequest<Person>(event, `/api/people${id ? '/'+encodeURIComponent(id) : ''}`, {method:id ? 'PUT':'POST', body:JSON.stringify({
    firstName:text(d,'firstName'),lastName:text(d,'lastName'),contactEmail:text(d,'contactEmail') || null,contactPhone:text(d,'contactPhone') || null,
-   loginIdentifier:text(d,'loginIdentifier') || null,profileTypes:['employee'],employeeRoleId,title:text(d,'title'),team:text(d,'team'),
+   loginIdentifier:text(d,'loginIdentifier') || null,profileTypes:['employee'],employeeRoleId,employeeRoleIds,title:text(d,'title'),team:text(d,'team'),
    customerId:text(d,'customerId') || null,modulePermissions:permissions,expectedVersion:text(d,'version')
   })});
   return {message:'User saved.',savedId:person.id};

@@ -101,17 +101,19 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         if (contact is null && owner && input.ModulePermissions is not null) throw new ArgumentException("Owners retain full module access.");
         if (contact is null && id == user.UserId && input.ModulePermissions is not null) throw new ArgumentException("You cannot restrict your own access.");
         var configuration = await access.ConfigurationAsync(ct);
+        var roleIds = (input.EmployeeRoleIds ?? (string.IsNullOrEmpty(input.EmployeeRoleId) ? Array.Empty<string>() : [input.EmployeeRoleId])).Distinct().Order().ToArray();
+        var rolesChanged = !roleIds.ToHashSet().SetEquals(UserModulePermissions.RoleIds(existing));
         if (contact is null) {
-            if (existing is null && membership is null && string.IsNullOrEmpty(input.EmployeeRoleId)) input.ModulePermissions = [];
-            if (!string.IsNullOrEmpty(input.EmployeeRoleId) && !configuration.Roles.Any(r => r.Id == input.EmployeeRoleId)) throw new ArgumentException("Choose a configured employee role.");
+            if (existing is null && membership is null && roleIds.Length == 0) input.ModulePermissions = [];
+            if (roleIds.Any(id => !configuration.Roles.Any(r => r.Id == id))) throw new ArgumentException("Choose a configured employee role.");
             if (!string.IsNullOrEmpty(input.Team) && input.Team != existing?.Team && !configuration.Teams.Contains(input.Team)) throw new ArgumentException("Choose a team configured in Settings.");
-            if (id == user.UserId && input.EmployeeRoleId != existing?.EmployeeRoleId) throw new ArgumentException("Another owner must change your role.");
+            if (id == user.UserId && !owner && rolesChanged) throw new ArgumentException("Another owner must change your role.");
         }
         var currentPermissions = await access.GetAsync(ct);
         var actor = await memberships.GetByUserIdAsync(Partition, user.UserId, ct);
         if (contact is null && actor?.IsOwner != true && actor?.Role != "owner") {
             if (owner) throw new ForbiddenAccessException("Only an owner can edit another owner.");
-            if (input.EmployeeRoleId != existing?.EmployeeRoleId) throw new ForbiddenAccessException("Only an owner can assign employee roles.");
+            if (rolesChanged) throw new ForbiddenAccessException("Only an owner can assign employee roles.");
             var permissionsUnchanged = input.ModulePermissions is null && existing?.ModulePermissions is null
                 || input.ModulePermissions is not null && existing?.ModulePermissions is not null && input.ModulePermissions.ToHashSet().SetEquals(existing.ModulePermissions);
             if (!permissionsUnchanged && (input.ModulePermissions is null || input.ModulePermissions.Except(currentPermissions).Any()))
@@ -125,7 +127,8 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
             : p.ProfileTypes.Where(t => t == "employee").Concat(input.ProfileTypes).Distinct().ToArray();
         if (contact is not null) { p.CompanyName = input.CompanyName?.Trim(); p.CustomerId = input.CustomerId; }
         if (contact is null) {
-            p.Title = input.Title?.Trim(); p.Team = input.Team?.Trim(); p.EmployeeRoleId = string.IsNullOrEmpty(input.EmployeeRoleId) ? null : input.EmployeeRoleId;
+            p.Title = input.Title?.Trim(); p.Team = input.Team?.Trim(); p.EmployeeRoleIds = roleIds; p.EmployeeRoleId = roleIds.FirstOrDefault();
+            if (rolesChanged || input.EmployeeRoleIds is not null && roleIds.Length > 0) input.ModulePermissions = owner || roleIds.Length > 0 ? null : [];
             p.ModulePermissions = UserModulePermissions.Validate(input.ModulePermissions);
         } else {
             p.AddressLine1 = contact.Address?.Trim(); p.City = contact.City?.Trim();
@@ -270,5 +273,5 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         p.ContactEmail ?? p.PrimaryEmail ?? m?.InvitedEmail, p.ContactPhone ?? p.PrimaryPhone ?? m?.InvitedPhone,
         p.ProfileTypes.Length == 0 && (m?.Role ?? p.Role) is "owner" or "admin" or "staff" or "member" ? ["employee"] : p.ProfileTypes,
         p.CompanyName, p.Title, p.Team, p.CustomerId, p.ModulePermissions,
-        UserModulePermissions.Resolve(m,p,configuration), m?.Role, m?.Id, m?.IsOwner == true || m?.Role == "owner", p.IsActive, p.ETag.ToString(), p.EmployeeRoleId);
+        UserModulePermissions.Resolve(m,p,configuration), m?.Role, m?.Id, m?.IsOwner == true || m?.Role == "owner", p.IsActive, p.ETag.ToString(), p.EmployeeRoleId, UserModulePermissions.RoleIds(p));
 }

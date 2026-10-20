@@ -29,7 +29,7 @@ public sealed class UserModuleAccessService(ITenantMembershipRepository membersh
         _isOwner = UserModulePermissions.IsActive(membership) && (membership!.IsOwner || membership.Role == "owner");
         var profile = await profiles.GetByKeysAsync(pk, EntityKeyPolicy.Row(user.UserId), ct);
         var configuration = await ConfigurationAsync(ct);
-        _hasEmployeeRole = UserModulePermissions.IsActive(membership) && profile is { IsActive: true, IsDeleted: false } && configuration.Roles.Any(r => r.Id == profile.EmployeeRoleId);
+        _hasEmployeeRole = UserModulePermissions.IsActive(membership) && profile is { IsActive: true, IsDeleted: false } && configuration.Roles.Any(r => UserModulePermissions.RoleIds(profile).Contains(r.Id));
         return UserModulePermissions.Resolve(membership, profile, configuration);
     }
 }

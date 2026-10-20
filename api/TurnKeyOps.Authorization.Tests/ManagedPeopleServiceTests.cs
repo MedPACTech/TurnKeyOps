@@ -151,6 +151,20 @@ public sealed class ManagedPeopleServiceTests
         Assert.Null(saved.EmployeeRoleId);
         Assert.Empty(saved.ModulePermissions!);
     }
+    [Fact] public async Task RemovingLastRoleDeniesModulesAndPersistsEmptyAssignments() {
+        var f = new Fixture(); f.Existing(); f.Profile.EmployeeRoleId = "technician";
+        await f.Service.SaveAsync(f.Target, new() { FirstName = "Test", ExpectedVersion = "v1", EmployeeRoleIds = [] }, default);
+        Assert.Empty(f.Profile.EmployeeRoleIds!); Assert.Null(f.Profile.EmployeeRoleId); Assert.Empty(f.Profile.ModulePermissions!);
+    }
+    [Fact] public async Task NonOwnerCannotRemoveAssignedRoles() {
+        var f = new Fixture(); f.Existing(); f.Profile.EmployeeRoleIds = ["technician"]; f.ActAsAdmin(["users.read", "users.write"]);
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => f.Service.SaveAsync(f.Target, new() { FirstName = "Test", ExpectedVersion = "v1", EmployeeRoleIds = [] }, default));
+    }
+    [Fact] public async Task OwnerRoleAssignmentsRetainFullAccessWhenLastRoleIsRemoved() {
+        var f = new Fixture(); f.Existing(); f.TargetMember.IsOwner = true; f.TargetMember.Role = "owner"; f.Profile.EmployeeRoleId = "technician";
+        var saved = await f.Service.SaveAsync(f.Target, new() { FirstName = "Owner", ExpectedVersion = "v1", EmployeeRoleIds = [] }, default);
+        Assert.Empty(f.Profile.EmployeeRoleIds!); Assert.Null(f.Profile.ModulePermissions); Assert.Contains("users.write", saved.EffectivePermissions);
+    }
     private sealed class Fixture {
         public Guid Actor=Guid.NewGuid(),Target=Guid.NewGuid(),Tenant=Guid.NewGuid();
         public Mock<IManagedProfileStore> Profiles=new();
