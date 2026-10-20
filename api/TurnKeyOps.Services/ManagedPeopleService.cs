@@ -102,7 +102,7 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         if (contact is null && id == user.UserId && input.ModulePermissions is not null) throw new ArgumentException("You cannot restrict your own access.");
         var configuration = await access.ConfigurationAsync(ct);
         if (contact is null) {
-            if (existing is null && membership is null && string.IsNullOrEmpty(input.EmployeeRoleId)) throw new ArgumentException("Choose an employee role configured in Settings.");
+            if (existing is null && membership is null && string.IsNullOrEmpty(input.EmployeeRoleId)) input.ModulePermissions = [];
             if (!string.IsNullOrEmpty(input.EmployeeRoleId) && !configuration.Roles.Any(r => r.Id == input.EmployeeRoleId)) throw new ArgumentException("Choose a configured employee role.");
             if (!string.IsNullOrEmpty(input.Team) && input.Team != existing?.Team && !configuration.Teams.Contains(input.Team)) throw new ArgumentException("Choose a team configured in Settings.");
             if (id == user.UserId && input.EmployeeRoleId != existing?.EmployeeRoleId) throw new ArgumentException("Another owner must change your role.");

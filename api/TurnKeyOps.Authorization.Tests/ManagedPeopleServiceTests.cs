@@ -138,6 +138,18 @@ public sealed class ManagedPeopleServiceTests
         await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.SaveAsync(f.Target,new(){FirstName="Test",ExpectedVersion="v1",EmployeeRoleId="unknown"},default));
         await Assert.ThrowsAsync<ArgumentException>(()=>f.Service.SaveAsync(f.Target,new(){FirstName="Test",ExpectedVersion="v1",Team="Unconfigured team"},default));
     }
+    [Fact] public async Task NewEmployeeWithoutRoleStartsWithNoModuleAccess() {
+        var f = new Fixture();
+        f.Identities.Setup(x => x.FindByEmailAsync("new@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IdentityUser(f.Target, "new@example.com", false, null));
+        UserProfile? saved = null;
+        f.Profiles.Setup(x => x.AddAsync(f.Tenant, It.IsAny<UserProfile>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid?, UserProfile, CancellationToken>((_, profile, _) => saved = profile);
+        await f.Service.SaveAsync(null, new() { FirstName = "New", LoginIdentifier = "new@example.com" }, default);
+        Assert.NotNull(saved);
+        Assert.Null(saved.EmployeeRoleId);
+        Assert.Empty(saved.ModulePermissions!);
+    }
     private sealed class Fixture {
         public Guid Actor=Guid.NewGuid(),Target=Guid.NewGuid(),Tenant=Guid.NewGuid();
         public Mock<IManagedProfileStore> Profiles=new();
