@@ -1,6 +1,7 @@
 using Azure;
 using Azure.Data.Tables;
 using IBeam.Identity.Interfaces;
+using IBeam.Identity.Models;
 using IBeam.Repositories.AzureTables;
 using MedInsights.Lib;
 using MedInsights.Lib.Dtos;
