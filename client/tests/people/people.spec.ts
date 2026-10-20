@@ -16,39 +16,49 @@ test('employee CRUD persists role and team assignments across reloads',async({pa
  await expect(page.getByText('Business profiles',{exact:true})).toHaveCount(0);
  await expect(page.getByLabel('Company',{exact:true})).toHaveCount(0);
  await page.getByLabel('Job title',{exact:true}).fill('Service technician');
- await page.getByRole('combobox',{name:'Role',exact:true}).selectOption('technician');
+
  await page.getByRole('button',{name:'Save employee',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('User saved.');
- await page.reload();
- await page.waitForLoadState('networkidle');
+ await page.goto('/bdr/admin/settings/people');await page.waitForLoadState('networkidle');
+ const assignment=page.locator('form.assignment').filter({hasText:'Alex Rivera'});
+ await assignment.getByRole('combobox').selectOption('technician');
+ await assignment.getByRole('button',{name:'Assign role',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('Role assigned');
+ await page.goto('/bdr/admin/users');await page.waitForLoadState('networkidle');
  await page.getByRole('button',{name:/Alex Rivera/}).click();
- await expect(page.getByRole('combobox',{name:'Role',exact:true})).toHaveValue('technician');
+ await expect(page.getByRole('combobox',{name:'Role',exact:true})).toHaveCount(0);
  await expect(page.getByLabel('Job title',{exact:true})).toHaveValue('Service technician');
- await expect(page.getByText('Module access is inherited from Technician.')).toBeVisible();
+ await expect(page.getByRole('listitem').filter({hasText:'jobs · Manage'})).toBeVisible();
+ await expect(page.getByText('Module access is inherited from the assigned role.')).toBeVisible();
  await page.getByLabel('First name',{exact:true}).fill('Alexandra');
  await page.getByRole('button',{name:'Save employee',exact:true}).click();
  await expect(page.getByRole('button',{name:/Alexandra Rivera/})).toBeVisible();
  await page.reload();
  await page.waitForLoadState('networkidle');
  await page.getByRole('button',{name:/Alexandra Rivera/}).click();
- await expect(page.getByText('Module access is inherited from Technician.')).toBeVisible();
- await expect(page.getByRole('combobox',{name:'Role',exact:true})).toHaveValue('technician');
+ await expect(page.getByText('Module access is inherited from the assigned role.')).toBeVisible();
+ await expect(page.getByRole('combobox',{name:'Role',exact:true})).toHaveCount(0);
  const violations=(await new AxeBuilder({page}).analyze()).violations.filter(v=>['critical','serious'].includes(v.impact??''));
  expect(violations).toEqual([]);
- await page.getByRole('heading',{name:'People & access',exact:true}).scrollIntoViewIfNeeded();
+ await expect(page.getByRole('dialog',{name:'Employee details'})).toBeVisible();
  await page.screenshot({path:test.info().outputPath('people.png'),fullPage:true});
  await page.getByRole('button',{name:'Delete user',exact:true}).click();
  await page.getByRole('button',{name:'Confirm delete',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('deleted from this company');
+ await page.getByRole('button',{name:'Close employee details',exact:true}).click();
  await page.getByRole('combobox',{name:'Status',exact:true}).selectOption('archived');
  await page.getByRole('button',{name:/Alexandra Rivera/}).click();
  await page.getByRole('button',{name:'Restore user',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('restored');
+ await page.getByRole('button',{name:'Close employee details',exact:true}).click();
  await page.getByRole('combobox',{name:'Status',exact:true}).selectOption('all');
  await expect(page.getByRole('button',{name:/Alexandra Rivera/})).toBeVisible();
  await page.getByRole('button',{name:/Existing Owner/}).click();
  await expect(page.getByRole('button',{name:'Delete user',exact:true})).toBeVisible();
- await expect(page.getByRole('combobox',{name:'Role',exact:true})).toBeDisabled();
+ await expect(page.getByText('Owner — full access',{exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:/Existing Owner/})).toBeFocused();
 });
 
 test('restricted administrators land on an allowed module and retain their session after denial',async({page,context})=>{
@@ -88,6 +98,12 @@ test('settings persist role permissions and teams and employee form uses the sav
  await page.getByRole('button',{name:'Save employee',exact:true}).click();await expect(page.getByRole('status')).toContainText('User saved');
  await page.reload();await page.waitForLoadState('networkidle');await page.getByRole('button',{name:/Team Technician/}).click();await expect(page.getByRole('combobox',{name:'Team',exact:true})).toHaveValue('Field service');
  await page.screenshot({path:test.info().outputPath('employee-details.png'),fullPage:true});
+ await page.goto('/bdr/admin/settings/people');await page.waitForLoadState('networkidle');
+ const assignment=page.locator('form.assignment').filter({hasText:'Team Technician'});
+ await assignment.getByRole('combobox').selectOption('technician');
+ await assignment.getByRole('button',{name:'Assign role',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('Role assigned');
+ await page.reload();await expect(page.getByRole('combobox',{name:'Role for Team Technician',exact:true})).toHaveValue('technician');
 });
 
 test('technician can open Ask Bob and Today while restricted routes stay forbidden',async({page,context,request})=>{

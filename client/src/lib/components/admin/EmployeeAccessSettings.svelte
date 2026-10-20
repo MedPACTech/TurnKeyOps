@@ -1,8 +1,8 @@
 <script lang="ts">
  import { enhance } from '$app/forms';
  import { page } from '$app/state';
- import type { EmployeeAccessConfiguration } from '$lib/server/people';
- let { configuration, version, canManage, form }: { configuration: EmployeeAccessConfiguration; version: string; canManage: boolean; form?: { message?: string; error?: string } | null } = $props();
+ import type { EmployeeAccessConfiguration, Person } from '$lib/server/people';
+ let { configuration, version, canManage, employees = [], form }: { employees?: Person[]; configuration: EmployeeAccessConfiguration; version: string; canManage: boolean; form?: { message?: string; error?: string } | null } = $props();
  let roles = $state<EmployeeAccessConfiguration['roles']>([]);
  let teams = $state<string[]>([]);
  let loaded = $state<string | null>(null);
@@ -28,6 +28,13 @@
  {#if form?.message}<p role="status" class="notice">{form.message}</p>{/if}
  {#if form?.error}<p role="alert" class="error">{form.error}</p>{/if}
  {#if !canManage}<p>Only company owners can change roles and teams.</p>{/if}
+ <section aria-labelledby="assignments-heading"><h2 id="assignments-heading">Employee role assignments</h2><p class="help">Assign a role to give an employee its module access. Create and save new roles below before assigning them.</p>
+ {#each employees as employee (employee.id)}
+ <form class="assignment" method="POST" action="?/assignRole" use:enhance>
+ <input type="hidden" name="id" value={employee.id}/><input type="hidden" name="version" value={employee.version}/>
+ <strong>{employee.firstName} {employee.lastName}</strong>
+ {#if employee.isOwner}<span>Owner — full access</span>{:else}<label>Role for {employee.firstName} {employee.lastName}<select name="employeeRoleId" value={employee.employeeRoleId || ''} disabled={!canManage} required><option value="" disabled>Select a role</option>{#each configuration.roles as role}<option value={role.id}>{role.name}</option>{/each}</select></label>{#if canManage}<button type="submit">Assign role</button>{/if}{/if}
+ </form>{:else}<p class="help">No active employees.</p>{/each}</section>
  <form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { try { await update({ reset: false }); } finally { saving = false; } }; }}>
  <input type="hidden" name="version" value={version}/><input type="hidden" name="configuration" value={JSON.stringify({ roles, teams })}/>
  <fieldset disabled={!canManage || saving}>
@@ -46,5 +53,6 @@
  </fieldset></form>
 </section>
 <style>
+ .assignment{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;padding:1rem 0;border-bottom:1px solid var(--border)}.assignment strong{flex:1;min-width:10rem}.assignment label{margin:0;min-width:12rem}
  .settings{max-width:1000px;margin:auto;color:var(--text-strong)}header{margin:1.5rem 0}h1{font-size:1.8rem;font-weight:750}h2{font-size:1.2rem;font-weight:700;margin:1.5rem 0 .75rem}p,.help{color:var(--text-muted)}.help{font-size:.85rem;margin:.5rem 0 1rem}fieldset{border:0;min-width:0;padding:0}.section-heading{display:flex;align-items:center;justify-content:space-between}.role{border-top:1px solid var(--border);padding:1.5rem 0}.role>label{max-width:360px}.permissions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}label{display:flex;flex-direction:column;gap:.4rem;font-size:.9rem;margin-bottom:.8rem}input,select{background:var(--surface);color:var(--text-strong);border:1px solid var(--input-border);border-radius:6px;padding:.65rem;min-width:0;min-height:44px}button{min-height:44px;padding:.6rem 1rem;border:1px solid var(--border);border-radius:6px;font-weight:600}button:disabled,fieldset:disabled{opacity:.6}.teams>div{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding:.5rem 0}.team-add{display:flex;gap:1rem;align-items:end;margin:1rem 0}.team-add label{margin:0;flex:1}.notice,.error{padding:1rem;margin:1rem 0;background:var(--positive-soft)}.error{background:var(--critical-soft);color:var(--critical-text)}a{text-decoration:underline}@media(max-width:760px){.permissions{grid-template-columns:1fr 1fr}}@media(max-width:480px){.permissions{grid-template-columns:1fr}}
 </style>

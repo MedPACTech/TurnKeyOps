@@ -3,4 +3,4 @@
  import type { PageProps } from './$types';
  let { data, form }: PageProps = $props();
 </script>
-<EmployeeAccessSettings configuration={data.employeeAccess} version={data.version} canManage={data.canManage} {form}/>
+<EmployeeAccessSettings employees={data.employees} configuration={data.employeeAccess} version={data.version} canManage={data.canManage} {form}/>
