@@ -7,6 +7,24 @@ using MedInsights.API.Infrastructure;
 namespace MedInsights.Authorization.Tests;
 public sealed class UserModulePermissionTests
 {
+    [Fact] public void MultipleRolesCombinePermissionsAndRetainMembershipCeiling() {
+        var configuration = EmployeeAccessConfiguration.Default();
+        configuration.Roles = [..configuration.Roles, new() { Id = "dispatcher", Name = "Dispatcher", ModulePermissions = ["invoices.read", "settings.read"] }];
+        var profile = new UserProfile { IsActive = true, EmployeeRoleIds = ["technician", "dispatcher"] };
+        var permissions = UserModulePermissions.Resolve(Member("staff"), profile, configuration);
+        Assert.Contains("jobs.write", permissions);
+        Assert.Contains("invoices.read", permissions);
+        Assert.DoesNotContain("settings.read", permissions);
+        profile.EmployeeRoleIds = ["dispatcher"];
+        permissions = UserModulePermissions.Resolve(Member("staff"), profile, configuration);
+        Assert.DoesNotContain("jobs.read", permissions);
+        Assert.Contains("invoices.read", permissions);
+    }
+    [Fact] public void ExplicitEmptyRoleListDoesNotFallBackToLegacyRoleId() {
+        var profile = new UserProfile { IsActive = true, EmployeeRoleId = "technician", EmployeeRoleIds = [], ModulePermissions = [] };
+        Assert.Empty(UserModulePermissions.RoleIds(profile));
+        Assert.Empty(UserModulePermissions.Resolve(Member("staff"), profile));
+    }
     private static TenantMembership Member(string role = "admin") => new() { Role = role, MembershipStatus = "Active" };
     [Fact] public void LegacyOwnersKeepFullAccess() {
         var m = Member("owner"); m.IsOwner = true;

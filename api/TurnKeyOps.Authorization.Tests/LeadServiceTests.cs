@@ -177,6 +177,13 @@ public sealed class LeadServiceTests
         update.ExpectedVersion=assigned.Version; update.OwnerProfileId=null;
         Assert.Equal("Unassigned",(await f.Service.UpdateAsync(lead.Id,update)).OwnerName);
     }
+    [Fact] public async Task SecondarySalesRoleQualifiesEmployeeForLeadAssignment() {
+        var f = new Fixture(); var id = Guid.NewGuid();
+        f.People.Add(new() { Id = id, ApplicationUserId = id, PartitionKey = Pk, FirstName = "Multi role", IsActive = true, ProfileTypes = ["employee"], EmployeeRoleId = "technician", EmployeeRoleIds = ["technician", "sales"] });
+        f.MemberRows.Add(new() { Id = Guid.NewGuid(), TenantId = Tenant, UserId = id, MembershipStatus = "Active", Role = "staff" });
+        var workspace = await f.Service.WorkspaceAsync();
+        Assert.Single(workspace.Associates!); Assert.Single(workspace.Members);
+    }
     [Fact] public async Task AssignmentCandidatesIncludeOwnersAdminsAndConfiguredSalesButNotTechnicians()
     {
         var f=new Fixture();

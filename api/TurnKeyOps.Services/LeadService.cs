@@ -68,10 +68,11 @@ public sealed partial class LeadService(
         if (profile is not null && (!profile.IsActive || profile.IsDeleted)) return false;
         if (member?.IsOwner == true || member?.Role.Equals("owner", StringComparison.OrdinalIgnoreCase) == true) return true;
         if (profile is not null && !profile.ProfileTypes.Contains("employee") && member?.Role != "admin") return false;
-        var role = !string.IsNullOrEmpty(profile?.EmployeeRoleId)
-            ? roles.Roles.FirstOrDefault(r => r.Id == profile.EmployeeRoleId)?.Name
-            : member?.Role ?? profile?.Role;
-        return role?.Trim().ToLowerInvariant() is "owner" or "admin" or "administrator" or "sales";
+        var assignedIds = UserModulePermissions.RoleIds(profile);
+        var names = assignedIds.Length > 0
+            ? roles.Roles.Where(r => assignedIds.Contains(r.Id)).Select(r => r.Name)
+            : new[] { member?.Role ?? profile?.Role ?? "" };
+        return names.Any(name => name.Trim().ToLowerInvariant() is "owner" or "admin" or "administrator" or "sales");
     }
     private static Guid ProfileUserId(MedInsights.Lib.Entities.UserProfile profile) => profile.ApplicationUserId == Guid.Empty ? profile.Id : profile.ApplicationUserId;
     private static string AssociateName(MedInsights.Lib.Entities.UserProfile? profile, MedInsights.Lib.Entities.TenantMembership? member)

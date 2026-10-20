@@ -1,3 +1,4 @@
+import { personRoleIds } from '$lib/employee-roles';
 import { fail, type RequestEvent } from '@sveltejs/kit';
 import { getTenantSettings, updateTenantSettings } from '$lib/api/tenant-settings';
 import { authTokenCookie } from './auth-session';
@@ -13,13 +14,14 @@ export const actions = { assignRole: async (event: RequestEvent) => {
  try {
   const employees = await peopleRequest<Person[]>(event, '/api/people');
   const person = employees.find(person => person.id === String(form.get('id')) && person.isActive && person.profileTypes.includes('employee'));
-  if (!person || person.isOwner) return fail(400, { error: 'Choose an active employee. Owners retain full access.' });
+  if (!person) return fail(400, { error: 'Choose an active employee.' });
   const employeeRoleId = String(form.get('employeeRoleId') || '');
   if (!employeeRoleId) return fail(400, { error: 'Choose a role.' });
+  const employeeRoleIds = form.get('operation') === 'remove' ? personRoleIds(person).filter(id => id !== employeeRoleId) : [...new Set([...personRoleIds(person), employeeRoleId])];
   await peopleRequest(event, `/api/people/${encodeURIComponent(person.id)}`, { method: 'PUT', body: JSON.stringify({
    firstName: person.firstName, lastName: person.lastName, contactEmail: person.contactEmail, contactPhone: person.contactPhone,
    profileTypes: ['employee'], title: person.title, team: person.team, customerId: person.customerId,
-   employeeRoleId, modulePermissions: null, expectedVersion: String(form.get('version') || '')
+   employeeRoleId: employeeRoleIds[0] || null, employeeRoleIds, modulePermissions: person.isOwner || employeeRoleIds.length ? null : [], expectedVersion: String(form.get('version') || '')
   }) });
   return { message: 'Role assigned. Module access now follows this role.' };
  } catch (cause) { const error = cause as { status?: number; body?: { message?: string }; message?: string }; return fail(error.status || 400, { error: error.body?.message || error.message || 'Could not assign role.' }); }

@@ -36,6 +36,7 @@ namespace MedInsights.Lib.Entities
         public string? CompanyName { get; set; }
         public string? Team { get; set; }
         public string? EmployeeRoleId { get; set; }
+        public string[]? EmployeeRoleIds { get; set; }
         public string? ContactNotes { get; set; }
         public Guid? CustomerId { get; set; }
         public string? ContactEmail { get; set; }

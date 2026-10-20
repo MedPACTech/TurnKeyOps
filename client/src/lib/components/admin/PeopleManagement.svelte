@@ -1,5 +1,6 @@
 <script lang="ts">
  import { untrack, type Snippet } from 'svelte';
+ import { personRoleIds } from '$lib/employee-roles';
  import AdminDrawer from './AdminDrawer.svelte';
  import PersonAvatar from '$lib/components/people/PersonAvatar.svelte';
  import { page } from '$app/state';
@@ -11,10 +12,11 @@
  let lastRequestedId = $state<string|null>(null);
  $effect(()=>{const id=page.url.searchParams.get('person');if(id && id!==lastRequestedId && people.some(p=>p.id===id)){lastRequestedId=id;open(people.find(p=>p.id===id));}});
  const selected = $derived(people.find(p=>p.id===selectedId));
- const rolePermissions = $derived(employeeAccess.roles.find(role=>role.id===selected?.employeeRoleId)?.modulePermissions ?? selected?.effectivePermissions ?? []);
+ let assignedRoleIds = $state<string[]>([]);
+ const rolePermissions = $derived(personRoleIds(selected).length ? [...new Set(employeeAccess.roles.filter(role=>personRoleIds(selected).includes(role.id)).flatMap(role=>role.modulePermissions))] : selected?.effectivePermissions ?? []);
  $effect(() => { if (form?.savedId && people.some(p=>p.id===form.savedId)) {selectedId=form.savedId;creating=false;} });
  const visible = $derived(people.filter(p => p.profileTypes.includes('employee') && (filter === 'archived' ? !p.isActive : p.isActive) && `${p.firstName} ${p.lastName} ${p.contactEmail ?? ''} ${p.contactPhone ?? ''}`.toLowerCase().includes(query.toLowerCase())));
- function open(p?: Person) { confirmDelete=false; selectedId=p?.id ?? null; creating=!p; }
+ function open(p?: Person) { confirmDelete=false; selectedId=p?.id ?? null; creating=!p; assignedRoleIds=[...personRoleIds(p)]; }
  const submit = () => { pending=true; return async ({update}: {update:(options?: {reset?: boolean})=>Promise<void>})=>{try {await update({reset:false});} finally {pending=false;}}; };
 </script>
 <svelte:head><title>People & access</title></svelte:head>
@@ -30,7 +32,7 @@
  <div class="table-scroll"><table><caption class="sr-only">Employee directory</caption><thead><tr><th>Employee</th><th>Contact</th><th>Job title</th><th>Team</th><th>Role</th><th>App access</th></tr></thead><tbody>
  {#each visible as person (person.id)}<tr class:selected={selectedId===person.id}>
  <td><button class="person" onclick={()=>open(person)}><PersonAvatar name={`${person.firstName} ${person.lastName}`} identity={person.id}/><strong>{`${person.firstName} ${person.lastName}`.trim() || person.contactEmail || person.contactPhone || 'Unnamed user'}</strong></button></td>
- <td>{person.contactEmail || '—'}{#if person.contactPhone}<small>{person.contactPhone}</small>{/if}</td><td>{person.title || '—'}</td><td>{person.team || '—'}</td><td>{person.isOwner ? 'Owner' : employeeAccess.roles.find(role=>role.id===person.employeeRoleId)?.name || (person.membershipId ? person.role || 'Existing access policy' : 'Unassigned')}</td><td>{!person.isActive ? 'Archived' : person.membershipId ? 'Active' : 'Not activated'}</td>
+ <td>{person.contactEmail || '—'}{#if person.contactPhone}<small>{person.contactPhone}</small>{/if}</td><td>{person.title || '—'}</td><td>{person.team || '—'}</td><td>{person.isOwner ? 'Owner' : employeeAccess.roles.filter(role=>personRoleIds(person).includes(role.id)).map(role=>role.name).join(', ') || (person.membershipId ? person.role || 'Existing access policy' : 'Unassigned')}</td><td>{!person.isActive ? 'Archived' : person.membershipId ? 'Active' : 'Not activated'}</td>
  </tr>{:else}<tr><td colspan="6" class="empty">No employees match this view.</td></tr>{/each}
  </tbody></table></div>
  {#if creating || selected}
@@ -50,12 +52,13 @@
  <p class="help">Contact details are company records. They do not change verified sign-in credentials.</p>
  <label>Job title<input name="title" maxlength="200" value={selected?.title ?? ''}/></label>
  <div class="fields">
- <input type="hidden" name="employeeRoleId" value={selected?.employeeRoleId ?? ''}/>
+ {#if !canDelete}{#each personRoleIds(selected) as id}<input type="hidden" name="employeeRoleIds" value={id}/>{/each}{/if}
+ <div class="roles"><h3>Roles</h3>{#each employeeAccess.roles as role}<label class="role-choice"><input type="checkbox" name="employeeRoleIds" value={role.id} bind:group={assignedRoleIds} disabled={!canDelete}/>{role.name}</label>{/each}<p class="help">Module access combines permissions from all assigned roles.</p></div>
  <label>Team<select aria-label="Team" name="team" value={selected?.team ?? ''}><option value="">No team</option>
  {#if selected?.team && !employeeAccess.teams.includes(selected.team)}<option value={selected.team}>{selected.team}</option>{/if}
  {#each employeeAccess.teams as team}<option value={team}>{team}</option>{/each}
  </select></label></div>
- {#if selected}<section class="access"><h3>Role & module access</h3><p>{selected.isOwner ? 'Owner — full access' : employeeAccess.roles.find(role=>role.id===selected.employeeRoleId)?.name || (selected.membershipId ? selected.role || 'Existing access policy' : 'Unassigned')}</p><p class="help">{selected.isOwner ? 'Owners have access to every module.' : selected.employeeRoleId ? 'Module access is inherited from the assigned role.' : selected.membershipId ? 'This employee uses an existing access policy. Assign a role in Settings to manage module access.' : 'No module access. Assign a role in Settings.'}</p><ul>{#each (selected.isOwner ? [] : rolePermissions.filter(permission=>permission.endsWith('.read'))) as permission}<li>{permission.split('.')[0] === 'bob' ? 'Ask Bob / Today' : permission.split('.')[0]}{permission === 'estimates.read' && rolePermissions.includes('estimates.submit') && !rolePermissions.includes('estimates.manage') ? ' · Draft and submit' : rolePermissions.includes(`${permission.split('.')[0]}.write`) ? ' · Manage' : ' · View'}</li>{/each}</ul></section>{/if}
+ {#if selected}<section class="access"><h3>Role & module access</h3><p>{selected.isOwner ? 'Owner — full access' : employeeAccess.roles.filter(role=>personRoleIds(selected).includes(role.id)).map(role=>role.name).join(', ') || (selected.membershipId ? selected.role || 'Existing access policy' : 'Unassigned')}</p><p class="help">{selected.isOwner ? 'Owners have access to every module.' : personRoleIds(selected).length ? 'Module access is inherited from the assigned role.' : selected.membershipId ? 'This employee uses an existing access policy. Assign a role in Settings to manage module access.' : 'No module access. Assign a role in Settings.'}</p><ul>{#each (selected.isOwner ? [] : rolePermissions.filter(permission=>permission.endsWith('.read'))) as permission}<li>{permission.split('.')[0] === 'bob' ? 'Ask Bob / Today' : permission.split('.')[0]}{permission === 'estimates.read' && rolePermissions.includes('estimates.submit') && !rolePermissions.includes('estimates.manage') ? ' · Draft and submit' : rolePermissions.includes(`${permission.split('.')[0]}.write`) ? ' · Manage' : ' · View'}</li>{/each}</ul></section>{/if}
  {#if canManagePortal}<p class="help"><a href={`${page.url.pathname.replace(/\/users$/, '')}/settings/people`}>Manage roles, assignments, and teams in Settings</a></p>{/if}
  <button class="btn-primary" type="submit">{pending ? 'Saving…':'Save employee'}</button></fieldset></form>
  {#if selected && personDetails}{@render personDetails(selected)}{/if}
@@ -74,5 +77,6 @@
  </div></AdminDrawer>{/if}
 </section>
 <style>
+ .roles{grid-column:1 / -1}.role-choice{display:flex;flex-direction:row;align-items:center;gap:.5rem}.role-choice input{width:1rem;height:1rem}
  .people{width:100%;color:var(--text-strong)}header{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:2rem}h1{font-size:1.8rem;font-weight:750}h3{font-weight:700;margin:1.5rem 0 .75rem}.eyebrow{text-transform:uppercase;font-size:.7rem;letter-spacing:.15em}p,.help{color:var(--text-muted)}.help{font-size:.85rem;margin:.5rem 0 1rem}.filters{display:flex;gap:1rem;margin-bottom:1rem}.filters label:first-child{flex:1;max-width:32rem}.table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface)}table{width:100%;border-collapse:collapse;text-align:left}th{font-size:.8rem;color:var(--text-muted);font-weight:600}th,td{padding:1rem;border-bottom:1px solid var(--border);white-space:nowrap}tbody tr:last-child td{border-bottom:0}small{display:block;color:var(--text-muted);margin-top:.25rem}.person{display:flex;align-items:center;gap:.75rem;background:transparent;color:var(--text-strong);border:0;padding:0;text-align:left}.person:hover strong{text-decoration:underline}.selected{background:var(--teal-soft)}.fields{display:grid;grid-template-columns:1fr 1fr;gap:1rem}label{display:flex;flex-direction:column;gap:.4rem;font-size:.85rem;margin-bottom:.8rem}input,select{border:1px solid var(--input-border);border-radius:6px;padding:.65rem;min-width:0;background:var(--surface);color:var(--text-strong)}button{border:1px solid var(--input-border);border-radius:6px;padding:.65rem 1rem;background:var(--cta);color:var(--cta-text);font-weight:600}button:disabled,fieldset:disabled{opacity:.6}fieldset{border:0;padding:0;min-width:0}.notice{background:var(--positive-soft);padding:1rem;margin-bottom:1rem;border-radius:8px;overflow-wrap:anywhere}.error{background:var(--critical-soft);color:var(--critical-text)}.empty{padding:1.5rem}.removal,.access{border-top:1px solid var(--border);margin-top:1rem}.danger{background:var(--surface);color:var(--critical-text);margin-top:.5rem}.delete-actions{display:flex;gap:.75rem}.secondary{background:var(--surface);color:var(--text-base)}a{text-decoration:underline}li{text-transform:capitalize;font-size:.85rem;margin:.35rem 0}button:focus-visible{outline:2px solid var(--focus-ring);outline-offset:3px}@media(max-width:640px){.fields{grid-template-columns:1fr}header,.filters{align-items:stretch;flex-direction:column}}
 </style>

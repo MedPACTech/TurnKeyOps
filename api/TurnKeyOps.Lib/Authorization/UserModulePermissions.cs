@@ -23,19 +23,21 @@ public static class UserModulePermissions
             "billing_admin" => new[] { "billing" },
             _ => Array.Empty<string>()
         };
-        var assignedRole = profile?.EmployeeRoleId is { Length: > 0 } roleId ? (configuration ?? EmployeeAccessConfiguration.Default()).Roles.FirstOrDefault(r => r.Id == roleId) : null;
-        if (!string.IsNullOrEmpty(profile?.EmployeeRoleId) && assignedRole is null) return [];
+        var roleIds = RoleIds(profile);
+        var assignedRoles = (configuration ?? EmployeeAccessConfiguration.Default()).Roles.Where(r => roleIds.Contains(r.Id)).ToArray();
+        if (roleIds.Length > 0 && assignedRoles.Length == 0) return [];
         var allowed = defaults.SelectMany(m => new[] { m + ".read", m + ".write" }).Concat(PayrollActions.Where(p => role=="admin" || p is not ("payroll.admin" or "payroll.compensation.read"))).ToArray();
-        if (assignedRole is null && profile?.ModulePermissions is null && role is not ("owner" or "admin")) allowed = allowed.Where(p => !p.StartsWith("inventory.") && !p.StartsWith("purchasing.") && !p.StartsWith("finance.") && !p.StartsWith("payroll.") && !p.StartsWith("time.")).ToArray();
+        if (roleIds.Length == 0 && profile?.ModulePermissions is null && role is not ("owner" or "admin")) allowed = allowed.Where(p => !p.StartsWith("inventory.") && !p.StartsWith("purchasing.") && !p.StartsWith("finance.") && !p.StartsWith("payroll.") && !p.StartsWith("time.")).ToArray();
         if(profile?.ModulePermissions is null)allowed=allowed.Where(p=>p is not("payroll.admin" or "payroll.compensation.read")).ToArray();
         if (allowed.Contains("estimates.write")) allowed = allowed.Concat(EstimateActions).ToArray();
-        if (assignedRole is not null) allowed = allowed.Intersect(assignedRole.ModulePermissions, StringComparer.Ordinal).ToArray();
+        if (roleIds.Length > 0) allowed = allowed.Intersect(assignedRoles.SelectMany(r => r.ModulePermissions), StringComparer.Ordinal).ToArray();
         if (profile?.ModulePermissions is null) return allowed;
         var overrides = profile.ModulePermissions.AsEnumerable();
         // Preserve the meaning of existing write overrides before employee roles were introduced.
-        if (assignedRole is null && profile.ModulePermissions.Contains("estimates.write")) overrides = overrides.Concat(EstimateActions);
+        if (roleIds.Length == 0 && profile.ModulePermissions.Contains("estimates.write")) overrides = overrides.Concat(EstimateActions);
         return allowed.Intersect(overrides, StringComparer.Ordinal).ToArray();
     }
+    public static string[] RoleIds(UserProfile? profile) => profile?.EmployeeRoleIds ?? (string.IsNullOrEmpty(profile?.EmployeeRoleId) ? [] : [profile.EmployeeRoleId]);
     public static bool Allows(IEnumerable<string> permissions, string module, bool write)
     {
         var set = permissions.ToHashSet(StringComparer.Ordinal);
