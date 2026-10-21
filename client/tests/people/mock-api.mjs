@@ -49,7 +49,7 @@ http.createServer(async(req,res)=>{
  if(url.pathname==='/api/TenantMembership'||url.pathname==='/api/Invite')return send([]);
  if(url.pathname==='/api/contacts' && req.method==='GET')return send(people.filter(p=>p.isActive&&p.profileTypes.some(t=>['customer','vendor'].includes(t))));
  if(url.pathname.startsWith('/api/contacts/')&&url.pathname.endsWith('/work'))return send({jobs:[],invoices:[],canViewJobs:!claims.fixtureContacts,canViewInvoices:!claims.fixtureContacts});
- if(url.pathname==='/api/people' && req.method==='GET')return send(people);
+ if(url.pathname==='/api/people' && req.method==='GET')return send(people.map(person=>({...person,team:employeeAccess.teamAliases?.[person.team] ?? person.team,teams:(person.teams ?? (person.team ? [person.team] : [])).map(team=>employeeAccess.teamAliases?.[team] ?? team)})));
  let raw='';for await(const chunk of req)raw+=chunk;
  const input=raw?JSON.parse(raw):{};
  if(url.pathname==='/api/admin/tenant-settings/employee-access'&&req.method==='PUT'){

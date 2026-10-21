@@ -50,10 +50,11 @@ public sealed class ManagedProfileStorageTests
         try {
             await store.AddAsync(tenant, new UserProfile { Id=id, ApplicationUserId=id, PartitionKey=pk, RowKey=rk,
                 FirstName="Storage fixture", Role="admin", IsActive=true, ProfileTypes=["employee","vendor"],
-                ModulePermissions=["jobs.read"] }, default);
+                ModulePermissions=["jobs.read"], Teams=["Residential", "Commercial"] }, default);
             var saved = (await store.GetByKeysAsync(pk,rk,default))!;
             Assert.Equal(new[]{"employee","vendor"}, saved.ProfileTypes);
             Assert.Equal(new[]{"jobs.read"}, saved.ModulePermissions);
+            Assert.Equal(new[]{"Residential", "Commercial"}, saved.Teams);
             var oldVersion = saved.ETag;
             Assert.False(string.IsNullOrWhiteSpace(oldVersion.ToString()));
             saved.ModulePermissions=[]; saved.IsActive=false; saved.IsDeleted=true;

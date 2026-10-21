@@ -1,6 +1,6 @@
 <script lang="ts">
  import { untrack, type Snippet } from 'svelte';
- import { personRoleIds } from '$lib/employee-roles';
+ import { personRoleIds, personTeams } from '$lib/employee-roles';
  import AdminDrawer from './AdminDrawer.svelte';
  import PersonAvatar from '$lib/components/people/PersonAvatar.svelte';
  import { page } from '$app/state';
@@ -13,10 +13,11 @@
  $effect(()=>{const id=page.url.searchParams.get('person');if(id && id!==lastRequestedId && people.some(p=>p.id===id)){lastRequestedId=id;open(people.find(p=>p.id===id));}});
  const selected = $derived(people.find(p=>p.id===selectedId));
  let assignedRoleIds = $state<string[]>([]);
+ let assignedTeams = $state<string[]>([]);
  const rolePermissions = $derived(personRoleIds(selected).length ? [...new Set(employeeAccess.roles.filter(role=>personRoleIds(selected).includes(role.id)).flatMap(role=>role.modulePermissions))] : selected?.effectivePermissions ?? []);
  $effect(() => { if (form?.savedId && people.some(p=>p.id===form.savedId)) {selectedId=form.savedId;creating=false;} });
  const visible = $derived(people.filter(p => p.profileTypes.includes('employee') && (filter === 'archived' ? !p.isActive : p.isActive) && `${p.firstName} ${p.lastName} ${p.contactEmail ?? ''} ${p.contactPhone ?? ''}`.toLowerCase().includes(query.toLowerCase())));
- function open(p?: Person) { confirmDelete=false; selectedId=p?.id ?? null; creating=!p; assignedRoleIds=[...personRoleIds(p)]; }
+ function open(p?: Person) { confirmDelete=false; selectedId=p?.id ?? null; creating=!p; assignedRoleIds=[...personRoleIds(p)]; assignedTeams=[...personTeams(p)]; }
  const submit = () => { pending=true; return async ({update}: {update:(options?: {reset?: boolean})=>Promise<void>})=>{try {await update({reset:false});} finally {pending=false;}}; };
 </script>
 <svelte:head><title>People & access</title></svelte:head>
@@ -32,7 +33,7 @@
  <div class="table-scroll"><table><caption class="sr-only">Employee directory</caption><thead><tr><th>Employee</th><th>Contact</th><th>Job title</th><th>Team</th><th>Role</th><th>App access</th></tr></thead><tbody>
  {#each visible as person (person.id)}<tr class:selected={selectedId===person.id}>
  <td><button class="person" onclick={()=>open(person)}><PersonAvatar name={`${person.firstName} ${person.lastName}`} identity={person.id}/><strong>{`${person.firstName} ${person.lastName}`.trim() || person.contactEmail || person.contactPhone || 'Unnamed user'}</strong></button></td>
- <td>{person.contactEmail || '—'}{#if person.contactPhone}<small>{person.contactPhone}</small>{/if}</td><td>{person.title || '—'}</td><td>{person.team || '—'}</td><td>{person.isOwner ? 'Owner' : employeeAccess.roles.filter(role=>personRoleIds(person).includes(role.id)).map(role=>role.name).join(', ') || (person.membershipId ? person.role || 'Existing access policy' : 'Unassigned')}</td><td>{!person.isActive ? 'Archived' : person.membershipId ? 'Active' : 'Not activated'}</td>
+ <td>{person.contactEmail || '—'}{#if person.contactPhone}<small>{person.contactPhone}</small>{/if}</td><td>{person.title || '—'}</td><td>{personTeams(person).join(', ') || '—'}</td><td>{person.isOwner ? 'Owner' : employeeAccess.roles.filter(role=>personRoleIds(person).includes(role.id)).map(role=>role.name).join(', ') || (person.membershipId ? person.role || 'Existing access policy' : 'Unassigned')}</td><td>{!person.isActive ? 'Archived' : person.membershipId ? 'Active' : 'Not activated'}</td>
  </tr>{:else}<tr><td colspan="6" class="empty">No employees match this view.</td></tr>{/each}
  </tbody></table></div>
  {#if creating || selected}
@@ -54,10 +55,7 @@
  <div class="fields">
  {#if !canDelete}{#each personRoleIds(selected) as id}<input type="hidden" name="employeeRoleIds" value={id}/>{/each}{/if}
  <div class="roles"><h3>Roles</h3>{#each employeeAccess.roles as role}<label class="role-choice"><input type="checkbox" name="employeeRoleIds" value={role.id} bind:group={assignedRoleIds} disabled={!canDelete}/>{role.name}</label>{/each}<p class="help">Module access combines permissions from all assigned roles.</p></div>
- <label>Team<select aria-label="Team" name="team" value={selected?.team ?? ''}><option value="">No team</option>
- {#if selected?.team && !employeeAccess.teams.includes(selected.team)}<option value={selected.team}>{selected.team}</option>{/if}
- {#each employeeAccess.teams as team}<option value={team}>{team}</option>{/each}
- </select></label></div>
+ <div class="teams"><h3>Teams</h3>{#each [...new Set([...employeeAccess.teams,...personTeams(selected)])] as team}<label class="role-choice"><input type="checkbox" name="teams" value={team} bind:group={assignedTeams}/>{team}</label>{:else}<p class="help">No teams configured.</p>{/each}</div></div>
  {#if selected}<section class="access"><h3>Role & module access</h3><p>{selected.isOwner ? 'Owner — full access' : employeeAccess.roles.filter(role=>personRoleIds(selected).includes(role.id)).map(role=>role.name).join(', ') || (selected.membershipId ? selected.role || 'Existing access policy' : 'Unassigned')}</p><p class="help">{selected.isOwner ? 'Owners have access to every module.' : personRoleIds(selected).length ? 'Module access is inherited from the assigned role.' : selected.membershipId ? 'This employee uses an existing access policy. Assign a role in Settings to manage module access.' : 'No module access. Assign a role in Settings.'}</p><ul>{#each (selected.isOwner ? [] : rolePermissions.filter(permission=>permission.endsWith('.read'))) as permission}<li>{permission.split('.')[0] === 'bob' ? 'Ask Bob / Today' : permission.split('.')[0]}{permission === 'estimates.read' && rolePermissions.includes('estimates.submit') && !rolePermissions.includes('estimates.manage') ? ' · Draft and submit' : rolePermissions.includes(`${permission.split('.')[0]}.write`) ? ' · Manage' : ' · View'}</li>{/each}</ul></section>{/if}
  {#if canManagePortal}<p class="help"><a href={`${page.url.pathname.replace(/\/users$/, '')}/settings/people`}>Manage roles, assignments, and teams in Settings</a></p>{/if}
  <button class="btn-primary" type="submit">{pending ? 'Saving…':'Save employee'}</button></fieldset></form>

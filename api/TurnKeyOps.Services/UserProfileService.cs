@@ -95,6 +95,7 @@ namespace MedInsights.Services
             entity.ProfileTypes = existingEntity.ProfileTypes;
             entity.CompanyName = existingEntity.CompanyName;
             entity.Team = existingEntity.Team;
+            entity.Teams = existingEntity.Teams;
             entity.CustomerId = existingEntity.CustomerId;
             entity.ContactEmail = existingEntity.ContactEmail;
             entity.ContactPhone = existingEntity.ContactPhone;

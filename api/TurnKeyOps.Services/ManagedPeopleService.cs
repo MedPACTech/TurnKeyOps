@@ -102,11 +102,13 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
         if (contact is null && id == user.UserId && input.ModulePermissions is not null) throw new ArgumentException("You cannot restrict your own access.");
         var configuration = await access.ConfigurationAsync(ct);
         var roleIds = (input.EmployeeRoleIds ?? (string.IsNullOrEmpty(input.EmployeeRoleId) ? Array.Empty<string>() : [input.EmployeeRoleId])).Distinct().Order().ToArray();
+        var teams = (input.Teams ?? (input.Team is not null ? (string.IsNullOrWhiteSpace(input.Team) ? [] : new[] { input.Team }) : existing?.Teams ?? (string.IsNullOrEmpty(existing?.Team) ? [] : new[] { existing.Team })))
+            .Select(t => configuration.ResolveTeam(t.Trim())!).Distinct().ToArray();
         var rolesChanged = !roleIds.ToHashSet().SetEquals(UserModulePermissions.RoleIds(existing));
         if (contact is null) {
             if (existing is null && membership is null && roleIds.Length == 0) input.ModulePermissions = [];
             if (roleIds.Any(id => !configuration.Roles.Any(r => r.Id == id))) throw new ArgumentException("Choose a configured employee role.");
-            if (!string.IsNullOrEmpty(input.Team) && input.Team != existing?.Team && !configuration.Teams.Contains(input.Team)) throw new ArgumentException("Choose a team configured in Settings.");
+            if (teams.Any(team => !configuration.Teams.Contains(team) && !(existing?.Teams ?? (string.IsNullOrEmpty(existing?.Team) ? [] : new[] { existing.Team })).Select(t => configuration.ResolveTeam(t)).Contains(team))) throw new ArgumentException("Choose a team configured in Settings.");
             if (id == user.UserId && !owner && rolesChanged) throw new ArgumentException("Another owner must change your role.");
         }
         var currentPermissions = await access.GetAsync(ct);
@@ -127,7 +129,7 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
             : p.ProfileTypes.Where(t => t == "employee").Concat(input.ProfileTypes).Distinct().ToArray();
         if (contact is not null) { p.CompanyName = input.CompanyName?.Trim(); p.CustomerId = input.CustomerId; }
         if (contact is null) {
-            p.Title = input.Title?.Trim(); p.Team = input.Team?.Trim(); p.EmployeeRoleIds = roleIds; p.EmployeeRoleId = roleIds.FirstOrDefault();
+            p.Title = input.Title?.Trim(); p.Teams = teams; p.Team = teams.FirstOrDefault(); p.EmployeeRoleIds = roleIds; p.EmployeeRoleId = roleIds.FirstOrDefault();
             if (rolesChanged || input.EmployeeRoleIds is not null && roleIds.Length > 0) input.ModulePermissions = owner || roleIds.Length > 0 ? null : [];
             p.ModulePermissions = UserModulePermissions.Validate(input.ModulePermissions);
         } else {
@@ -267,11 +269,13 @@ public sealed class ManagedPeopleService(IManagedProfileStore profiles,
             throw new ArgumentException("Enter a valid contact email.");
         if (new[] { input.ContactPhone, input.CompanyName, input.Title, input.Team }.Any(s => s?.Length > 200))
             throw new ArgumentException("Contact and business details must be at most 200 characters.");
+        if (input.Teams is not null && (input.Teams.Length > 100 || input.Teams.Any(t => string.IsNullOrWhiteSpace(t) || t.Length > 100)))
+            throw new ArgumentException("Choose at most 100 teams with names of at most 100 characters.");
         UserModulePermissions.Validate(input.ModulePermissions);
     }
     private ManagedPersonDto View(UserProfile p, TenantMembership? m, EmployeeAccessConfiguration? configuration = null) => new(p.Id, p.FirstName, p.LastName,
         p.ContactEmail ?? p.PrimaryEmail ?? m?.InvitedEmail, p.ContactPhone ?? p.PrimaryPhone ?? m?.InvitedPhone,
         p.ProfileTypes.Length == 0 && (m?.Role ?? p.Role) is "owner" or "admin" or "staff" or "member" ? ["employee"] : p.ProfileTypes,
-        p.CompanyName, p.Title, p.Team, p.CustomerId, p.ModulePermissions,
-        UserModulePermissions.Resolve(m,p,configuration), m?.Role, m?.Id, m?.IsOwner == true || m?.Role == "owner", p.IsActive, p.ETag.ToString(), p.EmployeeRoleId, UserModulePermissions.RoleIds(p));
+        p.CompanyName, p.Title, configuration?.ResolveTeam(p.Team) ?? p.Team, p.CustomerId, p.ModulePermissions,
+        UserModulePermissions.Resolve(m,p,configuration), m?.Role, m?.Id, m?.IsOwner == true || m?.Role == "owner", p.IsActive, p.ETag.ToString(), p.EmployeeRoleId, UserModulePermissions.RoleIds(p), (p.Teams ?? (string.IsNullOrEmpty(p.Team) ? [] : new[] { p.Team })).Select(t => configuration?.ResolveTeam(t) ?? t).Distinct().ToArray());
 }

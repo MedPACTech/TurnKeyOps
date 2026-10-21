@@ -3,7 +3,7 @@ import { authTokenCookie, getAuthApiBaseUrl } from './auth-session';
 import type { RequestEvent } from '@sveltejs/kit';
 
 export type Person = { id: string; firstName: string; lastName: string; contactEmail?: string; contactPhone?: string;
- profileTypes: string[]; companyName?: string; title?: string; team?: string; customerId?: string;
+ profileTypes: string[]; companyName?: string; title?: string; team?: string; teams?: string[]; customerId?: string;
  employeeRoleIds?: string[]; employeeRoleId?: string; modulePermissions: string[] | null; effectivePermissions: string[]; role?: string; membershipId?: string;
  isOwner: boolean; isActive: boolean; version: string };
 export const modules = ['dashboard','bob','calendar','jobs','leads','requests','estimates','invoices','contacts','users','settings','billing','inventory','purchasing','finance','payroll'];
@@ -18,7 +18,7 @@ export async function peopleRequest<T>(event: Pick<RequestEvent, 'fetch' | 'cook
  if (!response.ok) throw error(response.status, payload?.error || payload?.errors?.map((e: {message?: string}) => e.message).join(', ') || payload?.message || 'Could not save the user.');
  return payload && 'data' in payload ? payload.data : payload;
 }
-export type EmployeeAccessConfiguration = { roles: { id: string; name: string; modulePermissions: string[] }[]; teams: string[] };
+export type EmployeeAccessConfiguration = { roles: { id: string; name: string; modulePermissions: string[] }[]; teams: string[]; teamAliases?: Record<string,string> };
 export const loadPeople = async (event: RequestEvent) => ({
  ...(await peopleRequest<{canDeleteUsers:boolean}>(event, '/api/people/capabilities')),
  people: await peopleRequest<Person[]>(event, '/api/people'),
@@ -47,7 +47,7 @@ export const peopleActions = {
   const permissions = employeeRoleIds.length ? null : JSON.parse(text(d, 'existingPermissions') || 'null');
   const person = await peopleRequest<Person>(event, `/api/people${id ? '/'+encodeURIComponent(id) : ''}`, {method:id ? 'PUT':'POST', body:JSON.stringify({
    firstName:text(d,'firstName'),lastName:text(d,'lastName'),contactEmail:text(d,'contactEmail') || null,contactPhone:text(d,'contactPhone') || null,
-   loginIdentifier:text(d,'loginIdentifier') || null,profileTypes:['employee'],employeeRoleId,employeeRoleIds,title:text(d,'title'),team:text(d,'team'),
+   loginIdentifier:text(d,'loginIdentifier') || null,profileTypes:['employee'],employeeRoleId,employeeRoleIds,title:text(d,'title'),teams:d.getAll('teams').map(String).filter(Boolean),
    customerId:text(d,'customerId') || null,modulePermissions:permissions,expectedVersion:text(d,'version')
   })});
   return {message:'User saved.',savedId:person.id};
