@@ -44,6 +44,18 @@ test('unknown hosts, auth and assets retain existing behavior', () => {
 });
 
 
+test('TurnKeyOps Carl Zipf demo address serves the public homepage', () => {
+ for (const host of ['turnkeyops.ai', 'www.turnkeyops.ai']) {
+  for (const path of ['/carlzipf', '/carlzipf/']) {
+   assert.equal(resolveProductionPathname(host, path), '/carlzipf/public');
+  }
+  assert.equal(resolveProductionPathname(host, '/carlzipf/public/residential'), '/carlzipf/public/residential');
+  assert.equal(resolveProductionPathname(host, '/carlzipf/admin'), '/carlzipf/admin');
+ }
+ assert.equal(resolveProductionRedirect(new URL('https://turnkeyops.ai/carlzipf?source=demo')), null);
+ assert.equal(resolveProductionPathname('bdrconcrete.com', '/carlzipf'), '/bdr/public/carlzipf');
+});
+
 test('Carl Zipf routes and aliases remain isolated from BDR', () => {
  assert.equal(resolveProductionPathname('carlzipflockshop.com', '/'), '/carlzipf/public');
  assert.equal(resolveProductionPathname('carlzipflockshop.com', '/residential'), '/carlzipf/public/residential');

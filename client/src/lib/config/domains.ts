@@ -81,6 +81,9 @@ export const shouldBypassDomainReroute = (pathname: string) =>
 
 export const resolveProductionPathname = (hostname: string, pathname: string) => {
 	const domain = getProductionDomain(hostname);
+	if (domain?.surface === 'turnkeyops-public' && /^\/carlzipf\/?$/.test(pathname)) {
+		return '/carlzipf/public';
+	}
 	if (!domain || shouldBypassDomainReroute(pathname)) {
 		return pathname;
 	}
