@@ -9,7 +9,7 @@ const value = (data: FormData, key: string) => String(data.get(key) ?? '').trim(
 const services = ['replacement', 'hardware', 'repair', 'rekey', 'electronic', 'sourcing'];
 export const load = async ({ url, fetch }) => ({
  content: await loadCarlZipfContent(fetch),
- publicBase: url.pathname.startsWith('/carlzipf/') ? '/carlzipf/public' : '',
+ publicBase: /^\/carlzipf(?:\/|$)/.test(url.pathname) ? '/carlzipf/public' : '',
  canonicalOrigin: url.origin,
  submissionId: crypto.randomUUID(),
  submitted: url.searchParams.get('submitted') === '1',
