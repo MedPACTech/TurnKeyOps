@@ -1,12 +1,12 @@
 # Employees, roles, and company access
 
-**People & Access** is the employee directory for BDR, Think Pink, and Carl Zipf. Search and status filters sit above a full-width table; selecting an employee opens a right-hand details drawer. Employee fields are name, contact details, job title, Roles, and Team. Creating an employee automatically adds the employee profile. Company, Customer/Vendor classification, customer-account links, and customer portal access belong in **Contacts**, not the employee editor.
+**People & Access** is the employee directory for BDR, Think Pink, and Carl Zipf. Search and status filters sit above a full-width table; selecting an employee opens a right-hand details drawer. Employee fields are name, contact details, job title, Roles, and Teams. Creating an employee automatically adds the employee profile. Company, Customer/Vendor classification, customer-account links, and customer portal access belong in **Contacts**, not the employee editor.
 
 An identity can still have both employee and contact records. Editing employee details preserves its existing customer/vendor profile, company, customer link, and verified sign-in credentials. Customer/vendor-only contacts do not appear in People & Access.
 
 ## Roles and teams
 
-Open **Settings → Roles & teams** (`/{tenant}/admin/settings/people`). Company owners can create and rename roles, configure module access, and add or remove team names. Changes use a separate, tenant-scoped `employee-access` settings document with conditional versions and audit history. Team names must be unique. Existing employee team names remain visible after removal from the catalog; new assignments must use configured names.
+Open **Settings → Roles & teams** (`/{tenant}/admin/settings/people`). Company owners can create and rename roles, configure module access, and create or rename teams. Changes use a separate, tenant-scoped `employee-access` settings document with conditional versions and audit history. Teams use a table with active employee counts and Edit and Assignments drawers. Assignments can be added or removed from the team drawer or changed on an employee profile. Employees can belong to multiple teams. Adding or removing one membership preserves their other teams. Both Edit and Assignments drawers show current members and support adding and removing members. Renames preserve assignments through the tenant-scoped `teamAliases` map. Team names must be unique. Existing employee team names remain visible after removal from the catalog; new assignments must use configured names.
 
 Roles appear in a table with assigned-employee counts and Edit and Assignments buttons. Edit opens a drawer for the role name and module permissions. Assignments opens a drawer listing employees, with an employee dropdown to add assignments and a Remove action. Employees can also select multiple roles on their People & Access profile; teams are assigned on the profile.
 

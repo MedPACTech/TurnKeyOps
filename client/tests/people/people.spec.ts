@@ -1,5 +1,33 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+test('Carl Zipf team save persists Residential and reports duplicate names',async({page,context,request})=>{
+ await request.get('http://127.0.0.1:5190/reset');
+ const claims={sub:'11111111-1111-1111-1111-111111111111',role:['owner'],tid:'88888888-8888-4888-8888-888888888883',exp:Math.floor(Date.now()/1000)+3600};
+ const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.ui-fixture`;
+ await context.addCookies([{name:'tko_auth_token',value:token,url:process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191'}]);
+ await page.goto('/carlzipf/admin/settings/people');
+ await page.waitForLoadState('networkidle');
+ await page.getByRole('button',{name:'Add team',exact:true}).click();
+ await page.getByLabel('Team name',{exact:true}).fill('Residential');
+ await page.getByRole('button',{name:'Save team',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('status')).toHaveText('Team saved.');
+ await page.reload();
+ await page.waitForLoadState('networkidle');
+ const teams=page.getByRole('table',{name:'Configured teams and assignments'});
+ await expect(teams.getByRole('rowheader',{name:'Residential',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Add team',exact:true}).click();
+ await page.getByLabel('Team name',{exact:true}).fill('residential');
+ await page.getByRole('button',{name:'Save team',exact:true}).click();
+ await expect(page.getByRole('dialog')).toBeVisible();
+ await expect(page.getByRole('alert')).toHaveText('A team with this name already exists.');
+ await page.getByLabel('Team name',{exact:true}).fill('Commercial');
+ await page.getByRole('button',{name:'Save team',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await page.reload();
+ await expect(teams.getByRole('rowheader',{name:'Residential',exact:true})).toBeVisible();
+ await expect(teams.getByRole('rowheader',{name:'Commercial',exact:true})).toBeVisible();
+});
 test('multiple roles can be assigned from role drawers and employee profiles',async({page,context,request})=>{
  await request.get('http://127.0.0.1:5190/reset');
  const claims={sub:'11111111-1111-1111-1111-111111111111',role:['owner'],tid:'7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b',exp:Math.floor(Date.now()/1000)+3600};
@@ -62,11 +90,11 @@ test('role editor persists permissions and teams remain assigned on employee pro
  await page.screenshot({path:test.info().outputPath('role-editor.png'),fullPage:true});
  await page.getByRole('button',{name:'Save role',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
  await page.reload();await page.waitForLoadState('networkidle');await page.getByRole('button',{name:'Edit Technician',exact:true}).click();await expect(page.getByLabel('Technician — Calendar',{exact:true})).toHaveValue('read');
- await page.keyboard.press('Escape');await page.getByLabel('New team',{exact:true}).fill('Field service');await page.getByRole('button',{name:'Add team',exact:true}).click();await page.getByRole('button',{name:'Save teams',exact:true}).click();await expect(page.getByRole('status')).toContainText('Roles and teams saved');
+ await page.keyboard.press('Escape');await page.getByRole('button',{name:'Add team',exact:true}).click();await page.getByLabel('Team name',{exact:true}).fill('Field service');await page.getByRole('button',{name:'Save team',exact:true}).click();await expect(page.getByRole('status')).toContainText('Team saved');
  await page.screenshot({path:test.info().outputPath('roles-table.png'),fullPage:true});
  await page.goto('/bdr/admin/users');await page.waitForLoadState('networkidle');await page.getByRole('button',{name:'Add employee',exact:true}).click();
- await page.getByLabel('First name',{exact:true}).fill('Team');await page.getByLabel('Last name',{exact:true}).fill('Technician');await page.getByLabel('Login email or phone').fill('team@example.invalid');await page.getByRole('combobox',{name:'Team',exact:true}).selectOption('Field service');await page.getByRole('checkbox',{name:'Technician',exact:true}).check();
- await page.getByRole('button',{name:'Save employee',exact:true}).click();await expect(page.getByRole('status')).toContainText('User saved');await page.reload();await page.waitForLoadState('networkidle');await page.getByRole('button',{name:'Team Technician',exact:true}).click();await expect(page.getByRole('combobox',{name:'Team',exact:true})).toHaveValue('Field service');await expect(page.getByRole('checkbox',{name:'Technician',exact:true})).toBeChecked();
+ await page.getByLabel('First name',{exact:true}).fill('Team');await page.getByLabel('Last name',{exact:true}).fill('Technician');await page.getByLabel('Login email or phone').fill('team@example.invalid');await page.getByRole('checkbox',{name:'Field service',exact:true}).check();await page.getByRole('checkbox',{name:'Technician',exact:true}).check();
+ await page.getByRole('button',{name:'Save employee',exact:true}).click();await expect(page.getByRole('status')).toContainText('User saved');await page.reload();await page.waitForLoadState('networkidle');await page.getByRole('button',{name:'Team Technician',exact:true}).click();await expect(page.getByRole('checkbox',{name:'Field service',exact:true})).toBeChecked();await expect(page.getByRole('checkbox',{name:'Technician',exact:true})).toBeChecked();
 });
 
 test('technician can open Ask Bob and Today while restricted routes stay forbidden',async({page,context,request})=>{
@@ -81,4 +109,26 @@ test('technician can open Ask Bob and Today while restricted routes stay forbidd
  expect((await page.goto('/bdr/admin/intelligence'))?.status()).toBe(200);
  expect((await page.goto('/bdr/admin/calendar'))?.status()).toBe(200);
  for(const slug of ['purchasing','leads','invoices','finance','payroll','users','settings'])expect((await page.goto(`/bdr/admin/${slug}`))?.status()).toBe(403);
+});
+
+for (const mobile of [false,true]) test(`team drawers persist multiple memberships and renames (${mobile?'mobile':'desktop'})`,async({page,context,request})=>{
+ await request.get('http://127.0.0.1:5190/reset');
+ if(mobile)await page.setViewportSize({width:390,height:844});
+ const claims={sub:'11111111-1111-1111-1111-111111111111',role:['owner'],tid:'7d40ea6c-313f-4f53-bf7d-5d1ecb9cc50b',exp:Math.floor(Date.now()/1000)+3600};
+ const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.ui-fixture`;
+ await context.addCookies([{name:'tko_auth_token',value:token,url:process.env.PEOPLE_UI_BASE_URL ?? 'http://127.0.0.1:5191'}]);
+ await page.goto('/bdr/admin/settings/people');await page.waitForLoadState('networkidle');
+ for(const name of ['Field service','Office']){await page.getByRole('button',{name:'Add team',exact:true}).click();await page.getByLabel('Team name',{exact:true}).fill(name);await page.getByRole('button',{name:'Save team',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);}
+ await page.getByRole('button',{name:'Assignments for team Field service',exact:true}).click();await page.getByRole('combobox',{name:'Employee',exact:true}).selectOption({label:'Existing Owner'});await page.getByRole('button',{name:'Add assignment',exact:true}).click();await expect(page.getByRole('heading',{name:'Assigned employees (1)',exact:true})).toBeVisible();
+ expect((await new AxeBuilder({page}).analyze()).violations.filter(v=>['critical','serious'].includes(v.impact??''))).toEqual([]);
+ await page.screenshot({path:test.info().outputPath('team-assignments.png'),fullPage:true});
+ await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Assignments for team Field service',exact:true})).toBeFocused();
+ await expect(page.getByRole('table',{name:'Configured teams and assignments'}).getByRole('row').filter({hasText:'Field service'}).getByRole('cell').first()).toHaveText('1');
+ await page.getByRole('button',{name:'Edit team Field service',exact:true}).click();await expect(page.getByText('Existing Owner',{exact:true})).toBeVisible();await expect(page.getByRole('combobox',{name:'Employee',exact:true})).toBeVisible();await page.getByLabel('Team name',{exact:true}).fill('Field operations');await page.getByRole('button',{name:'Save team',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
+ await page.reload();await page.waitForLoadState('networkidle');await page.getByRole('button',{name:'Assignments for team Field operations',exact:true}).click();await expect(page.getByText('Existing Owner',{exact:true})).toBeVisible();await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'Edit Technician',exact:true}).click();await page.getByRole('button',{name:'Save role',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
+ await page.goto('/bdr/admin/users');await page.waitForLoadState('networkidle');await page.getByRole('button',{name:'Existing Owner',exact:true}).click();await expect(page.getByRole('checkbox',{name:'Field operations',exact:true})).toBeChecked();await page.getByRole('checkbox',{name:'Office',exact:true}).check();await page.getByRole('button',{name:'Save employee',exact:true}).click();await expect(page.getByRole('status')).toContainText('User saved');
+ await page.goto('/bdr/admin/settings/people');await page.waitForLoadState('networkidle');
+ await page.getByRole('button',{name:'Assignments for team Office',exact:true}).click();await expect(page.getByText('Existing Owner',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Remove Existing Owner from Office',exact:true}).click();await expect(page.getByText('No employees assigned.',{exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');await page.getByRole('button',{name:'Assignments for team Field operations',exact:true}).click();await expect(page.getByText('Existing Owner',{exact:true})).toBeVisible();
 });

@@ -165,6 +165,29 @@ public sealed class ManagedPeopleServiceTests
         var saved = await f.Service.SaveAsync(f.Target, new() { FirstName = "Owner", ExpectedVersion = "v1", EmployeeRoleIds = [] }, default);
         Assert.Empty(f.Profile.EmployeeRoleIds!); Assert.Null(f.Profile.ModulePermissions); Assert.Contains("users.write", saved.EffectivePermissions);
     }
+    [Fact] public async Task TeamMembershipsPreserveLegacyAssignmentsAndRemoveOnlySelectedTeam() {
+        var f = new Fixture(); f.Existing(); f.Profile.Team = "Residential";
+        f.Profile.Teams = ["Residential", "Commercial"];
+        var saved = await f.Service.SaveAsync(f.Target, new() { FirstName = "Test", ExpectedVersion = "v1", Teams = ["Commercial"] }, default);
+        Assert.Equal(["Commercial"], saved.Teams!);
+        Assert.Equal("Commercial", f.Profile.Team);
+        saved = await f.Service.SaveAsync(f.Target, new() { FirstName = "Test", ExpectedVersion = "v1", Teams = [] }, default);
+        Assert.Empty(saved.Teams!); Assert.Null(f.Profile.Team);
+    }
+    [Fact] public async Task LegacyTeamIsReturnedAndPreservedWhenTeamsAreOmitted() {
+        var f = new Fixture(); f.Existing(); f.Profile.Team = "Residential";
+        var saved = await f.Service.SaveAsync(f.Target, new() { FirstName = "Test", ExpectedVersion = "v1" }, default);
+        Assert.Equal(["Residential"], saved.Teams!);
+    }
+    [Fact] public async Task MultipleTeamsResolveRenamesAndRejectUnconfiguredMemberships() {
+        var config = MedInsights.Lib.Authorization.EmployeeAccessConfiguration.Default();
+        config.Teams = ["Residential", "Commercial"];
+        config.TeamAliases["Field"] = "Residential";
+        var f = new Fixture(config); f.Existing(); f.Profile.Team = "Field";
+        var saved = await f.Service.SaveAsync(f.Target, new() { FirstName = "Test", ExpectedVersion = "v1", Teams = ["Field", "Commercial", "Residential"] }, default);
+        Assert.Equal(["Residential", "Commercial"], saved.Teams!);
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Service.SaveAsync(f.Target, new() { FirstName = "Test", ExpectedVersion = "v1", Teams = ["Unknown"] }, default));
+    }
     private sealed class Fixture {
         public Guid Actor=Guid.NewGuid(),Target=Guid.NewGuid(),Tenant=Guid.NewGuid();
         public Mock<IManagedProfileStore> Profiles=new();
@@ -177,10 +200,12 @@ public sealed class ManagedPeopleServiceTests
         public Mock<IUserContext> Context=new();
         public Mock<IAzureTablesRepositoryStore<UserProfile>> AccessProfiles=new();
         public UserModuleAccessService Access;
-        public Fixture() {
+        public Fixture(MedInsights.Lib.Authorization.EmployeeAccessConfiguration? configuration = null) {
             var context=Context;context.SetupGet(x=>x.IsAuthenticated).Returns(true);context.SetupGet(x=>x.UserId).Returns(Actor);context.SetupGet(x=>x.TenantId).Returns(Tenant);
             Members.Setup(m=>m.GetByUserIdAsync(EntityKeyPolicy.TenantPartition(Tenant),Actor,It.IsAny<CancellationToken>())).ReturnsAsync(new TenantMembership {Role="owner",IsOwner=true,MembershipStatus="Active"});
-            var access=Access=new UserModuleAccessService(Members.Object,AccessProfiles.Object,context.Object);
+            var settings = new Mock<TurnKeyOps.Repositories.Interfaces.ITenantSettingsRepository>();
+            if (configuration is not null) settings.Setup(x => x.GetAsync(It.IsAny<string>(), "SETTINGS|EMPLOYEE-ACCESS", It.IsAny<CancellationToken>(), false)).ReturnsAsync(new TurnKeyOps.Lib.Entities.TenantSettingsDocument { ValuesJson = System.Text.Json.JsonSerializer.Serialize(configuration) });
+            var access=Access=new UserModuleAccessService(Members.Object,AccessProfiles.Object,context.Object, settings.Object);
             Profile=new() {Id=Target,ApplicationUserId=Target,PartitionKey=EntityKeyPolicy.TenantPartition(Tenant),RowKey=EntityKeyPolicy.Row(Target),IsActive=true,PrimaryEmail="login@example.com",ETag=new("v1")};
             Service=new(Profiles.Object,new Mock<IAzureTablesRepositoryStore<TurnKeyOps.Lib.Entities.Customer>>().Object,Members.Object,Identities.Object,context.Object,access,MembershipService.Object,new Mock<IAuditService>().Object,new Mock<IInviteService>().Object,new Mock<ITenantRoleStore>().Object);
         }
